@@ -1017,11 +1017,12 @@ export class Capture {
       match: match?.kind ?? 'none',
       authorIsMe: det.authorIsMe,
     };
-    // Samples, preferences, and notes for this kind of app and this person (Profile > How you write).
+    // Samples, preferences, and notes for this person, their relationship, and this kind of platform (Profile > How you write).
     const channel = replyChannel(s.selection.source_app, s.selection.window_title);
+    const audience = { channel, personId: state.personId, relationship: person?.relationship ?? null };
     const learning = this.settings.replyLearning;
     const preferences = learning
-      ? preferencesFor(people.styleSignals(), { channel, personId: state.personId }).map((p) => preferenceLine(p, p.scope === 'person' ? person?.name : null))
+      ? preferencesFor(people.styleSignals(), audience).map((p) => preferenceLine(p, p.scope === 'person' ? person?.name : null))
       : [];
     const input = {
       selection: s.selection,
@@ -1029,7 +1030,7 @@ export class Capture {
       author: det.author,
       authorIsMe: det.authorIsMe,
       person,
-      voice: people.voiceForPrompt(5, { channel, personId: state.personId }),
+      voice: people.voiceForPrompt(5, audience),
       preferences,
       notes: learning ? people.styleNotes().map((n) => n.text) : [],
     };

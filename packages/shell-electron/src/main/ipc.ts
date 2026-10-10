@@ -4,6 +4,7 @@ import {
   STYLE_DIMENSIONS,
   aliasKindOf,
   allPreferences,
+  asRelationship,
   cleanText,
   preferenceLabel,
   preferenceScope,
@@ -218,7 +219,7 @@ export function registerIpc(deps: IpcDeps): void {
       ...(optStr(a.email, 200) ? [{ kind: 'email' as const, value: str(a.email, 200) }] : []),
       ...(optStr(a.handle, 100) ? [{ kind: 'handle' as const, value: str(a.handle, 100) }] : []),
     ];
-    const p = people.create({ name: str(a.name, 200), note: optStr(a.note, 2000) ?? null, aliases });
+    const p = people.create({ name: str(a.name, 200), note: optStr(a.note, 2000) ?? null, relationship: asRelationship(a.relationship), aliases });
     log.info('person created', { aliases: aliases.length });
     return changed(p.id);
   });
@@ -239,7 +240,11 @@ export function registerIpc(deps: IpcDeps): void {
   });
   handle('people:update', (a) => {
     const id = str(a.personId, 100);
-    people.update(id, { ...(a.name !== undefined && { name: str(a.name, 200) }), ...(a.note !== undefined && { note: a.note === null ? null : str(a.note, 2000) }) });
+    people.update(id, {
+      ...(a.name !== undefined && { name: str(a.name, 200) }),
+      ...(a.note !== undefined && { note: a.note === null ? null : str(a.note, 2000) }),
+      ...(a.relationship !== undefined && { relationship: asRelationship(a.relationship) }),
+    });
     return changed(id);
   });
   handle('people:alias-add', (a) => {
@@ -298,7 +303,7 @@ export function registerIpc(deps: IpcDeps): void {
     const dimension = str(a.dimension, 20) as StyleDimension;
     if (!(STYLE_DIMENSIONS as readonly string[]).includes(dimension)) throw new Error('Invalid argument');
     const channel = a.channel === null ? null : (str(a.channel, 10) as ReplyChannel);
-    people.forgetStyle(dimension, { channel, personId: a.personId === null ? null : str(a.personId, 100) });
+    people.forgetStyle(dimension, { channel, personId: a.personId === null ? null : str(a.personId, 100), relationship: asRelationship(a.relationship) });
     return styleView();
   });
   handle('style:note-remove', (a) => {

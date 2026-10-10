@@ -19,6 +19,7 @@ import type { RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
 import type { PickDraft, ReplyChannel, StyleDimension, StylePreference } from './people/reply-style';
+import type { Relationship } from './people/relationship';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
 export type { MetricsSummary } from './metrics';
@@ -26,6 +27,7 @@ export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
 export type { PickDraft, ReplyChannel, StyleDimension, StylePreference } from './people/reply-style';
+export type { Relationship } from './people/relationship';
 export type { RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
@@ -397,10 +399,10 @@ export interface InvokeChannels {
   'people:list': { args: { query?: string }; result: PersonSummary[] };
   /** The full record: more interactions and saved items than the overlay card. */
   'people:card': { args: { personId: string }; result: PersonCard | null };
-  'people:create': { args: { name: string; email?: string; handle?: string; note?: string }; result: PersonCard };
+  'people:create': { args: { name: string; email?: string; handle?: string; note?: string; relationship?: Relationship | null }; result: PersonCard };
   /** "Is this the same Sam?" answered yes: the detected name, email, and handle become aliases. */
   'people:confirm-same': { args: { personId: string; name?: string; email?: string; handle?: string }; result: PersonCard };
-  'people:update': { args: { personId: string; name?: string; note?: string | null }; result: PersonCard };
+  'people:update': { args: { personId: string; name?: string; note?: string | null; relationship?: Relationship | null }; result: PersonCard };
   /** The kind is guessed from the value unless given ("a@b.c" email, "@x" handle, else name). */
   'people:alias-add': { args: { personId: string; value: string; kind?: AliasKind }; result: PersonCard };
   'people:alias-remove': { args: { personId: string; kind: AliasKind; value: string }; result: PersonCard };
@@ -415,7 +417,7 @@ export interface InvokeChannels {
   /** What Reply learned from picks and edits, and the style notes. */
   'style:get': { args: void; result: StyleView };
   /** Forgets one learned preference (it can be learned again). */
-  'style:forget': { args: { dimension: StyleDimension; channel: ReplyChannel | null; personId: string | null }; result: StyleView };
+  'style:forget': { args: { dimension: StyleDimension; channel: ReplyChannel | null; personId: string | null; relationship?: Relationship | null }; result: StyleView };
   /** Removes a style note; it is not written again. */
   'style:note-remove': { args: { id: string }; result: StyleView };
   'commitments:set-status': { args: { id: string; status: CommitmentStatus }; result: void };

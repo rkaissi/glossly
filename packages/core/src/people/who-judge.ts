@@ -4,6 +4,7 @@ import { chatSpeaker } from '../router/features';
 import type { Identity } from '../settings';
 import type { DetectedPerson, DetectInput } from './detect';
 import { findEmails, isRoleAddress } from './emails';
+import { asRelationship } from './relationship';
 import { canonicalize, isMe, normalizeEmail, normalizeHandle } from './names';
 
 export const WHO_MIN_CONFIDENCE = 0.7;
@@ -15,6 +16,8 @@ export interface WhoCandidate {
   handle: string;
   role: string;
   relation: string;
+  /** One of RELATIONSHIPS, or anything else for unknown. Optional: the local pass never guesses. */
+  relationship?: string;
   confidence: number;
   evidence: string;
 }
@@ -79,6 +82,7 @@ function mergeInto(keep: WhoCandidate, drop: WhoCandidate, preferName: string): 
   if (!keep.handle && drop.handle) keep.handle = drop.handle;
   if (!keep.role && drop.role) keep.role = drop.role;
   if (!keep.relation && drop.relation) keep.relation = drop.relation;
+  if (!asRelationship(keep.relationship) && asRelationship(drop.relationship)) keep.relationship = drop.relationship;
   keep.confidence = Math.max(keep.confidence, drop.confidence);
 }
 
@@ -214,6 +218,7 @@ function toDetected(r: WhoCandidate): DetectedPerson | null {
     knownId: null,
     detail: r.role.trim() || null,
     relation: r.relation.trim() || null,
+    relationship: asRelationship(r.relationship),
   };
 }
 
@@ -284,6 +289,6 @@ export function localWho(input: DetectInput, me: Identity): DetectedPerson[] {
     if (speaker) addLocal(found, { name: speaker, email: '', handle: '', evidence: speaker, ...blank }, me);
   }
   for (const name of loneSpeakers(corpus)) addLocal(found, { name, email: '', handle: '', evidence: name, ...blank }, me);
-  const people = acceptWhoRows([...found.values()], corpus, me).map((p) => ({ ...p, detail: null, relation: null }));
+  const people = acceptWhoRows([...found.values()], corpus, me).map((p) => ({ ...p, detail: null, relation: null, relationship: null }));
   return people.slice(0, WHO_MAX_PEOPLE);
 }

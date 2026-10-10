@@ -30,6 +30,7 @@ export * from './people/detect';
 export * from './people/resolve';
 export * from './people/dates';
 export * from './people/reply-style';
+export * from './people/relationship';
 export * from './store/people';
 
 export * from './llm/types';

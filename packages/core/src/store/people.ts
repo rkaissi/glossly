@@ -1,5 +1,6 @@
 import { uuidv7 } from 'uuidv7';
 import { canonicalize, normalizeEmail, normalizeHandle } from '../people/names';
+import type { Relationship } from '../people/relationship';
 import type { ReplyChannel, StyleDimension, StyleSignal, StyleSignalRow } from '../people/reply-style';
 import type {
   AliasKind,
@@ -59,6 +60,7 @@ export class AliasTakenError extends Error {
 export interface NewPerson {
   name: string;
   note?: string | null;
+  relationship?: Relationship | null;
   aliases?: PersonAlias[];
 }
 
@@ -93,8 +95,8 @@ export class PeopleRepo {
     const at = this.now();
     this.store.tx(() => {
       this.db
-        .prepare('INSERT INTO people (id, entity_id, name, note, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?)')
-        .run(id, name, p.note?.trim() ? clip(p.note.trim(), MAX_NOTE) : null, at, at);
+        .prepare('INSERT INTO people (id, entity_id, name, note, relationship, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?)')
+        .run(id, name, p.note?.trim() ? clip(p.note.trim(), MAX_NOTE) : null, p.relationship ?? null, at, at);
       for (const a of p.aliases ?? []) this.insertAlias(id, a.kind, a.value, true);
       this.linkEntity(id);
     });
@@ -102,7 +104,7 @@ export class PeopleRepo {
   }
 
   get(id: string): Person | null {
-    const row = this.db.prepare('SELECT id, entity_id, name, note, created_at, updated_at FROM people WHERE id = ?').get(id) as
+    const row = this.db.prepare('SELECT id, entity_id, name, note, relationship, created_at, updated_at FROM people WHERE id = ?').get(id) as
       | Omit<Person, 'aliases'>
       | undefined;
     if (!row) return null;
@@ -134,14 +136,15 @@ export class PeopleRepo {
     return out;
   }
 
-  update(id: string, patch: { name?: string; note?: string | null }): Person {
+  update(id: string, patch: { name?: string; note?: string | null; relationship?: Relationship | null }): Person {
     const p = this.get(id);
     if (!p) throw new Error('That person no longer exists.');
     const name = patch.name !== undefined ? clip(oneLine(patch.name), MAX_NAME) : p.name;
     if (!name) throw new Error('A person needs a name.');
     const note = patch.note !== undefined ? (patch.note?.trim() ? clip(patch.note.trim(), MAX_NOTE) : null) : p.note;
+    const relationship = patch.relationship !== undefined ? patch.relationship : p.relationship;
     this.store.tx(() => {
-      this.db.prepare('UPDATE people SET name = ?, note = ?, updated_at = ? WHERE id = ?').run(name, note, this.now(), id);
+      this.db.prepare('UPDATE people SET name = ?, note = ?, relationship = ?, updated_at = ? WHERE id = ?').run(name, note, relationship, this.now(), id);
       // The old name stays findable.
       if (canonicalize(name) !== canonicalize(p.name)) this.insertAlias(id, 'name', p.name, true);
       this.linkEntity(id);
@@ -433,6 +436,7 @@ export class PeopleRepo {
       id: p.id,
       name: p.name,
       note: p.note,
+      relationship: p.relationship,
       aliases: p.aliases,
       youOwe: open.filter((c) => c.owner === 'me'),
       theyOwe: open.filter((c) => c.owner === 'them'),
@@ -482,14 +486,20 @@ export class PeopleRepo {
   }
 
   /**
-   * Up to `n` samples for a Reply prompt: pasted ones first, then edited replies to the same
-   * person in the same kind of app, then to the same person, then in the same kind of app, then
-   * the rest. Newest first within each.
+   * Up to `n` samples for a Reply prompt: pasted ones first, then edited replies ranked by the
+   * same person, then the same relationship (friends, colleagues), then the same kind of
+   * platform. Newest first among equals.
    */
-  voiceForPrompt(n = 5, to: { channel?: ReplyChannel; personId?: string | null } = {}): string[] {
+  voiceForPrompt(n = 5, to: { channel?: ReplyChannel; personId?: string | null; relationship?: Relationship | null } = {}): string[] {
     const all = this.voiceSamples();
     const pasted = all.filter((v) => v.origin === 'pasted');
-    const rank = (v: VoiceSample) => (to.personId && v.person_id === to.personId ? 2 : 0) + (to.channel && v.channel === to.channel ? 1 : 0);
+    const relOf = new Map(
+      (this.db.prepare('SELECT id, relationship FROM people').all() as { id: string; relationship: Relationship | null }[]).map((r) => [r.id, r.relationship]),
+    );
+    const rank = (v: VoiceSample) =>
+      (to.personId && v.person_id === to.personId ? 4 : 0) +
+      (to.relationship && v.person_id && relOf.get(v.person_id) === to.relationship ? 2 : 0) +
+      (to.channel && v.channel === to.channel ? 1 : 0);
     const edited = all
       .filter((v) => v.origin === 'inserted_edited')
       .map((v, i) => ({ v, i }))
@@ -519,13 +529,23 @@ export class PeopleRepo {
   }
 
   styleSignals(): StyleSignalRow[] {
-    return this.db.prepare('SELECT dimension, pole, weight, channel, person_id, at FROM style_signals ORDER BY at, id').all() as unknown as StyleSignalRow[];
+    // The relationship is the person's current one, so changing it moves what was learned with them.
+    return this.db
+      .prepare(
+        `SELECT s.dimension, s.pole, s.weight, s.channel, s.person_id, p.relationship, s.at
+         FROM style_signals s LEFT JOIN people p ON p.id = s.person_id ORDER BY s.at, s.id`,
+      )
+      .all() as unknown as StyleSignalRow[];
   }
 
   /** "Forget this": drops what was learned for one trait in one place, so it starts over. */
-  forgetStyle(dimension: StyleDimension, where: { channel: ReplyChannel | null; personId: string | null }): void {
+  forgetStyle(dimension: StyleDimension, where: { channel: ReplyChannel | null; personId: string | null; relationship?: Relationship | null }): void {
     if (where.personId) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND person_id = ?').run(dimension, where.personId);
-    else if (where.channel) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ?').run(dimension, where.channel);
+    else if (where.channel && where.relationship) {
+      this.db
+        .prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ? AND person_id IN (SELECT id FROM people WHERE relationship = ?)')
+        .run(dimension, where.channel, where.relationship);
+    } else if (where.channel) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ?').run(dimension, where.channel);
   }
 
   styleNotes(): StyleNote[] {

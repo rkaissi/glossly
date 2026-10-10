@@ -24,6 +24,7 @@ const selection: SelectionPayload = {
 const maya: PersonCard = {
   id: 'p1',
   name: 'Maya Lin',
+  relationship: 'colleague',
   note: 'PM on the Acme account',
   aliases: [],
   youOwe: [{ id: 'c1', owner: 'me', text: 'send the onboarding deck', due_at: '2026-10-16', status: 'open', person_id: 'p1', person_name: 'Maya Lin' }],
@@ -40,6 +41,7 @@ describe('Reply', () => {
     const p = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: maya, voice: ['sounds good!! will do', 'yep on it'] }, now);
     expect(p).toContain('## The user\nRayan Kaissi (also: @rayank)');
     expect(p).toContain('## Replying to\nMaya Lin');
+    expect(p).toContain('Relationship to the user: colleague');
     expect(p).toContain('How the user knows them: PM on the Acme account');
     expect(p).toContain('The user owes them:\n- send the onboarding deck (due Fri, Oct 16)');
     expect(p).toContain('They owe the user:\n- share the budget sheet');

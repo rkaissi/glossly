@@ -122,6 +122,13 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX style_signals_at ON style_signals(at);
   CREATE TABLE style_notes (id TEXT PRIMARY KEY, text TEXT NOT NULL, created_at TEXT NOT NULL);
   `,
+  /* 4: How the user knows each person (friend, colleague, ...; null is unknown), so Reply can
+     learn per relationship. Platforms became kinds: the old "chat" can't be split into work
+     chat and messaging after the fact, so it counts as messaging. */ `
+  ALTER TABLE people ADD COLUMN relationship TEXT;
+  UPDATE style_signals SET channel = 'messaging' WHERE channel = 'chat';
+  UPDATE voice_samples SET channel = 'messaging' WHERE channel = 'chat';
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */

@@ -5,6 +5,7 @@ import { chatSpeaker, extractFeatures } from '../router/features';
 import type { KnownPerson } from '../router/types';
 import type { Identity } from '../settings';
 import { isRoleAddress } from './emails';
+import type { Relationship } from './relationship';
 import { canonicalize, isMe, normalizeEmail, normalizeHandle } from './names';
 
 export interface DetectedPerson {
@@ -18,6 +19,8 @@ export interface DetectedPerson {
   detail?: string | null;
   /** Model-written relation. Blank on the local pass. */
   relation?: string | null;
+  /** The model's guess at how the user knows them, to prefill Create person. Null on the local pass. */
+  relationship?: Relationship | null;
 }
 
 export interface Detection {

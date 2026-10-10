@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Info, UserRoundPlus } from 'lucide-react';
 import type { DetectedPerson, OverlayState, PersonCard, WhoEntry, WhoView } from '@glossly/core/api';
+import type { Relationship } from '@glossly/core/api';
+import { RELATIONSHIP_OPTIONS } from '../people/relationship';
 import { glossly } from '../bridge';
 import { firstName } from '../dates';
 import { PersonCardView } from '../people/PersonCard';
@@ -83,6 +85,8 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
   const [email, setEmail] = useState(detected?.email ?? '');
   const [handle, setHandle] = useState(detected?.handle ?? '');
   const [note, setNote] = useState(noteFrom(detected));
+  // The model's guess, editable; empty is unknown.
+  const [relationship, setRelationship] = useState<Relationship | ''>(detected?.relationship ?? '');
   const { busy, error, run } = useAction();
   const create = () =>
     void run(async () => {
@@ -93,6 +97,7 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
           ...(email.trim() && { email: email.trim() }),
           ...(handle.trim() && { handle: handle.trim().replace(/^@+/, '') }),
           ...(note.trim() && { note: note.trim() }),
+          relationship: relationship || null,
         }),
       );
     });
@@ -110,6 +115,14 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
         <input value={email} placeholder="Email (optional)" aria-label="Email" spellCheck={false} onChange={(e) => setEmail(e.target.value)} />
         <input value={handle} placeholder="Handle (optional)" aria-label="Handle" spellCheck={false} onChange={(e) => setHandle(e.target.value)} />
         <input className="wide" value={note} placeholder="How do you know them? (optional)" aria-label="Note" onChange={(e) => setNote(e.target.value)} />
+        <select value={relationship} aria-label="Relationship" onChange={(e) => setRelationship(e.target.value as Relationship | '')}>
+          <option value="">Relationship: unknown</option>
+          {RELATIONSHIP_OPTIONS.map(([value, text]) => (
+            <option key={value} value={value}>
+              {text}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="row-tight">
         <button className="primary" disabled={busy || !name.trim()} onClick={create}>

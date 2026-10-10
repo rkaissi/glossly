@@ -528,6 +528,16 @@ Not a new step. 406 unit tests pass; `pnpm typecheck` is clean; the app bundles.
 
 Not a new step. Rayan selected a Discord message that was a contact card (Full Name, Role, Email, Phone, Why) and the bar offered only Ask and Save. The model router answered `contact_info` but scored `mentions_people` low, because the prompt tells it not to count a message's sender, and a person describing themselves reads as that. Now `scoreActions` (`router/slots.ts`, tested) gives Who at least 0.9 for `contact_info` and at least 0.7 when a name sits in the selection with a phone or a personal (not shared-inbox) address, whatever the model said, and the prompt says a contact card counts (0.8 or higher). Not run live; the router prompt change waits for the Step 18 eval like the other prompt edits.
 
+### Step 16.8: Reply learns per relationship and kind of platform (Oct 10, night; partly done)
+
+409 unit tests pass; `pnpm typecheck` is clean. Not run live.
+
+- **Platforms are kinds now** (`replyChannel`): email (Outlook desktop and web, Hotmail and Live through the Outlook tab, Gmail, Yahoo, Proton, Fastmail, iCloud, AOL, Zoho, Thunderbird), work chat (Slack, Teams, Google Chat, Mattermost, Zoom), messaging (Discord, WhatsApp, Messenger, Telegram, Signal desktop, Instagram, Snapchat), other.
+- **People have a relationship** (`people/relationship.ts`: friend, family, colleague, professional, acquaintance, stranger, other; null is unknown). **Migration 4** adds `people.relationship` and turns stored "chat" into "messaging" (it can't be split after the fact).
+- **Learning levels** (`preferencesFor`): the person (3 signals), else their relationship on this kind of platform (5, pooled across everyone with that relationship), else the kind of platform (5). Signals keep only the person id; the relationship is joined in at read time, so changing someone's relationship moves what was learned with them. Voice samples rank person, then relationship, then platform. Reply's prompt tells the model the relationship. Profile lists "with friends in messaging apps" and Forget works per level.
+- **Inference**: Who's model call now returns a relationship guess (`prompts/who.md`, checked against the list); Create person prefills a select with it (editable, "unknown" allowed).
+- **Left to do**: editing the relationship on an existing person (the overlay card and Settings > People record; `people:update` already accepts `relationship`); people created from What did I promise or Reply's "Add to people" start as unknown (no inference there yet).
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -631,6 +641,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
     - **Ask remembers when asked.** If the question is "remember this" (or the same intent), a tool on the Ask stream saves a note into a collection and says what it saved. Don't add a second model call for it. Recall hits go into the Ask prompt as the spec's saved notes.
     - **New actions share the slot rule.** Todo, calendar, paste, and anything added later get a relevance score. The bar shows the top two above `slotThreshold`. The rest stay in More. Don't add a third visible slot.
     - Visualize stays as in the spec (deterministic table parse, LLM fallback, validated Vega-Lite).
+16.8. **Relationship and platform kinds for Reply** (mostly done, see Step 16.8; editing a saved person's relationship is left).
 16.7. ~~**Reply learns from picks and edits**~~ (done Oct 10, see Step 16.7 above; Rayan asked for it before Step 17).
 17. **Phase 4, Windows parts:** eval runners for every eval in the spec's table (commitments, date resolver, recall, visualize, router, and a people-extraction eval built from the Step 15.5 fixtures), optional decision providers behind settings (Jev, OpenAI Decisions; check their current docs), metrics view (done; extend it for the Phase 2 and 3 metrics), and Export and Delete all verified live. Skip the Swift helper and macOS onboarding.
 18. **One eval run.** Once everything above is done and looks good, run `pnpm eval` once (Rayan approved one run; Groq free-tier limits). Record every number in `STATUS.md`, including the tuned router prompt's slot match (Step 5). If the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection`, and compute people and commitment scores from rules. The Who model call is separate and is not dropped because of that.

@@ -191,10 +191,10 @@ function LearnedStyle({ learning }: { learning: boolean }) {
   useEffect(() => {
     void glossly.invoke('style:get').then(setView);
   }, [learning]);
-  const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.personId ?? p.channel}`;
+  const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.personId ?? `${p.relationship ?? ''}:${p.channel}`}`;
   const forget = (p: StylePreferenceView) =>
     void run(async () => {
-      setView(await glossly.invoke('style:forget', { dimension: p.dimension, channel: p.channel, personId: p.personId }));
+      setView(await glossly.invoke('style:forget', { dimension: p.dimension, channel: p.channel, personId: p.personId, relationship: p.relationship }));
       setPending(null);
     });
   const removeNote = (id: string) =>
@@ -231,8 +231,8 @@ function LearnedStyle({ learning }: { learning: boolean }) {
         <span>
           <strong>Learn from the drafts I pick and edit</strong>
           <span className="muted small block">
-            Reply notes which draft you take (its length, greeting, sign-off, tone, and what it does) and how you edit it, separately for email,
-            chat, and each person. A habit shows up here once your recent picks agree on it. Every 5 edited replies, your model writes a few
+            Reply notes which draft you take (its length, greeting, sign-off, tone, and what it does) and how you edit it, per person, per
+            relationship (friends, colleagues, ...) on each kind of platform, and per kind of platform (email, messaging apps, work chat). A habit shows up here once your recent picks agree on it. Every 5 edited replies, your model writes a few
             notes on how you edit. All of it stays on this computer and goes to your model provider only inside a Reply request.
           </span>
         </span>

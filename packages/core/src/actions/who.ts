@@ -41,6 +41,7 @@ export const WhoPeopleSchema = z.object({
       handle: z.string(),
       role: z.string(),
       relation: z.string(),
+      relationship: z.string(),
       // Not bounded here: one row scored 85 would fail the whole call. acceptWhoRows reads it.
       confidence: z.number(),
       evidence: z.string(),

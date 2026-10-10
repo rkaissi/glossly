@@ -1,6 +1,7 @@
 // People layer records (spec: People layer, Data model) and the views the UI renders.
 // Types only, so the UI can import them through `@glossly/core/api`.
 
+import type { Relationship } from './relationship';
 import type { ReplyChannel } from './reply-style';
 
 export type AliasKind = 'email' | 'handle' | 'name';
@@ -16,6 +17,8 @@ export interface Person {
   name: string;
   /** How you know them (user-written). */
   note: string | null;
+  /** Friend, colleague, ...; null when unknown. Reply learns per relationship. */
+  relationship: Relationship | null;
   created_at: string;
   updated_at: string;
   aliases: PersonAlias[];
@@ -107,6 +110,7 @@ export interface PersonCard {
   id: string;
   name: string;
   note: string | null;
+  relationship: Relationship | null;
   aliases: PersonAlias[];
   /** Open commitments you made to them. */
   youOwe: CommitmentView[];

@@ -3,9 +3,14 @@
 // exclamation marks, emoji, and contractions; the model tags each draft's kind (acknowledge,
 // ask, shift, ...) and tone (playful, warm, ...). A trait becomes a preference only when recent picks agree,
 // so one long reply after a run of short ones changes nothing, and a new habit takes over
-// as the old picks age out.
+// as the old picks age out. It is learned at three levels: the person, the relationship
+// (friends, colleagues, ...) on that kind of platform, and the kind of platform.
 
-export type ReplyChannel = 'email' | 'chat' | 'other';
+import { RELATIONSHIP_PLURALS, type Relationship } from './relationship';
+
+/** The kind of platform, not the app: Gmail and Outlook are both email, Discord and WhatsApp messaging, Slack and Teams work chat. */
+export type ReplyChannel = 'email' | 'messaging' | 'work_chat' | 'other';
+export const REPLY_CHANNELS = ['email', 'messaging', 'work_chat', 'other'] as const satisfies readonly ReplyChannel[];
 
 export const STYLE_DIMENSIONS = ['length', 'greeting', 'signoff', 'exclamation', 'emoji', 'contractions', 'kind', 'tone'] as const;
 export type StyleDimension = (typeof STYLE_DIMENSIONS)[number];
@@ -36,35 +41,41 @@ export interface StyleSignal {
   weight: number;
 }
 
-/** A stored signal: where and when it was seen. */
+/** A stored signal: where and when it was seen, and the person's relationship as it is now. */
 export interface StyleSignalRow extends StyleSignal {
   channel: ReplyChannel;
   person_id: string | null;
+  relationship: Relationship | null;
   at: string;
 }
 
 export interface StylePreference {
   dimension: StyleDimension;
   pole: StylePole;
-  /** A person's own preference wins over the channel's. */
-  scope: 'person' | 'channel';
+  /** The person's own wins, then their relationship on this kind of platform, then the platform. */
+  scope: 'person' | 'group' | 'channel';
   channel: ReplyChannel | null;
+  relationship: Relationship | null;
   personId: string | null;
   /** Recent signals that agree, out of `of`. */
   agree: number;
   of: number;
 }
 
-const EMAIL_PROCESSES = ['outlook.exe', 'olk.exe', 'thunderbird.exe', 'hxoutlook.exe'];
-const CHAT_PROCESSES = ['slack.exe', 'discord.exe', 'teams.exe', 'ms-teams.exe', 'whatsapp.exe', 'whatsapp.root.exe', 'messenger.exe', 'telegram.exe', 'signal.exe'];
-const EMAIL_TITLES = /(?:- Gmail|- Outlook|Outlook$|Proton Mail|Yahoo Mail|Fastmail)\b/i;
-const CHAT_TITLES = /(?:- Slack|Slack \||Discord|WhatsApp|Messenger|Microsoft Teams|Telegram|Signal)\b/i;
+const EMAIL_PROCESSES = ['outlook.exe', 'olk.exe', 'hxoutlook.exe', 'thunderbird.exe', 'mailspring.exe', 'mailclient.exe'];
+const WORK_PROCESSES = ['slack.exe', 'teams.exe', 'ms-teams.exe', 'mattermost.exe', 'zoom.exe'];
+const MESSAGING_PROCESSES = ['discord.exe', 'whatsapp.exe', 'whatsapp.root.exe', 'messenger.exe', 'telegram.exe', 'signal.exe'];
+// Web mail: Gmail, Outlook (also Hotmail and Live, whose tabs say Outlook), Yahoo, Proton, Fastmail, iCloud, AOL, Zoho.
+const EMAIL_TITLES = /(?:- Gmail|- Outlook|Outlook$|Yahoo Mail|Proton Mail|Fastmail|iCloud Mail|AOL Mail|Zoho Mail)\b/i;
+const WORK_TITLES = /(?:- Slack|Slack \||Microsoft Teams|Google Chat|Mattermost)\b/i;
+const MESSAGING_TITLES = /(?:Discord|WhatsApp|Messenger|Telegram|Instagram|Snapchat)\b/i;
 
-/** Email, chat, or anything else: register differs a lot between them, so each learns on its own. */
+/** The kind of platform: register differs a lot between them, so each learns on its own. */
 export function replyChannel(app: string, title: string): ReplyChannel {
   const p = app.toLowerCase();
   if (EMAIL_PROCESSES.includes(p) || EMAIL_TITLES.test(title)) return 'email';
-  if (CHAT_PROCESSES.includes(p) || CHAT_TITLES.test(title)) return 'chat';
+  if (WORK_PROCESSES.includes(p) || WORK_TITLES.test(title)) return 'work_chat';
+  if (MESSAGING_PROCESSES.includes(p) || MESSAGING_TITLES.test(title)) return 'messaging';
   return 'other';
 }
 
@@ -171,7 +182,7 @@ const WINDOW = 20;
 const DECAY = 0.9;
 /** Share of the (decayed) weight one side needs. */
 const AGREE = 0.7;
-const MIN_SIGNALS = { person: 3, channel: 5 } as const;
+const MIN_SIGNALS = { person: 3, group: 5, channel: 5 } as const;
 
 function judge(rows: StyleSignalRow[], min: number): { pole: StylePole; agree: number; of: number } | null {
   const recent = [...rows].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, WINDOW);
@@ -188,43 +199,56 @@ function judge(rows: StyleSignalRow[], min: number): { pole: StylePole; agree: n
   return { pole, agree: recent.filter((r) => r.pole === pole).length, of: recent.length };
 }
 
-/** The preferences for one reply: the person's own where they have enough, else the channel's. */
-export function preferencesFor(rows: StyleSignalRow[], scope: { channel: ReplyChannel; personId: string | null }): StylePreference[] {
+/** The preferences for one reply: the person's own where they have enough, else their relationship on this platform, else the platform's. */
+export function preferencesFor(
+  rows: StyleSignalRow[],
+  to: { channel: ReplyChannel; personId: string | null; relationship: Relationship | null },
+): StylePreference[] {
   const out: StylePreference[] = [];
   for (const dimension of STYLE_DIMENSIONS) {
     const mine = rows.filter((r) => r.dimension === dimension);
-    const person = scope.personId ? judge(mine.filter((r) => r.person_id === scope.personId), MIN_SIGNALS.person) : null;
+    const base = { dimension, channel: null, relationship: null, personId: null };
+    const person = to.personId ? judge(mine.filter((r) => r.person_id === to.personId), MIN_SIGNALS.person) : null;
     if (person) {
-      out.push({ dimension, ...person, scope: 'person', channel: null, personId: scope.personId });
+      out.push({ ...base, ...person, scope: 'person', personId: to.personId });
       continue;
     }
-    const channel = judge(
-      mine.filter((r) => r.channel === scope.channel),
-      MIN_SIGNALS.channel,
-    );
-    if (channel) out.push({ dimension, ...channel, scope: 'channel', channel: scope.channel, personId: null });
+    const onPlatform = mine.filter((r) => r.channel === to.channel);
+    const group = to.relationship ? judge(onPlatform.filter((r) => r.relationship === to.relationship), MIN_SIGNALS.group) : null;
+    if (group) {
+      out.push({ ...base, ...group, scope: 'group', channel: to.channel, relationship: to.relationship });
+      continue;
+    }
+    const channel = judge(onPlatform, MIN_SIGNALS.channel);
+    if (channel) out.push({ ...base, ...channel, scope: 'channel', channel: to.channel });
   }
   return out;
 }
 
-/** Every preference learned so far, per channel and per person, for the Profile tab. */
+/** Every preference learned so far, per platform, per relationship on a platform, and per person, for the Profile tab. */
 export function allPreferences(rows: StyleSignalRow[]): StylePreference[] {
   const out: StylePreference[] = [];
   for (const dimension of STYLE_DIMENSIONS) {
     const mine = rows.filter((r) => r.dimension === dimension);
-    for (const channel of ['email', 'chat', 'other'] as const) {
-      const j = judge(
-        mine.filter((r) => r.channel === channel),
-        MIN_SIGNALS.channel,
-      );
-      if (j) out.push({ dimension, ...j, scope: 'channel', channel, personId: null });
+    const base = { dimension, channel: null, relationship: null, personId: null };
+    for (const channel of REPLY_CHANNELS) {
+      const onPlatform = mine.filter((r) => r.channel === channel);
+      const j = judge(onPlatform, MIN_SIGNALS.channel);
+      if (j) out.push({ ...base, ...j, scope: 'channel', channel });
+      for (const relationship of new Set(onPlatform.map((r) => r.relationship).filter((x): x is Relationship => Boolean(x)))) {
+        const g = judge(
+          onPlatform.filter((r) => r.relationship === relationship),
+          MIN_SIGNALS.group,
+        );
+        if (g) out.push({ ...base, ...g, scope: 'group', channel, relationship });
+      }
     }
     for (const personId of new Set(mine.map((r) => r.person_id).filter((p): p is string => Boolean(p)))) {
       const j = judge(
         mine.filter((r) => r.person_id === personId),
         MIN_SIGNALS.person,
       );
-      if (j) out.push({ dimension, ...j, scope: 'person', channel: null, personId });
+      if (j) out.push({ ...base, ...j, scope: 'person', personId });
     }
   }
   return out;
@@ -257,15 +281,17 @@ const PHRASES: Record<StyleDimension, Partial<Record<StylePole, string>>> = {
   },
 };
 
-const CHANNEL_WORDS: Record<ReplyChannel, string> = { email: 'in email', chat: 'in chat', other: 'in other apps' };
+const CHANNEL_WORDS: Record<ReplyChannel, string> = { email: 'in email', messaging: 'in messaging apps', work_chat: 'in work chat', other: 'in other apps' };
 
 export function preferenceLabel(p: Pick<StylePreference, 'dimension' | 'pole'>): string {
   return PHRASES[p.dimension][p.pole] ?? `${p.dimension}: ${p.pole}`;
 }
 
-/** Where it applies, for a person by name: "in email", "with Jordan Hale". */
-export function preferenceScope(p: Pick<StylePreference, 'scope' | 'channel'>, personName?: string | null): string {
-  return p.scope === 'person' ? `with ${personName ?? 'this person'}` : CHANNEL_WORDS[p.channel ?? 'other'];
+/** Where it applies, for a person by name: "in email", "with friends in messaging apps", "with Jordan Hale". */
+export function preferenceScope(p: Pick<StylePreference, 'scope' | 'channel' | 'relationship'>, personName?: string | null): string {
+  if (p.scope === 'person') return `with ${personName ?? 'this person'}`;
+  const where = CHANNEL_WORDS[p.channel ?? 'other'];
+  return p.scope === 'group' && p.relationship ? `with ${RELATIONSHIP_PLURALS[p.relationship]} ${where}` : where;
 }
 
 /** One line for the Reply prompt, with its evidence. */

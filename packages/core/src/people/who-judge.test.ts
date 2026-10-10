@@ -139,6 +139,22 @@ describe('acceptWhoRows', () => {
     expect(people.map((p) => [p.name, p.email])).toEqual([['Jordan Hale', 'jordan.hale@example.com']]);
   });
 
+  it("keeps the model's relationship when it is one of the list, and drops anything else", () => {
+    const corpus = 'Jordan Hale (recruiter at Northwind) and Casey Lee from my climbing group';
+    const people = acceptWhoRows(
+      [
+        row({ name: 'Jordan Hale', evidence: 'Jordan Hale', relationship: 'Professional' }),
+        row({ name: 'Casey Lee', evidence: 'Casey Lee', relationship: 'climbing buddy' }),
+      ],
+      corpus,
+      me,
+    );
+    expect(people.map((p) => [p.name, p.relationship])).toEqual([
+      ['Jordan Hale', 'professional'],
+      ['Casey Lee', null],
+    ]);
+  });
+
   it('reads a quote across a line break and a confidence given in percent', () => {
     const corpus = 'From: Maya Chen\nThanks,\nMaya';
     const people = acceptWhoRows([row({ name: 'Maya Chen', confidence: 85, evidence: 'Thanks, Maya' })], corpus, me);
