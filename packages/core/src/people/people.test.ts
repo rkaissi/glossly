@@ -4,7 +4,7 @@ import { AliasTakenError, PeopleRepo, aliasKindOf } from '../store/people';
 import { Store } from '../store/store';
 import type { SelectionPayload } from '../types';
 import { detectPeople, type DetectInput } from './detect';
-import { resolvePerson } from './resolve';
+import { FIRST_NAME_SCORE, resolvePerson } from './resolve';
 
 const me = { name: 'Rayan Kaissi', emails: ['rayan@example.com'], handles: ['rayank'] };
 const noOne = { name: '', emails: [], handles: [] };
@@ -209,6 +209,21 @@ describe('resolvePerson', () => {
     expect(fuzzy).toMatchObject({ kind: 'fuzzy', personId: sam.id });
     expect(resolvePerson(r, { name: 'Sam Leee' }, 'chrome.exe')).toEqual({ kind: 'none' });
     expect(resolvePerson(r, { name: 'Sam Li' }, 'slack.exe')).toEqual({ kind: 'none' });
+  });
+
+  it('asks about a saved person when only the first name is shown, in any app', () => {
+    const r = repo();
+    const shivani = r.create({ name: 'Priya Desai' });
+    const vishnu = r.create({ name: 'Vishnu' });
+    expect(resolvePerson(r, { name: 'Shivani' }, 'chrome.exe')).toEqual({ kind: 'fuzzy', personId: shivani.id, score: FIRST_NAME_SCORE });
+    expect(resolvePerson(r, { name: 'Vishnu Satish' }, 'chrome.exe')).toMatchObject({ kind: 'fuzzy', personId: vishnu.id });
+    // Two full names with the same first name are different people unless the user says so.
+    expect(resolvePerson(r, { name: 'Shivani Rao' }, 'chrome.exe')).toEqual({ kind: 'none' });
+    expect(resolvePerson(r, { name: 'Jo' }, 'chrome.exe')).toEqual({ kind: 'none' });
+    // Two saved Shivanis: the one seen in this app is offered.
+    const other = r.create({ name: 'Shivani Rao' });
+    r.addInteraction({ person_id: other.id, direction: 'inbound', text: 'hi', source_app: 'discord.exe' });
+    expect(resolvePerson(r, { name: 'Shivani' }, 'discord.exe')).toMatchObject({ kind: 'fuzzy', personId: other.id });
   });
 });
 

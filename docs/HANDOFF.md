@@ -517,6 +517,13 @@ Rayan's plan, built in one go. 405 unit tests pass; `pnpm typecheck` is clean. N
 - **Not done (Rayan's "a friend versus a recruiter")**: preferences are per kind of app and per saved person. A group level such as "friends" or "recruiters" would need a relationship field on people; worth adding if per-person learning is too slow to build up.
 - **Live check**: Reply in Slack or Discord and in Gmail; headings show labels without the `| kind | tone` tags; Insert and Copy log `reply learned {signals, channel, edited}`; after 5 or more short picks in chat, Profile shows "Keeps replies short in chat" and the next Reply's drafts 1 and 2 are short; edit 5 replies and check `style notes written`; Forget and the switch work.
 
+### A first name alone asks about the saved person (Oct 10, night)
+
+Not a new step. 406 unit tests pass; `pnpm typecheck` is clean; the app bundles. Not run live.
+
+- **Bug (Rayan's screenshot):** Who showed "Shivani (new)" with Create person while "Priya Desai" was already saved. `resolvePerson` only tried a fuzzy match among people seen in the same app, with Jaro-Winkler above 0.92, and a lone first name against a full name scores below that, so it fell through to "none".
+- **Fix** (`people/resolve.ts`, `firstNameMatch`): when one side is only a first name ("Shivani" against a saved "Priya Desai", or "Vishnu Satish" against a saved "Vishnu"), the saved person is returned as `fuzzy` (`FIRST_NAME_SCORE` 0.9), in any app. Who then shows "Shivani?" with the existing "Is this the same Shivani?" question; Same person adds "Shivani" as a name alias, so the next time is an exact match, and Different person creates a new record. Two full names with the same first name ("Shivani Rao") are still different people, first names under 3 letters are skipped, and with several saved people of that first name, the one seen in this app is offered. Reply's author and What did I promise use the same resolver, so they show "Priya Desai?" too (a promises test now expects that). The bar's person badge still uses exact matches only.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

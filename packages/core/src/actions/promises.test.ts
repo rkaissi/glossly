@@ -79,7 +79,8 @@ describe('What did I promise', () => {
       selected: true,
       match: { personId: maya.id, name: 'Maya Lin', kind: 'exact' },
     });
-    expect(rows[1]).toMatchObject({ owner: 'them', due_phrase: null, due_at: null, selected: false, person_name: 'Maya', match: null });
+    // A first name alone is offered as the saved person, for the user to confirm ("Maya Lin?").
+    expect(rows[1]).toMatchObject({ owner: 'them', due_phrase: null, due_at: null, selected: false, person_name: 'Maya', match: { personId: maya.id, kind: 'fuzzy' } });
   });
 
   it('passes a Local only refusal through', async () => {

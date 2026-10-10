@@ -53,5 +53,28 @@ export function resolvePerson(lookup: PeopleLookup, c: PersonCandidate, sourceAp
       if (score > threshold && (!best || score > best.score)) best = { personId: p.personId, score };
     }
   }
-  return best ? { kind: 'fuzzy', ...best } : { kind: 'none' };
+  if (best) return { kind: 'fuzzy', ...best };
+  const first = firstNameMatch(lookup, target, seen);
+  return first ? { kind: 'fuzzy', personId: first, score: FIRST_NAME_SCORE } : { kind: 'none' };
+}
+
+/** Score reported for a first-name match; it is a question for the user, not a measure. */
+export const FIRST_NAME_SCORE = 0.9;
+
+/**
+ * One side is only a first name ("Shivani" for a saved "Priya Desai", or the reverse): a
+ * saved person with that first name is offered as "Is this the same Shivani?" instead of a
+ * duplicate. In any app, since chats and sign-offs often show only a first name. Several
+ * matches prefer someone seen in this app.
+ */
+function firstNameMatch(lookup: PeopleLookup, target: string, seen: Set<string>): string | null {
+  const firstOf = (n: string) => n.split(' ')[0]!;
+  const first = firstOf(target);
+  if (first.length < 3) return null;
+  const single = !target.includes(' ');
+  const matches = lookup
+    .nameIndex()
+    .filter((p) => p.names.some((n) => n !== target && (single || !n.includes(' ')) && firstOf(n) === first))
+    .map((p) => p.personId);
+  return matches.find((id) => seen.has(id)) ?? matches[0] ?? null;
 }
