@@ -1,69 +1,209 @@
-// Placeholder overlay for the shell milestone: renders the pill, the bar's slots, and the
-// debug view so capture can be checked by hand. Step 4 replaces it with the real UI.
+// The overlay renderer: pill, dot, bar, and panels in one transparent window. Main owns the
+// session and pushes OverlayState; this side only renders it and sends clicks and keys back.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { OverlayState } from '@glossly/core/api';
+import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import '../theme.css';
+import './overlay.css';
+import { AskPanel } from './AskPanel';
+import { Debug } from './Debug';
+import { barItems, barKey, sameItem, type BarItem } from './keys';
+import { LaterPanel } from './LaterPanel';
+import { SavePanel } from './SavePanel';
 
-const css = `
-html, body { margin: 0; background: transparent; overflow: hidden; font: 13px system-ui, sans-serif; user-select: none; }
-.box { display: inline-flex; flex-direction: column; gap: 6px; background: #1f1d2b; color: #f2f1f7; border-radius: 10px; padding: 6px; box-sizing: border-box; }
-.row { display: flex; gap: 4px; }
-button { background: #2e2b40; color: inherit; border: 0; border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; }
-button:hover { background: #4b4570; }
-button[disabled] { opacity: .5; }
-.dot { width: 12px; height: 12px; margin: 2px; border-radius: 50%; background: #6d5ef5; }
-pre { margin: 0; max-width: 440px; max-height: 160px; overflow: auto; white-space: pre-wrap; font: 11px ui-monospace, monospace; color: #b9b5d0; }
-`;
+const expand = (sessionId: number) => void glossly.invoke('bar:expand', { sessionId });
+const run = (sessionId: number, target: BarItem) => void glossly.invoke('bar:run', { sessionId, ...target });
+
+const badgeLabel = (b: Badge) => (b.kind === 'recall' ? `${b.count} related` : b.label);
 
 function Overlay() {
   const [s, setS] = useState<OverlayState | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void glossly.invoke('overlay:get').then(setS);
-    return glossly.on('overlay:state', setS);
+    let pushed = false;
+    const off = glossly.on('overlay:state', (next) => {
+      pushed = true;
+      setS(next);
+    });
+    void glossly.invoke('overlay:get').then((first) => {
+      if (!pushed) setS(first);
+    });
+    return off;
   }, []);
 
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || !s || (s.mode !== 'bar' && s.mode !== 'panel')) return;
-    const ro = new ResizeObserver(() => {
-      void glossly.invoke('overlay:resize', { sessionId: s.sessionId, w: el.offsetWidth, h: el.offsetHeight });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [s?.sessionId, s?.mode]);
-
   if (!s || s.mode === 'hidden') return null;
-  const id = s.sessionId;
-  const expand = () => void glossly.invoke('bar:expand', { sessionId: id });
-  if (s.mode === 'dot') return <div className="dot" onMouseEnter={expand} />;
-  const run = (slot: 1 | 2 | 3 | 4) => void glossly.invoke('bar:run', { sessionId: id, slot });
+  if (s.mode === 'dot') return <div className="dot" title="Glossly" onMouseEnter={() => expand(s.sessionId)} />;
+  if (s.mode === 'pill') return <Pill s={s} />;
+  return <Expanded key={s.sessionId} s={s} />;
+}
 
+/** Ask and Save only. Hovering expands it into the bar; nothing is sent to a model yet. */
+function Pill({ s }: { s: OverlayState }) {
   return (
-    <div className="box" ref={ref} onMouseEnter={s.mode === 'pill' ? expand : undefined}>
-      <div className="row">
-        <button onClick={() => run(1)}>Ask</button>
-        <button onClick={() => run(2)}>{s.slots?.slot2.label ?? 'Save'}</button>
-        {s.slots?.slot3 && <button onClick={() => run(3)}>{s.slots.slot3.label}</button>}
-        {s.slots?.slot4 && <button onClick={() => run(4)}>{s.slots.slot4.label}</button>}
-        {s.mode !== 'pill' && <button onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>×</button>}
-      </div>
-      {s.notice && <div>{s.notice}</div>}
-      {s.mode === 'panel' && <div>Panel: {s.panel} (UI arrives in step 4)</div>}
-      {s.mode !== 'pill' && s.debug && (
-        <pre>
-          {`${s.debug.method} · ${s.debug.trigger} · ${s.debug.source_app} · ${s.slots?.stage ?? ''} ${s.slots?.fallback ?? ''} ${s.slots?.content_type ?? ''}\n`}
-          {`timings ${JSON.stringify(s.debug.timings)}\n`}
-          {`«${s.debug.context_before.slice(-120)}[${s.debug.text.slice(0, 300)}]${s.debug.context_after.slice(0, 120)}»`}
-        </pre>
-      )}
+    <div className={`pill${s.placement?.side === 'above' ? ' above' : ''}`} onMouseEnter={() => expand(s.sessionId)}>
+      <button className="slot" onClick={() => run(s.sessionId, { slot: 1 })}>
+        Ask
+      </button>
+      <button className="slot" onClick={() => run(s.sessionId, { slot: 2 })}>
+        Save
+      </button>
     </div>
   );
 }
 
-const style = document.createElement('style');
-style.textContent = css;
-document.head.append(style);
+/** The bar, plus the open panel when mode is "panel". */
+function Expanded({ s }: { s: OverlayState }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [highlight, setHighlight] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const id = s.sessionId;
+  const items = barItems(s.slots, s.hasSelection, moreOpen);
+  const hl = Math.min(highlight, items.length - 1);
+
+  // Main sizes the window; report the content's real size after every change.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) void glossly.invoke('overlay:resize', { sessionId: id, w: el.offsetWidth, h: el.offsetHeight });
+  });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => void glossly.invoke('overlay:resize', { sessionId: id, w: el.offsetWidth, h: el.offsetHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [id]);
+
+  // The keyboard map is live only on the hotkey path (or once a panel has taken focus).
+  useEffect(() => {
+    if (!s.keyboard) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (s.mode === 'panel') {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          void glossly.invoke('bar:back', { sessionId: id });
+        }
+        return;
+      }
+      const cmd = barKey({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey, shift: e.shiftKey }, { items, highlight: hl, moreOpen });
+      if (!cmd) return;
+      e.preventDefault();
+      if (cmd.kind === 'run') run(id, cmd.target);
+      else if (cmd.kind === 'highlight') setHighlight(cmd.index);
+      else if (cmd.kind === 'more') {
+        // Opening More highlights its first item; closing it from there goes back to Ask.
+        const closed = barItems(s.slots, s.hasSelection, false).length;
+        setMoreOpen(cmd.open);
+        if (!cmd.open) setHighlight((h) => (h >= closed ? 0 : h));
+        else if (s.slots?.more.length) setHighlight(closed);
+      } else void glossly.invoke('bar:close', { sessionId: id });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const slotButton = (target: BarItem, view: SlotView, opts: { fresh?: boolean; disabled?: boolean; hint?: string } = {}) => {
+    const active = s.mode === 'panel' && s.panel === view.action;
+    const cls = [
+      'slot',
+      opts.fresh && 'fresh',
+      !view.available && 'later',
+      s.keyboard && s.mode === 'bar' && sameItem(items[hl], target) && 'highlight',
+      active && 'active',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const title = view.available ? view.label : `${view.label}: coming in a later phase`;
+    return (
+      <button
+        key={'slot' in target ? `slot${target.slot}:${view.action}` : `more:${view.action}`}
+        className={cls}
+        title={view.score !== undefined ? `${title} (score ${view.score.toFixed(2)})` : title}
+        disabled={opts.disabled}
+        onClick={() => !active && run(id, target)}
+      >
+        {s.keyboard && opts.hint && <kbd>{opts.hint}</kbd>}
+        <span>{view.label}</span>
+      </button>
+    );
+  };
+
+  const slots = s.slots;
+  const ask: SlotView = slots?.slot1 ?? { action: 'ask', label: 'Ask', available: true };
+  const save: SlotView = slots?.slot2 ?? { action: 'save', label: 'Save', available: true };
+  const more = slots?.more ?? [];
+
+  return (
+    <div ref={ref} className={`frame${s.placement?.side === 'above' ? ' above' : ''}`}>
+      <div className="row">
+        {slotButton({ slot: 1 }, ask, { hint: '1' })}
+        {slotButton({ slot: 2 }, save, { hint: '2', disabled: !s.hasSelection })}
+        {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true, hint: '3' })}
+        {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true, hint: '4' })}
+        <span className="spacer" />
+        {s.badges.map((b) => (
+          <span key={b.kind === 'recall' ? 'recall' : b.personId} className="badge">
+            {badgeLabel(b)}
+          </span>
+        ))}
+        {s.hasSelection && more.length > 0 && (
+          <button className="slot" title="More actions" onClick={() => setMoreOpen((o) => !o)}>
+            {s.keyboard && <kbd>Tab</kbd>}
+            <span>More</span>
+          </button>
+        )}
+        <button className="icon" title="Options" onClick={() => setMenuOpen((o) => !o)}>
+          ⋯
+        </button>
+        <button className="icon" title="Close" onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>
+          ✕
+        </button>
+      </div>
+
+      {moreOpen && s.mode === 'bar' && (
+        <div className="strip">
+          {more.length > 0 ? (
+            more.map((m) => slotButton({ action: m.action }, m))
+          ) : (
+            <span className="muted">No other actions fit this selection.</span>
+          )}
+        </div>
+      )}
+
+      {menuOpen && (
+        <div className="strip">
+          {s.siteKey && (
+            <button
+              title="Show the bar here only when you press the hotkey"
+              onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
+            >
+              Don't show here ({s.siteKey})
+            </button>
+          )}
+          <button onClick={() => void glossly.invoke('settings:open', {})}>Settings</button>
+        </div>
+      )}
+
+      {s.notice && <div className="strip notice">{s.notice}</div>}
+      {!s.hasSelection && !s.notice && (
+        <div className="strip muted">Nothing selected. Ask a question, or select text and press the hotkey again.</div>
+      )}
+
+      {s.mode === 'panel' &&
+        s.panel &&
+        (s.panel === 'ask' ? (
+          <AskPanel key="ask" s={s} />
+        ) : s.panel === 'save' ? (
+          <SavePanel key="save" s={s} />
+        ) : (
+          <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
+        ))}
+
+      {s.debug && <Debug d={s.debug} slots={slots} />}
+    </div>
+  );
+}
+
 createRoot(document.getElementById('root')!).render(<Overlay />);

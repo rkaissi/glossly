@@ -6,12 +6,16 @@ import { preloadPath, rendererUrl } from './paths';
 
 const log = logger('overlay');
 
-/** Window sizes in DIP. The renderer reports its real size for the bar and panel. */
+/**
+ * Window sizes in DIP. The renderer reports its real size for the bar and panel. The bar and
+ * panel widths match the UI's fixed width (packages/ui overlay.css), so the controls on the
+ * right never shift when slots 3 and 4 fill in.
+ */
 export const SIZES = {
   pill: { w: 168, h: 40 },
   dot: { w: 16, h: 16 },
-  bar: { w: 460, h: 56 },
-  panel: { w: 460, h: 320 },
+  bar: { w: 560, h: 40 },
+  panel: { w: 560, h: 300 },
 } satisfies Record<Exclude<OverlayMode, 'hidden'>, Size>;
 
 const LIMITS = { minW: 120, maxW: 680, minH: 16, maxH: 640 };
