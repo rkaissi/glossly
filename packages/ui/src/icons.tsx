@@ -17,12 +17,15 @@ export function ActionIcon({ action, size = 16 }: { action: ActionId; size?: num
   return <Icon size={size} strokeWidth={1.75} aria-hidden />;
 }
 
-/** The Glossly mark: a line of text with a highlight stroke over its middle. */
+/**
+ * The Glossly mark (design C1, Oct 10): a text cursor (the selection) with a sparkle (the
+ * action). Alternatives Rayan liked are kept in docs/brand/ in case we switch.
+ */
 export function GlosslyMark({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden>
-      <rect x="1.5" y="5.5" width="13" height="5" rx="2.5" fill="currentColor" opacity="0.22" />
-      <path d="M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 5v14M6 5h6M6 19h6" />
+      <path d="M18 3.5Q18 8 22.5 8Q18 8 18 12.5Q18 8 13.5 8Q18 8 18 3.5Z" fill="currentColor" stroke="none" />
     </svg>
   );
 }
