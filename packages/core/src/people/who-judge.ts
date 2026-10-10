@@ -39,8 +39,15 @@ const NOT_PEOPLE = new Set([
   'reply reply',
   'more more',
 ]);
+const NOT_NAMES = /^(?:thanks|thank you|thx|hi|hey|hello|dear|cc|bcc|to|from|ping|via|cheers|best|regards)$/i;
 const SIGN_OFF =
   /(?:^|\n)\s*(?:thanks|thank you|many thanks|best|best regards|kind regards|regards|cheers|sincerely|warmly|talk soon|all the best|thx)[,!.]?\s*\n+\s*([A-Z][\p{L}'’.-]+(?:\s+[A-Z][\p{L}'’.-]+)?)\s*$/iu;
+
+/** 0 to 1. A model that answers in percent (85) is read as 0.85. */
+function confidenceOf(c: number): number {
+  if (!Number.isFinite(c) || c < 0) return 0;
+  return c > 1 ? Math.min(c / 100, 1) : c;
+}
 
 export function whoCorpus(input: DetectInput): string {
   return [input.window_title, input.before, input.text, input.after].filter((s) => s.trim()).join('\n');
@@ -48,9 +55,11 @@ export function whoCorpus(input: DetectInput): string {
 
 const tokensOf = (s: string) => canonicalize(s).split(/[\s-]+/).filter(Boolean);
 
+const squash = (s: string) => s.replace(/\s+/g, ' ').trim();
+
 function present(corpus: string, value: string): boolean {
-  const v = value.trim();
-  return v.length > 0 && corpus.toLowerCase().includes(v.toLowerCase());
+  const v = squash(value).toLowerCase();
+  return v.length > 0 && squash(corpus).toLowerCase().includes(v);
 }
 
 /** True when every token of `short` appears, in order, inside `long`. */
@@ -92,10 +101,22 @@ function mergeFragments(rows: WhoCandidate[]): WhoCandidate[] {
   return out;
 }
 
+/**
+ * "Priya Shah; Lena Ortiz" or "Priya Shah, Lena Ortiz". A comma between two single words is
+ * read as "Shah, Priya" and kept whole.
+ */
+function recipients(list: string): string[] {
+  return list.split(';').flatMap((part) => {
+    const pieces = part.split(',');
+    const lastFirst = pieces.length === 2 && pieces.every((p) => /^\s*[\p{L}'’.-]+\s*$/u.test(p));
+    return lastFirst ? [part] : pieces;
+  });
+}
+
 function headerNames(corpus: string): { name: string | null; email: string | null }[] {
   const out: { name: string | null; email: string | null }[] = [];
   for (const line of corpus.matchAll(headerRe())) {
-    for (const part of line[2]!.split(';')) {
+    for (const part of recipients(line[2]!)) {
       const raw = part.trim();
       if (!raw) continue;
       const email = raw.match(emailRe())?.[0] ?? null;
@@ -113,7 +134,9 @@ function headerNames(corpus: string): { name: string | null; email: string | nul
 function neighborName(before: string): string | null {
   const cleaned = before.replace(/\([^)]{0,20}\)/g, ' ').replace(/[<>]/g, ' ').replace(/\s+/g, ' ').trim();
   const m = /([A-Z][\p{L}'’.-]+(?:\s+[A-Z][\p{L}'’.-]+){0,3})$/u.exec(cleaned);
-  return m?.[1]?.trim() ?? null;
+  const name = m?.[1]?.trim() ?? null;
+  // "Thanks @quinn" and "Hi @sam": the word before the handle is not their name.
+  return name && !NOT_NAMES.test(name) ? name : null;
 }
 
 /** Every email and @handle in the text is kept, attached to the neighboring name when there is one. */
@@ -174,11 +197,13 @@ function toDetected(r: WhoCandidate): DetectedPerson | null {
  * people, the user, and fragments of one name. Emails and handles in the text are kept.
  */
 export function acceptWhoRows(rows: WhoCandidate[], corpus: string, me: Identity): DetectedPerson[] {
+  const flat = squash(corpus);
   const grounded = rows.filter((r) => {
-    if (r.confidence < WHO_MIN_CONFIDENCE) return false;
+    if (confidenceOf(r.confidence) < WHO_MIN_CONFIDENCE) return false;
     if (NOT_PEOPLE.has(canonicalize(r.name))) return false;
-    const evidence = r.evidence.trim();
-    if (!evidence || !corpus.includes(evidence)) return false;
+    // A quote that spans a line break comes back with a space: compare with whitespace squashed.
+    const evidence = squash(r.evidence);
+    if (!evidence || !flat.includes(evidence)) return false;
     return present(corpus, r.name) || present(corpus, r.email) || present(corpus, r.handle.replace(/^@+/, ''));
   });
   const merged = dropUser(attachContacts(mergeFragments(grounded), corpus), corpus, me);
@@ -201,6 +226,8 @@ function addLocal(found: Map<string, WhoCandidate>, row: WhoCandidate, me: Ident
   else found.set(key, { ...row });
 }
 
+const TIME_LINE = /^(?:(?:today|yesterday)\s+at\s+)?\d{1,2}:\d{2}(?:\s?[AP]M)?$/i;
+
 /** Speakers on their own line, with the time on the next line ("quinn" / "3:12 PM"). */
 function loneSpeakers(corpus: string): string[] {
   const lines = corpus.split(/\r?\n/);
@@ -208,7 +235,7 @@ function loneSpeakers(corpus: string): string[] {
   for (let i = 0; i < lines.length - 1; i++) {
     const name = lines[i]!.trim();
     const next = lines[i + 1]!.trim();
-    if (/^[\p{L}][\p{L}\p{N}_.'-]{1,30}$/u.test(name) && /\d{1,2}:\d{2}/.test(next)) out.push(name);
+    if (/^[\p{L}][\p{L}\p{N}_.'-]{1,30}$/u.test(name) && TIME_LINE.test(next)) out.push(name);
   }
   return out;
 }

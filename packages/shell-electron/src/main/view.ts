@@ -39,13 +39,21 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
  */
 export function mergeRoute(prev: SlotsView, next: SlotsView, opts?: { keepSave?: boolean }): SlotsView {
   const saveSettled = prev.stage === 'model' || prev.stage === 'rules_fallback';
+  const slot3 = shownSlot(prev.slot3, next.slot3);
+  let slot4 = shownSlot(prev.slot4, next.slot4);
+  // A kept button and a new one can name the same action: show it once.
+  if (slot4 && slot4.action === slot3?.action) slot4 = null;
+  const inSlots = new Set([slot3?.action, slot4?.action]);
+  // A button the route wanted but a kept one displaced goes to More rather than vanishing.
+  const displaced = [next.slot3, next.slot4].filter((v): v is SlotView => v !== null && !inSlots.has(v.action));
+  const more = shownMore(prev.more, [...displaced, ...next.more]);
   return {
     ...next,
     slot1: prev.slot1,
     slot2: opts?.keepSave || saveSettled ? prev.slot2 : next.slot2,
-    slot3: shownSlot(prev.slot3, next.slot3),
-    slot4: shownSlot(prev.slot4, next.slot4),
-    more: shownMore(prev.more, next.more),
+    slot3,
+    slot4,
+    more: more.filter((m, i) => !inSlots.has(m.action) && more.findIndex((o) => o.action === m.action) === i),
   };
 }
 

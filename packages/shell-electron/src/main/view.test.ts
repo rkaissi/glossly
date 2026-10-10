@@ -66,6 +66,12 @@ describe('slotsView', () => {
 
     const swapped = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.5 } }, 'Notes'), 'model'));
     expect(swapped.slot3?.action).toBe('who');
+
+    const moved = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.6 }, slot4: { action: 'who', score: 0.5 }, more: [{ action: 'who', score: 0.5 }] }, 'Notes'), 'model'));
+    expect(moved.slot3?.action).toBe('who');
+    expect(moved.slot4).toBeNull();
+    expect(moved.more.map((m) => m.action)).not.toContain('who');
+    expect(moved.more.map((m) => m.action)).toContain('reply');
   });
 });
 

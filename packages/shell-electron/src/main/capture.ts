@@ -811,7 +811,9 @@ export class Capture {
     const t = performance.now();
     try {
       const container = (await s.container) ?? null;
-      const view = await identifyWho(this.services.llm, this.services.people, this.settings, s.selection, container, ctl.signal);
+      const view = await identifyWho(this.services.llm, this.services.people, this.settings, s.selection, container, ctl.signal, (e) =>
+        log.warn('who model failed, reading the text only', { code: e instanceof LlmError ? e.code : 'provider' }),
+      );
       log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', ms: ms(t) });
       return view;
     } catch (e) {
@@ -1143,7 +1145,17 @@ export class Capture {
       this.close(signal);
       return;
     }
-    if (shouldHideOverlay({ ...input, settling: false })) log.info('overlay hide suppressed', { reason: signal });
+    if (!shouldHideOverlay({ ...input, settling: false })) return;
+    log.info('overlay hide suppressed', { reason: signal });
+    // A focused bar ignores clicks outside and typing, so a blur swallowed by the grace has to
+    // be looked at again when it ends: if Windows still hasn't given the bar focus, close it.
+    if (signal === 'blur') {
+      const id = this.session?.id;
+      setTimeout(() => {
+        const s = this.session;
+        if (s && s.id === id && this.overlay.isVisible && this.overlay.hasFocus && !this.overlay.osFocused) this.activityHide('blur');
+      }, Math.max(0, this.settleUntil - Date.now()) + 20);
+    }
   }
 
   private endSession(): void {

@@ -60,7 +60,13 @@ export function KeyCard({ k }: { k: KeyStatus }) {
               prompt={`Remove the ${k.label} key?`}
               confirm="Remove"
               busy={busy}
-              onConfirm={() => void run(() => glossly.invoke('keys:remove', { provider: k.provider }))}
+              onConfirm={() =>
+                void run(async () => {
+                  await glossly.invoke('keys:remove', { provider: k.provider });
+                  // Adding a key again later shows Remove, not this confirm.
+                  setConfirming(false);
+                })
+              }
               onCancel={() => setConfirming(false)}
             />
           ) : (

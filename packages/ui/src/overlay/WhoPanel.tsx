@@ -223,6 +223,12 @@ export function WhoPanel({ s }: { s: OverlayState }) {
           </button>
         </div>
       )}
+      {view?.local === 'model_failed' && (
+        <div className="inline-note">
+          <Info size={14} strokeWidth={1.75} aria-hidden />
+          <span>The model didn't answer, so this list is from the text only.</span>
+        </div>
+      )}
       {failed && <p className="error">Could not look up the people in this selection.</p>}
       {!view && !failed && <p className="muted">Looking up people…</p>}
 

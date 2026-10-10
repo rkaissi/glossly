@@ -8,7 +8,6 @@ import { describeIdentity } from '../people/names';
 import { acceptWhoRows, localWho, whoCorpus } from '../people/who-judge';
 import { resolvePerson } from '../people/resolve';
 import type { PersonCard } from '../people/types';
-import type { KnownPerson } from '../router/types';
 import type { Identity, Settings } from '../settings';
 import type { PeopleRepo } from '../store/people';
 import type { ContainerContext, SelectionPayload } from '../types';
@@ -23,7 +22,8 @@ export interface WhoEntry {
   person: PersonCard | null;
 }
 
-export type WhoLocal = null | 'local_only' | 'no_model';
+/** Why the list came from the text only: Local only, no Fast model, or the model call failed. */
+export type WhoLocal = null | 'local_only' | 'no_model' | 'model_failed';
 
 export interface WhoView {
   entries: WhoEntry[];
@@ -41,7 +41,8 @@ export const WhoPeopleSchema = z.object({
       handle: z.string(),
       role: z.string(),
       relation: z.string(),
-      confidence: z.number().min(0).max(1),
+      // Not bounded here: one row scored 85 would fail the whole call. acceptWhoRows reads it.
+      confidence: z.number(),
       evidence: z.string(),
     }),
   ),
@@ -110,43 +111,36 @@ export async function identifyWho(
   selection: SelectionPayload,
   container: ContainerContext | null | undefined,
   signal?: AbortSignal,
+  onModelError?: (e: unknown) => void,
 ): Promise<WhoView> {
   const input = detectInputFor(selection, container);
   const identitySet = settings.identity.name.trim().length > 0;
   const local: WhoLocal = settings.localOnly ? 'local_only' : llm.hasModel('fast') ? null : 'no_model';
-  const people =
-    local !== null
-      ? localWho(input, settings.identity)
-      : acceptWhoRows(
-          (
-            await llm.structured(
-              {
-                role: 'fast',
-                action: 'who',
-                instructions: whoPrompt,
-                prompt: buildWhoPrompt(settings.identity, input),
-                signal,
-                temperature: 0,
-                maxOutputTokens: 1000,
-              },
-              WhoPeopleSchema,
-            )
-          ).people,
-          whoCorpus(input),
-          settings.identity,
-        );
-  return buildWho(repo, { people, author: null, authorIsMe: false }, selection.source_app, identitySet, local);
-}
-
-export function whoFor(
-  repo: PeopleRepo,
-  selection: SelectionPayload,
-  container: ContainerContext | null | undefined,
-  identity: Identity,
-  _known: KnownPerson[],
-): WhoView {
-  const people = localWho(detectInputFor(selection, container), identity);
-  return buildWho(repo, { people, author: null, authorIsMe: false }, selection.source_app, identity.name.trim().length > 0, null);
+  const view = (people: DetectedPerson[], why: WhoLocal) =>
+    buildWho(repo, { people, author: null, authorIsMe: false }, selection.source_app, identitySet, why);
+  if (local !== null) return view(localWho(input, settings.identity), local);
+  let rows: z.infer<typeof WhoPeopleSchema>['people'];
+  try {
+    const out = await llm.structured(
+      {
+        role: 'fast',
+        action: 'who',
+        instructions: whoPrompt,
+        prompt: buildWhoPrompt(settings.identity, input),
+        signal,
+        temperature: 0,
+        maxOutputTokens: 1000,
+      },
+      WhoPeopleSchema,
+    );
+    rows = out.people;
+  } catch (e) {
+    // A rate limit or a bad answer still leaves the people the text itself names.
+    if (signal?.aborted) throw e;
+    onModelError?.(e);
+    return view(localWho(input, settings.identity), 'model_failed');
+  }
+  return view(acceptWhoRows(rows, whoCorpus(input), settings.identity), null);
 }
 
 /**

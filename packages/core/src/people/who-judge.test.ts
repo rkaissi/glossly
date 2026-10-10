@@ -116,4 +116,29 @@ describe('acceptWhoRows', () => {
     );
     expect(people.map((p) => p.name)).toEqual(['Sam Smith']);
   });
+
+  it('reads a quote across a line break and a confidence given in percent', () => {
+    const corpus = 'From: Maya Chen\nThanks,\nMaya';
+    const people = acceptWhoRows([row({ name: 'Maya Chen', confidence: 85, evidence: 'Thanks, Maya' })], corpus, me);
+    expect(people.map((p) => p.name)).toEqual(['Maya Chen']);
+  });
+});
+
+describe('localWho edge cases', () => {
+  const input = (text: string): DetectInput => ({ text, before: '', after: '', source_app: 'msedge.exe', window_title: '' });
+
+  it('splits recipients on commas but keeps "Last, First" whole', () => {
+    const names = localWho(input('To: Priya Shah, Lena Ortiz\nCc: Okonkwo, Sam'), me).map((p) => p.name);
+    expect(names).toEqual(['Priya Shah', 'Lena Ortiz', 'Okonkwo, Sam']);
+  });
+
+  it('does not name a handle after the greeting before it', () => {
+    const people = localWho(input('Thanks @quinn for the notes'), me);
+    expect(people.map((p) => [p.name, p.handle])).toEqual([[null, 'quinn']]);
+  });
+
+  it('needs a line that is only a time under a lone speaker', () => {
+    expect(localWho(input('Meeting\n3:00 PM tomorrow in room 4'), me)).toEqual([]);
+    expect(localWho(input('quinn\nToday at 3:12 PM\nhey'), me).map((p) => p.name)).toEqual(['quinn']);
+  });
 });
