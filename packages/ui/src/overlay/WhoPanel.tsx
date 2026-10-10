@@ -73,11 +73,16 @@ function SameQuestion({ entry, onResolved }: { entry: WhoEntry; onResolved: (car
   );
 }
 
-/** Spec: no match, so offer "Create person" with the detected name and email prefilled. */
+function noteFrom(detected: DetectedPerson | null): string {
+  return [detected?.detail, detected?.relation].filter((s) => s && s.trim()).join('. ');
+}
+
+/** Spec: no match, so offer "Create person" with the detected name, email, handle, and note prefilled. */
 function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null; onCreated: (card: PersonCard) => void }) {
   const [name, setName] = useState(detected?.name ?? '');
   const [email, setEmail] = useState(detected?.email ?? '');
-  const [note, setNote] = useState('');
+  const [handle, setHandle] = useState(detected?.handle ?? '');
+  const [note, setNote] = useState(noteFrom(detected));
   const { busy, error, run } = useAction();
   const create = () =>
     void run(async () => {
@@ -86,7 +91,7 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
         await glossly.invoke('people:create', {
           name: name.trim(),
           ...(email.trim() && { email: email.trim() }),
-          ...(detected?.handle && { handle: detected.handle }),
+          ...(handle.trim() && { handle: handle.trim().replace(/^@+/, '') }),
           ...(note.trim() && { note: note.trim() }),
         }),
       );
@@ -103,6 +108,7 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
       <div className="form-grid">
         <input value={name} placeholder="Name" aria-label="Name" spellCheck={false} onChange={(e) => setName(e.target.value)} />
         <input value={email} placeholder="Email (optional)" aria-label="Email" spellCheck={false} onChange={(e) => setEmail(e.target.value)} />
+        <input value={handle} placeholder="Handle (optional)" aria-label="Handle" spellCheck={false} onChange={(e) => setHandle(e.target.value)} />
         <input className="wide" value={note} placeholder="How do you know them? (optional)" aria-label="Note" onChange={(e) => setNote(e.target.value)} />
       </div>
       <div className="row-tight">
@@ -132,6 +138,16 @@ export function WhoPanel({ s }: { s: OverlayState }) {
       live = false;
     };
   }, [s.sessionId]);
+
+  const turnOffLocalOnly = () => {
+    setView(null);
+    setFailed(false);
+    void glossly
+      .invoke('settings:set', { key: 'localOnly', value: false })
+      .then(() => glossly.invoke('who:get', { sessionId: s.sessionId }))
+      .then((v) => setView(v))
+      .catch(() => setFailed(true));
+  };
 
   const entries = view?.entries ?? [];
   const entry = entries[Math.min(index, entries.length - 1)];
@@ -186,6 +202,24 @@ export function WhoPanel({ s }: { s: OverlayState }) {
           <span>Add your name so Glossly can leave you out of this list.</span>
           <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'profile' })}>
             Add your name
+          </button>
+        </div>
+      )}
+      {view?.local === 'local_only' && (
+        <div className="inline-note">
+          <Info size={14} strokeWidth={1.75} aria-hidden />
+          <span>Local only is on, so this list is from the text only.</span>
+          <button className="ghost" onClick={turnOffLocalOnly}>
+            Turn off Local only
+          </button>
+        </div>
+      )}
+      {view?.local === 'no_model' && (
+        <div className="inline-note">
+          <Info size={14} strokeWidth={1.75} aria-hidden />
+          <span>No model is set up, so this list is from the text only.</span>
+          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>
+            Add a key
           </button>
         </div>
       )}

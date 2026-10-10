@@ -1,10 +1,15 @@
-// "Who is this": the people in a selection, each resolved against the people layer. Local
-// only; no model call.
-import { detectPeople, type DetectedPerson, type DetectInput, type Detection } from '../people/detect';
+// "Who is this": one Fast structured call when Who opens, then code keeps or drops each row.
+// Local only and no key stay on the strict text pass. People are never created here.
+import { z } from 'zod';
+import whoPrompt from '../../prompts/who.md?raw';
+import type { LlmProvider } from '../llm/types';
+import { type DetectedPerson, type DetectInput, type Detection } from '../people/detect';
+import { describeIdentity } from '../people/names';
+import { acceptWhoRows, localWho, whoCorpus } from '../people/who-judge';
 import { resolvePerson } from '../people/resolve';
 import type { PersonCard } from '../people/types';
 import type { KnownPerson } from '../router/types';
-import type { Identity } from '../settings';
+import type { Identity, Settings } from '../settings';
 import type { PeopleRepo } from '../store/people';
 import type { ContainerContext, SelectionPayload } from '../types';
 
@@ -18,11 +23,29 @@ export interface WhoEntry {
   person: PersonCard | null;
 }
 
+export type WhoLocal = null | 'local_only' | 'no_model';
+
 export interface WhoView {
   entries: WhoEntry[];
   /** False until the user entered their name, so "me" can't be told apart yet. */
   identitySet: boolean;
+  /** Set when the list was read from the text only, with no model-written note. */
+  local: WhoLocal;
 }
+
+export const WhoPeopleSchema = z.object({
+  people: z.array(
+    z.object({
+      name: z.string(),
+      email: z.string(),
+      handle: z.string(),
+      role: z.string(),
+      relation: z.string(),
+      confidence: z.number().min(0).max(1),
+      evidence: z.string(),
+    }),
+  ),
+});
 
 export interface PersonBadge {
   kind: 'person';
@@ -44,7 +67,7 @@ export function detectInputFor(selection: SelectionPayload, container?: Containe
   return { ...base, before: selection.context_before, after: selection.context_after };
 }
 
-export function buildWho(repo: PeopleRepo, detection: Detection, sourceApp: string, identitySet: boolean): WhoView {
+export function buildWho(repo: PeopleRepo, detection: Detection, sourceApp: string, identitySet: boolean, local: WhoLocal = null): WhoView {
   const entries: WhoEntry[] = [];
   const seen = new Set<string>();
   detection.people.forEach((d, i) => {
@@ -56,7 +79,63 @@ export function buildWho(repo: PeopleRepo, detection: Detection, sourceApp: stri
     const person = r.kind === 'none' ? null : repo.card(r.personId);
     entries.push({ key: `${i}:${d.email ?? d.handle ?? d.name}`, detected: d, match: person ? r.kind : 'none', score: r.kind === 'fuzzy' ? r.score : null, person });
   });
-  return { entries, identitySet };
+  return { entries, identitySet, local };
+}
+
+const WHO_CORPUS_CHARS = 8000;
+
+export function buildWhoPrompt(identity: Identity, input: DetectInput): string {
+  return [
+    '## The user',
+    describeIdentity(identity) ?? 'Unknown. Do not guess who the user is.',
+    '',
+    `## Captured text (from ${input.source_app})`,
+    input.window_title ? `Window: ${input.window_title}` : '',
+    '<text>',
+    whoCorpus(input).slice(0, WHO_CORPUS_CHARS),
+    '</text>',
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
+}
+
+/**
+ * Who opened. One Fast call (action "who") when a model is available; code then accepts the
+ * rows. Local only, or no Fast model, reads the text only and leaves the note blank.
+ */
+export async function identifyWho(
+  llm: LlmProvider,
+  repo: PeopleRepo,
+  settings: Pick<Settings, 'identity' | 'localOnly'>,
+  selection: SelectionPayload,
+  container: ContainerContext | null | undefined,
+  signal?: AbortSignal,
+): Promise<WhoView> {
+  const input = detectInputFor(selection, container);
+  const identitySet = settings.identity.name.trim().length > 0;
+  const local: WhoLocal = settings.localOnly ? 'local_only' : llm.hasModel('fast') ? null : 'no_model';
+  const people =
+    local !== null
+      ? localWho(input, settings.identity)
+      : acceptWhoRows(
+          (
+            await llm.structured(
+              {
+                role: 'fast',
+                action: 'who',
+                instructions: whoPrompt,
+                prompt: buildWhoPrompt(settings.identity, input),
+                signal,
+                temperature: 0,
+                maxOutputTokens: 1000,
+              },
+              WhoPeopleSchema,
+            )
+          ).people,
+          whoCorpus(input),
+          settings.identity,
+        );
+  return buildWho(repo, { people, author: null, authorIsMe: false }, selection.source_app, identitySet, local);
 }
 
 export function whoFor(
@@ -64,10 +143,10 @@ export function whoFor(
   selection: SelectionPayload,
   container: ContainerContext | null | undefined,
   identity: Identity,
-  known: KnownPerson[],
+  _known: KnownPerson[],
 ): WhoView {
-  const detection = detectPeople(detectInputFor(selection, container), identity, known);
-  return buildWho(repo, detection, selection.source_app, identity.name.trim().length > 0);
+  const people = localWho(detectInputFor(selection, container), identity);
+  return buildWho(repo, { people, author: null, authorIsMe: false }, selection.source_app, identity.name.trim().length > 0, null);
 }
 
 /**

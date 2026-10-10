@@ -13,6 +13,10 @@ export interface DetectedPerson {
   role: 'author' | 'mentioned';
   /** Set when the name or an alias of a known person appears in the text. */
   knownId: string | null;
+  /** Model-written role ("recruiter at NVIDIA"). Blank on the local pass. */
+  detail?: string | null;
+  /** Model-written relation. Blank on the local pass. */
+  relation?: string | null;
 }
 
 export interface Detection {

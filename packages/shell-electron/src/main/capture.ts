@@ -14,7 +14,7 @@ import {
   resolvePerson,
   savePromises,
   personBadges,
-  whoFor,
+  identifyWho,
   gateApp,
   gateAutoSelection,
   isoNow,
@@ -96,6 +96,8 @@ interface Session {
   pill: PillTiming | null;
   /** The running "What did I promise" extraction. */
   promisesCtl: AbortController | null;
+  /** The running "Who is this" read. */
+  whoCtl: AbortController | null;
   /** Who wrote the selected message, from the last extraction: their person id (exact match only) and whether it was the user. */
   author: { personId: string | null; isMe: boolean } | null;
   /** The latest Reply request: drafts done, and whether one was inserted or copied (else it counts as discarded). */
@@ -352,6 +354,7 @@ export class Capture {
         obstacles: obstacleInfo,
         pill: { wait_ms: wait.ms, reason: wait.reason, polls: poll.polls, found: poll.found, baseline: before !== null },
         promisesCtl: null,
+        whoCtl: null,
         author: null,
         reply: null,
       };
@@ -541,6 +544,7 @@ export class Capture {
       obstacles: [],
       pill: null,
       promisesCtl: null,
+      whoCtl: null,
       author: null,
       reply: null,
     };
@@ -795,13 +799,28 @@ export class Capture {
 
   // ---- people ----
 
-  /** "Who is this": the people in the selection, resolved against the people layer. */
+  /** "Who is this": one model read when one is available, then code keeps or drops each row. */
   async who(sessionId: number): Promise<WhoView> {
     const s = this.current(sessionId);
     const identity = this.settings.identity;
-    if (!s?.selection) return { entries: [], identitySet: identity.name.trim().length > 0 };
-    const container = (await s.container) ?? null;
-    return whoFor(this.services.people, s.selection, container, identity, this.services.store.listKnownPeople());
+    const empty: WhoView = { entries: [], identitySet: identity.name.trim().length > 0, local: null };
+    if (!s?.selection) return empty;
+    s.whoCtl?.abort();
+    const ctl = new AbortController();
+    s.whoCtl = ctl;
+    const t = performance.now();
+    try {
+      const container = (await s.container) ?? null;
+      const view = await identifyWho(this.services.llm, this.services.people, this.settings, s.selection, container, ctl.signal);
+      log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', ms: ms(t) });
+      return view;
+    } catch (e) {
+      const code = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
+      if (code !== 'aborted') log.error('who failed', { code });
+      throw e;
+    } finally {
+      if (s.whoCtl === ctl) s.whoCtl = null;
+    }
   }
 
   // ---- Reply ----
@@ -1133,6 +1152,7 @@ export class Capture {
     if (!s) return;
     s.routeCtl?.abort();
     s.promisesCtl?.abort();
+    s.whoCtl?.abort();
     s.reply?.ctl.abort();
     if (s.reply?.done && !s.reply.used) this.services.metrics.record('reply_discarded');
     this.cancelAsks(s);

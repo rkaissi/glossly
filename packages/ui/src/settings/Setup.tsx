@@ -35,7 +35,7 @@ function Welcome({ view }: { view: SettingsView }) {
           <li>It never records keystrokes; the hotkey is its only keyboard shortcut. Password fields and password managers are never read.</li>
           <li>
             Everything is stored on this computer. Selected text goes only to the provider whose key you add: when the bar opens, to pick actions, and
-            when you click Ask, Save, Reply, or What did I promise. Turn on Local only in Settings and nothing is sent at all.
+            when you click Ask, Save, Reply, Who is this, or What did I promise. Turn on Local only in Settings and nothing is sent at all.
           </li>
         </ul>
       </div>

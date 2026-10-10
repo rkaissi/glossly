@@ -4,7 +4,7 @@ Read this first (and `AGENTS.md` for the standing working rules), then `docs/Hig
 
 ## Scope
 
-Phases 0 and 1 are built and written up in `STATUS.md` (Steps 1 to 11). Rayan reviewed them on Oct 10 and widened the scope. Phase 2 is built (Step 15). The order from here is: the bugs and easy wins from his Oct 10 afternoon use (Step 15.5), then Phase 3 and the Windows parts of Phase 4, then one `pnpm eval` run, then `electron-builder` packaging, then local model support, then in-app todos and calendar, then visual polish. A subscription is parked. Details are in "Next steps" below. Commit to `main` per chunk, update this file and `STATUS.md` at the end of each phase (spec: "Instructions for the coding agent", item 8), and stop after each chunk to hand off.
+Phases 0 and 1 are built and written up in `STATUS.md` (Steps 1 to 11). Rayan reviewed them on Oct 10 and widened the scope. Phase 2 is built (Step 15), and the Oct 10 afternoon bugs are fixed (Step 15.5). The order from here is Phase 3 and the Windows parts of Phase 4, then one `pnpm eval` run, then `electron-builder` packaging, then local model support, then in-app todos and calendar, then visual polish. A subscription is parked. Details are in "Next steps" below. Commit to `main` per chunk, update this file and `STATUS.md` at the end of each phase (spec: "Instructions for the coding agent", item 8), and stop after each chunk to hand off.
 
 For the follow-ups, Phase 0 and 1 sections of the spec still apply. Phases 2 and up use People layer, Reply, Recall, Visualize, Data model, Evals and local metrics, and Milestones. macOS work (the Swift helper and macOS onboarding) waits for a Mac; keep everything outside `helpers/windows` OS-neutral.
 
@@ -386,6 +386,16 @@ The Save confirmation now reads "Saved to Notes · just now". Each row in a pers
 
 Insert already stores the text the panel sends, which is the edited draft when one was typed (`insertReply` trims that string and marks it `inserted_edited`). `voiceForPrompt` still puts pasted samples first, then edited inserts, then other inserts, newest first within each group, and still caps at 5. The Reply panel says "Edits are remembered." No new learner.
 
+### Step 15.5.8: Who is this reads with a model, and code keeps the rows (Oct 10)
+
+341 unit tests pass (new: `core/src/people/who-judge.test.ts`; `names.test.ts` covers the wider `isMe`); `pnpm typecheck` is clean. Not run live yet.
+
+- **When Who opens, one Fast call.** `identifyWho` (`actions/who.ts`) sends action `who`, temperature 0, on the tier-2 text (capped at 8,000 characters). It does not run on pill show or on every highlight. `prompts/who.md` says an empty list is right, button labels are not people, use the full name, and don't emit the user. The schema is name, email, handle, role, relation, confidence, and evidence.
+- **Code then keeps or drops rows** (`people/who-judge.ts`). Confidence under 0.7 goes. The evidence quote has to be a substring, and the name, email, or handle has to appear in the text. A name that is only a button label (Reply, Add Reaction, Edit Edit, and the rest of that list) is dropped even when the words are on screen. Fragments of one name collapse to the longest form. Every email and `@handle` in the text is kept, including a parenthetical such as `(mc)` between the name and the address, and a handle in the window title. The cap of 8 is after those filters. The user is dropped through a wider `isMe`: exact name, first name alone, first name plus the last name or its initial with middle tokens allowed ("Alex", "Alex M", and "Alex Hale-Morgan" for profile "Alex Morgan"), any profile email, and any profile handle.
+- **Local only, or no Fast model, skips the call.** A strict local pass keeps emails, `@handles`, From/To/Cc lines, sign-offs, and real speakers (including a name on its own line with the time on the next line). It does not keep a bare capitalized pair, and it writes no role or relation. The panel says so in one line, with "Turn off Local only" or "Add a key".
+- **The panel waits.** It already showed "Looking up people…" until `who:get` returns, so regex chips are not painted first. Create person prefills name, email, handle, and a note joined from the role and the relation, all editable. Nothing is created or merged without a confirm. Reply's author and the person badge still use `detectPeople`, so those paths are unchanged.
+- **Fixtures** (fictional people, in `who-judge.test.ts`): the email keeps Maya Chen, Priya Shah, Lena Ortiz, and Sam Okonkwo, with the two addresses attached, and drops Alex plus the Outlook chrome. Discord keeps only quinn.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -435,7 +445,7 @@ Decision 13. Inspiration: the ChatGPT and Codex desktop apps. Refined and modern
 
 Rayan fills in `evals/capture.md`. Fix what it turns up (apps where UIA reads nothing, pill placement next to real toolbars, additions to `DEFAULT_HOTKEY_ONLY`), and record results in `STATUS.md`. This is the remaining Phase 0 sign-off, and it can happen in parallel with Steps 15 to 17.
 
-### Step 15.5: bugs and easy wins from the Oct 10 afternoon use (in progress)
+### Step 15.5: bugs and easy wins from the Oct 10 afternoon use (done)
 
 Do these before Phase 3. Bugs first, and the small ones before the people rewrite. Commit after each numbered chunk, then one live check at the end of the step (Composer or Grok subagent; real Discord and Outlook-on-the-web cases if Rayan is at the machine, plus the two fixtures below). Respect Local only (decision 12) and the Step 13 design.
 
@@ -447,7 +457,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
 6. ~~**Show when a snippet was saved.**~~ Done, see Step 15.5.6 above. Original notes: `items.created_at` already exists and isn't shown on the Save confirmation or the person's Saved list. Show it there ("Saved to Notes · just now", and the day on each saved row). Recall cards in Step 16 show it too.
 7. ~~**Reply edits are already kept.**~~ Done, see Step 15.5.7 above. Original notes: An inserted draft is stored as a voice sample, `inserted` or `inserted_edited` (Step 15.4), and the next Reply prompt gets up to 5 samples, pasted ones first. In this step, only check that the text stored is the edited text, put the newest edits ahead of older inserted ones, and add one line on the draft ("Edits are remembered"). No new learner.
 
-8. **Who is this identifies the wrong people.** This is the important bug. Regex is the whole implementation (`people/detect.ts` calls `extractFeatures`; `actions/who.ts` says it makes no model call). On Rayan's two captures it both invents people and misses the real ones.
+8. ~~**Who is this identifies the wrong people.**~~ Done, see Step 15.5.8 above. Original notes: This is the important bug. Regex is the whole implementation (`people/detect.ts` calls `extractFeatures`; `actions/who.ts` says it makes no model call). On two captures it both invents people and misses the real ones.
 
    What the regex does today, and why those screenshots look like that:
    - `NAME_PAIR` is any two capitalized words, and `\s` matches newlines, so Discord's stacked button labels become "Edit Edit" and "Forward Forward". "Add Reaction" is a pair. Outlook's "Reactions" and "Reply" become "Reactions Reply". "Cc" after a hyphenated surname becomes "Morgan Cc".
@@ -499,11 +509,11 @@ Respect Local only (decision 12) in every new model call, and apply the Step 13 
 
 ## Open questions for Rayan
 
-**Who is this, when the model call runs (before chunk 8).** Decision 14 stands: one Fast-role structured call, code accepts or drops the rows, and Local only or no key stays on the strict local pass. The plan runs that call when Who opens, not on every highlight (the router already spends a call per bar, and Groq's free tier is per model). Rayan is unsure that is the right moment: only when Who opens, only after code has already found a candidate, or folded into the router's existing call with more JSON fields. Confirm before chunk 8. Do not run it on every highlight unless he says so.
+**Who is this, when the model call runs.** Built as written in Step 15.5.8: one Fast call when Who opens, not on every highlight, and not folded into the router. Local only or no key stays on the strict local pass. The other timings (only after code has already found someone, or extra fields on the router call) were not changed.
 
 Answered on Oct 10: pill speed (stay careful about toolbars, make it faster, never move a visible pill), router timeout (raise it), Delete all data (keep keys and settings; add Reset settings), Local only (strict; local models later), packaging (after all phases), the eval run (once, at the end), the redesign direction, and the scope (all Windows phases before packaging).
 
-Answered the same afternoon, from the Discord and Outlook screenshots and the written list: people identification (model reads, code accepts; see decision 14 and Step 15.5), no word minimum, the bar and slot flicker, Save's collection, delete confirms, snippet timestamps, empty-selection search and paste, a save hotkey, Ask memory, todos then Google sync, privacy as a choice, polish, and a subscription parked. Step 15.5 is in progress: chunks 1 to 7 are done, chunk 8 (Who is this) is next.
+Answered the same afternoon, from the afternoon screenshots and the written list: people identification (model reads, code accepts; see decision 14 and Step 15.5), no word minimum, the bar and slot flicker, Save's collection, delete confirms, snippet timestamps, empty-selection search and paste, a save hotkey, Ask memory, todos then Google sync, privacy as a choice, polish, and a subscription parked. Step 15.5 is done. Next is Step 16.
 
 ## Things Rayan has to do himself
 

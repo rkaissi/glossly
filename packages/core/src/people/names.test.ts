@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeIdentity, hasIdentity, isMe, jaroWinkler, normalizeHandle } from './names';
 
-const me = { name: 'Rayan Kaissi', emails: ['rayan@example.com'], handles: ['rayank'] };
+const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: ['alexm'] };
 
 describe('jaroWinkler', () => {
   it('scores the classic examples', () => {
@@ -20,18 +20,21 @@ describe('jaroWinkler', () => {
 
 describe('identity', () => {
   it('recognizes the user by name, first name alone, email, and handle', () => {
-    expect(isMe('Rayan Kaissi', me)).toBe(true);
-    expect(isMe('rayan', me)).toBe(true);
-    expect(isMe('Rayan Smith', me)).toBe(false);
-    expect(isMe('RAYAN@example.com', me)).toBe(true);
+    expect(isMe('Alex Morgan', me)).toBe(true);
+    expect(isMe('alex', me)).toBe(true);
+    expect(isMe('Alex M', me)).toBe(true);
+    expect(isMe('Alex Hale-Morgan', me)).toBe(true);
+    expect(isMe('Alex Hale', me)).toBe(false);
+    expect(isMe('Alex Smith', me)).toBe(false);
+    expect(isMe('ALEX@example.com', me)).toBe(true);
     expect(isMe('other@example.com', me)).toBe(false);
-    expect(isMe('@RayanK', me)).toBe(true);
+    expect(isMe('@AlexM', me)).toBe(true);
     expect(isMe('Maya Lin', me)).toBe(false);
     expect(isMe('', me)).toBe(false);
-    expect(isMe('Rayan', { name: '', emails: [], handles: [] })).toBe(false);
+    expect(isMe('Alex', { name: '', emails: [], handles: [] })).toBe(false);
   });
   it('describes the identity for prompts', () => {
-    expect(describeIdentity(me)).toBe('Rayan Kaissi (also: rayan@example.com, @rayank)');
+    expect(describeIdentity(me)).toBe('Alex Morgan (also: alex@example.com, @alexm)');
     expect(describeIdentity({ name: '  ', emails: [], handles: [] })).toBeNull();
     expect(hasIdentity({ name: 'A', emails: [], handles: [] })).toBe(true);
     expect(normalizeHandle(' @@Sam.Lee ')).toBe('sam.lee');

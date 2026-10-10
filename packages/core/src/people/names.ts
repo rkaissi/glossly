@@ -68,10 +68,19 @@ export function isMe(value: string | null | undefined, id: Identity): boolean {
   const mine = canonicalize(id.name);
   if (!c || !mine) return false;
   if (c === mine) return true;
-  return !c.includes(' ') && c === mine.split(' ')[0];
+  const mineTokens = mine.split(/[\s-]+/).filter(Boolean);
+  const theirTokens = c.split(/[\s-]+/).filter(Boolean);
+  if (!mineTokens.length || !theirTokens.length || theirTokens[0] !== mineTokens[0]) return false;
+  // A single token equal to the first name ("Alex").
+  if (theirTokens.length === 1) return true;
+  // First name plus the last name or its initial. Extra middle tokens are fine
+  // ("Alex M", "Alex Hale-Morgan" for "Alex Morgan").
+  const last = mineTokens[mineTokens.length - 1]!;
+  const initial = last[0] ?? '';
+  return theirTokens.slice(1).some((t) => t === last || t === initial);
 }
 
-/** "Rayan Kaissi (also: rayan@example.com, @rayan)", or null without an identity. */
+/** "Alex Morgan (also: alex@example.com, @alex)", or null without an identity. */
 export function describeIdentity(id: Identity): string | null {
   if (!hasIdentity(id)) return null;
   const also = [...id.emails.map(normalizeEmail), ...id.handles.map((h) => `@${normalizeHandle(h)}`)].filter(Boolean);
