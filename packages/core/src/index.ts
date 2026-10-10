@@ -45,4 +45,7 @@ export * from './actions/who';
 export * from './actions/promises';
 export * from './actions/reply';
 
+export * from './recall/recall';
+export type * from './recall/types';
+
 export type * from './api';

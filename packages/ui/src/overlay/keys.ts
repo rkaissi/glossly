@@ -28,11 +28,11 @@ export type BarCommand =
   | { kind: 'menu'; open: boolean }
   | { kind: 'close' };
 
-/** The bar's actionable items: slots 1 to 4, then More's actions while the menu is open. */
+/** The bar's actionable items: slots 1 to 4 (no Save without a selection), then More's actions while the menu is open. */
 export function barItems(slots: SlotsView | null, hasSelection: boolean, menuOpen: boolean): BarItem[] {
   const items: BarItem[] = [{ slot: 1 }];
-  if (!hasSelection) return items;
-  items.push({ slot: 2 });
+  // Nothing selected: Save is hidden, and slots 3 and 4 hold Search and the paste actions.
+  if (hasSelection) items.push({ slot: 2 });
   if (slots?.slot3) items.push({ slot: 3 });
   if (slots?.slot4) items.push({ slot: 4 });
   if (menuOpen && slots) for (const m of slots.more) items.push({ action: m.action });

@@ -10,7 +10,7 @@ import type { SettingsWindow } from './settings-window';
 
 const log = logger('ipc');
 
-const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize'];
+const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall'];
 const TABS = ['profile', 'people', 'keys', 'models', 'general', 'data', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
@@ -96,6 +96,17 @@ export function registerIpc(deps: IpcDeps): void {
   handle('save:setWhy', (a) => services.save.setWhy(str(a.itemId, 100), str(a.why, 2000)));
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
+
+  // ---- Recall and search ----
+  handle('recall:get', (a) => capture.recallHits(num(a.sessionId)));
+  handle('recall:dismiss', (a) => capture.dismissRecall(num(a.sessionId), str(a.itemId, 100)));
+  handle('recall:ask', (a) => capture.askAboutRecall(num(a.sessionId)));
+  handle('search:query', (a) => capture.search(str(a.query ?? '', 500)));
+  handle('items:copy', (a) => {
+    const item = services.store.getItem(str(a.itemId, 100));
+    if (!item) throw new Error('That item no longer exists.');
+    clipboard.writeText(item.text);
+  });
 
   // ---- Reply ----
   handle('reply:start', (a, e) => capture.startReply(num(a.sessionId), e.sender));

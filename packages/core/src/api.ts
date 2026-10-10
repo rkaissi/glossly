@@ -15,6 +15,7 @@ import type { ContextualAction, ContentType, DecisionProviderId } from './router
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
+import type { RecallHit, SearchResults } from './recall/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, VoiceSample } from './people/types';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
@@ -22,14 +23,16 @@ export type { MetricsSummary } from './metrics';
 export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
+export type { RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 
 // ---- overlay state (main -> overlay renderer) ----
 
-export type ActionId = 'ask' | 'save' | ContextualAction;
+/** `search` is the search box (hotkey with nothing selected); `recall` is the panel behind the Recall badge. */
+export type ActionId = 'ask' | 'save' | ContextualAction | 'search' | 'recall';
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply';
+export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'search' | 'recall';
 
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
 
@@ -300,7 +303,18 @@ export interface InvokeChannels {
   /** Saves the rows the user kept. New people are created; the message is stored with its author. */
   'promises:save': { args: { sessionId: number; rows: PromiseSaveRow[] }; result: { saved: number; created: number } };
 
-  /** The people in the session's selection, each resolved against the people layer. Local only. */
+  /** The Recall cards for the session's selection (spec: Recall), without the ones dismissed. Local. */
+  'recall:get': { args: { sessionId: number }; result: { hits: RecallHit[] } };
+  /** "Not related": hides the card for this selection and logs it (no text) for tuning. */
+  'recall:dismiss': { args: { sessionId: number; itemId: string }; result: void };
+  /** "Ask about these": opens Ask with the cards as its saved notes. */
+  'recall:ask': { args: { sessionId: number }; result: void };
+  /** The search box: saved items, people, and open commitments. Local. */
+  'search:query': { args: { sessionId: number; query: string }; result: SearchResults };
+  /** Copies a saved item's full text. */
+  'items:copy': { args: { itemId: string }; result: void };
+
+  /** The people in the session's selection: one Fast call when a model is available, then code keeps the rows. */
   'who:get': { args: { sessionId: number }; result: WhoView };
 
   // ---- people (overlay and settings) ----

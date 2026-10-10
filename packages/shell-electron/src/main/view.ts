@@ -8,9 +8,14 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   who: 'Who is this',
   promises: 'What did I promise',
   visualize: 'Visualize',
+  search: 'Search',
+  recall: 'Related',
 };
 
-const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply'];
+const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'search', 'recall'];
+/** Actions that read tier 2 when clicked: the ones that send or store the text around the selection. */
+const TIER2: readonly ActionId[] = ['ask', 'save', 'who', 'promises', 'reply'];
+export const needsTier2 = (a: ActionId) => TIER2.includes(a);
 export const isAvailable = (a: ActionId): a is AvailableAction => (AVAILABLE as readonly string[]).includes(a);
 
 function slot(action: ActionId, score?: number): SlotView {
@@ -30,6 +35,22 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
     provider: r.decisions.provider,
     fallback: r.fallback,
     route_ms: Math.round(r.ms),
+  };
+}
+
+/** The bar with nothing selected: Ask, and Search in slot 3. Save is hidden (there is nothing to save). */
+export function emptySlotsView(): SlotsView {
+  return {
+    slot1: slot('ask'),
+    slot2: { ...slot('save'), collection: '' },
+    slot3: slot('search'),
+    slot4: null,
+    more: [],
+    stage: 'rules',
+    content_type: null,
+    provider: null,
+    fallback: null,
+    route_ms: null,
   };
 }
 

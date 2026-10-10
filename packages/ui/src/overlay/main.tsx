@@ -2,7 +2,7 @@
 // pushes OverlayState; this side only renders it and sends clicks and keys back.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { EyeOff, Info, Settings, UserRound, X } from 'lucide-react';
+import { EyeOff, History, Info, Settings, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { ActionIcon, GlosslyMark } from '../icons';
@@ -13,8 +13,10 @@ import { Debug } from './Debug';
 import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { PromisesPanel } from './PromisesPanel';
+import { RecallPanel } from './RecallPanel';
 import { ReplyPanel } from './ReplyPanel';
 import { SavePanel } from './SavePanel';
+import { SearchPanel } from './SearchPanel';
 import { WhoPanel } from './WhoPanel';
 
 // Main loads the page with ?material=acrylic when the window is Windows 11 acrylic glass.
@@ -190,7 +192,7 @@ function Expanded({ s }: { s: OverlayState }) {
   const ask: SlotView = slots?.slot1 ?? { action: 'ask', label: 'Ask', available: true };
   const save: SlotView = slots?.slot2 ?? { action: 'save', label: 'Save', available: true };
   const more = slots?.more ?? [];
-  const strip = Boolean(s.notice) || !s.hasSelection;
+  const strip = Boolean(s.notice) || (!s.hasSelection && s.panel !== 'search');
   const frameCls = [
     'frame',
     s.placement?.side === 'above' && 'above',
@@ -207,7 +209,8 @@ function Expanded({ s }: { s: OverlayState }) {
       <div className="row">
         <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
         {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
-        {slotButton({ slot: 2 }, save, { cls: 'save', disabled: !s.hasSelection })}
+        {/* Nothing selected: nothing to save, so Search and the paste actions sit next to Ask. */}
+        {s.hasSelection && slotButton({ slot: 2 }, save, { cls: 'save' })}
         {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
         {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
         {s.badges.map((b) =>
@@ -218,9 +221,11 @@ function Expanded({ s }: { s: OverlayState }) {
               {badgeLabel(b)}
             </button>
           ) : (
-            <span key="recall" className="badge">
+            // Saved items related to this selection: opens the Recall cards.
+            <button key="recall" className="badge" title="What you saved before that relates to this" onClick={() => run(id, { action: 'recall' })}>
+              <History size={13} strokeWidth={1.75} aria-hidden />
               {badgeLabel(b)}
-            </span>
+            </button>
           ),
         )}
       </div>
@@ -283,10 +288,10 @@ function Expanded({ s }: { s: OverlayState }) {
           <span>{s.notice}</span>
         </div>
       )}
-      {!s.hasSelection && !s.notice && (
+      {!s.hasSelection && !s.notice && s.panel !== 'search' && (
         <div className="strip">
           <Info size={15} strokeWidth={1.75} aria-hidden />
-          <span>Nothing selected. Ask a question, or select text and press the hotkey again.</span>
+          <span>Nothing selected. Search what you saved, ask a question, or select text and press the hotkey again.</span>
         </div>
       )}
 
@@ -302,6 +307,10 @@ function Expanded({ s }: { s: OverlayState }) {
           <PromisesPanel key="promises" s={s} />
         ) : s.panel === 'reply' ? (
           <ReplyPanel key="reply" s={s} />
+        ) : s.panel === 'search' ? (
+          <SearchPanel key="search" s={s} />
+        ) : s.panel === 'recall' ? (
+          <RecallPanel key="recall" s={s} />
         ) : (
           <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
         ))}

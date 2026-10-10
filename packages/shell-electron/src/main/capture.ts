@@ -24,6 +24,8 @@ import {
   mayCopyFallback,
   pillWait,
   reply,
+  recall as recallFor,
+  search as searchSaved,
   placeBar,
   placePill,
   pollForToolbar,
@@ -43,6 +45,8 @@ import {
   type ReplyInsertResult,
   type ReplyStart,
   type ReplyTo,
+  type RecallHit,
+  type SearchResults,
   type Placement,
   type Point,
   type Rect,
@@ -52,12 +56,13 @@ import {
   type SelectionContext,
   type Trigger,
   type WhoView,
+  type Item,
 } from '@glossly/core';
 import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { actionForSlot, contains, distanceToRect, growFrom, holdForRoute, isAvailable, mergeRoute, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { actionForSlot, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
@@ -102,6 +107,14 @@ interface Session {
   author: { personId: string | null; isMe: boolean } | null;
   /** The latest Reply request: drafts done, and whether one was inserted or copied (else it counts as discarded). */
   reply: { requestId: string; ctl: AbortController; personId: string | null; done: boolean; used: boolean } | null;
+  /** Recall cards for the selection, once found (null until then). */
+  recall: RecallHit[] | null;
+  /** Cards dismissed as "not related" in this session. */
+  recallDismissed: Set<string>;
+  /** "Ask about these": the saved items Ask uses instead of the top recall hits. */
+  askRelated: string[] | null;
+  /** Hotkey with nothing selected: whether the focused control takes text (null when unknown). */
+  focusEditable: boolean | null;
 }
 
 /** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
@@ -357,6 +370,10 @@ export class Capture {
         whoCtl: null,
         author: null,
         reply: null,
+        recall: null,
+        recallDismissed: new Set(),
+        askRelated: null,
+        focusEditable: null,
       };
       this.session = session;
       this.overlay.update(
@@ -462,6 +479,7 @@ export class Capture {
     let notice: string | null = null;
     let selection: SelectionPayload | null = null;
     let physBounds: Rect | null = null;
+    let focusEditable: boolean | null = null;
 
     try {
       let t = performance.now();
@@ -490,6 +508,7 @@ export class Capture {
             else if (e instanceof HelperError && (e.code === 'closed' || e.code === 'timeout')) throw e;
           }
           timings.selection = ms(t);
+          focusEditable = sel ? sel.is_editable : null;
           let text = sel?.text ?? '';
           let method: SelectionPayload['method'] = sel?.method ?? 'uia';
           if (sel?.bounds && text.trim()) physBounds = sel.bounds;
@@ -547,6 +566,10 @@ export class Capture {
       whoCtl: null,
       author: null,
       reply: null,
+      recall: null,
+      recallDismissed: new Set(),
+      askRelated: null,
+      focusEditable,
     };
     this.session = session;
 
@@ -559,25 +582,32 @@ export class Capture {
     session.route = quick;
     timings.total = ms(t0);
     this.focusOverlay(true);
-    this.overlay.update(
-      {
-        ...HIDDEN_STATE,
-        sessionId: session.id,
-        mode: 'bar',
-        placement,
-        keyboard: true,
-        hasSelection: Boolean(selection),
-        wordCount: selection ? countWords(selection.text) : 0,
-        siteKey: session.siteKey,
-        debug: this.debugFor(session),
-        slots: this.initialSlots(quick),
-        badges: this.badgesFor(session),
-        notice: notice ?? this.takeNotice(),
-      },
-      placement.rect,
-    );
+    const common = {
+      ...HIDDEN_STATE,
+      sessionId: session.id,
+      keyboard: true,
+      hasSelection: Boolean(selection),
+      wordCount: selection ? countWords(selection.text) : 0,
+      siteKey: session.siteKey,
+      debug: this.debugFor(session),
+      badges: this.badgesFor(session),
+      notice: notice ?? this.takeNotice(),
+    };
+    if (selection) {
+      this.overlay.update({ ...common, mode: 'bar', placement, slots: this.initialSlots(quick) }, placement.rect);
+    } else {
+      // Nothing selected: the search box opens at once, under Ask and Search.
+      const rect = growFrom(placement.rect, placement.side, SIZES.panel, workArea(session.anchor));
+      this.overlay.update(
+        { ...common, mode: 'panel', panel: 'search', placement: { mode: 'pill', side: placement.side, rect }, slots: emptySlotsView() },
+        rect,
+      );
+    }
     this.services.metrics.record('bar_shown', { trigger: 'hotkey', ms: timings.total, has_selection: Boolean(selection) });
-    if (selection) void this.routeModel(session);
+    if (selection) {
+      void this.routeModel(session);
+      void this.runRecall(session);
+    }
   }
 
   /**
@@ -646,6 +676,7 @@ export class Capture {
     );
     this.services.metrics.record('bar_shown', { trigger: viaHotkey ? 'hotkey' : 'auto', ms: ms(s.t0) });
     void this.routeModel(s);
+    void this.runRecall(s);
   }
 
   private async readTier1(s: Session): Promise<void> {
@@ -720,11 +751,12 @@ export class Capture {
     if (!s) return;
     const action = 'slot' in target ? actionForSlot(this.state.slots, target.slot) : target.action;
     if (!action) return;
-    if (!s.selection && action !== 'ask') return;
+    if (!s.selection && action !== 'ask' && action !== 'search') return;
     this.stopWatch();
     this.services.metrics.record('action_clicked', { action, ms: ms(s.t0), trigger: s.trigger });
+    if (action === 'recall') this.services.metrics.record('recall_opened', { count: this.visibleRecall(s).length });
 
-    if (isAvailable(action) && s.selection) await this.readTier2(s);
+    if (needsTier2(action) && s.selection) await this.readTier2(s);
     if (!this.current(sessionId)) return;
 
     const from = this.state.placement?.rect ?? this.overlay.bounds();
@@ -1012,13 +1044,79 @@ export class Capture {
   /** Person badges from tier 1 (local, a few ms): a known person with open commitments or a note. */
   private badgesFor(s: Session): OverlayState['badges'] {
     if (!s.selection) return [];
+    const related = this.visibleRecall(s).length;
+    const recall: OverlayState['badges'] = related > 0 ? [{ kind: 'recall', count: related }] : [];
     try {
       const detection = detectPeople(detectInputFor(s.selection, null), this.settings.identity, this.services.store.listKnownPeople());
-      return personBadges(this.services.people, detection, s.selection.source_app);
+      return [...personBadges(this.services.people, detection, s.selection.source_app), ...recall];
     } catch (e) {
       log.warn('person badges failed', errorInfo(e));
-      return [];
+      return recall;
     }
+  }
+
+  // ---- Recall and search ----
+
+  private recallDeps() {
+    const sv = this.services;
+    return { store: sv.store, embedder: () => sv.embed.embedder(), settings: () => sv.settings };
+  }
+
+  private visibleRecall(s: Session): RecallHit[] {
+    return (s.recall ?? []).filter((h) => !s.recallDismissed.has(h.itemId));
+  }
+
+  /** Runs with the router (spec: Recall), on the selection; the badge appears when something is related. */
+  private async runRecall(s: Session): Promise<void> {
+    if (!s.selection || s.recall) return;
+    const t = performance.now();
+    try {
+      const hits = await recallFor(this.recallDeps(), { text: s.selection.text, personIds: s.route?.features.knownPeople ?? [] });
+      if (!this.current(s.id)) return;
+      s.recall = hits;
+      s.timings.recall = ms(t);
+      if (hits.length === 0) return;
+      this.overlay.patch({ badges: this.badgesFor(s), debug: this.debugFor(s) });
+      this.services.metrics.record('recall_shown', {
+        count: hits.length,
+        entity: hits.filter((h) => h.reason !== 'similar_topic').length,
+        ms: s.timings.recall,
+      });
+    } catch (e) {
+      log.warn('recall failed', errorInfo(e));
+    }
+  }
+
+  recallHits(sessionId: number): { hits: RecallHit[] } {
+    const s = this.current(sessionId);
+    return { hits: s ? this.visibleRecall(s) : [] };
+  }
+
+  dismissRecall(sessionId: number, itemId: string): void {
+    const s = this.current(sessionId);
+    const hit = s?.recall?.find((h) => h.itemId === itemId);
+    if (!s || !hit) return;
+    s.recallDismissed.add(itemId);
+    this.services.metrics.record('recall_dismissed', { reason: hit.reason, ...(hit.similarity !== null && { similarity: Math.round(hit.similarity * 100) / 100 }) });
+    this.overlay.patch({ badges: this.badgesFor(s) });
+  }
+
+  /** "Ask about these": Ask opens with the cards as its saved notes. */
+  async askAboutRecall(sessionId: number): Promise<void> {
+    const s = this.current(sessionId);
+    if (!s) return;
+    s.askRelated = this.visibleRecall(s).map((h) => h.itemId);
+    await this.run(sessionId, { action: 'ask' });
+  }
+
+  async search(query: string): Promise<SearchResults> {
+    return searchSaved({ ...this.recallDeps(), people: this.services.people }, query);
+  }
+
+  /** Saved notes for Ask: the cards picked with "Ask about these", else the top recall hits. */
+  private askNotes(s: Session): Item[] {
+    const ids = s.askRelated ?? this.visibleRecall(s).slice(0, 3).map((h) => h.itemId);
+    return this.services.store.itemsWithCollection(ids);
   }
 
   // ---- Ask and Save ----
@@ -1056,7 +1154,7 @@ export class Capture {
       let firstMs: number | null = null;
       try {
         const container = (await s.container) ?? null;
-        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: [] }, ctl.signal);
+        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: this.askNotes(s) }, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
           send('ask:chunk', { requestId, text });

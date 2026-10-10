@@ -183,6 +183,66 @@ export class Store {
     this.db.prepare('UPDATE items SET why = ? WHERE id = ?').run(why, id);
   }
 
+  /** Items with their collection's name, in the order of `ids`. Missing ids are skipped. */
+  itemsWithCollection(ids: string[]): (Item & { collection: string | null })[] {
+    if (ids.length === 0) return [];
+    const rows = this.db
+      .prepare(`SELECT i.*, c.name AS collection FROM items i LEFT JOIN collections c ON c.id = i.collection_id WHERE i.id IN (${ids.map(() => '?').join(', ')})`)
+      .all(...ids) as unknown as (Item & { collection: string | null })[];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
+  }
+
+  /** Newest first, optionally only since an ISO time. */
+  recentItemIds(limit: number, sinceIso?: string): string[] {
+    const rows = (
+      sinceIso
+        ? this.db.prepare('SELECT id FROM items WHERE created_at >= ? ORDER BY created_at DESC, rowid DESC LIMIT ?').all(sinceIso, limit)
+        : this.db.prepare('SELECT id FROM items ORDER BY created_at DESC, rowid DESC LIMIT ?').all(limit)
+    ) as { id: string }[];
+    return rows.map((r) => r.id);
+  }
+
+  /** Items whose text, note, or window title contains `query` (case-insensitive), newest first. */
+  searchItemText(query: string, limit: number): string[] {
+    const q = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const rows = this.db
+      .prepare(
+        `SELECT id FROM items WHERE text LIKE ? ESCAPE '\\' OR why LIKE ? ESCAPE '\\' OR window_title LIKE ? ESCAPE '\\'
+         ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+      )
+      .all(q, q, q, limit) as { id: string }[];
+    return rows.map((r) => r.id);
+  }
+
+  /** Every person, company, product, and place entity, for matching against a selection. */
+  matchableEntities(): { id: string; kind: EntityKind; canonical: string; display: string }[] {
+    return this.db
+      .prepare("SELECT id, kind, canonical, display FROM entities WHERE kind IN ('person', 'company', 'product', 'place')")
+      .all() as unknown as { id: string; kind: EntityKind; canonical: string; display: string }[];
+  }
+
+  /** Items linked to any of these entities, newest first, with the entity that linked them. */
+  itemsForEntities(entityIds: string[], limit: number): { item_id: string; entity_id: string }[] {
+    if (entityIds.length === 0) return [];
+    return this.db
+      .prepare(
+        `SELECT ie.item_id, ie.entity_id FROM item_entities ie JOIN items i ON i.id = ie.item_id
+         WHERE ie.entity_id IN (${entityIds.map(() => '?').join(', ')}) ORDER BY i.created_at DESC, i.rowid DESC LIMIT ?`,
+      )
+      .all(...entityIds, limit) as unknown as { item_id: string; entity_id: string }[];
+  }
+
+  /** People's entity ids, for people matched by an alias such as an email. */
+  personEntityIds(personIds: string[]): string[] {
+    if (personIds.length === 0) return [];
+    return (
+      this.db
+        .prepare(`SELECT entity_id FROM people WHERE entity_id IS NOT NULL AND id IN (${personIds.map(() => '?').join(', ')})`)
+        .all(...personIds) as { entity_id: string }[]
+    ).map((r) => r.entity_id);
+  }
+
   /** Deletes an item, its entity links, its vector, and entities nothing else uses. */
   deleteItem(id: string): boolean {
     return this.tx(() => {

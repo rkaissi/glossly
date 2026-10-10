@@ -26,8 +26,10 @@ describe('barItems', () => {
     expect(barItems(slots, true, false)).toEqual([{ slot: 1 }, { slot: 2 }, { slot: 3 }]);
     expect(barItems(slots, true, true)).toEqual([{ slot: 1 }, { slot: 2 }, { slot: 3 }, { action: 'visualize' }]);
   });
-  it('offers only Ask with nothing selected', () => {
+  it('drops Save with nothing selected, and keeps Search in slot 3', () => {
     expect(barItems(null, false, true)).toEqual([{ slot: 1 }]);
+    const empty: SlotsView = { ...slots, slot3: slot('search', true), slot4: null, more: [] };
+    expect(barItems(empty, false, false)).toEqual([{ slot: 1 }, { slot: 3 }]);
   });
 });
 

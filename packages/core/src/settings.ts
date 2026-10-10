@@ -103,6 +103,16 @@ export const SettingsSchema = z.object({
     })
     .prefault({}),
 
+  recall: z
+    .object({
+      /** Cosine similarity a saved item needs to count as related (spec: Recall). */
+      minSimilarity: z.number().min(0).max(1).default(0.78),
+      /** Lower bar for the search box, where the user asked for it. */
+      searchSimilarity: z.number().min(0).max(1).default(0.45),
+      maxResults: z.number().int().min(1).max(20).default(5),
+    })
+    .prefault({}),
+
   embeddings: z
     .object({
       model: z.string().default('Xenova/all-MiniLM-L6-v2'),

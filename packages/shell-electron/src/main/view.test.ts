@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { actionForSlot, distanceToRect, growFrom, holdForRoute, mergeRoute, shouldHideOverlay, slotsView } from './view';
+import { actionForSlot, distanceToRect, emptySlotsView, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -144,6 +144,17 @@ describe('shouldHideOverlay', () => {
 
   it('does nothing when the overlay is hidden', () => {
     expect(shouldHideOverlay({ signal: 'keyboard_activity', visible: false, focused: false, settling: false })).toBe(false);
+  });
+});
+
+describe('empty selection', () => {
+  it('puts Search in slot 3, and reads tier 2 only for actions that send or store the text', () => {
+    const v = emptySlotsView();
+    expect(actionForSlot(v, 3)).toBe('search');
+    expect(v.slot4).toBeNull();
+    expect(needsTier2('ask')).toBe(true);
+    expect(needsTier2('search')).toBe(false);
+    expect(needsTier2('recall')).toBe(false);
   });
 });
 
