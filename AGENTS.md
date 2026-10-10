@@ -9,3 +9,4 @@ Start every session by reading `docs/HANDOFF.md`. It is the source of truth for 
 - Commit to `main` per chunk of work, update `docs/HANDOFF.md` in the same commit, and after each committed chunk stop and give Rayan the updated handoff.
 - Don't run `pnpm eval` unless Rayan asks (Groq free-tier rate limits). `pnpm test` runs unit tests only.
 - Never print or log API keys or selected text.
+- Never commit real people's names, email addresses, or handles. In `docs/HANDOFF.md` and other docs, use fictional people and example addresses (for example Alex Morgan, `alex.morgan@example.com`).
