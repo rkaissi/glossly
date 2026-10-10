@@ -57,7 +57,7 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { actionForSlot, contains, distanceToRect, growFrom, isAvailable, mergeRoute, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { actionForSlot, contains, distanceToRect, growFrom, holdForRoute, isAvailable, mergeRoute, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
@@ -566,7 +566,7 @@ export class Capture {
         wordCount: selection ? countWords(selection.text) : 0,
         siteKey: session.siteKey,
         debug: this.debugFor(session),
-        slots: quick ? slotsView(quick, 'rules') : null,
+        slots: this.initialSlots(quick),
         badges: this.badgesFor(session),
         notice: notice ?? this.takeNotice(),
       },
@@ -603,7 +603,7 @@ export class Capture {
 
   // ---- expand and routing ----
 
-  /** Pill to bar: tier-1 context, rules paint at once, the model fills slots 3 and 4. */
+  /** Pill to bar. Ask and Save paint at once. Slots 3 and 4 wait for the model when one will be called. */
   async expand(sessionId: number, viaHotkey = false): Promise<void> {
     const s = this.current(sessionId);
     if (!s || !s.selection || this.expanding === s) return;
@@ -631,10 +631,12 @@ export class Capture {
       {
         mode: 'bar',
         placement: { mode: 'pill', side, rect },
-        slots: slotsView(quick, 'rules'),
+        slots: this.initialSlots(quick),
         badges: this.badgesFor(s),
         debug: this.debugFor(s),
         notice: this.takeNotice(),
+        // Hotkey hints are on for the whole focused bar, from the first paint.
+        ...(viaHotkey && { keyboard: true }),
       },
       rect,
     );
@@ -655,6 +657,17 @@ export class Capture {
       /* no tier 1 (copy fallback, or the app lost its selection): route on the selection alone */
     }
     s.timings.context = ms(t);
+  }
+
+  /** True when Router.route will spend a model call. Rules then wait instead of flashing. */
+  private routeWillCallModel(): boolean {
+    return !this.settings.localOnly && this.services.llm.hasModel('decision');
+  }
+
+  private initialSlots(quick: RouteResult | null): ReturnType<typeof slotsView> | null {
+    if (!quick) return null;
+    const view = slotsView(quick, 'rules');
+    return this.routeWillCallModel() ? holdForRoute(view) : view;
   }
 
   private router(): Router {

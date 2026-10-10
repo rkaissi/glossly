@@ -34,11 +34,35 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
 }
 
 /**
- * Slots 3 and 4 may fill in after the model answers, but slots 1 and 2 never change label
- * mid-session: the collection the user saw first stays.
+ * Ask and Save stay as first painted. Slots 3 and 4 fill in when the route settles.
+ * A contextual button already on screen is kept: a later result may add one, not take one away.
  */
 export function mergeRoute(prev: SlotsView, next: SlotsView): SlotsView {
-  return { ...next, slot1: prev.slot1, slot2: prev.slot2 };
+  return {
+    ...next,
+    slot1: prev.slot1,
+    slot2: prev.slot2,
+    slot3: shownSlot(prev.slot3, next.slot3),
+    slot4: shownSlot(prev.slot4, next.slot4),
+    more: shownMore(prev.more, next.more),
+  };
+}
+
+/** Slots 3 and 4 stay empty while a model route is in flight, so a rules guess cannot flash and vanish. */
+export function holdForRoute(view: SlotsView): SlotsView {
+  return { ...view, slot3: null, slot4: null, more: [], stage: 'pending' };
+}
+
+function shownSlot(prev: SlotView | null, next: SlotView | null): SlotView | null {
+  if (!prev) return next;
+  if (!next || prev.action !== next.action) return prev;
+  return next;
+}
+
+function shownMore(prev: SlotView[], next: SlotView[]): SlotView[] {
+  if (prev.length === 0) return next;
+  const seen = new Set(prev.map((m) => m.action));
+  return [...prev.map((p) => next.find((n) => n.action === p.action) ?? p), ...next.filter((n) => !seen.has(n.action))];
 }
 
 /** The action for a slot number, or null if the slot is empty. */

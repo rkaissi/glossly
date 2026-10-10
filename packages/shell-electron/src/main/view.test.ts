@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { actionForSlot, distanceToRect, growFrom, mergeRoute, shouldHideOverlay, slotsView } from './view';
+import { actionForSlot, distanceToRect, growFrom, holdForRoute, mergeRoute, shouldHideOverlay, slotsView } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -38,14 +38,30 @@ describe('slotsView', () => {
     expect(v.route_ms).toBe(3);
   });
 
-  it('keeps slots 1 and 2 from the first paint when the model answers', () => {
-    const first = slotsView(route({}, 'Notes'), 'rules');
-    const next = slotsView(route({ slot3: { action: 'who', score: 0.8 }, slot4: null }, 'Reading'), 'model');
-    const merged = mergeRoute(first, next);
+  it('fills empty slots from the settled route and does not remove a button already shown', () => {
+    const waiting = holdForRoute(slotsView(route({}, 'Notes'), 'rules'));
+    expect(waiting.slot3).toBeNull();
+    expect(waiting.slot4).toBeNull();
+    expect(waiting.more).toEqual([]);
+    expect(waiting.stage).toBe('pending');
+    expect(waiting.slot2.collection).toBe('Notes');
+
+    const settled = slotsView(route({ slot3: { action: 'who', score: 0.8 }, slot4: null, more: [{ action: 'promises', score: 0.4 }] }, 'Reading'), 'model');
+    const merged = mergeRoute(waiting, settled);
     expect(merged.slot2.collection).toBe('Notes');
     expect(merged.slot3?.action).toBe('who');
     expect(merged.slot4).toBeNull();
+    expect(merged.more.map((m) => m.action)).toEqual(['promises']);
     expect(merged.stage).toBe('model');
+
+    const again = slotsView(route({ slot3: null, slot4: null, more: [] }, 'Ideas'), 'rules_fallback');
+    const kept = mergeRoute(merged, again);
+    expect(kept.slot2.collection).toBe('Notes');
+    expect(kept.slot3?.action).toBe('who');
+    expect(kept.more.map((m) => m.action)).toEqual(['promises']);
+
+    const swapped = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.5 } }, 'Notes'), 'model'));
+    expect(swapped.slot3?.action).toBe('who');
   });
 });
 
