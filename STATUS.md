@@ -132,7 +132,7 @@ Known rough edges:
 
 ## Open questions for you
 
-**Answered Oct 10** (the plan is in `docs/HANDOFF.md`, Steps 12 to 20):
+**Answered Oct 10** (the plan is in `docs/HANDOFF.md`). Steps 12 to 15 are done. Next is Step 15.5 (the afternoon bugs, then Who is this). Steps 16 to 22 and a parked subscription follow.
 
 - Pill speed: keep checking for toolbars but make it faster; a visible pill never moves.
 - Router timeout: raise it to 600 ms. **Done in Step 12.3** (Oct 10): the default `router.decisionTimeoutMs` is 600, and a stored value of exactly 400 (the old default) is moved to 600 once, the first time the new version opens the database (tracked in meta `settings_migrations`, so a 400 you set later is kept). The Models tab's Decision description shows the current budget.
