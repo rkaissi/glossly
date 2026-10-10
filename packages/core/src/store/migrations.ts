@@ -1,0 +1,116 @@
+/**
+ * Versioned migrations, applied in order and tracked with PRAGMA user_version. Never edit a
+ * shipped migration; add a new one. The vec0 table is created separately (see Store) because
+ * its dimension depends on the embedding model.
+ */
+export const MIGRATIONS: string[] = [
+  /* 1 */ `
+  CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+  CREATE TABLE settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL);
+
+  CREATE TABLE models (
+    provider TEXT NOT NULL,
+    model_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    capabilities_json TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (provider, model_id)
+  );
+
+  CREATE TABLE collections (
+    id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL, created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE items (
+    id TEXT PRIMARY KEY,
+    collection_id TEXT REFERENCES collections(id),
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    why TEXT,
+    source_app TEXT, window_title TEXT,
+    data_json TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX items_collection ON items(collection_id);
+  CREATE INDEX items_created ON items(created_at);
+
+  CREATE TABLE entities (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    canonical TEXT NOT NULL,
+    display TEXT NOT NULL,
+    UNIQUE (kind, canonical)
+  );
+
+  CREATE TABLE item_entities (
+    item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
+    entity_id TEXT REFERENCES entities(id) ON DELETE CASCADE,
+    PRIMARY KEY (item_id, entity_id)
+  );
+  CREATE INDEX item_entities_entity ON item_entities(entity_id);
+
+  CREATE TABLE people (
+    id TEXT PRIMARY KEY,
+    entity_id TEXT UNIQUE REFERENCES entities(id),
+    name TEXT NOT NULL,
+    note TEXT,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE person_aliases (
+    person_id TEXT REFERENCES people(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    value TEXT NOT NULL,
+    UNIQUE (kind, value)
+  );
+
+  CREATE TABLE interactions (
+    id TEXT PRIMARY KEY,
+    person_id TEXT REFERENCES people(id) ON DELETE CASCADE,
+    direction TEXT NOT NULL,
+    text TEXT NOT NULL,
+    source_app TEXT,
+    occurred_at TEXT NOT NULL
+  );
+
+  CREATE TABLE commitments (
+    id TEXT PRIMARY KEY,
+    person_id TEXT REFERENCES people(id) ON DELETE CASCADE,
+    owner TEXT NOT NULL,
+    text TEXT NOT NULL,
+    due_at TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    source_interaction_id TEXT REFERENCES interactions(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE voice_samples (
+    id TEXT PRIMARY KEY, text TEXT NOT NULL, origin TEXT NOT NULL, created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE events (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    payload_json TEXT,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX events_kind_at ON events(kind, at);
+  `,
+];
+
+/** Tables included in export and cleared by delete-all, in foreign-key-safe delete order. */
+export const DATA_TABLES = [
+  'item_entities',
+  'commitments',
+  'interactions',
+  'person_aliases',
+  'people',
+  'entities',
+  'items',
+  'collections',
+  'voice_samples',
+  'events',
+  'models',
+  'settings',
+] as const;

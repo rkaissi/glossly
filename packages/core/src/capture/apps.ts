@@ -1,0 +1,116 @@
+import type { AppMode, Settings } from '../settings';
+
+/** Password managers. Glossly never reads from these, on any trigger. */
+export const DEFAULT_BLOCK_LIST: readonly string[] = [
+  '1password.exe',
+  'bitwarden.exe',
+  'keepass.exe',
+  'keepassxc.exe',
+  'dashlane.exe',
+  'lastpass.exe',
+  'enpass.exe',
+  'nordpass.exe',
+  'keeper.exe',
+  'keeperpasswordmanager.exe',
+  'roboform.exe',
+  'proton pass.exe',
+  'protonpass.exe',
+  'credentialuibroker.exe',
+  // Web vaults, matched by window-title suffix.
+  '- Bitwarden',
+  '- Bitwarden Web vault',
+  '- 1Password',
+  '- LastPass',
+  '- Proton Pass',
+];
+
+/**
+ * Apps and sites where the auto pill conflicts with the app's own behavior. Drag-selecting
+ * in spreadsheets selects cells, and terminals copy on select. Extend this after the
+ * Phase 0 hand tests (evals/capture.md).
+ */
+export const DEFAULT_HOTKEY_ONLY: readonly string[] = [
+  'excel.exe',
+  '- Google Sheets',
+  'windowsterminal.exe',
+  'conhost.exe',
+  'mstsc.exe',
+];
+
+/** Browser suffixes stripped from titles so "Doc - Google Docs - Google Chrome" matches "- Google Docs". */
+const BROWSER_SUFFIXES = [
+  /\s+-\s+Google Chrome$/,
+  /\s+-\s+Microsoft\u200b? Edge$/,
+  /\s+—\s+Mozilla Firefox$/,
+  /\s+-\s+Mozilla Firefox$/,
+  /\s+-\s+Brave$/,
+  /\s+-\s+Opera$/,
+  /\s+-\s+Vivaldi$/,
+  /\s+-\s+Arc$/,
+  /\s+-\s+Chromium$/,
+  // Edge and Chrome add "and N more pages" / profile names in some locales.
+  /\s+-\s+Personal$/,
+  /\s+-\s+Work$/,
+];
+
+export function stripBrowserSuffix(title: string): string {
+  let t = title.trim();
+  for (let i = 0; i < 3; i++) {
+    const before = t;
+    for (const re of BROWSER_SUFFIXES) t = t.replace(re, '');
+    if (t === before) break;
+  }
+  return t;
+}
+
+export interface AppIdentity {
+  process_name: string;
+  title: string;
+}
+
+/**
+ * True if a key matches the app: process names match case-insensitively; keys starting with
+ * "-" or "—" are title suffixes, matched after stripping the browser's own suffix.
+ */
+export function keyMatches(key: string, app: AppIdentity): boolean {
+  const k = key.trim();
+  if (!k) return false;
+  if (/^[-—–]/.test(k)) {
+    const title = stripBrowserSuffix(app.title).toLowerCase();
+    return title.endsWith(k.toLowerCase());
+  }
+  return app.process_name.toLowerCase() === k.toLowerCase();
+}
+
+/** The key "Don't show here" would store for this app: the site suffix for browsers, else the process name. */
+export function siteKeyFor(app: AppIdentity): string {
+  const browsers = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe', 'arc.exe'];
+  if (browsers.includes(app.process_name.toLowerCase())) {
+    const title = stripBrowserSuffix(app.title);
+    const parts = title.split(/\s+[-—–]\s+/);
+    if (parts.length > 1) return `- ${parts[parts.length - 1]}`;
+  }
+  return app.process_name.toLowerCase();
+}
+
+export interface ResolvedMode {
+  mode: AppMode;
+  blocked: boolean;
+  /** The key that decided the mode, for the settings UI and debug view. */
+  matched: string | null;
+}
+
+export function resolveAppMode(app: AppIdentity, settings: Pick<Settings, 'appModes' | 'blockList'>): ResolvedMode {
+  for (const key of [...DEFAULT_BLOCK_LIST, ...settings.blockList]) {
+    if (keyMatches(key, app)) return { mode: 'off', blocked: true, matched: key };
+  }
+  // Title-suffix keys are more specific than process names (a site inside a browser).
+  const userKeys = Object.keys(settings.appModes).sort((a, b) => Number(/^[-—–]/.test(b)) - Number(/^[-—–]/.test(a)));
+  for (const key of userKeys) {
+    if (keyMatches(key, app)) return { mode: settings.appModes[key]!, blocked: false, matched: key };
+  }
+  for (const key of DEFAULT_HOTKEY_ONLY) {
+    if (keyMatches(key, app)) return { mode: 'hotkey', blocked: false, matched: key };
+  }
+  return { mode: 'auto', blocked: false, matched: null };
+}

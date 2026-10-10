@@ -1,0 +1,63 @@
+{
+  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast. Models matching nothing show as Untested and are never auto-assigned. Patterns are case-insensitive regexes over the provider's model ID.",
+  "version": 1,
+  "exclude": [
+    "embed",
+    "whisper",
+    "tts",
+    "speech",
+    "transcribe",
+    "audio",
+    "realtime",
+    "dall-e",
+    "image",
+    "vision-preview",
+    "moderation",
+    "guard",
+    "safeguard",
+    "babbage",
+    "davinci",
+    "search",
+    "computer-use",
+    "sora",
+    "orpheus",
+    "playai",
+    "prompt-guard",
+    "deprecated",
+    "-instruct$",
+    "^ft:",
+    "compound"
+  ],
+  "models": [
+    { "provider": "groq", "pattern": "^openai/gpt-oss-20b", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "groq", "pattern": "^openai/gpt-oss-120b", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 3 },
+    { "provider": "groq", "pattern": "^moonshotai/kimi-k2", "structured": "json_schema", "streaming": true, "tools": true, "context": 262144, "cost": "medium", "speed": "fast", "tier": 3 },
+    { "provider": "groq", "pattern": "^meta-llama/llama-4-scout", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "groq", "pattern": "^meta-llama/llama-4-maverick", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 3 },
+    { "provider": "groq", "pattern": "^llama-3\\.1-8b-instant$", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 1 },
+    { "provider": "groq", "pattern": "^llama-3\\.3-70b-versatile$", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "groq", "pattern": "^qwen/qwen3-32b", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
+
+    { "provider": "openai", "pattern": "^gpt-6.*luna", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-nano", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 1 },
+    { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-mini", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-pro", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "high", "speed": "slow", "tier": 4 },
+    { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-codex", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "medium", "speed": "medium", "tier": 3 },
+    { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?(-chat-latest)?(-\\d{4}-\\d{2}-\\d{2})?$", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "medium", "speed": "medium", "tier": 4 },
+    { "provider": "openai", "pattern": "^gpt-4\\.1-nano", "structured": "json_schema", "streaming": true, "tools": true, "context": 1047576, "cost": "low", "speed": "fast", "tier": 1 },
+    { "provider": "openai", "pattern": "^gpt-4\\.1-mini", "structured": "json_schema", "streaming": true, "tools": true, "context": 1047576, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "openai", "pattern": "^gpt-4\\.1(-\\d{4}-\\d{2}-\\d{2})?$", "structured": "json_schema", "streaming": true, "tools": true, "context": 1047576, "cost": "medium", "speed": "medium", "tier": 3 },
+    { "provider": "openai", "pattern": "^gpt-4o-mini", "structured": "json_schema", "streaming": true, "tools": true, "context": 128000, "cost": "low", "speed": "fast", "tier": 1 },
+    { "provider": "openai", "pattern": "^gpt-4o(-\\d{4}-\\d{2}-\\d{2})?$", "structured": "json_schema", "streaming": true, "tools": true, "context": 128000, "cost": "medium", "speed": "medium", "tier": 3 },
+
+    { "provider": "anthropic", "pattern": "^claude-haiku-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "anthropic", "pattern": "^claude-sonnet-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "medium", "speed": "medium", "tier": 4 },
+    { "provider": "anthropic", "pattern": "^claude-opus-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "high", "speed": "slow", "tier": 5 },
+    { "provider": "anthropic", "pattern": "^claude-3-5-haiku", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "low", "speed": "fast", "tier": 1 }
+  ],
+  "$preferences": "Default role picks. Fast: cheapest model with structured output, then fastest, then lowest tier. Chat: highest tier, then cheaper. Ties keep this file's order.",
+  "preferences": {
+    "fast": { "require": { "structured": ["json_schema", "json"] }, "sort": ["cost", "speed", "tier"] },
+    "chat": { "require": { "streaming": true }, "sort": ["-tier", "cost"] }
+  }
+}

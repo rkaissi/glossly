@@ -1,0 +1,112 @@
+import { createRequire } from 'node:module';
+import { afterEach, describe, expect, it } from 'vitest';
+import { DEFAULT_SETTINGS } from '../settings';
+import { canonicalize, Store } from './store';
+
+const require = createRequire(import.meta.url);
+const vecExtensionPath = (require('sqlite-vec') as { getLoadablePath(): string }).getLoadablePath();
+
+let store: Store;
+afterEach(() => store?.close());
+
+function unit(dims: number, hot: number): Float32Array {
+  const v = new Float32Array(dims);
+  v[hot] = 1;
+  return v;
+}
+
+describe('Store', () => {
+  it('migrates and seeds default collections', () => {
+    store = new Store(':memory:');
+    expect(store.schemaVersion).toBe(1);
+    expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
+    expect(store.collectionByName('reading')?.name).toBe('Reading');
+  });
+
+  it('round-trips settings with defaults for missing and corrupt keys', () => {
+    store = new Store(':memory:');
+    expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);
+    store.setSetting('localOnly', true);
+    store.setSetting('appModes', { 'slack.exe': 'hotkey' });
+    store.db.prepare("INSERT INTO settings (key, value_json) VALUES ('hotkey', '42')").run();
+    const s = store.getSettings();
+    expect(s.localOnly).toBe(true);
+    expect(s.appModes).toEqual({ 'slack.exe': 'hotkey' });
+    expect(s.hotkey).toBe(DEFAULT_SETTINGS.hotkey);
+  });
+
+  it('stores items with entities and deletes orphans with the item', () => {
+    store = new Store(':memory:');
+    const notes = store.collectionByName('Notes')!;
+    const item = store.insertItem({
+      collection_id: notes.id,
+      kind: 'selection',
+      text: 'Sam from Acme',
+      why: null,
+      source_app: 'slack.exe',
+      window_title: '#design',
+      data_json: null,
+    });
+    const sam = store.upsertEntity('person', 'Sam Lee');
+    expect(store.upsertEntity('person', '  sam   LEE ')).toBe(sam);
+    store.linkItemEntity(item.id, sam);
+    store.linkItemEntity(item.id, store.upsertEntity('company', 'Acme'));
+    expect(store.entitiesForItem(item.id).map((e) => e.display)).toEqual(['Acme', 'Sam Lee']);
+
+    expect(store.deleteItem(item.id)).toBe(true);
+    expect(store.getItem(item.id)).toBeNull();
+    expect(store.db.prepare('SELECT COUNT(*) AS n FROM entities').get()).toEqual({ n: 0 });
+  });
+
+  it('searches vectors with sqlite-vec by cosine similarity', () => {
+    store = new Store(':memory:', { vecExtensionPath });
+    expect(store.ensureVectorModel('test-model', 8)).toBe(true);
+    expect(store.ensureVectorModel('test-model', 8)).toBe(false);
+    const ids = [0, 1, 2].map((i) =>
+      store.insertItem({ collection_id: null, kind: 'note', text: `n${i}`, why: null, source_app: null, window_title: null, data_json: null }).id,
+    );
+    ids.forEach((id, i) => store.setVector(id, unit(8, i)));
+    const hits = store.searchVectors(unit(8, 1), 2);
+    expect(hits[0]).toEqual({ item_id: ids[1], similarity: expect.closeTo(1, 5) });
+    expect(hits[1]!.similarity).toBeCloseTo(0, 5);
+
+    // Changing the model resets the table so everything is re-embedded.
+    expect(store.ensureVectorModel('other-model', 8)).toBe(true);
+    expect(store.itemsWithoutVectors().length).toBe(3);
+  });
+
+  it('exports everything and deletes everything', () => {
+    store = new Store(':memory:', { vecExtensionPath });
+    store.ensureVectorModel('m', 4);
+    const item = store.insertItem({ collection_id: null, kind: 'note', text: 'x', why: 'y', source_app: null, window_title: null, data_json: null });
+    store.setVector(item.id, unit(4, 0));
+    store.insertEvent('hotkey', { ms: 3 });
+    store.setSetting('localOnly', true);
+
+    const dump = store.exportAll() as { tables: Record<string, unknown[]> };
+    expect(dump.tables.items).toHaveLength(1);
+    expect(dump.tables.events).toHaveLength(1);
+    expect(JSON.stringify(dump)).not.toContain('apiKey');
+
+    store.deleteAll();
+    expect(store.listItems()).toHaveLength(0);
+    expect(store.listEvents()).toHaveLength(0);
+    expect(store.getSettings().localOnly).toBe(false);
+    expect(store.searchVectors(unit(4, 0))).toHaveLength(0);
+    expect(store.listCollections()).toHaveLength(4);
+  });
+
+  it('records events', () => {
+    store = new Store(':memory:');
+    store.insertEvent('action_clicked', { action: 'ask' }, '2026-10-09T10:00:00-04:00');
+    store.insertEvent('hotkey', null, '2026-10-10T10:00:00-04:00');
+    expect(store.listEvents('2026-10-10').map((e) => e.kind)).toEqual(['hotkey']);
+  });
+});
+
+describe('canonicalize', () => {
+  it('normalizes case, spacing, and punctuation', () => {
+    expect(canonicalize('  Sam   LEE ')).toBe('sam lee');
+    expect(canonicalize('O\u2019Brien, Inc.')).toBe("o'brien inc.");
+  });
+});
