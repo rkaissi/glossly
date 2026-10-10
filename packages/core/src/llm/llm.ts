@@ -142,7 +142,13 @@ export class AiSdkLlm implements LlmProvider {
     const instructions = jsonMode
       ? `${req.instructions}\n\nRespond with only a JSON object matching this JSON Schema:\n${JSON.stringify(z.toJSONSchema(schema))}`
       : req.instructions;
-    const providerOptions = provider === 'groq' ? { groq: { structuredOutputs: !jsonMode } } : undefined;
+    const reasoningEffort = caps?.reasoning;
+    const providerOptions: Record<string, Record<string, string | boolean>> | undefined =
+      provider === 'groq'
+        ? { groq: { structuredOutputs: !jsonMode, ...(reasoningEffort && { reasoningEffort }) } }
+        : provider === 'openai' && reasoningEffort
+          ? { openai: { reasoningEffort } }
+          : undefined;
 
     let prompt = req.prompt;
     for (let attempt = 0; attempt < 2; attempt++) {

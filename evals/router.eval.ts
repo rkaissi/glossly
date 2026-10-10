@@ -83,6 +83,20 @@ function report(name: string, results: CaseResult[], extra: Record<string, unkno
   return summary;
 }
 
+/** Free-tier keys hit per-minute limits partway through the run; wait as the provider asks and try again. */
+async function withRateLimitRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const err = e as Error & { statusCode?: number };
+      if (err.statusCode !== 429 || attempt >= 5) throw e;
+      const s = Number(/try again in ([\d.]+)s/i.exec(err.message)?.[1] ?? 10);
+      await new Promise((r) => setTimeout(r, Math.min(s + 0.5, 60) * 1000));
+    }
+  }
+}
+
 describe('router eval', () => {
   it('has the 60 fixture cases with unique ids', () => {
     expect(cases).toHaveLength(60);
@@ -100,7 +114,7 @@ describe('router eval', () => {
   });
 
   const groqKey = process.env.GROQ_API_KEY;
-  const modelRef = process.env.GLOSSLY_EVAL_MODEL ?? 'groq:llama-3.1-8b-instant';
+  const modelRef = process.env.GLOSSLY_EVAL_MODEL ?? 'groq:qwen/qwen3.8-27b';
 
   it.skipIf(!groqKey)(`llm (${modelRef}): content_type accuracy >= ${TARGET * 100}%`, async () => {
     const llm = new AiSdkLlm({
@@ -112,13 +126,17 @@ describe('router eval', () => {
     const results: CaseResult[] = [];
     for (const c of cases) {
       const features = extractFeatures(c.context);
-      const t = performance.now();
+      let t = performance.now();
       try {
-        const d = await decision.decide({ context: c.context, features, collections });
+        const d = await withRateLimitRetry(() => {
+          t = performance.now();
+          return decision.decide({ context: c.context, features, collections });
+        });
         results.push(score(c, d, performance.now() - t));
       } catch (e) {
         const fallback = decideByRules({ context: c.context, features, collections });
-        results.push({ ...score(c, fallback, performance.now() - t), error: (e as Error).name });
+        const err = e as Error;
+        results.push({ ...score(c, fallback, performance.now() - t), error: `${err.name}: ${err.message.slice(0, 120)}` });
       }
     }
     const s = report('llm', results, {
@@ -126,6 +144,8 @@ describe('router eval', () => {
       errors: results.filter((r) => r.error).length,
       over_budget: results.filter((r) => r.ms > DEFAULT_SETTINGS.router.decisionTimeoutMs).length,
     });
+    // Errored cases are scored on the rules fallback, so many errors would hide a broken model call.
+    expect(s.errors).toBeLessThanOrEqual(cases.length * 0.1);
     expect(s.type_accuracy).toBeGreaterThanOrEqual(TARGET);
   });
 });

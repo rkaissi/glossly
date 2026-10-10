@@ -160,6 +160,13 @@ describe('AiSdkLlm.structured', () => {
     expect(call.providerOptions).toMatchObject({ groq: { structuredOutputs: false } });
   });
 
+  it('sets the reasoning effort from capabilities on reasoning models', async () => {
+    const m = jsonModel('{"answer":"a","n":3}');
+    const { llm } = llmWith({ 'groq:qwen/qwen3.8-27b': m }, roles({ fast: { model: 'groq:qwen/qwen3.8-27b', fallback: null, manual: false } }));
+    await llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema);
+    expect(m.doGenerateCalls[0]!.providerOptions).toMatchObject({ groq: { structuredOutputs: true, reasoningEffort: 'none' } });
+  });
+
   it('falls back on 5xx, and the decision role uses the Fast model by default', async () => {
     const { llm, fallbacks } = llmWith(
       { 'groq:openai/gpt-oss-20b': failingModel(500), 'openai:gpt-5-mini': jsonModel('{"answer":"b","n":4}') },
@@ -220,6 +227,14 @@ describe('roles', () => {
     expect(u.roles.chat.model).toBe('anthropic:claude-sonnet-5-5');
     expect(parseRef(u.roles.chat.fallback!).provider).toBe('groq');
     expect(u.roles.decision.model).toBeNull();
+  });
+
+  it('with only the current Groq catalog, puts the small Qwen model on Fast and spreads fallbacks across models', () => {
+    const live = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'].map((id) => toCatalogModel('groq', id));
+    const u = updateRoles(DEFAULT_SETTINGS.roles, live);
+    expect(u.roles.fast).toEqual({ model: 'groq:qwen/qwen3.8-27b', fallback: 'groq:openai/gpt-oss-20b', manual: false });
+    expect(u.roles.chat.model).toBe('groq:openai/gpt-oss-120b');
+    expect(u.roles.chat.fallback).not.toBe('groq:openai/gpt-oss-120b');
   });
 
   it('keeps a manual pick that is still available, and replaces one that went away with a notice', () => {

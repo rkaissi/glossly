@@ -14,7 +14,7 @@ const pct = (x) => `${(x * 100).toFixed(1)}%`;
 
 for (const f of files) {
   const r = JSON.parse(readFileSync(join(dir, f), 'utf8'));
-  const pass = r.type_accuracy >= r.target_type_accuracy;
+  const pass = r.type_accuracy >= r.target_type_accuracy && (r.errors ?? 0) <= r.cases * 0.1;
   console.log(`\n${r.eval} / ${r.mode}${r.model ? ` (${r.model})` : ''}  ${pass ? 'PASS' : 'FAIL'}`);
   console.table({
     'type accuracy': `${pct(r.type_accuracy)} (target ${pct(r.target_type_accuracy)})`,
@@ -23,6 +23,8 @@ for (const f of files) {
     'median ms': Math.round(r.median_ms * 10) / 10,
     ...(r.errors !== undefined ? { errors: r.errors, 'over 400 ms': r.over_budget } : {}),
   });
+  const errorKinds = [...new Set(r.results.map((c) => c.error).filter(Boolean))];
+  if (errorKinds.length) console.log(`errors (scored on the rules fallback):\n  ${errorKinds.join('\n  ')}`);
   const misses = r.results.filter((c) => !c.type_ok || !c.slots_ok);
   if (misses.length) {
     console.table(

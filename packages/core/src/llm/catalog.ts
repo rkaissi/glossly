@@ -12,6 +12,8 @@ export interface Capabilities {
   cost: Tier;
   speed: Speed;
   tier: number;
+  /** Reasoning effort for structured calls on reasoning models; reasoning tokens count against the output cap. */
+  reasoning?: 'none' | 'minimal' | 'low';
 }
 
 export interface CatalogModel {
