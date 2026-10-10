@@ -1,88 +1,92 @@
 # Glossly build handoff
 
-Read this first, then `docs/Highlight-to-Action App Prototype Spec.md` (the spec). This handoff covers what is already set up, the decisions made so far (some deviate from the spec, with reasons), and what to build next.
+Read this first, then `docs/Highlight-to-Action App Prototype Spec.md` (the spec) for general context. This file is the current source of truth: what exists, decisions that deviate from the spec, and what to build next.
 
 ## Scope
 
 Build Phases 0 and 1 of the spec, then stop for review. Commit to `main` as each milestone chunk lands. At the end, write `STATUS.md` (spec: "Instructions for the coding agent", item 8).
 
-Spec sections to read in full before coding: Core user flow (incl. Coexisting with app selection toolbars), Architecture and stack, Capture layer, Router and action bar, Actions (Ask and Save only for Phase 1), Data model, Model providers, Privacy and safety rules, Milestones (Phase 0 and 1), Instructions for the coding agent. People layer, Reply, Recall, Visualize are later phases; skim them only so the design stays compatible.
+Spec sections that matter for this scope: Core user flow (incl. Coexisting with app selection toolbars), Architecture and stack, Capture layer, Router and action bar, Actions (Ask and Save only for Phase 1), Data model, Model providers, Privacy and safety rules, Milestones (Phase 0 and 1). People layer, Reply, Recall, and Visualize are later phases; keep the design compatible with them but don't build them.
 
 ## Environment (verified)
 
 - System Node: v24.21.0 via nvm-windows at `C:\Program Files\nodejs`. Cursor's agent shell puts its own bundled Node 22 first on PATH, so prefix commands with `$env:PATH = "C:\Program Files\nodejs;" + $env:PATH;`.
-- pnpm 12.10.1 (via corepack). pnpm 12 uses `allowBuilds` in `pnpm-workspace.yaml`, not `onlyBuiltDependencies`.
+- pnpm 12.10.1 (via corepack). pnpm 12 uses `allowBuilds` in `pnpm-workspace.yaml`, not `onlyBuiltDependencies`. Use `pnpm exec vitest ...` rather than `npx` (npx prints npm warnings).
 - .NET SDK 10.0.401 and Windows Desktop runtime 10.0.12. Visual Studio 2026 Community is installed.
-- The agent shell often returns empty output; requesting `all` permissions fixes it.
+- The agent shell often returns empty output; requesting `all` permissions fixes it. PowerShell shows stderr lines from pnpm as red "NativeCommandError" text even when the command succeeds, so check `$LASTEXITCODE`.
+- The display is at 125% scaling, so the helper's physical-pixel coordinates are 1.25 × DIP.
 
-## What exists
+## Pinned versions (all checked for compatibility)
 
-```
-package.json            root scripts: dev, build, dist, helper:build, helper:publish, helper:record, test, eval, typecheck
-                        postinstall downloads the Electron binary (Electron 44 no longer does this itself)
-pnpm-workspace.yaml     packages/*, nodeLinker: hoisted (for electron-builder), allowBuilds
-tsconfig.base.json      strict, module preserve, moduleResolution bundler, noEmit
-vitest.config.ts        projects: "unit" (packages/*/src/**/*.test.ts) and "evals" (evals/**/*.eval.ts)
-packages/core/          package.json + tsconfig only. Exports ./src/index.ts, ./embed, ./api (files not written yet)
-packages/ui/            package.json + tsconfig only (React 19)
-packages/shell-electron/ package.json + tsconfig only (electron-vite; renderer root should point at ../ui)
-helpers/windows/        C# helper, partially written (see below)
-```
-
-Pinned versions (all checked for compatibility): electron 44.7.0 (Node 24.21 inside), electron-vite 5.0.0, vite 7.3.7 (electron-vite 5 does not support Vite 8), @vitejs/plugin-react 5.2.0, react 19.3, typescript 7.0.2, ai 7.0.137 with @ai-sdk/groq, openai, anthropic v4, zod 4.6, sqlite-vec 0.1.9, @huggingface/transformers 4.3.1, uuidv7, vitest 5, electron-builder 26. FlaUI.UIA3 5.0.0 for the helper.
+electron 44.7.0 (Node 24.21 inside), electron-vite 5.0.0, vite 7.3.7 (electron-vite 5 does not support Vite 8), @vitejs/plugin-react 5.2.0, react 19.3, typescript 7.0.2, ai 7.0.137 with @ai-sdk/groq 4.0.59, @ai-sdk/openai 4.0.91, @ai-sdk/anthropic 4.0.78, zod 4.6.5, sqlite-vec 0.1.9, @huggingface/transformers 4.3.1, uuidv7 1.2.1, vitest 5.0.3, electron-builder 26.15.3. FlaUI.UIA3 5.0.0 for the helper.
 
 ## Decisions made (deviations from the spec)
 
-1. **AI SDK v7, not v6.** v7 is current. API notes: `instructions` replaces `system`; structured output is `generateText({ output: Output.object({ schema }) })` then `result.output`; streaming is `streamText(...).textStream`; ESM only; errors are `APICallError` with `statusCode`. Docs ship in `node_modules/ai/docs/` (see `08-migration-guides/23-migration-guide-7-0.mdx`). Provider factories: `createGroq`, `createOpenAI`, `createAnthropic` with `{ apiKey }`. The SDK also has `Experimental_DecisionModelV4`, which is relevant to Phase 4 decision providers.
-2. **`node:sqlite` instead of `better-sqlite3`.** Verified inside Electron 44: `new DatabaseSync(path, { allowExtension: true })`, `db.loadExtension(require('sqlite-vec').getLoadablePath())`, and a `vec0` table with a KNN query all work. No native module or ABI rebuilds, and the same code runs in Vitest on Node 24. Pass vectors as `new Uint8Array(new Float32Array(v).buffer)`.
-3. **No `uiohook-napi`.** It installs a global keyboard hook along with the mouse hook, which breaks the privacy rule "the only global keyboard hook is the hotkey". Instead, the C# helper runs a mouse-only `WH_MOUSE_LL` hook and pushes events over stdout. "Hide pill when the user types" uses `GetLastInputInfo`: input activity that the mouse hook didn't see counts as keyboard activity, so the app never sees which keys were pressed. The mouse-moved-200px check is done in Electron by polling `screen.getCursorScreenPoint()` while the pill is visible.
+1. **AI SDK v7, not v6.** API notes: `instructions` replaces `system`; structured output is `generateText({ output: Output.object({ schema }) })` then `result.output`; full stream is `result.stream` (was `fullStream`), with `text-delta` parts carrying `.text` plus `error` and `abort` parts; ESM only; errors are `APICallError` (`statusCode`), `RetryError` (`lastError`), `NoObjectGeneratedError`, `StreamProviderError`. Docs ship in `node_modules/ai/docs/` (see `08-migration-guides/23-migration-guide-7-0.mdx`). Test mocks: `MockLanguageModelV4` from `ai/test` (constructor takes `doGenerate` / `doStream` results; result shape in `@ai-sdk/provider` `LanguageModelV4GenerateResult`: `content`, `finishReason: {unified, raw}`, `usage: {inputTokens:{total,...}, outputTokens:{total,...}}`, `warnings`).
+2. **`node:sqlite` instead of `better-sqlite3`.** `new DatabaseSync(path, { allowExtension: true })` plus `db.loadExtension(require('sqlite-vec').getLoadablePath())`. Works in Vitest on Node 24 (tested) and inside Electron 44 (verified earlier). No native rebuilds. When packaging, sqlite-vec's DLL must be `asarUnpack`ed.
+3. **No `uiohook-napi`.** It also installs a global keyboard hook, which breaks the privacy rule. The C# helper runs a mouse-only `WH_MOUSE_LL` hook and reports keyboard activity through `GetLastInputInfo` (it never sees which keys). The "mouse moved 200 px away" check is done in Electron by polling `screen.getCursorScreenPoint()` while the pill is visible.
 4. **Evals use Vitest** (`pnpm eval`), not `cargo test`.
-5. **Embeddings:** local `Xenova/all-MiniLM-L6-v2` (384 dims) through transformers.js in an Electron utility process. The app downloads it on first run into the app data dir, with a notice in first-run setup (Rayan chose this for ease of use).
-6. **Package manager:** pnpm, as the spec says. Rayan is more used to npm, so keep the instructions simple.
+5. **Embeddings:** local `Xenova/all-MiniLM-L6-v2` (384 dims) through transformers.js in an Electron utility process, downloaded on first run into the app data dir, with a notice in first-run setup.
+6. **Package manager:** pnpm. Rayan is more used to npm, so keep instructions simple.
+7. **`DecisionProvider.decide(input, signal)`** takes `{ context, features, collections }` instead of the spec's `(input, questions)`; the questions are fixed by our output contract.
+8. **Helper request arguments are top-level fields** next to `cmd` (e.g. `{"id":3,"cmd":"context","before":500,"after":500}`).
 
-## C# helper status (`helpers/windows/`)
+## Done
 
-Done: `GlosslyHelper.csproj` (net10.0-windows, assembly `glossly-helper`), `app.manifest` (PerMonitorV2 DPI, so all coordinates are physical pixels and Electron converts with `screen.screenToDipRect`), `Win32.cs` (all P/Invokes needed), `Input.cs` (SendInput, `ReleaseModifiers` waits for or releases the held hotkey keys with a dummy-key trick so Alt doesn't open menus, `Chord`, `TapDummyKey`), and `ClipboardOps.cs` (full-format snapshot and restore in `finally`, `CopySelection(timeoutMs)` polls `GetClipboardSequenceNumber`, `PasteText` sets text with formats that keep it out of Win+V history, waits about 250 ms, then restores). Both clipboard methods run on an STA thread.
+### Step 1: C# helper (complete, committed `ac6510a`)
 
-Not done yet (references `HelperException(code, message)`, which still needs defining):
+`helpers/windows/`: `Program.cs` (JSON-lines loop, one request at a time on the MTA main thread, exits on stdin EOF, emits a `ready` event), `Output.cs` (single queued stdout writer thread so the hook callback never blocks), `HelperException.cs`, `MouseHook.cs`, `Uia.cs`, `Focus.cs`, plus the earlier `Win32.cs`, `Input.cs` (now records `LastInjectedTick`), and `ClipboardOps.cs`.
 
-- `MouseHook.cs`: LL mouse hook on its own thread with a `GetMessage` loop. Emit `{"event":"mouse_down"}`, `{"event":"mouse_up","x","y","drag":bool,"double":bool}` (drag means more than 4 px from mouse-down; double means a second up within `GetDoubleClickTime` and within 4 px), and `{"event":"wheel"}`. Add `input_watch` on/off: while on, poll `GetLastInputInfo` every 50 ms and emit `{"event":"keyboard_activity"}` when the input tick moves without a matching mouse event. Ignore injected events that carry `Input.Signature`.
-- `Uia.cs` (FlaUI UIA3, MTA thread, set `ConnectionTimeout` and `TransactionTimeout` to about 1 s):
-  - `selection`: focused element, walking up to the nearest TextPattern provider; fall back to `FromPoint(cursor)`. Use `GetSelection()[0]`, with bounds from the union of `GetBoundingRectangles()`. `is_password` comes from `IsPassword`. `is_editable` means an Edit control type or a ValuePattern that isn't read-only. For Chromium windows (class `Chrome_WidgetWin_*`), first send `WM_GETOBJECT` via `SendMessageTimeout` to nudge accessibility on.
-  - `context {before, after}`: clone the range, collapse it, then `MoveEndpointByUnit` by characters.
-  - `context_container {max_chars}`: walk up from `GetEnclosingElement()` to the nearest Document, List, or Pane, and use `docPattern.RangeFromChild(ancestor)` text centered on the selection. Fall back to tier 1.
-  - `popups_near {bounds, exclude_pids}`: `EnumWindows` for visible, non-cloaked popup, tool, or topmost windows near the bounds, plus UIA hit-test points above and below the selection looking for ToolBar, Menu, or ToolTip ancestors. Budget about 80 ms.
-- `Focus.cs`: `restore_focus {handle}` restores the window if minimized, then `SetForegroundWindow`; if that fails, use the `AttachThreadInput` trick plus `TapDummyKey`, and verify it worked.
-- `Program.cs`: reads JSON lines from stdin, one at a time, and writes one response line per request: `{id, ok, result}` or `{id, ok:false, error:{code,message}}`. Unsolicited events have no `id`. Writes to stdout are locked. Commands: `ping`, `selection`, `context`, `context_container`, `foreground` (process name, title, handle, pid, class), `popups_near`, `copy_fallback {timeout_ms=120}`, `restore_focus`, `paste {text}`, `mouse_hook {enabled}`, `input_watch {enabled}`. Never log selection text.
-- `helpers/protocol.md`: document every command and event above. Add protocol fixtures in `helpers/fixtures/` as request and response JSON, validated by Zod schemas in core so the macOS helper can be checked against the same cases. `scripts/record-helper.mjs` (`pnpm helper:record`) runs the commands against the foreground app after a 3 s delay and saves the result.
+- `helpers/protocol.md` documents every command, error code, and event. Read it before touching the shell's helper code.
+- `helpers/fixtures/*.json` (one file per command, plus `errors.json` and `events.json`) are validated by `packages/core/src/helper/protocol.test.ts`.
+- `pnpm helper:record` (`scripts/record-helper.mjs`) records read-only commands against the foreground app after 3 s (`--copy` adds `copy_fallback`) into git-ignored `helpers/fixtures/recorded/local-*.json`. `pnpm helper:record --check` replays the 10 deterministic fixture cases against the live binary; all pass.
+- Hand-tested with throwaway WPF and WinForms windows. Working: `selection` (text, bounds, editable, control type), `context`, `context_container` (centered, clipped to container), password fields return empty text and the context and copy commands refuse, `copy_fallback` and `paste` both restore the original clipboard, and `restore_focus` reports `window_gone`. Mouse hook: click, drag, and double-click are classified correctly, mouse movement causes no false `keyboard_activity`, and a real key does trigger it.
+- Findings: WinForms (.NET Framework) text boxes expose no TextPattern, so those apps need the hotkey's copy fallback. WPF counts `\r\n` as one character unit (handled). The first `selection` call per Chromium window costs about 300 ms (accessibility nudge plus one retry); later calls are fast. `restore_focus` success paths and `popups_near` against real toolbars have not been tested yet; that happens during the per-app hand tests.
 
-Then run `pnpm helper:build` and smoke test it by piping `{"id":1,"cmd":"ping"}` in.
+### Step 2: Core (mostly done, committed `c9f7adc`)
+
+All under `packages/core/`. Imports are extensionless (bundler resolution). Prompts are loaded with `?raw` (`src/env.d.ts` declares `*.md?raw`). 58 unit tests pass and `tsc` is clean.
+
+- `src/types.ts`: `Rect`, `Point`, `SelectionPayload` (as in the spec), `ContainerContext`, `Collection`, `Item`, and `isoNow()` (ISO 8601 with offset).
+- `src/settings.ts`: Zod `SettingsSchema` with defaults for everything tunable: hotkey `Control+Alt+Space`, `localOnly`, `debugView`, `appModes`, `blockList`, `capture` (minWords 3, pillDelayMs 250, hideDistancePx 200, contextChars 500, containerChars 8000, copyTimeoutMs 120), `router` (slot 0.5, more 0.2, decisionTimeoutMs 400), `roles` (fast, chat, decision; each `{model, fallback, manual}`, where model refs look like `"groq:llama-3.1-8b-instant"`; a decision model of null means "Use Fast model"), `actionModels` (per-action override), `save` (undo 10 s, excerpt 1000), `ask.defaultQuestion`, `embeddings`, `pendingNotice`, `firstRunComplete`. It also exports `DEFAULT_COLLECTIONS` and `parseSettings()`, which keeps valid keys and defaults bad ones.
+- `src/helper/protocol.ts`: Zod schemas per command (`Commands[cmd].args/result`), plus `ResponseSchema` and `EventSchema`. `src/helper/client.ts`: `HelperClient(stdin, stdout, timeouts?)` with a typed `request(cmd, args)`, per-command timeouts, result validation, and `HelperError` (`code` is a protocol code or `timeout`, `closed`, or `invalid_response`). It emits `event`, `ready`, `close`, and `protocol_error`.
+- `src/capture/apps.ts`: `DEFAULT_BLOCK_LIST` (password managers plus web-vault title suffixes), `DEFAULT_HOTKEY_ONLY` (excel, Google Sheets, terminals, mstsc), `stripBrowserSuffix`, `keyMatches` (process name, or a title suffix when the key starts with "-"), `siteKeyFor` (the key "Don't show here" should store), and `resolveAppMode` (block list, then user modes with site keys first, then defaults). `src/capture/gating.ts`: `countWords` (`Intl.Segmenter`), `gateApp`, `gateAutoSelection`, `mayCopyFallback`. `src/capture/placement.ts`: `placePill` places below by default, above if blocked, and as a 12 px dot if both sides are taken; `placeBar` never becomes a dot.
+- `src/router/`: `types.ts` (Decisions Zod contract, `SelectionContext`, `DecisionProvider`, `CONTEXTUAL_ACTIONS` = reply/who/promises/visualize, `Slots`), `features.ts` (`extractFeatures`), `rules.ts` (`RulesDecision`, `decideByRules`, `ruleCollection`), `slots.ts` (`scoreActions`, `assignSlots`), `llm-decision.ts` (`LlmStructuredDecision`, which uses role `decision`; prompt in `prompts/router-decision.md`), and `router.ts` (`Router` with `quick()` for rules-only instant paint, and `route()`, which races the decision against `decisionTimeoutMs`, aborts on timeout, falls back to rules, and returns a `fallback` reason of `local_only`, `no_model`, `timeout`, or `error`).
+- `src/store/`: `migrations.ts` (v1: every spec table plus `meta`, `settings`, `models`; tracked via `PRAGMA user_version`) and `store.ts` (`Store(path, { vecExtensionPath })`). The Store covers meta, settings, collections (seeds the defaults), items (`deleteItem` cascades links, the vector, and orphan entities), entities (`upsertEntity` matches on canonical form, `linkItemEntity`), and vectors (`ensureVectorModel(model, dims)` recreates the `vec0` table with a cosine metric and returns true when everything needs re-embedding; `setVector`, `searchVectors` returns a similarity, `itemsWithoutVectors`). It also covers events, the model catalog (`replaceModels`, `removeProviderModels`, `listModels`), `exportAll()` (all tables except vectors; no keys), and `deleteAll()` (re-seeds collections).
+- `src/llm/`: `types.ts` (`ChatRequest {role, action?, instructions, prompt, signal?, ...}`, `LlmProvider {stream, structured, hasModel}`, `LlmError`). `models/capabilities.json` holds the exclude patterns, known-model patterns (structured mode `json_schema`, `json`, or `none`, plus cost, speed, and tier), and role preferences. `catalog.ts` has `isChatModel`, `lookupCapabilities`, `toCatalogModel`, `pickDefault('fast'|'chat')` (untested models are never auto-picked), and `toRef`/`parseRef`. `providers.ts` defines `PROVIDERS.groq/openai/anthropic`: `createModel`, and `listModels`, which doubles as the live key test and throws `ProviderKeyError` with the provider's message. `roles.ts` has `updateRoles(roles, models)`, which fills defaults, auto-picks a fallback from a different provider, never overwrites a manual pick that is still available, and emits notices; and `modelChain(role, settings, action)`. `llm.ts` has `AiSdkLlm`: it streams via `result.stream`, falls back on 429 or 5xx only before the first token, and makes structured calls with one retry that appends the validation error. In JSON mode (Groq llama models) it puts the JSON Schema into the instructions and sets `groq.structuredOutputs: false`. It also exports `isFallbackError`.
+- `src/embed/types.ts` (`Embedder`, `EmbedProgress`) and `src/embed/transformers.ts` (`createTransformersEmbedder({model, dims, cacheDir, onProgress})`, mean pooling, normalized). Not run yet; the model has never been downloaded.
+- Prompts written: `prompts/router-decision.md`, `prompts/ask.md`, `prompts/extract-entities.md`.
 
 ## Next steps, in order
 
-1. Finish the helper (above), build it, and smoke test it.
-2. **Core** (`packages/core/src`, no Electron imports):
-   - `types.ts`: SelectionPayload, as in the spec.
-   - `api.ts`: the typed IPC API shared by the shell and the UI.
-   - `helper/`: protocol Zod schemas, plus a `HelperClient` over any stdin/stdout pair, with timeouts and an event emitter.
-   - `capture/`: gating (3-word minimum, password, per-app mode matched by process name or window-title suffix such as "- Google Docs", default hotkey-only list, block list with password managers) and pill placement (opposite side if a toolbar is detected, a 12 px dot if both sides are taken).
-   - `router/`: features (under 5 ms), `RulesDecision`, `LlmStructuredDecision` with a 400 ms timeout that falls back to rules, and slot assignment with thresholds from settings.
-   - `store/`: `node:sqlite` with migrations covering all spec tables plus `meta`, `models`, `settings`, and `item_vectors`; export and delete-all.
-   - `llm/`: AI SDK provider registry, model-list fetch per provider, `models/capabilities.json` (patterns, never-auto-assign "Untested"), roles with defaults and fallback-on-429/5xx, and structured calls with one retry that includes the validation error.
-   - `actions/`: Ask (streaming, default question "Explain this briefly.") and Save (excerpt, embedding, entity extraction, 10 s undo).
-   - `metrics.ts`, and `prompts/*.md` loaded with `?raw`.
-3. **Core tests and fixtures:** `fixtures/*.json` (spec asks for 60 across categories), a router eval in `evals/`, and a fixture plus test for every model-backed function and helper command.
-4. **Shell** (`packages/shell-electron`, electron-vite):
-   - Tray, plus overlay windows created once at launch (`focusable:false`, `showInactive`, always on top, skip taskbar; `setFocusable(true)` only on the hotkey path or when an action needs typing).
-   - `globalShortcut` hotkey (`Ctrl+Alt+Space`, configurable).
-   - Helper manager (spawn `helpers/windows/bin/Debug/net10.0-windows/glossly-helper.exe` in dev, `resources/` when packaged; auto-restart).
-   - Auto pill path with the 250 ms delay, and hotkey path with `copy_fallback`.
-   - `safeStorage` keys file; embeddings utility process; IPC with `contextIsolation` on.
-5. **UI** (`packages/ui`, React):
-   - Pill → bar (fixed slots that fade in, badges, debug view with captured text, method, and tier-1 context), plus panel (Ask stream, Save with collection `Tab`-cycling, the "why" field, and undo).
-   - Keyboard map.
-   - First-run setup (Welcome, Keys with live test and Groq first, Models/roles, Try it) and Settings (Keys, Models, General: hotkey, local-only, per-app modes, block list; Data: export, delete all; Metrics table).
-6. **Verify:** `pnpm typecheck`, `pnpm test`, `pnpm dev`. Then write `STATUS.md` and `evals/capture.md` (per-app pass/fail table for Rayan to fill in by hand: Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad; plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit.
+1. **Finish core:**
+   - `src/actions/ask.ts`: `ask(llm, settings, {selection, container?, question?, related?}, signal)` returns a `StreamResult`. If the question is empty, use `settings.ask.defaultQuestion`. Use the `chat` role with action `ask`. The prompt has labeled sections for the question, the selection, the surrounding context (tier 2, else tier 1), and "Saved notes" with labels like "From your note, Sep 18" for citation. Phase 1 may pass `related: []`.
+   - `src/actions/save.ts`: a `SaveService` with `save({selection, container?, collection, why?})`. It inserts the item right away (`data_json` holds a 1000-char excerpt centered on the selection, plus method, trigger, captured_at, and is_editable) and returns `{item, undoUntil}`. A background `enrich(item)` embeds and calls `setVector`, extracts entities with the `fast` role (Zod: `{entities: [{kind, name}]}`, max 20, using `prompts/extract-entities.md`), upserts and links them, and links `people.entity_id` when a person's name or alias matches. Also `undo(itemId)` (only within `undoSeconds` plus a little grace) and `setWhy(itemId, why)`. Log errors as events without text.
+   - `src/metrics.ts`: a `Metrics(store)` class with `record(kind, payload)`. The payload is sanitized: only numbers, booleans, and short identifier strings matching `/^[\w.:-]{1,40}$/`, never text. `summary(days)` returns per-day hotkey, pill_shown, bar_shown, and per-action click counts, click rate per action, and median ms from trigger to action.
+   - `src/api.ts`: the typed IPC contract shared by the shell and the UI (types only; the UI imports `@glossly/core/api`). Cover: overlay state pushed to renderers (pill, bar, or panel; placement; selection debug info including text, method, and tier-1 context; slots; badges), bar actions (expand, run an action by slot, "Don't show here", close), Ask (start, chunk, done, error, cancel), Save (save, setWhy, undo), and settings (get and set, keys add/test/remove, model catalog refresh, role set, export, delete all, metrics summary, embed model status).
+   - `src/index.ts`: re-export everything except `embed/transformers` (exported separately as `./embed`).
+2. **Core tests and fixtures:**
+   - Tests for features, rules, slots, the router timeout fallback (fake slow decision), `LlmStructuredDecision` and `AiSdkLlm` (with `MockLanguageModelV4`: fallback on 429, no fallback after the first token, retry with the validation error, the JSON-mode path), roles (`updateRoles` and `modelChain`), the catalog, `providers.listModels` (fake fetch, bad-key error message), Save (fake embedder plus mock LLM, and undo), Ask prompt building, and metrics sanitizing.
+   - `fixtures/*.json`: 60 hand-written selections (20 messages or threads, 10 with commitments in both directions, 10 tables, 10 articles or docs, 5 code, 5 contact blocks), each with a `SelectionContext` and the expected `content_type` and slots.
+   - `evals/router.eval.ts`: rules-only by default, and the LLM decision when `GROQ_API_KEY` is set. `evals/print-results.mjs` (referenced by `pnpm eval`) prints the table. Target: 85% type accuracy.
+3. **Shell** (`packages/shell-electron`, electron-vite; renderer root should point at `../ui`; no `electron.vite.config.ts` exists yet):
+   - Tray, plus overlay windows created once at launch (`focusable:false`, `showInactive`, always on top, skip taskbar; call `setFocusable(true)` only on the hotkey path or when an action needs typing).
+   - `globalShortcut` hotkey (configurable).
+   - Helper manager: spawn `helpers/windows/bin/Debug/net10.0-windows/glossly-helper.exe` in dev, or from `resources/` when packaged; wrap it in `HelperClient`; restart it automatically and re-send `mouse_hook` on `ready`. Convert physical pixels with `screen.screenToDipRect`.
+   - Auto pill path: `mouse_up` with drag or double, then `foreground` and `gateApp`, then `selection` and `gateAutoSelection`, then wait out the rest of the 250 ms, then `popups_near` (exclude Electron's own pids), then `placePill`, then show. While the pill is visible, enable `input_watch` and hide on `keyboard_activity`, `wheel`, a `mouse_down` outside the pill, or the cursor moving more than 200 px away.
+   - Hotkey path: `foreground`, then `selection`, then `copy_fallback` if `mayCopyFallback`, then `context`. Open the bar focused. If nothing was found, show the "nothing selected" state.
+   - Expand: tier-1 `context`, then `Router.quick` to paint, then `Router.route` to fill slots 3 and 4.
+   - Keys: one `safeStorage`-encrypted file per provider in userData. Embeddings run in a `utilityProcess` using `@glossly/core/embed`. Store at `userData/glossly.db`. IPC uses `contextIsolation` with a preload `contextBridge`.
+4. **UI** (`packages/ui`, React):
+   - Pill and bar: fixed slots that fade in, badges, and a debug view showing captured text, method, and tier-1 context. Panel: Ask stream; Save with `Tab` cycling through collections, the "why" field, and undo. Later-phase actions in slots 3 and 4 show a "Coming in a later phase" panel.
+   - Keyboard map per the spec.
+   - First-run setup: Welcome (privacy summary plus the embedding-download notice), Keys (live test, Groq first and labeled free), Models and roles, Try it.
+   - Settings tabs: Keys; Models; General (hotkey, local-only, per-app modes, block list); Data (export, delete all); Metrics table.
+5. **Verify:** run `pnpm typecheck`, `pnpm test`, and `pnpm dev`. Then write `STATUS.md` and `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit.
+
+## Open question for Rayan (note in STATUS.md)
+
+"Local only" currently means only the router's model call is disabled, as the spec says. Save's entity extraction (Fast model) still runs because the user clicked an action. Should local-only also skip it?
 
 ## Things Rayan has to do himself
 
