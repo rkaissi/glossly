@@ -120,6 +120,16 @@ describe('slots', () => {
     expect(scoreActions(base, { ...f, knownPeople: ['p1'] }).who).toBe(1);
   });
 
+  it('offers Who on a contact card even when the model scores people low', () => {
+    const card = 'Full Name: Jordan Hale\nRole: Backend\nEmail: jordan.hale@example.com\nPhone: +1 (555) 123-4567';
+    const low = { ...base, content_type: 'contact_info' as const, mentions_people: 0.1 };
+    expect(scoreActions(low, extractFeatures(ctx(card))).who).toBe(0.9);
+    // The same card read as a message still has a name next to a phone and an address.
+    expect(scoreActions({ ...low, content_type: 'single_message' }, extractFeatures(ctx(card))).who).toBe(0.7);
+    // A no-reply address next to a name is not a person to look up.
+    expect(scoreActions({ ...low, content_type: 'single_message' }, extractFeatures(ctx('Jordan Hale via noreply@example.com'))).who).toBe(0.1);
+  });
+
   it('fills slots 3 and 4 above 0.5 and puts the rest above 0.2 under More', () => {
     const s = assignSlots(base, f, DEFAULT_SETTINGS.router);
     expect(s.slot3?.action).toBe('reply');

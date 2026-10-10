@@ -1,3 +1,4 @@
+import { isRoleAddress } from '../people/emails';
 import type { Settings } from '../settings';
 import type { Features } from './features';
 import { CONTEXTUAL_ACTIONS, EMPTY_ACTIONS, type BarAction, type ContextualAction, type Decisions, type EmptyAction, type ScoredAction, type Slots } from './types';
@@ -6,9 +7,13 @@ export function scoreActions(d: Decisions, f: Features): Record<ContextualAction
   const isMessage = d.content_type === 'message_thread' || d.content_type === 'single_message';
   // Applies to the model's answer too: no Reply for automated mail or the user's own message.
   const answerable = isMessage && !f.automated && !f.authorIsMe;
+  // A contact card, or a name next to a person's own address or phone, is someone to look up,
+  // even when the model reads them as the sender rather than a third person and scores it low.
+  const contact =
+    d.content_type === 'contact_info' ? 0.9 : f.namePairs.length > 0 && (f.phones.length > 0 || f.emails.some((e) => !isRoleAddress(e))) ? 0.7 : 0;
   return {
     reply: answerable ? d.authored_by_other : 0,
-    who: f.knownPeople.length > 0 ? 1 : d.mentions_people,
+    who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact),
     promises: d.contains_commitment,
     visualize: d.content_type === 'table_or_numbers' ? 1 : 0,
   };

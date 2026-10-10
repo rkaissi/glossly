@@ -524,6 +524,10 @@ Not a new step. 406 unit tests pass; `pnpm typecheck` is clean; the app bundles.
 - **Bug (Rayan's screenshot):** Who showed "Shivani (new)" with Create person while "Priya Desai" was already saved. `resolvePerson` only tried a fuzzy match among people seen in the same app, with Jaro-Winkler above 0.92, and a lone first name against a full name scores below that, so it fell through to "none".
 - **Fix** (`people/resolve.ts`, `firstNameMatch`): when one side is only a first name ("Shivani" against a saved "Priya Desai", or "Vishnu Satish" against a saved "Vishnu"), the saved person is returned as `fuzzy` (`FIRST_NAME_SCORE` 0.9), in any app. Who then shows "Shivani?" with the existing "Is this the same Shivani?" question; Same person adds "Shivani" as a name alias, so the next time is an exact match, and Different person creates a new record. Two full names with the same first name ("Shivani Rao") are still different people, first names under 3 letters are skipped, and with several saved people of that first name, the one seen in this app is offered. Reply's author and What did I promise use the same resolver, so they show "Priya Desai?" too (a promises test now expects that). The bar's person badge still uses exact matches only.
 
+### Who on contact cards (Oct 10, night)
+
+Not a new step. Rayan selected a Discord message that was a contact card (Full Name, Role, Email, Phone, Why) and the bar offered only Ask and Save. The model router answered `contact_info` but scored `mentions_people` low, because the prompt tells it not to count a message's sender, and a person describing themselves reads as that. Now `scoreActions` (`router/slots.ts`, tested) gives Who at least 0.9 for `contact_info` and at least 0.7 when a name sits in the selection with a phone or a personal (not shared-inbox) address, whatever the model said, and the prompt says a contact card counts (0.8 or higher). Not run live; the router prompt change waits for the Step 18 eval like the other prompt edits.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
