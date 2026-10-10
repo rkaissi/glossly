@@ -5,6 +5,7 @@ release/
 *.log
 .vite/
 evals/results/
+.vscode/
 
 helpers/windows/bin/
 helpers/windows/obj/
