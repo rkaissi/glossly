@@ -1,6 +1,8 @@
 // People layer records (spec: People layer, Data model) and the views the UI renders.
 // Types only, so the UI can import them through `@glossly/core/api`.
 
+import type { ReplyChannel } from './reply-style';
+
 export type AliasKind = 'email' | 'handle' | 'name';
 
 export interface PersonAlias {
@@ -47,12 +49,25 @@ export interface Interaction {
 }
 
 /** pasted: from the Profile tab. inserted: a reply inserted as drafted. inserted_edited: edited first. */
+/** `inserted` (an unedited draft) is no longer stored; migration 3 removed the old ones. */
 export type VoiceOrigin = 'pasted' | 'inserted' | 'inserted_edited';
 
 export interface VoiceSample {
   id: string;
   text: string;
   origin: VoiceOrigin;
+  created_at: string;
+  /** Where an edited reply was written (email, chat, other); null for pasted samples. */
+  channel: ReplyChannel | null;
+  /** Who it was written to, when they are in the user's people. */
+  person_id: string | null;
+  /** The model's draft before the user's edit, for the style notes. */
+  original: string | null;
+}
+
+export interface StyleNote {
+  id: string;
+  text: string;
   created_at: string;
 }
 

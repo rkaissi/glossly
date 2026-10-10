@@ -27,6 +27,13 @@ import {
   mayCopyFallback,
   pillWait,
   reply,
+  replyChannel,
+  preferencesFor,
+  preferenceLine,
+  pickSignals,
+  isMeaningfulEdit,
+  writeStyleNotes,
+  STYLE_NOTES_EVERY,
   recall as recallFor,
   visualize,
   assignEmptySlots,
@@ -54,6 +61,7 @@ import {
   type PromisesResult,
   type PasteCompose,
   type ReplyInsertResult,
+  type ReplyPick,
   type ReplyStart,
   type ReplyTo,
   type RecallHit,
@@ -124,7 +132,8 @@ interface Session {
   /** Who wrote the selected message, from the last extraction: their person id (exact match only) and whether it was the user. */
   author: { personId: string | null; isMe: boolean } | null;
   /** The latest Reply request: drafts done, and whether one was inserted or copied (else it counts as discarded). */
-  reply: { requestId: string; ctl: AbortController; personId: string | null; done: boolean; used: boolean } | null;
+  /** `learned`: this session's pick has been recorded (Copy then Insert counts once). */
+  reply: { requestId: string; ctl: AbortController; personId: string | null; done: boolean; used: boolean; learned: boolean } | null;
   /** Recall cards for the selection, once found (null until then). */
   recall: RecallHit[] | null;
   /** Cards dismissed as "not related" in this session. */
@@ -992,7 +1001,7 @@ export class Capture {
     }
     s.reply?.ctl.abort();
     const ctl = new AbortController();
-    const state = { requestId, ctl, personId: null as string | null, done: false, used: false };
+    const state = { requestId, ctl, personId: null as string | null, done: false, used: false, learned: false };
     s.reply = state;
 
     const container = (await s.container) ?? null;
@@ -1008,7 +1017,22 @@ export class Capture {
       match: match?.kind ?? 'none',
       authorIsMe: det.authorIsMe,
     };
-    const input = { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe, person, voice: people.voiceForPrompt(5) };
+    // Samples, preferences, and notes for this kind of app and this person (Profile > How you write).
+    const channel = replyChannel(s.selection.source_app, s.selection.window_title);
+    const learning = this.settings.replyLearning;
+    const preferences = learning
+      ? preferencesFor(people.styleSignals(), { channel, personId: state.personId }).map((p) => preferenceLine(p, p.scope === 'person' ? person?.name : null))
+      : [];
+    const input = {
+      selection: s.selection,
+      container,
+      author: det.author,
+      authorIsMe: det.authorIsMe,
+      person,
+      voice: people.voiceForPrompt(5, { channel, personId: state.personId }),
+      preferences,
+      notes: learning ? people.styleNotes().map((n) => n.text) : [],
+    };
 
     void (async () => {
       const t = performance.now();
@@ -1038,18 +1062,75 @@ export class Capture {
     if (r?.requestId === requestId) r.ctl.abort();
   }
 
-  /** Ctrl+C or Copy in the Reply panel. */
-  replyCopied(sessionId: number): void {
+  /** Ctrl+C or Copy in the Reply panel. A copy is a pick too: it is learned from like an insert. */
+  replyCopied(sessionId: number, text?: string, pick?: ReplyPick, personId?: string): void {
     const s = this.current(sessionId);
     if (s?.reply) s.reply.used = true;
     this.services.metrics.record('reply_copied');
+    if (s && text?.trim() && pick) {
+      const pid = personId && this.services.people.get(personId) ? personId : (s.reply?.personId ?? null);
+      this.learnFromReply(s, text.trim(), pid, pick);
+    }
+  }
+
+  /**
+   * What a picked draft teaches (Profile > How you write). An edit worth the name becomes a voice
+   * sample, with where it was written and the draft it came from; an unedited draft is the
+   * model's writing, so it isn't one. The pick itself is stored only as which way it leaned.
+   * Every few edits, the style notes are written again.
+   */
+  private learnFromReply(s: Session, final: string, personId: string | null, pick: ReplyPick): void {
+    const r = s.reply;
+    if (!r || r.learned || !s.selection || !this.settings.replyLearning) return;
+    r.learned = true;
+    const people = this.services.people;
+    const channel = replyChannel(s.selection.source_app, s.selection.window_title);
+    const original = pick.drafts[pick.chosen]?.text;
+    if (original === undefined) return;
+    const edited = isMeaningfulEdit(original, final);
+    if (edited) {
+      people.addVoice(final, 'inserted_edited', { channel, personId, original });
+      this.countStyleEdit();
+    }
+    const signals = pickSignals({ drafts: pick.drafts, chosen: pick.chosen, final });
+    people.addStyleSignals(signals, { channel, personId });
+    log.info('reply learned', { signals: signals.length, channel, edited, person: Boolean(personId) });
+  }
+
+  private styleNotesRunning = false;
+
+  /** Counts an edited reply; every STYLE_NOTES_EVERY of them, the notes are written again in the background. */
+  private countStyleEdit(): void {
+    const store = this.services.store;
+    const pending = Number(store.getMeta('style_edits_pending') ?? 0) + 1;
+    if (pending < STYLE_NOTES_EVERY || this.styleNotesRunning) {
+      store.setMeta('style_edits_pending', String(pending));
+      return;
+    }
+    store.setMeta('style_edits_pending', '0');
+    this.styleNotesRunning = true;
+    const people = this.services.people;
+    void writeStyleNotes(this.services.llm, people.editedPairs(), people.removedStyleNotes())
+      .then((notes) => {
+        // Nothing repeating in the latest edits keeps the notes there are.
+        if (notes.length) people.replaceStyleNotes(notes);
+        log.info('style notes written', { count: notes.length });
+      })
+      .catch((e: unknown) => {
+        // Local only, no key, or a failed call: try again after the next edit.
+        store.setMeta('style_edits_pending', String(STYLE_NOTES_EVERY - 1));
+        log.warn('style notes skipped', { code: e instanceof LlmError ? e.code : 'provider' });
+      })
+      .finally(() => {
+        this.styleNotesRunning = false;
+      });
   }
 
   /**
    * Inserts a draft (spec: Inserting text). Reply never sends. An inserted reply is stored as a
    * voice sample and, when the author is a known person, as an interaction with them.
    */
-  async insertReply(sessionId: number, text: string, edited: boolean, personId?: string): Promise<ReplyInsertResult> {
+  async insertReply(sessionId: number, text: string, edited: boolean, personId?: string, pick?: ReplyPick): Promise<ReplyInsertResult> {
     const s = this.current(sessionId);
     if (!s?.selection || !s.fg) throw new Error('This selection is gone. Select the message again.');
     const draft = text.trim();
@@ -1057,10 +1138,9 @@ export class Capture {
     const people = this.services.people;
     const pid = personId && people.get(personId) ? personId : (s.reply?.personId ?? null);
     const sourceApp = s.selection.source_app;
-    if (s.reply) s.reply.used = true;
     const record = (how: 'inserted' | 'copied') => {
       if (s.reply) s.reply.used = true;
-      people.addVoice(draft, edited ? 'inserted_edited' : 'inserted');
+      if (pick) this.learnFromReply(s, draft, pid, pick);
       if (pid) people.addInteraction({ person_id: pid, direction: 'outbound', text: draft, source_app: sourceApp });
       this.services.metrics.record('reply_inserted', { how, edited, person: Boolean(pid), ms: ms(s.t0) });
     };

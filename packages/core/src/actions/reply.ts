@@ -16,8 +16,12 @@ export interface ReplyInput {
   authorIsMe: boolean;
   /** The author's record, when they resolved exactly. */
   person: PersonCard | null;
-  /** 3 to 5 samples of how the user writes (Profile, plus replies they inserted). */
+  /** Up to 5 samples of how the user writes (pasted in Profile, then replies they edited). */
   voice: string[];
+  /** What the user tends to pick here, one line each with its evidence (`preferenceLine`). */
+  preferences?: string[];
+  /** Style notes written from the user's edits (Profile). */
+  notes?: string[];
 }
 
 const MAX_SELECTION = 6000;
@@ -62,6 +66,8 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
   parts.push('## Voice samples (how the user writes)');
   if (voice.length) voice.forEach((v) => parts.push('<sample>', clip(v, MAX_VOICE_CHARS), '</sample>'));
   else parts.push('None yet. Keep it natural and brief.');
+  if (input.preferences?.length) parts.push('', '## What the user tends to pick', ...input.preferences.map((p) => `- ${p}`));
+  if (input.notes?.length) parts.push('', '## Notes on how the user writes', ...input.notes.map((n) => `- ${n}`));
   parts.push(
     '',
     '## App',

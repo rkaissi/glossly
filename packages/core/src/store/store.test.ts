@@ -22,7 +22,7 @@ function unit(dims: number, hot: number): Float32Array {
 describe('Store', () => {
   it('migrates and seeds default collections', () => {
     store = new Store(':memory:');
-    expect(store.schemaVersion).toBe(2);
+    expect(store.schemaVersion).toBe(3);
     expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
     expect(store.collectionByName('reading')?.name).toBe('Reading');
   });

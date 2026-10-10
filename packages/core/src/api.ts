@@ -17,13 +17,15 @@ import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
 import type { RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
-import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, VoiceSample } from './people/types';
+import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
+import type { PickDraft, ReplyChannel, StyleDimension, StylePreference } from './people/reply-style';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
 export type { MetricsSummary } from './metrics';
 export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
+export type { PickDraft, ReplyChannel, StyleDimension, StylePreference } from './people/reply-style';
 export type { RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
@@ -199,6 +201,26 @@ export interface ReplyInsertArgs {
   edited: boolean;
   /** Set when the user added the author to their people from the panel. */
   personId?: string;
+  /** Which draft this came from, so Reply can learn from the pick. */
+  pick?: ReplyPick;
+}
+/** The drafts as shown (text plus the model's kind and tone tags) and the one taken. Learned from, never stored as text. */
+export interface ReplyPick {
+  drafts: PickDraft[];
+  chosen: number;
+}
+
+/** What Reply learned, for the Profile tab. */
+export interface StylePreferenceView extends StylePreference {
+  /** "Keeps replies short". */
+  label: string;
+  /** "in email", "with Jordan Hale". */
+  where: string;
+}
+export interface StyleView {
+  learning: boolean;
+  preferences: StylePreferenceView[];
+  notes: StyleNote[];
 }
 /** inserted: pasted into the source app. copied: on the clipboard instead (focus failed, or the focused field doesn't take text). */
 export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; reason: 'focus' | 'not_editable' | 'paste' };
@@ -343,7 +365,7 @@ export interface InvokeChannels {
   /** Gives focus back to the source window and pastes (spec: Inserting text). Never sends. */
   'reply:insert': { args: ReplyInsertArgs; result: ReplyInsertResult };
   /** Ctrl+C or the Copy button: counted for metrics only. */
-  'reply:copied': { args: { sessionId: number }; result: void };
+  'reply:copied': { args: { sessionId: number; text?: string; pick?: ReplyPick; personId?: string }; result: void };
 
   /** The recent snippets as a plain list, or a summary from the Chat role. Nothing is pasted yet. */
   'paste:compose': { args: { sessionId: number; kind: PasteKind }; result: PasteCompose };
@@ -390,6 +412,12 @@ export interface InvokeChannels {
   'voice:list': { args: void; result: VoiceSample[] };
   'voice:add': { args: { text: string }; result: VoiceSample[] };
   'voice:remove': { args: { id: string }; result: VoiceSample[] };
+  /** What Reply learned from picks and edits, and the style notes. */
+  'style:get': { args: void; result: StyleView };
+  /** Forgets one learned preference (it can be learned again). */
+  'style:forget': { args: { dimension: StyleDimension; channel: ReplyChannel | null; personId: string | null }; result: StyleView };
+  /** Removes a style note; it is not written again. */
+  'style:note-remove': { args: { id: string }; result: StyleView };
   'commitments:set-status': { args: { id: string; status: CommitmentStatus }; result: void };
 
   'settings:get': { args: void; result: SettingsView };

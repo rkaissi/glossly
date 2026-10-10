@@ -49,6 +49,8 @@ export const SettingsSchema = z.object({
   /** Registered only in the "hotkey" Save mode. */
   saveHotkey: z.string().default('Control+Alt+S'),
   localOnly: z.boolean().default(false),
+  /** Reply learns from the drafts the user picks and edits (Profile). Off: nothing is recorded or used. */
+  replyLearning: z.boolean().default(true),
   debugView: z.boolean().default(true),
   identity: IdentitySchema.prefault({}),
 

@@ -1,5 +1,6 @@
 import { uuidv7 } from 'uuidv7';
 import { canonicalize, normalizeEmail, normalizeHandle } from '../people/names';
+import type { ReplyChannel, StyleDimension, StyleSignal, StyleSignalRow } from '../people/reply-style';
 import type {
   AliasKind,
   Commitment,
@@ -14,6 +15,7 @@ import type {
   PersonCard,
   PersonItemView,
   PersonSummary,
+  StyleNote,
   VoiceOrigin,
   VoiceSample,
 } from '../people/types';
@@ -24,8 +26,11 @@ const MAX_NAME = 100;
 const MAX_NOTE = 1000;
 const MAX_ALIAS = 200;
 const MAX_TEXT = 2000;
-/** Inserted replies kept as voice samples; older ones are dropped. */
+/** Edited replies kept as voice samples; older ones are dropped. */
 const MAX_INSERTED_VOICE = 20;
+/** Pick signals kept for learning; the learner only looks at the newest 20 per trait and scope. */
+const MAX_STYLE_SIGNALS = 1000;
+const MAX_STYLE_NOTE = 160;
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -220,6 +225,8 @@ export class PeopleRepo {
     this.store.tx(() => {
       this.db.prepare('UPDATE interactions SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       this.db.prepare('UPDATE commitments SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
+      this.db.prepare('UPDATE voice_samples SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
+      this.db.prepare('UPDATE style_signals SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       const moved = drop.aliases;
       this.db.prepare('DELETE FROM person_aliases WHERE person_id = ?').run(dropId);
       this.db.prepare('DELETE FROM people WHERE id = ?').run(dropId);
@@ -237,6 +244,9 @@ export class PeopleRepo {
       this.db.prepare('DELETE FROM person_aliases WHERE person_id = ?').run(id);
       this.db.prepare('DELETE FROM commitments WHERE person_id = ?').run(id);
       this.db.prepare('DELETE FROM interactions WHERE person_id = ?').run(id);
+      // What was learned stays with the channel; only the link to them goes.
+      this.db.prepare('UPDATE voice_samples SET person_id = NULL WHERE person_id = ?').run(id);
+      this.db.prepare('UPDATE style_signals SET person_id = NULL WHERE person_id = ?').run(id);
       return Number(this.db.prepare('DELETE FROM people WHERE id = ?').run(id).changes) > 0;
     });
   }
@@ -434,12 +444,23 @@ export class PeopleRepo {
 
   // ---- voice samples ----
 
-  addVoice(text: string, origin: VoiceOrigin): VoiceSample {
+  /** A sample: pasted in Profile, or a reply the user edited (with where it was written and the draft it came from). */
+  addVoice(text: string, origin: VoiceOrigin, from: { channel?: ReplyChannel; personId?: string | null; original?: string } = {}): VoiceSample {
     const t = clip(text.trim(), MAX_TEXT);
     if (!t) throw new Error('Paste a sample first.');
-    const row: VoiceSample = { id: uuidv7(), text: t, origin, created_at: this.now() };
+    const row: VoiceSample = {
+      id: uuidv7(),
+      text: t,
+      origin,
+      created_at: this.now(),
+      channel: from.channel ?? null,
+      person_id: from.personId ?? null,
+      original: from.original ? clip(from.original.trim(), MAX_TEXT) : null,
+    };
     this.store.tx(() => {
-      this.db.prepare('INSERT INTO voice_samples (id, text, origin, created_at) VALUES (?, ?, ?, ?)').run(row.id, row.text, row.origin, row.created_at);
+      this.db
+        .prepare('INSERT INTO voice_samples (id, text, origin, created_at, channel, person_id, original) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(row.id, row.text, row.origin, row.created_at, row.channel, row.person_id, row.original);
       if (origin !== 'pasted') {
         this.db
           .prepare(
@@ -460,12 +481,84 @@ export class PeopleRepo {
     this.db.prepare('DELETE FROM voice_samples WHERE id = ?').run(id);
   }
 
-  /** Up to `n` samples for a Reply prompt: pasted ones first, then edits, then other inserted replies. Newest first within each. */
-  voiceForPrompt(n = 5): string[] {
+  /**
+   * Up to `n` samples for a Reply prompt: pasted ones first, then edited replies to the same
+   * person in the same kind of app, then to the same person, then in the same kind of app, then
+   * the rest. Newest first within each.
+   */
+  voiceForPrompt(n = 5, to: { channel?: ReplyChannel; personId?: string | null } = {}): string[] {
     const all = this.voiceSamples();
     const pasted = all.filter((v) => v.origin === 'pasted');
-    const edited = all.filter((v) => v.origin === 'inserted_edited');
-    const inserted = all.filter((v) => v.origin === 'inserted');
-    return [...pasted, ...edited, ...inserted].slice(0, n).map((v) => v.text);
+    const rank = (v: VoiceSample) => (to.personId && v.person_id === to.personId ? 2 : 0) + (to.channel && v.channel === to.channel ? 1 : 0);
+    const edited = all
+      .filter((v) => v.origin === 'inserted_edited')
+      .map((v, i) => ({ v, i }))
+      .sort((a, b) => rank(b.v) - rank(a.v) || a.i - b.i)
+      .map(({ v }) => v);
+    return [...pasted, ...edited].slice(0, n).map((v) => v.text);
+  }
+
+  /** The newest edited replies with the draft they started from, for the style notes. */
+  editedPairs(n = 10): { original: string; text: string }[] {
+    return this.voiceSamples()
+      .filter((v): v is VoiceSample & { original: string } => v.origin === 'inserted_edited' && Boolean(v.original))
+      .slice(0, n)
+      .map((v) => ({ original: v.original, text: v.text }));
+  }
+
+  // ---- what Reply learned (picks and edits) ----
+
+  addStyleSignals(signals: StyleSignal[], where: { channel: ReplyChannel; personId: string | null }): void {
+    if (signals.length === 0) return;
+    const at = this.now();
+    this.store.tx(() => {
+      const insert = this.db.prepare('INSERT INTO style_signals (id, dimension, pole, weight, channel, person_id, at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      for (const sig of signals) insert.run(uuidv7(), sig.dimension, sig.pole, sig.weight, where.channel, where.personId, at);
+      this.db.prepare('DELETE FROM style_signals WHERE id NOT IN (SELECT id FROM style_signals ORDER BY at DESC, id DESC LIMIT ?)').run(MAX_STYLE_SIGNALS);
+    });
+  }
+
+  styleSignals(): StyleSignalRow[] {
+    return this.db.prepare('SELECT dimension, pole, weight, channel, person_id, at FROM style_signals ORDER BY at, id').all() as unknown as StyleSignalRow[];
+  }
+
+  /** "Forget this": drops what was learned for one trait in one place, so it starts over. */
+  forgetStyle(dimension: StyleDimension, where: { channel: ReplyChannel | null; personId: string | null }): void {
+    if (where.personId) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND person_id = ?').run(dimension, where.personId);
+    else if (where.channel) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ?').run(dimension, where.channel);
+  }
+
+  styleNotes(): StyleNote[] {
+    return this.db.prepare('SELECT * FROM style_notes ORDER BY created_at, rowid').all() as unknown as StyleNote[];
+  }
+
+  /** The model's notes replace the previous set. */
+  replaceStyleNotes(notes: string[]): StyleNote[] {
+    const at = this.now();
+    this.store.tx(() => {
+      this.db.exec('DELETE FROM style_notes');
+      const insert = this.db.prepare('INSERT INTO style_notes (id, text, created_at) VALUES (?, ?, ?)');
+      for (const n of notes) insert.run(uuidv7(), clip(oneLine(n), MAX_STYLE_NOTE), at);
+    });
+    return this.styleNotes();
+  }
+
+  /** Removes a note and remembers it, so the next set of notes leaves it out. */
+  removeStyleNote(id: string): void {
+    const note = this.db.prepare('SELECT text FROM style_notes WHERE id = ?').get(id) as { text: string } | undefined;
+    if (!note) return;
+    this.store.tx(() => {
+      this.db.prepare('DELETE FROM style_notes WHERE id = ?').run(id);
+      this.store.setMeta('style_notes_removed', JSON.stringify([...this.removedStyleNotes(), note.text].slice(-20)));
+    });
+  }
+
+  removedStyleNotes(): string[] {
+    try {
+      const v = JSON.parse(this.store.getMeta('style_notes_removed') ?? '[]') as unknown;
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
   }
 }

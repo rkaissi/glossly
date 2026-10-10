@@ -95,12 +95,14 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
   const draft = drafts[sel];
   const text = edits[sel] ?? draft?.text ?? '';
   const edited = edits[sel] !== undefined && edits[sel] !== draft?.text;
+  // Which draft this is, so Reply learns what gets picked (main keeps no text for a pick).
+  const pickOf = () => ({ drafts: drafts.map((d) => ({ text: d.text, kind: d.kind, tone: d.tone })), chosen: sel });
 
   const insert = async () => {
     if (!done || !text.trim() || busy) return;
     setBusy(true);
     try {
-      const r = await glossly.invoke('reply:insert', { sessionId: s.sessionId, text, edited, ...(personId && { personId }) });
+      const r = await glossly.invoke('reply:insert', { sessionId: s.sessionId, text, edited, pick: pickOf(), ...(personId && { personId }) });
       // On success the bar has closed; a copy keeps the panel open with how to paste.
       if (r.result === 'copied') {
         setNote(
@@ -121,7 +123,7 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
   const copy = () => {
     if (!text) return;
     void glossly.invoke('clipboard:write', { text });
-    void glossly.invoke('reply:copied', { sessionId: s.sessionId });
+    void glossly.invoke('reply:copied', { sessionId: s.sessionId, text, ...(done && { pick: pickOf() }), ...(personId && { personId }) });
     setNote('Copied.');
   };
 
@@ -242,7 +244,7 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
           })}
         </ul>
       )}
-      {done && drafts.length > 0 && <p className="muted">Edits are remembered.</p>}
+      {done && drafts.length > 0 && <p className="muted">Your pick and edits teach Reply how you write (Profile).</p>}
 
       {stream.status === 'error' && (
         <div className="answer-error">

@@ -54,6 +54,25 @@ describe('Reply', () => {
     expect(p).toContain('The user wrote the selected message; draft a follow-up');
     expect(p).not.toContain('What you know about');
     expect(p).toContain('None yet. Keep it natural and brief.');
+    expect(p).not.toContain('What the user tends to pick');
+  });
+
+  it('adds what the user tends to pick and the style notes', () => {
+    const p = buildReplyPrompt(
+      settings,
+      {
+        selection,
+        author,
+        authorIsMe: false,
+        person: null,
+        voice: [],
+        preferences: ['Keeps replies short (8 of the last 10 picks in chat)'],
+        notes: ["Drops 'Hope you're well'"],
+      },
+      now,
+    );
+    expect(p).toContain('## What the user tends to pick\n- Keeps replies short (8 of the last 10 picks in chat)');
+    expect(p).toContain("## Notes on how the user writes\n- Drops 'Hope you're well'");
   });
 
   it('streams on the chat role with action reply', () => {

@@ -1,10 +1,13 @@
 // Splits Reply's streamed text into its drafts. Pure, so it is unit-tested. The model writes
-// "### Intent" then the reply, three times (prompts/reply.md); the parser also accepts other
-// heading levels and bold labels, since models drift.
+// "### Intent | kind | tone" then the reply, three times (prompts/reply.md); the parser also
+// accepts other heading levels, bold labels, and a missing tag, since models drift.
 
 export interface Draft {
   intent: string;
   text: string;
+  /** The model's tags, lowercased; main checks them against its lists before learning from them. */
+  kind: string | null;
+  tone: string | null;
 }
 
 const HEADER = /^\s*(?:#{1,4}\s+|\*\*)(.+?)(?:\*\*)?\s*:?\s*$/;
@@ -19,12 +22,14 @@ function cleanIntent(s: string): string {
     .slice(0, 60);
 }
 
+const tag = (s: string | undefined) => (s ? s.toLowerCase().replace(/[^a-z_ ]/g, '').trim().replace(/ +/g, '_') || null : null);
+
 /** Drafts so far; while streaming, the last one may still be growing. */
 export function parseDrafts(raw: string): Draft[] {
   const drafts: Draft[] = [];
-  let current: { intent: string; lines: string[] } | null = null;
+  let current: { intent: string; kind: string | null; tone: string | null; lines: string[] } | null = null;
   const flush = () => {
-    if (current) drafts.push({ intent: current.intent, text: current.lines.join('\n').trim() });
+    if (current) drafts.push({ intent: current.intent, kind: current.kind, tone: current.tone, text: current.lines.join('\n').trim() });
   };
   for (const line of raw.split(/\r?\n/)) {
     // A header still arriving ("##") shouldn't flash at the end of the previous draft.
@@ -34,7 +39,8 @@ export function parseDrafts(raw: string): Draft[] {
     if (h && (line.trimStart().startsWith('#') || h[1]!.length <= 40)) {
       flush();
       if (drafts.length >= MAX_DRAFTS) return drafts;
-      current = { intent: cleanIntent(h[1]!), lines: [] };
+      const [label, kind, tone] = h[1]!.split('|').map((p) => p.trim());
+      current = { intent: cleanIntent(label ?? ''), kind: tag(kind), tone: tag(tone), lines: [] };
     } else if (current) current.lines.push(line);
   }
   flush();

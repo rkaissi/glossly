@@ -420,11 +420,13 @@ export class Store {
 
   /**
    * "Delete all data": every saved item, entity, person, vector, event, and collection, then
-   * re-creates the default collections. Settings, the model list, and meta stay.
+   * re-creates the default collections. Settings, the model list, and meta stay, except the
+   * Reply style notes the user removed (their text) and the edit count toward the next notes.
    */
   deleteAll(): void {
     this.tx(() => {
       for (const t of USER_DATA_TABLES) this.db.exec(`DELETE FROM ${t}`);
+      this.db.exec("DELETE FROM meta WHERE key IN ('style_notes_removed', 'style_edits_pending')");
       if (this.hasVectors && this.vectorTableExists()) this.db.exec('DELETE FROM item_vectors');
     });
     this.db.exec('VACUUM');

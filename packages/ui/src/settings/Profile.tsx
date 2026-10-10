@@ -1,6 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import type { Identity, SettingsView, VoiceSample } from '@glossly/core/api';
+import type { Identity, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { parseEmail, parseHandle } from './format';
@@ -114,7 +114,7 @@ export function IdentityForm({ value, onChange, autoFocus }: { value: Identity; 
 
 const same = (a: Identity, b: Identity) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Spec: Reply's voice samples are up to 5 pasted here, plus replies you inserted. */
+/** Reply's voice samples: up to 5 pasted here, plus replies you edited before inserting or copying. */
 function VoiceSamples() {
   const [samples, setSamples] = useState<VoiceSample[] | null>(null);
   const [text, setText] = useState('');
@@ -152,8 +152,9 @@ function VoiceSamples() {
       <div className="field-label">
         <strong>How you write</strong>
         <p className="muted small">
-          Paste up to 5 messages you wrote, so Reply drafts sound like you. Replies you insert are added on their own (the last 20 are kept). Samples
-          are sent to your model provider only inside a Reply request.
+          Paste up to 5 messages you wrote, so Reply drafts sound like you. Replies you change before inserting are added on their own (the last
+          20 are kept); a draft you take as written is not, since the model wrote it. Samples are sent to your model provider only inside a Reply
+          request.
         </p>
       </div>
       {pasted.length > 0 && <ul className="list">{pasted.map(sample)}</ul>}
@@ -170,9 +171,83 @@ function VoiceSamples() {
       )}
       {inserted.length > 0 && (
         <details className="small">
-          <summary className="muted">From replies you inserted ({inserted.length})</summary>
+          <summary className="muted">From replies you edited ({inserted.length})</summary>
           <ul className="list">{inserted.map(sample)}</ul>
         </details>
+      )}
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * What Reply learned from the drafts you pick and edit: preferences counted in code (per kind of
+ * app and per person) and the model's style notes. Each can be removed; one switch turns it off.
+ */
+function LearnedStyle({ learning }: { learning: boolean }) {
+  const [view, setView] = useState<StyleView | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
+  useEffect(() => {
+    void glossly.invoke('style:get').then(setView);
+  }, [learning]);
+  const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.personId ?? p.channel}`;
+  const forget = (p: StylePreferenceView) =>
+    void run(async () => {
+      setView(await glossly.invoke('style:forget', { dimension: p.dimension, channel: p.channel, personId: p.personId }));
+      setPending(null);
+    });
+  const removeNote = (id: string) =>
+    void run(async () => {
+      setView(await glossly.invoke('style:note-remove', { id }));
+      setPending(null);
+    });
+  const toggle = (on: boolean) =>
+    void run(async () => {
+      const r = await glossly.invoke('settings:set', { key: 'replyLearning', value: on });
+      if (r.error) throw new Error(r.error);
+    });
+  const row = (key: string, text: string, meta: string | null, onRemove: () => void) => (
+    <li key={key}>
+      <span className="grow">
+        {text}
+        {meta && <span className="muted small"> · {meta}</span>}
+      </span>
+      {pending === key ? (
+        <InlineConfirm prompt="Forget this?" confirm="Forget" busy={busy} onConfirm={onRemove} onCancel={() => setPending(null)} />
+      ) : (
+        <button className="icon-btn danger" title="Forget" aria-label="Forget" disabled={busy} onClick={() => setPending(key)}>
+          <X size={15} strokeWidth={1.75} aria-hidden />
+        </button>
+      )}
+    </li>
+  );
+  const prefs = view?.preferences ?? [];
+  const notes = view?.notes ?? [];
+  return (
+    <div className="field">
+      <label className="toggle">
+        <input type="checkbox" checked={learning} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+        <span>
+          <strong>Learn from the drafts I pick and edit</strong>
+          <span className="muted small block">
+            Reply notes which draft you take (its length, greeting, sign-off, tone, and what it does) and how you edit it, separately for email,
+            chat, and each person. A habit shows up here once your recent picks agree on it. Every 5 edited replies, your model writes a few
+            notes on how you edit. All of it stays on this computer and goes to your model provider only inside a Reply request.
+          </span>
+        </span>
+      </label>
+      {learning && view && prefs.length === 0 && notes.length === 0 && (
+        <p className="muted small">Nothing learned yet. After a few replies, what you tend to pick shows here.</p>
+      )}
+      {prefs.length > 0 && (
+        <ul className="list">{prefs.map((p) => row(prefKey(p), `${p.label} ${p.where}`, `${p.agree} of ${p.of}`, () => forget(p)))}</ul>
+      )}
+      {notes.length > 0 && (
+        <>
+          <p className="muted small">Notes from your edits</p>
+          <ul className="list">{notes.map((n) => row(`note:${n.id}`, n.text, null, () => removeNote(n.id)))}</ul>
+        </>
       )}
       {error && <p className="error small">{error}</p>}
     </div>
@@ -223,6 +298,7 @@ export function ProfileTab({ view }: { view: SettingsView }) {
         </div>
       </div>
       <VoiceSamples />
+      <LearnedStyle learning={view.settings.replyLearning} />
     </section>
   );
 }

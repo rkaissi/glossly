@@ -104,6 +104,24 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX interactions_person ON interactions(person_id, occurred_at);
   CREATE INDEX person_aliases_person ON person_aliases(person_id);
   `,
+  /* 3: Reply learns from edits and picks. Voice samples remember where they were written and the
+     draft they were edited from; unedited inserts are the model's own writing, so they go. */ `
+  ALTER TABLE voice_samples ADD COLUMN channel TEXT;
+  ALTER TABLE voice_samples ADD COLUMN person_id TEXT;
+  ALTER TABLE voice_samples ADD COLUMN original TEXT;
+  DELETE FROM voice_samples WHERE origin = 'inserted';
+  CREATE TABLE style_signals (
+    id TEXT PRIMARY KEY,
+    dimension TEXT NOT NULL,
+    pole TEXT NOT NULL,
+    weight REAL NOT NULL,
+    channel TEXT NOT NULL,
+    person_id TEXT,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX style_signals_at ON style_signals(at);
+  CREATE TABLE style_notes (id TEXT PRIMARY KEY, text TEXT NOT NULL, created_at TEXT NOT NULL);
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */
@@ -117,6 +135,8 @@ export const DATA_TABLES = [
   'items',
   'collections',
   'voice_samples',
+  'style_signals',
+  'style_notes',
   'events',
   'models',
   'settings',

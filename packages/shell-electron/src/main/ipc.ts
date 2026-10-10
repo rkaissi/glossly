@@ -1,6 +1,27 @@
 import { writeFileSync } from 'node:fs';
 import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { aliasKindOf, cleanText, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type PromiseSaveRow, type SetSettingResult, type SettingsKey } from '@glossly/core';
+import {
+  STYLE_DIMENSIONS,
+  aliasKindOf,
+  allPreferences,
+  cleanText,
+  preferenceLabel,
+  preferenceScope,
+  type ReplyChannel,
+  type ReplyPick,
+  type StyleDimension,
+  type StyleView,
+  type ActionId,
+  type AliasKind,
+  type CommitmentStatus,
+  type InvokeArgs,
+  type InvokeChannel,
+  type InvokeResult,
+  type PersonCard,
+  type PromiseSaveRow,
+  type SetSettingResult,
+  type SettingsKey,
+} from '@glossly/core';
 import type { Capture } from './capture';
 import type { HotkeyManager, SaveHotkey } from './hotkey';
 import { logger } from './log';
@@ -43,6 +64,19 @@ const optStr = (v: unknown, max = 10_000): string | undefined => (v === undefine
 const obj = (v: unknown): Record<string, unknown> => {
   if (typeof v !== 'object' || v === null) throw new Error('Invalid argument');
   return v as Record<string, unknown>;
+};
+/** Reply's pick: up to 3 drafts (text plus the model's tags) and the chosen index. Missing is fine (nothing is learned). */
+const replyPick = (v: unknown): ReplyPick | undefined => {
+  if (v === undefined || v === null) return undefined;
+  const p = obj(v);
+  if (!Array.isArray(p.drafts) || p.drafts.length === 0 || p.drafts.length > 3) throw new Error('Invalid argument');
+  const drafts = p.drafts.map((raw) => {
+    const d = obj(raw);
+    return { text: str(d.text, 10_000), kind: optStr(d.kind, 30) ?? null, tone: optStr(d.tone, 30) ?? null };
+  });
+  const chosen = num(p.chosen);
+  if (!Number.isInteger(chosen) || chosen < 0 || chosen >= drafts.length) throw new Error('Invalid argument');
+  return { drafts, chosen };
 };
 
 export function registerIpc(deps: IpcDeps): void {
@@ -129,11 +163,13 @@ export function registerIpc(deps: IpcDeps): void {
   handle('reply:cancel', (a) => capture.cancelReply(str(a.requestId, 100)));
   handle('reply:insert', async (a) => {
     if (typeof a.edited !== 'boolean') throw new Error('Invalid argument');
-    const r = await capture.insertReply(num(a.sessionId), str(a.text, 10_000), a.edited, optStr(a.personId, 100));
+    const r = await capture.insertReply(num(a.sessionId), str(a.text, 10_000), a.edited, optStr(a.personId, 100), replyPick(a.pick));
     broadcastPeople();
     return r;
   });
-  handle('reply:copied', (a) => capture.replyCopied(num(a.sessionId)));
+  handle('reply:copied', (a) =>
+    capture.replyCopied(num(a.sessionId), a.text === undefined ? undefined : str(a.text, 10_000), replyPick(a.pick), optStr(a.personId, 100)),
+  );
 
   // ---- Paste (nothing selected) ----
   const pasteKind = (v: unknown) => {
@@ -246,6 +282,28 @@ export function registerIpc(deps: IpcDeps): void {
   handle('voice:remove', (a) => {
     people.deleteVoice(str(a.id, 100));
     return people.voiceSamples();
+  });
+
+  // ---- What Reply learned (Profile > How you write) ----
+  const styleView = (): StyleView => ({
+    learning: services.settings.replyLearning,
+    preferences: allPreferences(people.styleSignals()).map((p) => {
+      const name = p.personId ? (people.get(p.personId)?.name ?? null) : null;
+      return { ...p, label: preferenceLabel(p), where: preferenceScope(p, name) };
+    }),
+    notes: people.styleNotes(),
+  });
+  handle('style:get', () => styleView());
+  handle('style:forget', (a) => {
+    const dimension = str(a.dimension, 20) as StyleDimension;
+    if (!(STYLE_DIMENSIONS as readonly string[]).includes(dimension)) throw new Error('Invalid argument');
+    const channel = a.channel === null ? null : (str(a.channel, 10) as ReplyChannel);
+    people.forgetStyle(dimension, { channel, personId: a.personId === null ? null : str(a.personId, 100) });
+    return styleView();
+  });
+  handle('style:note-remove', (a) => {
+    people.removeStyleNote(str(a.id, 100));
+    return styleView();
   });
   handle('commitments:set-status', (a) => {
     const status = str(a.status, 10) as CommitmentStatus;

@@ -98,14 +98,32 @@ describe('PeopleRepo', () => {
     expect(r.card(p.id)!.theyOwe).toEqual([]);
   });
 
-  it('keeps pasted voice samples first and caps inserted ones', () => {
+  it('keeps pasted voice samples first, caps edited ones, and prefers the same person and kind of app', () => {
     const r = repo();
-    for (let i = 0; i < 25; i++) r.addVoice(`reply ${i}`, 'inserted');
+    for (let i = 0; i < 25; i++) r.addVoice(`reply ${i}`, 'inserted_edited', { channel: 'chat', original: `draft ${i}` });
     r.addVoice('my pasted sample', 'pasted');
-    expect(r.voiceSamples().filter((v) => v.origin === 'inserted')).toHaveLength(20);
+    expect(r.voiceSamples().filter((v) => v.origin === 'inserted_edited')).toHaveLength(20);
     expect(r.voiceForPrompt(3)).toEqual(['my pasted sample', 'reply 24', 'reply 23']);
-    r.addVoice('please send the deck', 'inserted_edited');
-    expect(r.voiceForPrompt(3)).toEqual(['my pasted sample', 'please send the deck', 'reply 24']);
+    const p = r.create({ name: 'Jordan Hale' });
+    r.addVoice('to jordan by email', 'inserted_edited', { channel: 'email', personId: p.id });
+    r.addVoice('newest, in email', 'inserted_edited', { channel: 'email' });
+    expect(r.voiceForPrompt(3, { channel: 'email', personId: p.id })).toEqual(['my pasted sample', 'to jordan by email', 'newest, in email']);
+    expect(r.voiceForPrompt(2, { channel: 'chat' })).toEqual(['my pasted sample', 'reply 24']);
+    expect(r.editedPairs(3).map((x) => x.original)).toEqual(['draft 24', 'draft 23', 'draft 22']);
+  });
+
+  it('stores what Reply learned, forgets one habit, and remembers removed notes', () => {
+    const r = repo();
+    const p = r.create({ name: 'Jordan Hale' });
+    r.addStyleSignals([{ dimension: 'length', pole: 'shorter', weight: 1 }], { channel: 'email', personId: p.id });
+    r.addStyleSignals([{ dimension: 'tone', pole: 'playful', weight: 1 }], { channel: 'chat', personId: null });
+    expect(r.styleSignals()).toHaveLength(2);
+    r.forgetStyle('length', { channel: null, personId: p.id });
+    expect(r.styleSignals().map((x) => x.dimension)).toEqual(['tone']);
+    const [note] = r.replaceStyleNotes(['Drops the greeting', 'Signs off with a dash']);
+    r.removeStyleNote(note!.id);
+    expect(r.styleNotes().map((n) => n.text)).toEqual(['Signs off with a dash']);
+    expect(r.removedStyleNotes()).toEqual(['Drops the greeting']);
   });
 
   it('deletes a person with their records', () => {

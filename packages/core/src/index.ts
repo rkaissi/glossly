@@ -29,6 +29,7 @@ export type * from './people/types';
 export * from './people/detect';
 export * from './people/resolve';
 export * from './people/dates';
+export * from './people/reply-style';
 export * from './store/people';
 
 export * from './llm/types';
@@ -45,6 +46,7 @@ export * from './actions/save';
 export * from './actions/who';
 export * from './actions/promises';
 export * from './actions/reply';
+export * from './actions/style-notes';
 export * from './actions/paste';
 
 export * from './recall/recall';
