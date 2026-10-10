@@ -35,7 +35,7 @@ The app lives in the tray. The default hotkey is `Ctrl+Alt+Space`. Data is in `%
 | Debug view showing captured text, method, and tier-1 context | Done | Verified live. Also shows routing stage, fallback reason, and every timing. |
 | Works in Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, recorded in `evals/capture.md` | Not done | Notepad passes, including tier 2. The table for the rest is ready for you to fill in. |
 | No overlap with selection toolbars in Notion, Google Docs, Word, Slack's composer | Not done | Hand test, also in `evals/capture.md`. |
-| Selection to pill under 150 ms | Reworked, not measured yet | Before Step 12.2: 314 and 358 ms in Notepad (250 ms wait, then about 100 ms for `popups_near`). Step 12.2 aims for about 150 ms where no toolbar is expected; the live numbers come with the Step 12 live check. |
+| Selection to pill under 150 ms | Done where no toolbar is expected | Measured Oct 10 after Step 12: **117 to 125 ms in Notepad** and **116 to 117 ms in Chrome** (100 ms wait, one check of 10 to 25 ms). Before Step 12.2 it was 314 and 358 ms. Apps known to show a selection toolbar still wait 250 ms by design. A shown pill never moved (screenshots 0.35 s and 1.5 s after the selection were identical). |
 
 ## Phase 1: bar, Ask, Save
 
@@ -93,6 +93,7 @@ Verified on this machine (Windows 11, 125% scaling):
 - Ask streaming with a real Groq key, and the "No chat model is set up" state with an "Add a key" button.
 - First-run setup end to end: key test, model catalog, role defaults, Try it, Finish, then the embedding download and backfill.
 - `pnpm dev` with hot reload in both windows (main-process edits need a restart).
+- Step 12 (Oct 10): pill timings above; the router answering in 330 and 446 ms against its 600 ms budget; Delete all data on a throwaway profile copy (items, entities, and events gone; the key, settings, and model list kept); Reset settings there (key, models, and settings gone; back to the setup's Welcome step); Local only (rules routing, Save kept the item and its embedding but skipped entities, Ask showed "Local only is on" and its button turned it off and answered).
 - Fixes from the last two rounds: a second launch no longer runs a second copy of the app (it just opens Settings in the running one), `pnpm test` no longer runs the evals, settings Fast Refresh no longer falls back to a full reload, and the overlay no longer shows an Electron taskbar button when it takes focus (verified on the hotkey path).
 
 Not verified live:
@@ -100,7 +101,7 @@ Not verified live:
 - Every app in the Phase 0 list except Notepad, and every toolbar-overlap check.
 - `popups_near` against a real selection toolbar, so "move to the other side" has only been unit tested. The dot itself was checked live with `GLOSSLY_FORCE_DOT=1` (fake obstacles on both sides): it is a round 18 px mark at the end of the selection, clicks next to it go through to the app, and hovering it opens the bar.
 - The copy-fallback branch inside the app.
-- Changing the hotkey with the recorder, Export, "Delete all data" and "Reset settings" (destructive; to be checked on a throwaway copy of the profile), and errors from refreshing the model catalog.
+- Changing the hotkey with the recorder, Export, and errors from refreshing the model catalog. ("Delete all data" and "Reset settings" were verified on Oct 10 on a throwaway copy of the profile; see below.)
 - `Ctrl+C` in the Ask panel.
 - The forced-focus path for when Windows refuses to give the bar focus (it didn't trigger in the repro attempt).
 - The taskbar fix on the auto path (it uses the same code as the hotkey path).

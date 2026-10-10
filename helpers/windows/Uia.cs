@@ -244,13 +244,13 @@ internal sealed class Uia : IDisposable
     /// <paramref name="allWindows"/> (the app's baseline snapshot at mouse-down) windows are
     /// listed screen-wide and regardless of z-order; the UIA probes stay around <paramref name="sel"/>.
     /// </summary>
-    public List<Popup> PopupsNear(Rect sel, HashSet<int> excludePids, bool allWindows)
+    public List<Popup> PopupsNear(Rect sel, HashSet<int> excludePids, bool allWindows, Point[]? probePoints = null)
     {
         // In-page toolbars (Google Docs, Notion, web apps) are not separate windows, so they are
         // probed through UIA, in parallel with the window scan. Each probe is about 8 to 18 px
         // outside the selection, where a toolbar about 40 px tall that sits next to it overlaps.
         int cx = sel.X + sel.W / 2;
-        var points = new[]
+        var points = probePoints ?? new[]
         {
             new Point(cx, sel.Y - 18), new Point(cx, sel.Y + sel.H + 18),
             new Point(sel.X + 10, sel.Y - 18), new Point(sel.X + sel.W - 10, sel.Y + sel.H + 18),

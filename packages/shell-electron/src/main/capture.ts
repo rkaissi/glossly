@@ -12,6 +12,7 @@ import {
   gateAutoSelection,
   isoNow,
   learnKeyFor,
+  foundAppToolbar,
   learnToolbarWait,
   mayCopyFallback,
   pillWait,
@@ -364,9 +365,9 @@ export class Capture {
       });
       this.startWatch();
 
-      // Only the app's own new obstacles teach its wait (not, say, another app's notification).
+      // Only the app's own new toolbars teach its wait (see foundAppToolbar).
       const learnKey = wait.reason !== 'known' && session.siteKey !== null ? learnKeyFor(appId) : null;
-      const fromApp = (found: ClassifiedObstacle[]) => found.some((o) => o.status === 'new' && o.popup.process_name === fg.process_name);
+      const fromApp = (found: ClassifiedObstacle[]) => foundAppToolbar(found, fg.process_name);
       if (learnKey && poll.found && fromApp(classified)) this.learnToolbar(learnKey, poll.at);
       else if (learnKey && wait.ms < settings.capture.pillDelayMs) {
         // The pill is up and never moves, but one check at the full wait teaches the next
@@ -628,12 +629,14 @@ export class Capture {
       const prev = this.state.slots;
       const next = slotsView(r, r.fallback ? 'rules_fallback' : 'model');
       this.overlay.patch({ slots: prev ? mergeRoute(prev, next) : next, debug: this.debugFor(s) });
-      this.services.metrics.record('router_done', {
+      const routed = {
         provider: r.decisions.provider,
         fallback: r.fallback ?? 'none',
         ms: Math.round(r.ms),
-        content_type: r.decisions.content_type,
-      });
+        budget_ms: this.settings.router.decisionTimeoutMs,
+      };
+      this.services.metrics.record('router_done', { ...routed, content_type: r.decisions.content_type });
+      log.info('routed', routed);
     } catch (e) {
       log.error('route failed', errorInfo(e));
     } finally {

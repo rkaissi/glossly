@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Diagnostics;
 using static Glossly.Helper.Win32;
 
@@ -68,7 +69,7 @@ internal static class Baseline
             List<Popup> popups;
             try
             {
-                popups = _uia!.PopupsNear(new Rect(pt.X - 1, pt.Y - 10, 2, 20), new HashSet<int>(), allWindows: true);
+                popups = _uia!.PopupsNear(new Rect(pt.X - 1, pt.Y - 10, 2, 20), new HashSet<int>(), allWindows: true, ProbesAround(pt));
             }
             catch
             {
@@ -83,6 +84,24 @@ internal static class Baseline
                 Monitor.PulseAll(Gate);
             }
         }
+    }
+
+    /// <summary>
+    /// The check after mouse-up probes 18 px outside the selected line's box, which is not known
+    /// at the press: the press can be anywhere inside a line up to about 50 px tall. So probe a
+    /// column above and below the press point that covers every such spot, or static chrome next
+    /// to the first or last line (Notepad's menu bar) would look new. This runs off the request
+    /// thread, so the extra probes cost nothing there.
+    /// </summary>
+    private static Point[] ProbesAround(POINT pt)
+    {
+        var points = new List<Point>();
+        foreach (int dy in new[] { 20, 30, 40, 52, 66 })
+        {
+            points.Add(new Point(pt.X, pt.Y - dy));
+            points.Add(new Point(pt.X, pt.Y + dy));
+        }
+        return points.ToArray();
     }
 
     /// <summary>

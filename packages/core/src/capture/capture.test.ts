@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS } from '../settings';
 import { keyMatches, resolveAppMode, siteKeyFor, stripBrowserSuffix } from './apps';
 import { countWords, gateAutoSelection, mayCopyFallback } from './gating';
 import { classifyObstacles, type Popup } from './obstacles';
-import { learnKeyFor, learnToolbarWait, pillWait, pollForToolbar, type PollOptions } from './pill-wait';
+import { foundAppToolbar, learnKeyFor, learnToolbarWait, pillWait, pollForToolbar, type PollOptions } from './pill-wait';
 import { placeBar, placePill } from './placement';
 
 const s = DEFAULT_SETTINGS;
@@ -204,6 +204,26 @@ describe('pill wait', () => {
     expect(a).toEqual({ 'notepad.exe': 132 });
     expect(learnToolbarWait(a!, 'notepad.exe', 90)).toBeNull();
     expect(learnToolbarWait(a!, 'notepad.exe', 250)).toEqual({ 'notepad.exe': 250 });
+  });
+
+  it("learns only from the app's own new toolbars, never from a menu bar", () => {
+    const sel = { x: 600, y: 400, w: 240, h: 20 };
+    const p = (over: Partial<Popup>): Popup => ({
+      source: 'uia',
+      kind: 'toolbar',
+      bounds: { x: 600, y: 340, w: 300, h: 40 },
+      id: 'u:1',
+      class_name: '',
+      process_name: 'notepad.exe',
+      ...over,
+    });
+    const found = (...ps: Popup[]) => classifyObstacles(ps, [], sel);
+    expect(foundAppToolbar(found(p({})), 'notepad.exe')).toBe(true);
+    expect(foundAppToolbar(found(p({ source: 'window', kind: 'popup_window', id: 'w:3' })), 'notepad.exe')).toBe(true);
+    // Notepad's menu bar, missed by the baseline: it may still steer placement, but it teaches nothing.
+    expect(foundAppToolbar(found(p({ kind: 'menu', bounds: { x: 80, y: 340, w: 160, h: 33 } })), 'notepad.exe')).toBe(false);
+    expect(foundAppToolbar(found(p({ process_name: 'teams.exe' })), 'notepad.exe')).toBe(false);
+    expect(foundAppToolbar(classifyObstacles([p({})], [p({})], sel), 'notepad.exe')).toBe(false);
   });
 
   // A fake clock: sleep and each check advance it.

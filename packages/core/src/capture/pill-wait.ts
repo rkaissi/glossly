@@ -1,5 +1,6 @@
 import type { Settings } from '../settings';
 import { isBrowser, keyMatches, siteKeyFor, type AppIdentity } from './apps';
+import type { ClassifiedObstacle } from './obstacles';
 
 /**
  * Apps and sites known to show their own toolbar when text is selected, so the pill waits the
@@ -50,6 +51,16 @@ export function pillWait(app: AppIdentity, s: Pick<Settings, 'capture' | 'toolba
 export function learnKeyFor(app: AppIdentity): string | null {
   const key = siteKeyFor(app);
   return isBrowser(app) && !/^[-|]/.test(key) ? null : key;
+}
+
+/**
+ * Whether one of the found obstacles is the app's own selection toolbar, which is what teaches
+ * an app its wait: new since mouse-down, owned by the foreground process (not, say, another app's
+ * notification), and a toolbar or popup window. A UIA menu never counts: it is a static menu bar
+ * or a context menu, never a toolbar that a left-drag selection brings up.
+ */
+export function foundAppToolbar(found: readonly ClassifiedObstacle[], processName: string): boolean {
+  return found.some((o) => o.status === 'new' && o.popup.process_name === processName && o.popup.kind !== 'menu' && o.popup.kind !== 'tooltip');
 }
 
 /**

@@ -188,14 +188,14 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **Live results (Notepad, Composer subagent, Oct 10).** With the forced dot: a round about 22 physical px circle just right of the selection end, centered on its line; clicking 20 px to its right reached Notepad and closed it; hovering it opened the full bar in place. The OS made the 40x40 window 41x40 (DPI rounding; the size check now allows 1 px). Without the flag: a normal pill below, and hovering opened the bar. Notepad's menu bar (UIA `menu` 160x33 above) was found on every selection and correctly marked `preexisting`; before this change it counted as an obstacle. Rayan's events before the fix: 103 below, 9 above, 8 dots. Items and entities unchanged (2 and 4).
 - Machine state: a build of this commit is running against Rayan's data; the sample-message tab is still open (unsaved) in his Notepad.
 
-### Step 12.2: faster careful pill (Oct 10, built; live check pending)
+### Step 12.2: faster careful pill (Oct 10, done; live numbers in the Step 12 live check)
 
 157 unit tests pass (8 new in `capture.test.ts`); `pnpm typecheck` is clean; the helper builds. Not run live yet (Rayan asked for one combined live check after 12.5).
 
 - **Helper.** New `baseline` command (protocol, fixture, `--check` case): the helper takes the mouse-down snapshot itself in `Baseline.cs`, on its own thread, on every left press while `mouse_hook` is on (the hook callback only hands over the point), so it never blocks the request thread. The second press of a double-click keeps the first press's snapshot. `baseline {exclude_pids, wait_ms}` returns `{available, popups, age_ms, ms}`, waiting up to `wait_ms` if the latest press's snapshot is still running. `Popup` has a non-serialized `Pid` so the snapshot can be filtered per request. `popups_near` is cheaper: the window scan runs while the UIA probes run on thread-pool threads (`Task.WaitAll` with the 80 ms budget), each probe uses the raw `IUIAutomation` interface (`NativeAutomation`, `Interop.UIAutomationClient`) with a cache request so each element costs one cross-process call, the probes went from 6 to 4 (18 px above and below at the center, start, and end; the 42 px ones were redundant for toolbars about 40 px tall), and `Focus.ProcessName` uses `QueryFullProcessImageName` instead of `Process.GetProcessById`, which snapshots every process on each call (the likely bulk of the old 88 ms screen-wide baseline).
 - **Core.** `capture/pill-wait.ts`: `DEFAULT_TOOLBAR_APPS` (Word, PowerPoint, Outlook classic and new, OneNote, Notion, Slack, `- Google Docs`, `- Google Slides`, `- Word`, `- Outlook`, `- Slack`, `| Medium`), `pillWait(app, settings)` (`known` = `capture.pillDelayMs` 250, `learned` = learned ms + 40 clamped between short and full, `short` = `capture.shortWaitMs` 100), `learnKeyFor` (null for a browser page without a site suffix, so one page can't slow the whole browser), `learnToolbarWait` (keeps the max seen, at most 200 keys), and `pollForToolbar` (first check at `capture.pollStartMs` 100, then every `capture.pollIntervalMs` 35; stops on the first check that finds a new obstacle, or after the first check that starts at or after the wait). `keyMatches` accepts `|` title-suffix keys and `siteKeyFor` falls back to `| <last part>` for titles split by bars (Medium). New settings `capture.shortWaitMs`, `pollStartMs`, `pollIntervalMs`, and top-level `toolbarWaits` (learned; kept by Delete all data, cleared by Reset settings).
 - **Shell.** `autoTrigger`: foreground, selection, `baseline` (waits up to 100 ms), then `pollForToolbar` with `popups_near` checks, then place and show once. No baseline request on mouse-down any more. After showing in a non-`known` app, if a check found a new obstacle owned by the foreground app's process it learns at once; otherwise one extra check runs at 250 ms after mouse-up (the pill is up and doesn't move) and learns if the app's own toolbar appeared late. Timings: `foreground`, `selection`, `baseline`, `wait` (time slept), `polls`, `popups_near` (last check), `popups_total`, `total`. `SelectionDebug.pill` (`PillTiming`: wait, reason, polls, found, baseline) shows in the debug view as "pill wait: shown at N ms · wait 100 ms (short) · 1 check, last N ms". `pill_shown` gained `wait_ms`, `wait_reason`, `polls`, `popups_ms`; `main.log` gets INFO "pill shown" per pill and "toolbar wait learned" (ms, and whether the key is a site; the key itself is not logged).
-- Expected in Notepad: one check at about 100 ms, so about 100 ms plus one `popups_near` (target about 130 to 150 ms). To be measured in the live check.
+- Measured in the Step 12 live check: Notepad 117 to 125 ms, Chrome 116 to 117 ms.
 
 ### Step 12.3: router timeout (Oct 10, done)
 
@@ -204,7 +204,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - `router.decisionTimeoutMs` defaults to 600. `SETTINGS_MIGRATIONS` in `core/src/settings.ts` is a list of one-time changes to stored values, applied in order by `Store.migrateSettings()` in the constructor and tracked in meta `settings_migrations` (the count applied). Entry 1 moves a stored `router.decisionTimeoutMs` of exactly 400 to 600; a fresh database just records the count, so a 400 picked later is kept (store test). Add later default changes as new entries; never edit a shipped one.
 - The Models tab's Decision description reads the budget from settings; `evals/print-results.mjs` says "over budget (600 ms)".
 
-### Step 12.4: Delete all data versus Reset settings (Oct 10, built; live check pending)
+### Step 12.4: Delete all data versus Reset settings (Oct 10, done; verified in the Step 12 live check)
 
 160 unit tests pass (store tests split into export, delete-all, and reset); `pnpm typecheck` is clean.
 
@@ -212,7 +212,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - Data tab: both cards use one `Destructive` component (description, inline confirm with a warning, a done line). Reset settings goes to `#setup` afterwards; Delete all data stays on the tab.
 - **Dev-only switches for testing these safely:** `GLOSSLY_USER_DATA=<dir>` points userData at another folder (the single-instance lock is per profile, so it runs next to the real instance), and `GLOSSLY_NO_CAPTURE=1` skips the helper and the hotkey so it doesn't compete with the real instance's pill. Both are ignored when packaged. Keys are `safeStorage` files whose encryption key lives in the profile's `Local State`, so a copied profile needs `Local State` and `keys\` together.
 
-### Step 12.5: strict Local only (Oct 10, built; live check pending)
+### Step 12.5: strict Local only (Oct 10, done; verified in the Step 12 live check)
 
 162 unit tests pass (a Local only test in `llm.test.ts`, a Save test in `actions.test.ts`); `pnpm typecheck` is clean.
 
@@ -220,6 +220,17 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **Save:** entity extraction catches `local_only` and sets `EnrichResult.entitiesSkipped = 'local_only'` without a `save_enrich_error` event; the item is still saved and embedded. Items saved under Local only are **not** backfilled with entities later (the simpler option, stated in `STATUS.md`). `capture.ts` logs INFO "save enriched" (`embedded`, `entities`, `skipped`, `cancelled`) for every save.
 - **Ask:** `AskErrorEvent.code` gained `local_only`; the panel shows "Local only is on, so nothing is sent to a model provider." with a "Turn off Local only and ask" button (`settings:set localOnly false`, then asks again).
 - Copy: the General tab's Local only description and setup's privacy line now say nothing is sent while it is on.
+
+### Step 12 live check (Oct 10, complete)
+
+163 unit tests pass; `pnpm typecheck` is clean; `pnpm helper:record --check` passes. This chat ran in Claude Code, which has no Cursor models, so the checks ran on Sonnet subagents instead of Composer or Grok.
+
+- **Delete all data and Reset settings** on a throwaway copy of the profile (`GLOSSLY_USER_DATA=%TEMP%\glossly-throwaway`, `GLOSSLY_NO_CAPTURE=1`; copied `Local State`, `keys\`, `models\`, and the DB; deleted afterwards). Delete all: items 2 -> 0, entities 4 -> 0, events -> 0, collections 4 (re-seeded), models 4 kept, `firstRunComplete` kept, `groq.bin` kept and the Keys tab still "Working". Reset: models 0, no settings rows, keys folder empty, the window went to the setup's Welcome step. Log: `[ipc] all data deleted`, `[ipc] settings reset`.
+- **Pill (auto path), after the fix below:** Notepad 117 to 125 ms (wait 100 `short`, 1 check, `popups_near` 10 to 16 ms, `baseline` 1 to 15 ms), Chrome 116 to 117 ms (selection 7 to 11 ms; the first Chromium selection was not slower). Pixel-diffed screenshots 0.35 s and 1.5 s after the drag were identical in 5 pairs: a shown pill never moves. A 2-word drag correctly showed no pill.
+- **Router:** `routed {"provider":"llm_structured","fallback":"none","ms":330|446,"budget_ms":600}`. New this round: `router_done` carries `budget_ms` and `main.log` has an INFO `routed` line (provider, fallback, ms, budget).
+- **Local only:** routing `rules_fallback ... fallback local_only`; Save then Undo logged `save enriched {"embedded":true,"entities":0,"skipped":"local_only","cancelled":false}` and left items 2, entities 4; Ask showed the message and "Turn off Local only and ask", which turned it off and streamed an answer from `groq:openai/gpt-oss-120b`.
+- **Fixed: Notepad's menu bar looked like a new toolbar.** On a first-line selection the check's probe 18 px above the line hit Notepad's menu bar (UIA `menu` 160x33), but the mouse-down baseline's probes (28 px from the press point, after 12.2 cut the 42 px ones) missed it, so it was `new`, and Notepad learned a 109 ms toolbar wait (later pills about 165 ms). Now `Baseline.cs` probes a column at 20, 30, 40, 52, and 66 px above and below the press point (`PopupsNear` takes optional probe points; it runs on the baseline thread), and `foundAppToolbar` (`pill-wait.ts`, unit tested) only learns from the app's new toolbars and popup windows, never a UIA menu or tooltip. Re-check: the menu bar is `preexisting` on all first-line pills, no wait learned. The stray `toolbarWaits {"notepad.exe":109}` was removed from Rayan's settings.
+- Machine state: a build of this commit is running against Rayan's real data (items 2, entities 4; debug view and Local only off, as before). Events went from 324 to about 360 from the tests' normal metrics. The throwaway profile is deleted. The Notepad sample tab is still open (unsaved). A stray click from the re-check may have opened a `fixtures` folder tab in Cursor; nothing was edited.
 
 ## Next steps, in order
 
@@ -238,7 +249,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 
 Rayan's review answers (Oct 10) set the order below. Each numbered step is one or more commits; stop and hand off after each.
 
-### Step 12 (in progress; 12.1 to 12.5 built, the combined live check next): fixes from Rayan's review
+### Step 12 (done Oct 10, including the combined live check): fixes from Rayan's review
 
 **How to run 12.2 to 12.5 (Rayan, Oct 10):** do all four in one chat, in order. Commit to `main` after each one (with this file and `STATUS.md` updated) but don't stop between them. Do no end-to-end or desktop testing until all four are implemented, then run one combined live check through a Composer or Grok subagent, fix what it finds, commit, and stop to hand off.
 
