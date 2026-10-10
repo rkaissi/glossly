@@ -1,0 +1,15 @@
+{
+  "cmd": "window_corners",
+  "cases": [
+    {
+      "name": "rounded",
+      "request": { "id": 31, "cmd": "window_corners", "handle": 722856, "corners": "round" },
+      "response": { "id": 31, "ok": true, "result": { "applied": true } }
+    },
+    {
+      "name": "window closed",
+      "request": { "id": 32, "cmd": "window_corners", "handle": 1, "corners": "round" },
+      "response": { "id": 32, "ok": false, "error": { "code": "window_gone", "message": "The window no longer exists" } }
+    }
+  ]
+}

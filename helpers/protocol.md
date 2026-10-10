@@ -155,6 +155,17 @@ Restores the window if minimized, then tries `SetForegroundWindow`, then a dummy
 
 Result: `{"restored": true, "method": "already" | "direct" | "dummy_key" | "attach_thread_input"}`. Errors: `window_gone`, `focus_failed`.
 
+### `window_corners`
+
+| Arg | Notes |
+| --- | --- |
+| `handle` | Required: one of the app's own windows |
+| `corners` | Required: `default`, `none`, `round`, or `small` |
+
+Sets DWM's `DWMWA_WINDOW_CORNER_PREFERENCE` (Windows 11). The shell uses it for the overlay: Electron leaves transparent windows square, and `round` gives them Windows 11 rounding plus DWM's soft shadow (the dot uses `default`, which draws neither).
+
+Result: `{"applied": bool}` (false when DWM refused, for example before Windows 11). Errors: `window_gone`, `bad_request`.
+
 ### `paste`
 
 | Arg | Default | Notes |

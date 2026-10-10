@@ -98,6 +98,10 @@ export const Commands = {
       method: z.enum(['already', 'direct', 'dummy_key', 'attach_thread_input']),
     }),
   },
+  window_corners: {
+    args: z.object({ handle: z.number().int(), corners: z.enum(['default', 'none', 'round', 'small']) }),
+    result: z.object({ applied: z.boolean() }),
+  },
   paste: {
     args: z.object({ text: z.string(), settle_ms: z.number().int().optional() }),
     result: z.object({ pasted: z.literal(true) }),

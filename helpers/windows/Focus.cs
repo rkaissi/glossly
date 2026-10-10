@@ -5,6 +5,7 @@ namespace Glossly.Helper;
 
 internal sealed record ForegroundResult(long Handle, int Pid, string ProcessName, string Title, string ClassName);
 internal sealed record RestoreFocusResult(bool Restored, string Method);
+internal sealed record WindowCornersResult(bool Applied);
 
 internal static class Focus
 {
@@ -81,5 +82,24 @@ internal static class Focus
             if (Environment.TickCount64 >= deadline) return false;
             Thread.Sleep(10);
         }
+    }
+
+    /// <summary>
+    /// Sets DWM's corner preference on one of our own windows. Electron leaves transparent
+    /// windows square; with "round", DWM rounds them (Windows 11) and draws its soft shadow.
+    /// </summary>
+    public static WindowCornersResult Corners(long handle, string corners)
+    {
+        var h = new IntPtr(handle);
+        if (!IsWindow(h)) throw new HelperException("window_gone", "The window no longer exists");
+        int pref = corners switch
+        {
+            "default" => 0,
+            "none" => 1,
+            "round" => 2,
+            "small" => 3,
+            _ => throw new HelperException("bad_request", "corners must be default, none, round, or small"),
+        };
+        return new WindowCornersResult(DwmSetWindowAttribute(h, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int)) == 0);
     }
 }

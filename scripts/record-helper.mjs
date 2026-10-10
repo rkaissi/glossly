@@ -122,6 +122,7 @@ const DETERMINISTIC = new Set([
   'errors/invalid JSON',
   'errors/wrong argument type',
   'restore_focus/window closed',
+  'window_corners/window closed',
   'paste/missing text',
   'popups_near/missing bounds',
   'mouse_hook/on',

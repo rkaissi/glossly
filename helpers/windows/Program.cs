@@ -72,6 +72,7 @@ internal static class Program
         "baseline" => Baseline.Get(PidsArg(req, "exclude_pids"), Int(req, "wait_ms", 150, 0, 1_000)),
         "copy_fallback" => CopyFallback(uia, Int(req, "timeout_ms", 120, 10, 2_000)),
         "restore_focus" => Focus.Restore(Long(req, "handle")),
+        "window_corners" => Focus.Corners(Long(req, "handle"), Str(req, "corners")),
         "paste" => Paste(Str(req, "text"), Int(req, "settle_ms", 250, 0, 2_000)),
         "mouse_hook" => SetMouse(Bool(req, "enabled")),
         "input_watch" => SetInputWatch(Bool(req, "enabled")),
