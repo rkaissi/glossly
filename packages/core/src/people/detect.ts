@@ -4,6 +4,7 @@
 import { chatSpeaker, extractFeatures } from '../router/features';
 import type { KnownPerson } from '../router/types';
 import type { Identity } from '../settings';
+import { isRoleAddress } from './emails';
 import { canonicalize, isMe, normalizeEmail, normalizeHandle } from './names';
 
 export interface DetectedPerson {
@@ -115,6 +116,7 @@ export function detectPeople(input: DetectInput, me: Identity, known: KnownPerso
   for (const name of f.namePairs) add({ name, email: null, handle: null, role: 'mentioned', knownId: knownIdFor(name, null) });
   for (const email of f.emails) {
     const e = normalizeEmail(email);
+    if (isRoleAddress(e)) continue;
     if (![...found.values()].some((p) => p.email === e)) add({ name: null, email: e, handle: null, role: 'mentioned', knownId: knownIdFor(null, e) });
   }
   for (const h of f.handles) add({ name: null, email: null, handle: normalizeHandle(h), role: 'mentioned', knownId: null });

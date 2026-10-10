@@ -117,6 +117,28 @@ describe('acceptWhoRows', () => {
     expect(people.map((p) => p.name)).toEqual(['Sam Smith']);
   });
 
+  it('does not turn a glued address or a shared inbox into a person', () => {
+    const corpus = [
+      'Hello team',
+      '',
+      'casey@waterloo.cablake',
+      'communications@alumo.ca',
+      'nyc-swe-intern-interview-scheduling@northwind.comjordan',
+      '',
+      'Jordan Hale <jordan.hale@example.com> will follow up.',
+    ].join('\n');
+    const people = acceptWhoRows(
+      [
+        row({ name: 'Jordan Hale', evidence: 'Jordan Hale' }),
+        row({ name: 'casey@waterloo.cablake', email: 'casey@waterloo.cablake', evidence: 'casey@waterloo.cablake' }),
+        row({ name: 'communications@alumo.ca', email: 'communications@alumo.ca', evidence: 'communications@alumo.ca' }),
+      ],
+      corpus,
+      me,
+    );
+    expect(people.map((p) => [p.name, p.email])).toEqual([['Jordan Hale', 'jordan.hale@example.com']]);
+  });
+
   it('reads a quote across a line break and a confidence given in percent', () => {
     const corpus = 'From: Maya Chen\nThanks,\nMaya';
     const people = acceptWhoRows([row({ name: 'Maya Chen', confidence: 85, evidence: 'Thanks, Maya' })], corpus, me);

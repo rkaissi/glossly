@@ -70,6 +70,8 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .frame {
   width: max-content;
   min-width: 200px;
+  /* Keep in sync with MAX_W in shell-electron overlay.ts. Wider than this, the window clips. */
+  max-width: 680px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -90,9 +92,11 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   min-width: 520px;
 }
 /* Everything under the row takes the row's width instead of widening the bar. */
+/* width 0 keeps a long panel from widening the bar; min-width 100% then fills the row. */
 .frame > :not(.row) {
   width: 0;
   min-width: 100%;
+  overflow-wrap: anywhere;
   border-top: 1px solid var(--border);
 }
 .frame.above > :not(.row) {
@@ -107,6 +111,8 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   align-items: center;
   gap: 4px;
   padding: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .menu-btn {
@@ -129,7 +135,9 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   justify-content: flex-start;
   background: transparent;
   overflow: hidden;
-  flex: none;
+  /* Ask and Save stay put (flex: none below). Later slots shrink before the bar clips. */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .slot > span {
   overflow: hidden;
@@ -137,9 +145,11 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 }
 .slot.ask {
   min-width: 72px;
+  flex: none;
 }
 .slot.save {
   min-width: 80px;
+  flex: none;
 }
 .pill .slot.ask {
   width: 72px;
@@ -185,8 +195,16 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   border: 1px solid var(--border-strong);
   color: var(--fg-2);
   white-space: nowrap;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
   animation: fade-in 180ms ease-out;
+}
+.badge > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* The Glossly menu: More (the extra actions), then Don't show here, Settings, and Close. */
@@ -412,11 +430,16 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 }
 .chip {
   height: 28px;
+  max-width: 100%;
+  min-width: 0;
   padding: 0 12px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   background: transparent;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chip.selected,
 .chip.selected:hover:not(:disabled) {
@@ -726,6 +749,7 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .draft-text {
   margin: 0;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   user-select: text;
   line-height: 1.5;
 }

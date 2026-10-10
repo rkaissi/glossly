@@ -3,7 +3,7 @@ import { BrowserWindow, screen } from 'electron';
 import type { OverlayMode, OverlayState, Placement, Rect, Size } from '@glossly/core';
 import { logger } from './log';
 import { hasWindowMaterial, preloadPath, rendererUrl } from './paths';
-import { hwndFromBuffer } from './view';
+import { fitOnScreen, hwndFromBuffer } from './view';
 
 const log = logger('overlay');
 
@@ -48,8 +48,6 @@ export const HIDDEN_STATE: OverlayState = {
   notice: null,
   saved: null,
 };
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
 
 /**
  * The pill, bar, and panel share one window, created once at launch and kept hidden. It is
@@ -259,23 +257,24 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   /**
    * The renderer measured its content. Keeps the left edge and the edge next to the selection
    * fixed, so the window only grows rightward and away from the selection. Placement already
-   * left room for MAX_W on the right; the clamp below is only a safety net.
+   * left room for MAX_W on the right. If the content is still wider than the work area, the
+   * window shrinks to fit instead of hanging off the screen.
    */
   resize(sessionId: number, w: number, h: number): void {
     const s = this.state;
     if (sessionId !== s.sessionId || (s.mode !== 'bar' && s.mode !== 'panel' && s.mode !== 'toast')) return;
     if (!Number.isFinite(w) || !Number.isFinite(h)) return;
     const cur = this.bounds();
-    const nw = Math.round(clamp(w, LIMITS.minW, LIMITS.maxW));
-    const nh = Math.round(clamp(h, LIMITS.minH, LIMITS.maxH));
-    if (nw === cur.w && nh === cur.h) return;
-    const area = screen.getDisplayMatching({ x: cur.x, y: cur.y, width: cur.w, height: cur.h }).workArea;
-    const above = s.placement?.side === 'above';
-    let x = clamp(cur.x, area.x, area.x + area.width - nw);
-    let y = above ? cur.y + cur.h - nh : cur.y;
-    y = clamp(y, area.y, area.y + area.height - nh);
-    x = Math.round(x);
-    const rect = { x, y: Math.round(y), w: nw, h: nh };
+    const display = screen.getDisplayMatching({ x: cur.x, y: cur.y, width: cur.w, height: cur.h }).workArea;
+    const rect = fitOnScreen(
+      cur,
+      w,
+      h,
+      { x: display.x, y: display.y, w: display.width, h: display.height },
+      s.placement?.side === 'above',
+      LIMITS,
+    );
+    if (rect.w === cur.w && rect.h === cur.h && rect.x === cur.x && rect.y === cur.y) return;
     const placement: Placement | null = s.placement ? { ...s.placement, rect } : null;
     this.state = { ...s, placement };
     this.win.setBounds({ x: rect.x, y: rect.y, width: rect.w, height: rect.h });

@@ -144,13 +144,14 @@ export async function identifyWho(
 }
 
 /**
- * Person badges for the bar (spec: a known person matched and has open commitments or a
- * note). Exact matches only; at most two.
+ * Person badges for the bar (a known person matched, with open commitments or a note).
+ * Exact matches only. The bar shows one chip ("Jordan +2 others"), so this can return
+ * more than will fit on a row; the overlay collapses them.
  */
 export function personBadges(repo: PeopleRepo, detection: Detection, sourceApp: string): PersonBadge[] {
   const out: PersonBadge[] = [];
   for (const d of detection.people) {
-    if (out.length >= 2) break;
+    if (out.length >= 8) break;
     const r = resolvePerson(repo, d, sourceApp);
     if (r.kind !== 'exact' || out.some((b) => b.personId === r.personId)) continue;
     const card = repo.card(r.personId, { interactions: 0, items: 0 });

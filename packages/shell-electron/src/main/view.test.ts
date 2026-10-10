@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { actionForSlot, distanceToRect, emptySlotsView, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
+import { actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -105,6 +105,32 @@ describe('growFrom', () => {
 
   it('stays inside the work area', () => {
     expect(growFrom({ x: 900, y: 780, w: 168, h: 40 }, 'below', { w: 460, h: 56 }, area)).toEqual({ x: 540, y: 744, w: 460, h: 56 });
+  });
+
+  it('shrinks a window that is wider than the work area instead of hanging off the edge', () => {
+    expect(growFrom({ x: 400, y: 100, w: 200, h: 40 }, 'below', { w: 900, h: 40 }, { x: 0, y: 0, w: 500, h: 400 })).toEqual({
+      x: 0,
+      y: 100,
+      w: 500,
+      h: 40,
+    });
+  });
+});
+
+describe('fitOnScreen', () => {
+  const limits = { minW: 40, maxW: 680, minH: 16, maxH: 640 };
+
+  it('shifts left so a bar near the right edge stays on screen', () => {
+    expect(fitOnScreen({ x: 800, y: 200, w: 200, h: 40 }, 680, 40, area, false, limits)).toEqual({ x: 320, y: 200, w: 680, h: 40 });
+  });
+
+  it('shrinks to the work area when the screen is narrower than the bar', () => {
+    const narrow = { x: 10, y: 20, w: 400, h: 300 };
+    expect(fitOnScreen({ x: 10, y: 40, w: 200, h: 40 }, 680, 800, narrow, false, limits)).toEqual({ x: 10, y: 20, w: 400, h: 300 });
+  });
+
+  it('keeps the bottom edge when the bar sits above the selection', () => {
+    expect(fitOnScreen({ x: 100, y: 500, w: 200, h: 40 }, 400, 200, area, true, limits)).toEqual({ x: 100, y: 340, w: 400, h: 200 });
   });
 });
 

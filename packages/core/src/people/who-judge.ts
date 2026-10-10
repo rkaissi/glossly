@@ -3,6 +3,7 @@
 import { chatSpeaker } from '../router/features';
 import type { Identity } from '../settings';
 import type { DetectedPerson, DetectInput } from './detect';
+import { findEmails, isRoleAddress } from './emails';
 import { canonicalize, isMe, normalizeEmail, normalizeHandle } from './names';
 
 export const WHO_MIN_CONFIDENCE = 0.7;
@@ -18,7 +19,6 @@ export interface WhoCandidate {
   evidence: string;
 }
 
-const emailRe = () => /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/gi;
 const handleRe = () => /(?:^|[\s(])@([A-Za-z0-9_][\w.-]{1,30})/g;
 const headerRe = () => /^\s*(from|to|cc|bcc):\s*(.+)$/gim;
 /** Button labels the model must not turn into people. Matched on the whole name. */
@@ -119,16 +119,32 @@ function headerNames(corpus: string): { name: string | null; email: string | nul
     for (const part of recipients(line[2]!)) {
       const raw = part.trim();
       if (!raw) continue;
-      const email = raw.match(emailRe())?.[0] ?? null;
-      const name = raw
-        .replace(emailRe(), '')
-        .replace(/\([^)]{0,20}\)/g, '')
-        .replace(/[<>]/g, '')
-        .trim();
-      out.push({ name: name || null, email: email ? normalizeEmail(email) : null });
+      const found = findEmails(raw)[0];
+      let email = found ? normalizeEmail(found.email) : null;
+      let rest = raw;
+      if (found) {
+        // Letters stuck to the domain ("…example.comJordan") are not part of the name either.
+        const glue = /^[A-Za-z]+/.exec(raw.slice(found.end))?.[0].length ?? 0;
+        rest = raw.slice(0, found.index) + raw.slice(found.end + glue);
+      }
+      const name =
+        rest
+          .replace(/\([^)]{0,20}\)/g, '')
+          .replace(/[<>]/g, '')
+          .trim() || null;
+      if (email && isRoleAddress(email)) email = null;
+      if (!name && !email) continue;
+      out.push({ name, email });
     }
   }
   return out;
+}
+
+/** The address, cut at the real domain, or "" when it is missing or a shared inbox. */
+function repairedEmail(value: string): string {
+  const found = findEmails(value)[0];
+  if (!found || isRoleAddress(found.email)) return '';
+  return normalizeEmail(found.email);
 }
 
 function neighborName(before: string): string | null {
@@ -139,11 +155,15 @@ function neighborName(before: string): string | null {
   return name && !NOT_NAMES.test(name) ? name : null;
 }
 
-/** Every email and @handle in the text is kept, attached to the neighboring name when there is one. */
+/**
+ * Attaches an address to the person it sits next to. A bare address is not a person, and a
+ * no-reply or scheduling inbox is not one either. @handles are still kept on their own.
+ */
 function attachContacts(rows: WhoCandidate[], corpus: string): WhoCandidate[] {
-  const out = rows.map((r) => ({ ...r }));
+  const out = rows.map((r) => ({ ...r, email: repairedEmail(r.email) }));
   const take = (kind: 'email' | 'handle', value: string, before: string) => {
     const norm = kind === 'email' ? normalizeEmail(value) : normalizeHandle(value);
+    if (kind === 'email' && isRoleAddress(norm)) return;
     if (out.some((r) => (kind === 'email' ? normalizeEmail(r.email) === norm : normalizeHandle(r.handle) === norm))) return;
     const name = neighborName(before);
     const host = name ? out.find((r) => r.name && canonicalize(r.name) === canonicalize(name)) : undefined;
@@ -152,6 +172,8 @@ function attachContacts(rows: WhoCandidate[], corpus: string): WhoCandidate[] {
       else host.handle = norm;
       return;
     }
+    // An address with nobody's name next to it is not a person. A handle still is.
+    if (kind === 'email' && !name) return;
     out.push({
       name: name ?? '',
       email: kind === 'email' ? norm : '',
@@ -162,7 +184,7 @@ function attachContacts(rows: WhoCandidate[], corpus: string): WhoCandidate[] {
       evidence: value,
     });
   };
-  for (const m of corpus.matchAll(emailRe())) take('email', m[0], corpus.slice(Math.max(0, m.index! - 80), m.index));
+  for (const m of findEmails(corpus)) take('email', m.email, corpus.slice(Math.max(0, m.index - 80), m.index));
   for (const m of corpus.matchAll(handleRe())) take('handle', m[1]!, corpus.slice(Math.max(0, m.index! - 80), m.index));
   return mergeFragments(out);
 }
@@ -177,13 +199,16 @@ function dropUser(rows: WhoCandidate[], corpus: string, me: Identity): WhoCandid
 }
 
 function toDetected(r: WhoCandidate): DetectedPerson | null {
-  const name = r.name.trim() || null;
-  const email = r.email.trim() ? normalizeEmail(r.email) : null;
+  const rawName = r.name.trim();
+  // A row whose "name" is an address is not a person. The address can still attach to someone else.
+  const name = rawName && !rawName.includes('@') ? rawName : null;
+  const email = repairedEmail(r.email);
   const handle = r.handle.trim() ? normalizeHandle(r.handle) : null;
-  if (!name && !email && !handle) return null;
+  // An address with no name is not a person. A handle still is.
+  if (!name && !handle) return null;
   return {
     name,
-    email,
+    email: email || null,
     handle,
     role: 'mentioned',
     knownId: null,
@@ -194,7 +219,8 @@ function toDetected(r: WhoCandidate): DetectedPerson | null {
 
 /**
  * Keeps the model's rows that are actually in the text. Drops low confidence, invented
- * people, the user, and fragments of one name. Emails and handles in the text are kept.
+ * people, the user, and fragments of one name. An address attaches to the neighboring
+ * name; a bare or shared inbox does not become a person. @handles are kept.
  */
 export function acceptWhoRows(rows: WhoCandidate[], corpus: string, me: Identity): DetectedPerson[] {
   const flat = squash(corpus);

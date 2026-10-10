@@ -1,4 +1,5 @@
 import { countWords } from '../capture/gating';
+import { findEmails } from '../people/emails';
 import { isMe } from '../people/names';
 import type { Identity } from '../settings';
 import type { KnownPerson, SelectionContext } from './types';
@@ -30,7 +31,6 @@ export interface Features {
   authorIsMe: boolean;
 }
 
-const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const HANDLE = /(?:^|[\s(])@([A-Za-z0-9_][\w.-]{1,30})/g;
 const PHONE = /(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
 const NAME_PAIR = /\b([A-Z][a-z]{1,15})\s([A-Z][a-z]{1,20})\b/g;
@@ -138,7 +138,7 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
   const lines = text.split(/\r?\n/);
   const app = ctx.source_app.toLowerCase();
 
-  const emails = unique(text.match(EMAIL) ?? []);
+  const emails = unique(findEmails(text).map((e) => e.email.toLowerCase()));
   const handles = unique([...text.matchAll(HANDLE)].map((m) => m[1]!));
   const phones = unique(text.match(PHONE) ?? []);
   // Speaker names in chat headers ("Sam Lee  10:42 AM") are who wrote it, not who it mentions.

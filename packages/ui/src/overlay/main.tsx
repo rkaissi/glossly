@@ -10,6 +10,7 @@ import '../theme.css';
 import './overlay.css';
 import { AskPanel } from './AskPanel';
 import { Debug } from './Debug';
+import { shownBadges } from './badges';
 import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { PastePanel } from './PastePanel';
@@ -239,18 +240,18 @@ function Expanded({ s }: { s: OverlayState }) {
         )}
         {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
         {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
-        {s.badges.map((b) =>
+        {shownBadges(s.badges).map(({ badge: b, title }) =>
           b.kind === 'person' ? (
-            // A known person with open commitments or a note: opens their Who card.
-            <button key={b.personId} className="badge" title={`Who is ${b.label.split(' · ')[0]}`} onClick={() => run(id, { action: 'who' })}>
+            // Known people with open commitments or a note. Several collapse to "Jordan +2 others".
+            <button key={b.personId} className="badge" title={title} onClick={() => run(id, { action: 'who' })}>
               <UserRound size={13} strokeWidth={1.75} aria-hidden />
-              {badgeLabel(b)}
+              <span>{b.label}</span>
             </button>
           ) : (
             // Saved items related to this selection: opens the Recall cards.
-            <button key="recall" className="badge" title="What you saved before that relates to this" onClick={() => run(id, { action: 'recall' })}>
+            <button key="recall" className="badge" title={title} onClick={() => run(id, { action: 'recall' })}>
               <History size={13} strokeWidth={1.75} aria-hidden />
-              {badgeLabel(b)}
+              <span>{badgeLabel(b)}</span>
             </button>
           ),
         )}
