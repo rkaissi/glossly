@@ -151,3 +151,15 @@ export function timeAgo(iso: string, now = Date.now()): string {
 }
 
 export const pct = (x: number) => `${Math.round(x * 100)}%`;
+
+/** A typed email, lower-cased, or null when it isn't one. */
+export function parseEmail(raw: string): string | null {
+  const s = raw.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
+}
+
+/** A chat handle or display name without the leading "@", or null when empty. */
+export function parseHandle(raw: string): string | null {
+  const s = raw.trim().replace(/^@+/, '').trim();
+  return s && s.length <= 100 ? s : null;
+}

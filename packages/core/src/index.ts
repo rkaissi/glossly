@@ -23,6 +23,8 @@ export * from './router/router';
 export * from './store/migrations';
 export * from './store/store';
 
+export * from './people/names';
+
 export * from './llm/types';
 export * from './llm/catalog';
 export * from './llm/providers';

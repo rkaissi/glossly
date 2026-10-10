@@ -1,10 +1,10 @@
-# Glossly status: Phases 0 and 1
+# Glossly status: Phases 0 to 2
 
-Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1). `docs/HANDOFF.md` has the detailed build notes.
+Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1) and Phase 2 (people layer and Reply), which is being built in Step 15. `docs/HANDOFF.md` has the detailed build notes.
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 169 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 174 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -47,6 +47,17 @@ The app lives in the tray. The default hotkey is `Ctrl+Alt+Space`. Data is in `%
 | Save stores items with embeddings, entities, and undo | Done | Live: your two saved items have embeddings and four linked entities. Undo verified on the hotkey path. |
 | Keyboard map from the Core user flow | Done | `1` to `4`, `Tab` (More in the bar, collections in Save), `Enter`, and `Esc` verified live in Notepad. Since Step 13, More lives in the Glossly menu at the left of the bar: `Tab` opens the menu with More's first item highlighted, and Up and Down move through it too. `Ctrl+C` copying an Ask answer hasn't been tried live. |
 | First-run setup and settings: keys with live test, model catalog, roles with fallbacks, hotkey, block list, local-only | Done | You ran setup yourself on Oct 10. All five tabs (Keys, Models, General, Data, Metrics) were checked with real data. |
+
+## Phase 2: people layer and Reply (Step 15, in progress)
+
+| Spec check | Status | Notes |
+| --- | --- | --- |
+| User identity setup at first run | Built (Step 15.1), not checked live | Setup has a new "You" step after Welcome (name required, emails and handles optional), and Settings has a Profile tab with the same form. Since you finished setup before this existed, the sidebar shows "Add your name" until you fill in Profile. Ask now tells the model who is asking and that a message in the selection was most likely written to them, which fixes Ask treating you as a message's author. |
+| Person resolution, Create person, alias management, confirm-merge prompt | Not started | |
+| Who is this card | Not started | |
+| Commitment extraction, date resolution, review-then-save, due-date notifications | Not started | |
+| Reply with 3 intent-labeled drafts, person context, voice samples, insert into original field | Not started | |
+| Person badge on the bar | Not started | |
 
 Built ahead of schedule because the privacy rules require them from day one or the work was cheap: JSON export and "Delete all data" (Data tab), and the local metrics view (Metrics tab; spec Phase 4).
 
@@ -115,7 +126,7 @@ Known rough edges:
 
 - Notepad's taskbar button flashes after the tier-2 hand-off on the hotkey path (Windows refusing one of the foreground changes). Harmless.
 - The rules call the 39-word sample message in Notepad an `article`, because it has no speaker header.
-- Ask's answer to a message assumes you wrote it. The Phase 2 "You" identity setup fixes that.
+- Ask's answer to a message assumed you wrote it. Fixed in Step 15.1 (Ask now gets your identity and is told you are the reader); not re-checked live yet.
 
 ## Open questions for you
 

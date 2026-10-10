@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
-import { canonicalize, Store } from './store';
+import { canonicalize } from '../people/names';
+import { Store } from './store';
 
 const require = createRequire(import.meta.url);
 const vecExtensionPath = (require('sqlite-vec') as { getLoadablePath(): string }).getLoadablePath();

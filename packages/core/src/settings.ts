@@ -21,6 +21,18 @@ export type RoleAssignment = z.infer<typeof RoleAssignmentSchema>;
 const emptyRole: RoleAssignment = { model: null, fallback: null, manual: false };
 
 /**
+ * Who the user is (spec: People layer, User identity): used to tell "me" from "them" in
+ * messages, commitments, and replies. Entered at first run and in the Profile tab.
+ */
+export const IdentitySchema = z.object({
+  name: z.string().max(100).default(''),
+  emails: z.array(z.string().max(200)).max(10).default([]),
+  /** Chat handles and display names, stored without a leading "@". */
+  handles: z.array(z.string().max(100)).max(10).default([]),
+});
+export type Identity = z.infer<typeof IdentitySchema>;
+
+/**
  * Every user-tunable value. Stored one key per row in the `settings` table. Model names,
  * thresholds, and timings live here, never in code.
  */
@@ -30,6 +42,7 @@ export const SettingsSchema = z.object({
   hotkey: z.string().default('Control+Alt+Space'),
   localOnly: z.boolean().default(false),
   debugView: z.boolean().default(true),
+  identity: IdentitySchema.prefault({}),
 
   /** Keys are process names ("slack.exe") or window-title suffixes ("- Google Docs"). */
   appModes: z.record(z.string(), AppModeSchema).default({}),

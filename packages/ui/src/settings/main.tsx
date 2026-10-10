@@ -1,8 +1,8 @@
-// The settings window: first-run setup (#setup) and the settings tabs (#keys, #models,
-// #general, #data, #metrics). Main changes the hash on an open window to switch tabs.
+// The settings window: first-run setup (#setup) and the settings tabs (#profile, #keys,
+// #models, #general, #data, #metrics). Main changes the hash on an open window to switch tabs.
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react';
+import { Activity, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { GlosslyMark } from '../icons';
@@ -13,9 +13,11 @@ import { GeneralTab } from './General';
 import { KeysTab } from './Keys';
 import { MetricsTab } from './Metrics';
 import { ModelsTab } from './Models';
+import { ProfileTab } from './Profile';
 import { Setup } from './Setup';
 
 const TABS = [
+  { id: 'profile', label: 'Profile' },
   { id: 'keys', label: 'Keys' },
   { id: 'models', label: 'Models' },
   { id: 'general', label: 'General' },
@@ -24,7 +26,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
-const TAB_ICONS: Record<Tab, LucideIcon> = { keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
+const TAB_ICONS: Record<Tab, LucideIcon> = { profile: UserRound, keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
 
 // Main loads the page with ?material=mica when the window is Windows 11 mica.
 document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
@@ -83,8 +85,15 @@ function App() {
             Finish setup
           </a>
         )}
+        {view.settings.firstRunComplete && !view.settings.identity.name.trim() && tab !== 'profile' && (
+          <a href="#profile" className="setup-link">
+            <UserRound size={16} strokeWidth={1.75} aria-hidden />
+            Add your name
+          </a>
+        )}
       </nav>
       <main>
+        {tab === 'profile' && <ProfileTab view={view} />}
         {tab === 'keys' && <KeysTab view={view} />}
         {tab === 'models' && <ModelsTab view={view} />}
         {tab === 'general' && <GeneralTab view={view} />}

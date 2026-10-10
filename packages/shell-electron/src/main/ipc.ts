@@ -11,7 +11,7 @@ import type { SettingsWindow } from './settings-window';
 const log = logger('ipc');
 
 const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize'];
-const TABS = ['keys', 'models', 'general', 'data', 'metrics'] as const;
+const TABS = ['profile', 'keys', 'models', 'general', 'data', 'metrics'] as const;
 const MAX_CLIPBOARD = 1_000_000;
 
 export interface IpcDeps {

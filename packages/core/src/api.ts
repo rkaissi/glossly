@@ -17,7 +17,7 @@ import type { CaptureMethod, Trigger } from './types';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
 export type { MetricsSummary } from './metrics';
-export type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
+export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 
 // ---- overlay state (main -> overlay renderer) ----
 
@@ -222,6 +222,8 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
+export type SettingsTab = 'profile' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
+
 // ---- channel maps ----
 
 /** Renderer -> main request/response (ipcRenderer.invoke / ipcMain.handle). */
@@ -264,7 +266,7 @@ export interface InvokeChannels {
   'metrics:summary': { args: { days: number }; result: MetricsSummary };
   'embed:status': { args: void; result: EmbedStatus };
   'embed:download': { args: void; result: void };
-  'settings:open': { args: { tab?: 'keys' | 'models' | 'general' | 'data' | 'metrics' }; result: void };
+  'settings:open': { args: { tab?: SettingsTab }; result: void };
   /**
    * The setup's "Try it" step is showing: the settings window may be a capture source (it is
    * otherwise ignored like every Glossly window). Cleared when the window closes.

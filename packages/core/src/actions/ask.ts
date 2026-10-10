@@ -1,5 +1,6 @@
 import askPrompt from '../../prompts/ask.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
+import { describeIdentity } from '../people/names';
 import type { Settings } from '../settings';
 import type { ContainerContext, Item, SelectionPayload } from '../types';
 import { contextWindow } from './context';
@@ -39,16 +40,23 @@ export function noteLabels(items: Pick<Item, 'created_at'>[]): string[] {
   });
 }
 
-export function buildAskPrompt(settings: Pick<Settings, 'ask' | 'capture'>, input: AskInput): { question: string; prompt: string } {
+type AskSettings = Pick<Settings, 'ask' | 'capture' | 'identity'>;
+
+export function buildAskPrompt(settings: AskSettings, input: AskInput): { question: string; prompt: string } {
   const question = input.question?.trim() || settings.ask.defaultQuestion;
   const { selection } = input;
   const win = contextWindow(selection, input.container, settings.capture.containerChars);
   const surrounding =
     win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length);
 
+  const me = describeIdentity(settings.identity);
   const parts = [
     '## Question',
     question,
+    '',
+    // Without this the model reads a message in the selection as the asker's own.
+    '## The person asking',
+    me ? `${me}. They are reading the selection; they did not write it unless it is signed by or attributed to them.` : 'Unknown. They are reading the selection and most likely did not write it.',
     '',
     `## Selection (from ${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''})`,
     '<selection>',
@@ -78,7 +86,7 @@ export function buildAskPrompt(settings: Pick<Settings, 'ask' | 'capture'>, inpu
 }
 
 /** Streams an answer to a question about the selection, on the Chat role. */
-export function ask(llm: LlmProvider, settings: Pick<Settings, 'ask' | 'capture'>, input: AskInput, signal?: AbortSignal): StreamResult {
+export function ask(llm: LlmProvider, settings: AskSettings, input: AskInput, signal?: AbortSignal): StreamResult {
   const { prompt } = buildAskPrompt(settings, input);
   return llm.stream({ role: 'chat', action: 'ask', instructions: askPrompt, prompt, signal, maxOutputTokens: 800 });
 }

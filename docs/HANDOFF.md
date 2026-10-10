@@ -285,6 +285,15 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **The overlay belongs to the source window.** It stays always-on-top (it never takes focus on the auto path, so the source app would otherwise cover it), but it now closes when another app's window comes to the front. The helper's mouse-hook thread also runs `SetWinEventHook(EVENT_SYSTEM_FOREGROUND, out of context, skip own process)` and emits `foreground {handle, pid}` while `input_watch` is on (protocol, `EventSchema`, and `events.json` updated). `Capture` closes a visible, unfocused pill or bar on it unless the new foreground is the session's source window or one of Glossly's own processes (the settings window, so Try it still works). A focused overlay already closed on blur. `main.log` gets INFO `overlay closed {reason}` for `foreground` and `settings`.
 - **Live (Sonnet subagent, Notepad, real data, nothing saved):** pill then another window brought to the front by script, no click: `overlay closed {"reason":"foreground"}`; the same with the hover-expanded bar; Settings from the menu on the auto path and on the hotkey path (Tab, then Settings): `overlay closed {"reason":"settings"}`, the settings window in front with no bar over it, focus not returned to Notepad. With no overlay showing, switching apps logged nothing. No WARN or ERROR. Screenshots `%TEMP%\glossly-live\fg-*.png`.
 
+### Step 15.1: the "You" identity (Oct 10, done; not run live yet)
+
+174 unit tests pass; `pnpm typecheck` is clean.
+
+- **Setting** `identity {name, emails[], handles[]}` (`IdentitySchema` in `settings.ts`; handles stored without "@"). It is a setting, so Reset settings clears it (and setup asks again) and Delete all data keeps it.
+- **`core/src/people/names.ts`** (pure): `canonicalize` (moved out of `store.ts`, which imports it), `jaroWinkler`, `normalizeHandle`/`normalizeEmail`, `hasIdentity`, `isMe(value, identity)` (email, handle, full name, or a one-word speaker equal to the user's first name, since chat apps often show first names only), and `describeIdentity` ("Rayan Kaissi (also: rayan@example.com, @rayank)").
+- **Ask fix.** `buildAskPrompt` takes `identity` and adds a "The person asking" section (the identity, or "Unknown"), saying they are reading the selection and did not write it unless it is signed by or attributed to them; `prompts/ask.md` gained a rule to name the author and never describe the reader as the writer.
+- **UI.** `settings/Profile.tsx`: `IdentityForm` (controlled: name input plus chip inputs for emails and handles; Enter, comma, or blur adds; Backspace on empty removes the last) and `ProfileTab` (Save button, enabled when changed and a name is present). Setup is now five steps (Welcome, You, Keys, Models, Try it); You needs a name and saves on Next. The sidebar has a Profile tab first, and an "Add your name" link while setup is finished but the name is empty (Rayan's case). `settings:open` takes `profile`; the tab list is the new `SettingsTab` type in `api.ts`.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

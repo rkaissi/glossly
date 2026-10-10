@@ -138,6 +138,14 @@ describe('Ask', () => {
     expect(prompt).toContain('Why it was saved: pricing');
   });
 
+  it('says who is asking, so a message is not read as their own', () => {
+    const anon = buildAskPrompt(DEFAULT_SETTINGS, { selection: selection() }).prompt;
+    expect(anon).toContain('## The person asking\nUnknown. They are reading the selection');
+    const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Rayan Kaissi', emails: ['Rayan@Example.com'], handles: ['@rayan'] } };
+    const { prompt } = buildAskPrompt(settings, { selection: selection() });
+    expect(prompt).toContain('## The person asking\nRayan Kaissi (also: rayan@example.com, @rayan). They are reading the selection; they did not write it');
+  });
+
   it('labels notes by short date', () => {
     expect(noteLabel(item({ created_at: '2026-01-05T09:00:00-05:00' }))).toBe('From your note, Jan 5');
     expect(noteLabels([item(), item({ created_at: '2026-09-19T12:00:00-04:00' })])).toEqual([

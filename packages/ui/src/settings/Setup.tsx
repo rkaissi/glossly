@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { SettingsView } from '@glossly/core/api';
+import type { Identity, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { EmbedLine } from './Data';
 import { formatAccelerator, hasWorkingKey } from './format';
 import { KeyCard } from './Keys';
+import { IdentityForm } from './Profile';
 import { RolePickers } from './Models';
 import { useAction } from './useAction';
 
-const STEPS = ['Welcome', 'Keys', 'Models', 'Try it'] as const;
+const STEPS = ['Welcome', 'You', 'Keys', 'Models', 'Try it'] as const;
 
 const SAMPLE_PARAGRAPH =
   'Octopuses have three hearts and blue blood. Two of the hearts pump blood through the gills, while the third keeps it moving through the rest of the body. The blood is blue because it carries oxygen with a copper-based protein called hemocyanin instead of the iron-based hemoglobin humans use.';
@@ -44,6 +45,21 @@ function Welcome({ view }: { view: SettingsView }) {
           At the end of setup, Glossly downloads a small local model ({view.embed.model}, about 23 MB) that indexes what you save. It runs on this
           computer; nothing you save is sent anywhere to be indexed.
         </p>
+      </div>
+    </>
+  );
+}
+
+function You({ identity, onChange }: { identity: Identity; onChange: (next: Identity) => void }) {
+  return (
+    <>
+      <h1>About you</h1>
+      <p className="muted">
+        Glossly uses your name, emails, and handles to tell your own messages and promises from other people's, and to write replies as you. Your name is
+        required; add the emails and chat names people see when you write to them.
+      </p>
+      <div className="card">
+        <IdentityForm value={identity} onChange={onChange} autoFocus />
       </div>
     </>
   );
@@ -109,9 +125,22 @@ function TryIt({ view }: { view: SettingsView }) {
 
 export function Setup({ view, onDone }: { view: SettingsView; onDone: () => void }) {
   const [step, setStep] = useState(0);
+  const [identity, setIdentity] = useState<Identity>(view.settings.identity);
   const { busy, error, run } = useAction();
   const last = step === STEPS.length - 1;
-  const canNext = step !== 1 || hasWorkingKey(view);
+  const canNext = step === 1 ? identity.name.trim().length > 0 : step === 2 ? hasWorkingKey(view) : true;
+
+  const next = async () => {
+    if (step === 1) {
+      const ok = await run(async () => {
+        const r = await glossly.invoke('settings:set', { key: 'identity', value: { ...identity, name: identity.name.trim() } });
+        if (r.error) throw new Error(r.error);
+        return true;
+      });
+      if (!ok) return;
+    }
+    setStep(step + 1);
+  };
 
   const finish = async () => {
     const ok = await run(async () => {
@@ -134,9 +163,10 @@ export function Setup({ view, onDone }: { view: SettingsView; onDone: () => void
       </ol>
       <div className="setup-body">
         {step === 0 && <Welcome view={view} />}
-        {step === 1 && <Keys view={view} />}
-        {step === 2 && <Models view={view} />}
-        {step === 3 && <TryIt view={view} />}
+        {step === 1 && <You identity={identity} onChange={setIdentity} />}
+        {step === 2 && <Keys view={view} />}
+        {step === 3 && <Models view={view} />}
+        {step === 4 && <TryIt view={view} />}
       </div>
       <div className="setup-foot">
         {step > 0 && (
@@ -151,8 +181,9 @@ export function Setup({ view, onDone }: { view: SettingsView; onDone: () => void
           </span>
         )}
         <span className="spacer" />
-        {step === 1 && !canNext && <span className="muted small">Add a working key to continue.</span>}
-        <button className="primary" disabled={!canNext || busy} onClick={() => (last ? void finish() : setStep(step + 1))}>
+        {step === 1 && !canNext && <span className="muted small">Type your name to continue.</span>}
+        {step === 2 && !canNext && <span className="muted small">Add a working key to continue.</span>}
+        <button className="primary" disabled={!canNext || busy} onClick={() => void (last ? finish() : next())}>
           {last ? 'Finish' : 'Next'}
         </button>
       </div>

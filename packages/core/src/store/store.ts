@@ -3,6 +3,7 @@ import { uuidv7 } from 'uuidv7';
 import type { KnownPerson } from '../router/types';
 import { DEFAULT_COLLECTIONS, SETTINGS_MIGRATIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
 import { isoNow, type Collection, type Item } from '../types';
+import { canonicalize } from '../people/names';
 import { DATA_TABLES, MIGRATIONS, USER_DATA_TABLES } from './migrations';
 
 export type EntityKind = 'person' | 'company' | 'product' | 'place' | 'other';
@@ -376,14 +377,6 @@ export class Store {
   }
 }
 
-export function canonicalize(s: string): string {
-  return s
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[\u2019']/g, "'")
-    .replace(/[^\p{L}\p{N}@.' +-]/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+
 
 export type { SQLInputValue };
