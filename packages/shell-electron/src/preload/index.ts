@@ -1,18 +1,21 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { GlosslyBridge, PushChannel } from '@glossly/core/api';
 
-const PUSH: readonly PushChannel[] = [
-  'overlay:state',
-  'ask:chunk',
-  'ask:done',
-  'ask:error',
-  'reply:chunk',
-  'reply:done',
-  'reply:error',
-  'embed:progress',
-  'settings:changed',
-  'people:changed',
-];
+// Every push channel, as a record so a channel added to the API without being listed here fails typecheck.
+const PUSH_CHANNELS: Record<PushChannel, true> = {
+  'overlay:state': true,
+  'ask:chunk': true,
+  'ask:done': true,
+  'ask:error': true,
+  'ask:saved': true,
+  'reply:chunk': true,
+  'reply:done': true,
+  'reply:error': true,
+  'embed:progress': true,
+  'settings:changed': true,
+  'people:changed': true,
+};
+const PUSH = Object.keys(PUSH_CHANNELS) as PushChannel[];
 
 const bridge: GlosslyBridge = {
   invoke: ((channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args)) as GlosslyBridge['invoke'],

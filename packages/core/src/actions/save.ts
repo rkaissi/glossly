@@ -131,6 +131,30 @@ export class SaveService {
     return { item, undoUntil, enriched: this.startEnrich(item) };
   }
 
+  /**
+   * Saves a note Ask wrote when the user asked it to remember something: an item of kind
+   * "note", embedded and enriched like any save, with the same undo window.
+   */
+  saveNote(input: { text: string; collection: string; selection: SelectionPayload | null }): SaveResult {
+    const { store } = this.deps;
+    const settings = this.deps.settings();
+    const collection = store.collectionByName(input.collection) ?? store.createCollection(input.collection);
+    const sel = input.selection;
+    const item = store.insertItem({
+      collection_id: collection.id,
+      kind: 'note',
+      text: input.text,
+      why: null,
+      source_app: sel?.source_app || null,
+      window_title: sel?.window_title || null,
+      data_json: JSON.stringify({ via: 'ask', captured_at: sel?.captured_at ?? null }),
+    });
+    const undoUntil = this.now() + settings.save.undoSeconds * 1000;
+    this.undoDeadlines.set(item.id, undoUntil);
+    this.deps.metrics?.record('save_done', { via: 'ask', has_why: false });
+    return { item, undoUntil, enriched: this.startEnrich(item) };
+  }
+
   /** Moves a saved item to another collection (created if needed). Returns the collection's name, or null if the item is gone. */
   move(itemId: string, collection: string): string | null {
     const { store } = this.deps;

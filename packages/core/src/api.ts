@@ -158,6 +158,14 @@ export interface AskDone {
   /** The model that answered, after any fallback. */
   model: ModelRef;
 }
+/** Ask saved a note because the question asked it to remember something. */
+export interface AskSaved {
+  requestId: string;
+  itemId: string;
+  collection: string;
+  /** Epoch ms. */
+  undoUntil: number;
+}
 export interface AskErrorEvent {
   requestId: string;
   code: 'no_model' | 'local_only' | 'invalid_output' | 'provider' | 'aborted' | 'timeout' | 'no_selection';
@@ -394,6 +402,7 @@ export interface PushChannels {
   'ask:chunk': AskChunk;
   'ask:done': AskDone;
   'ask:error': AskErrorEvent;
+  'ask:saved': AskSaved;
   'reply:chunk': AskChunk;
   'reply:done': AskDone;
   'reply:error': AskErrorEvent;

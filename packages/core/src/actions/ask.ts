@@ -1,3 +1,5 @@
+import { tool } from 'ai';
+import { z } from 'zod';
 import askPrompt from '../../prompts/ask.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import { describeIdentity } from '../people/names';
@@ -11,8 +13,43 @@ export interface AskInput {
   container?: ContainerContext | null;
   /** Empty or missing means settings.ask.defaultQuestion. */
   question?: string;
-  /** Top recall results. Phase 1 passes []. */
+  /** Top recall results, or the cards picked with "Ask about these". */
   related?: Item[];
+  /** Lets Ask save a note when the question asks it to remember something. */
+  remember?: RememberDeps;
+}
+
+export interface RememberDeps {
+  /** The user's collections; the model picks one. */
+  collections: string[];
+  /** The collection the router picked for this selection, offered as the default. */
+  suggested: string;
+  /** Saves the note and returns where it went. */
+  save: (note: string, collection: string) => { collection: string };
+}
+
+const MAX_NOTE = 1000;
+
+/**
+ * The `remember` tool on the Ask stream: saves a note into a collection and reports it in the
+ * answer ("Saved to Notes: ..."), with no second model call (see ChatRequest.tools).
+ */
+export function rememberTool(deps: RememberDeps) {
+  const names = deps.collections.length ? deps.collections : [deps.suggested];
+  return tool({
+    description: `Save a note for the person when they ask you to remember, save, keep, or note something. Collections: ${names.join(', ')}.`,
+    inputSchema: z.object({
+      note: z.string().describe('What to remember: short and self-contained, with the names and dates it needs.'),
+      collection: z.string().describe(`One of: ${names.join(', ')}. Use ${deps.suggested} when unsure.`),
+    }),
+    execute: async ({ note, collection }) => {
+      const text = note.replace(/\s+/g, ' ').trim().slice(0, MAX_NOTE);
+      if (!text) return { say: 'There was nothing to save.' };
+      const known = names.find((n) => n.toLowerCase() === collection.trim().toLowerCase()) ?? deps.suggested;
+      const saved = deps.save(text, known);
+      return { say: `Saved to ${saved.collection}: "${clip(text, 160)}"` };
+    },
+  });
 }
 
 const MAX_SELECTION = 12_000;
@@ -88,5 +125,6 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
 /** Streams an answer to a question about the selection, on the Chat role. */
 export function ask(llm: LlmProvider, settings: AskSettings, input: AskInput, signal?: AbortSignal): StreamResult {
   const { prompt } = buildAskPrompt(settings, input);
-  return llm.stream({ role: 'chat', action: 'ask', instructions: askPrompt, prompt, signal, maxOutputTokens: 800 });
+  const tools = input.remember ? { remember: rememberTool(input.remember) } : undefined;
+  return llm.stream({ role: 'chat', action: 'ask', instructions: askPrompt, prompt, signal, maxOutputTokens: 800, ...(tools && { tools }) });
 }

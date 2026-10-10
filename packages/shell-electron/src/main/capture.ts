@@ -37,6 +37,7 @@ import {
   type ActionId,
   type AppMode,
   type AskErrorEvent,
+  type AskSaved,
   type ClassifiedObstacle,
   type CommandResult,
   type ContainerContext,
@@ -1398,7 +1399,18 @@ export class Capture {
       let firstMs: number | null = null;
       try {
         const container = (await s.container) ?? null;
-        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: this.askNotes(s) }, ctl.signal);
+        const remember = {
+          collections: this.services.collections(),
+          suggested: s.route?.decisions.best_collection ?? 'Notes',
+          save: (note: string, collection: string) => {
+            const saved = this.services.save.saveNote({ text: note, collection, selection: s.selection });
+            void saved.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
+            send<AskSaved>('ask:saved', { requestId, itemId: saved.item.id, collection, undoUntil: saved.undoUntil });
+            log.info('ask remembered');
+            return { collection };
+          },
+        };
+        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: this.askNotes(s), remember }, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
           send('ask:chunk', { requestId, text });

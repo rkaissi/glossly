@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ModelRef, RoleName, Settings } from '../settings';
 import { lookupCapabilities, parseRef } from './catalog';
 import { modelChain } from './roles';
-import { LlmError, type ChatRequest, type LlmProvider, type StreamResult } from './types';
+import { LlmError, type ChatRequest, type LlmProvider, type SpokenToolResult, type StreamResult } from './types';
 
 export interface AiSdkLlmDeps {
   settings: () => Pick<Settings, 'roles' | 'actionModels' | 'localOnly'>;
@@ -92,6 +92,13 @@ export class AiSdkLlm implements LlmProvider {
       for (let i = 0; i < chain.length; i++) {
         const { ref, model: m } = chain[i]!;
         let started = false;
+        const start = () => {
+          if (started) return;
+          started = true;
+          resolveModel(ref);
+        };
+        const { provider, modelId } = parseRef(ref);
+        const tools = req.tools && lookupCapabilities(provider, modelId)?.tools !== false ? req.tools : undefined;
         try {
           const result = streamText({
             model: m,
@@ -101,14 +108,19 @@ export class AiSdkLlm implements LlmProvider {
             maxOutputTokens: req.maxOutputTokens,
             temperature: req.temperature,
             maxRetries: 0,
+            ...(tools && { tools }),
           });
           for await (const part of result.stream) {
             if (part.type === 'text-delta') {
-              if (!started) {
-                started = true;
-                resolveModel(ref);
-              }
+              start();
               yield part.text;
+            } else if (part.type === 'tool-result') {
+              start();
+              const say = (part.output as Partial<SpokenToolResult> | undefined)?.say;
+              if (typeof say === 'string' && say) yield say;
+            } else if (part.type === 'tool-error') {
+              start();
+              yield 'That did not work, so nothing was saved.';
             } else if (part.type === 'error') {
               throw part.error;
             } else if (part.type === 'abort') {

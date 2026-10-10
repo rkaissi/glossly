@@ -1,3 +1,4 @@
+import type { ToolSet } from 'ai';
 import type { z } from 'zod';
 import type { ModelRef, RoleName } from '../settings';
 
@@ -11,6 +12,17 @@ export interface ChatRequest {
   signal?: AbortSignal;
   maxOutputTokens?: number;
   temperature?: number;
+  /**
+   * Tools for a streamed call (Ask's "remember"). One step only: the tool runs, and a result
+   * with a `say` string is streamed as text, so the model is never called a second time.
+   * Left out for models whose capabilities say they have no tools.
+   */
+  tools?: ToolSet;
+}
+
+/** What a tool returns to be reported in the stream. */
+export interface SpokenToolResult {
+  say: string;
 }
 
 export interface StreamResult {

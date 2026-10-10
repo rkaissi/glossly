@@ -9,6 +9,7 @@ import { AiSdkLlm, isFallbackError } from './llm';
 import { PROVIDERS, ProviderKeyError } from './providers';
 import { modelChain, updateRoles } from './roles';
 import { LlmError } from './types';
+import { rememberTool } from '../actions/ask';
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
@@ -331,5 +332,32 @@ describe('providers.listModels', () => {
 
     const net = await PROVIDERS.openai!.listModels('k', (async () => Promise.reject(new Error('offline'))) as unknown as typeof fetch).catch((e) => e);
     expect(net).toMatchObject({ status: 0, message: 'Could not reach openai: offline' });
+  });
+});
+
+describe('AiSdkLlm.stream with a tool', () => {
+  it('runs Ask\'s remember tool once, says what it saved, and makes no second call', async () => {
+    const parts: LanguageModelV4StreamPart[] = [
+      { type: 'stream-start', warnings: [] },
+      { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Maya prefers  mornings', collection: 'notes' }) },
+      { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
+    ];
+    const model = new MockLanguageModelV4({ doStream: { stream: convertArrayToReadableStream(parts) } });
+    const { llm } = llmWith({ [CHAT.model]: model }, roles({ chat: { ...CHAT, fallback: null } }));
+    const saved: [string, string][] = [];
+    const tools = {
+      remember: rememberTool({
+        collections: ['Notes', 'Reading'],
+        suggested: 'Reading',
+        save: (note, collection) => {
+          saved.push([note, collection]);
+          return { collection };
+        },
+      }),
+    };
+    const r = llm.stream({ role: 'chat', action: 'ask', instructions: 'i', prompt: 'p', tools });
+    expect(await collect(r.textStream)).toBe('Saved to Notes: "Maya prefers mornings"');
+    expect(saved).toEqual([['Maya prefers mornings', 'Notes']]);
+    expect(model.doStreamCalls).toHaveLength(1);
   });
 });

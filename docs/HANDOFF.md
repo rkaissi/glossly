@@ -438,6 +438,15 @@ A review of the 15.5 commits, with fixes. 345 unit tests pass; `pnpm typecheck` 
 - Metrics: `save_done` now has `via` (`panel`, `hotkey`, `autosave`); `save_hotkey` counts presses. New channel `saved:undo`; `OverlayState.saved` (`SavedNotice`).
 - **Cost to know about.** Autosave runs Save's entity extraction (one Fast call) on every highlight that shows the pill, and the save hotkey runs the router's call. With Groq's free tier, heavy highlighting in autosave can hit its per-minute limits; the item is still saved and embedded when that call fails.
 
+### Step 16.4: Ask remembers when asked (Oct 10)
+
+356 unit tests pass (new: the tool case in `llm.test.ts`); `pnpm typecheck` is clean. Not run live yet.
+
+- **A `remember` tool on the Ask stream** (`rememberTool` in `actions/ask.ts`). `ChatRequest.tools` passes tools to `streamText` for one step only; a tool result with a `say` string is streamed as answer text, so "Saved to Notes: "Maya prefers mornings"" appears with no second model call. The tool takes a short self-contained note and one of the user's collections (case-insensitive; anything else goes to the collection the router picked for this selection). `prompts/ask.md` says to call it only when the person asks to remember, save, keep, or note something, and to write nothing else then. Models whose catalog entry says `tools: false` get no tools (all current Groq, OpenAI, and Anthropic entries have tools).
+- **The note** is an item of kind `note` (`SaveService.saveNote`), with the app and window title, embedded and enriched like any save, with the same undo window. The Ask panel shows "Saved to Notes" with Undo (`ask:saved` push, then `save:undo`). Metrics: `save_done` with `via: ask`.
+- **Recall hits in the Ask prompt** landed in 16.1 (the top 3, or the cards picked with "Ask about these").
+- The preload's push-channel list is now a `Record<PushChannel, true>`, so a new push channel that isn't listed fails typecheck instead of throwing in the renderer.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

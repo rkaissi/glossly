@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, Copy } from 'lucide-react';
-import type { AskErrorEvent, OverlayState } from '@glossly/core/api';
+import { ArrowUp, Bookmark, Check, Copy, Undo2 } from 'lucide-react';
+import type { AskErrorEvent, AskSaved, OverlayState } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { AnswerText } from './AnswerText';
+import { useSecondsLeft } from './SavedToast';
 
 type Answer =
   | { status: 'starting' }
@@ -31,6 +32,9 @@ export function AskPanel({ s }: { s: OverlayState }) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [copied, setCopied] = useState(false);
+  /** A note Ask saved because the question asked it to remember something. */
+  const [saved, setSaved] = useState<(AskSaved & { undone?: boolean }) | null>(null);
+  const undoLeft = useSecondsLeft(saved && !saved.undone ? saved.undoUntil : null);
   const input = useRef<HTMLInputElement>(null);
   /** The live request id; null while ask:start is in flight. */
   const current = useRef<string | null>(null);
@@ -51,6 +55,10 @@ export function AskPanel({ s }: { s: OverlayState }) {
       glossly.on('ask:chunk', (p) => route(p.requestId, { kind: 'chunk', text: p.text })),
       glossly.on('ask:done', (p) => route(p.requestId, { kind: 'done', model: p.model })),
       glossly.on('ask:error', (p) => route(p.requestId, { kind: 'error', code: p.code, message: p.message })),
+      // Saving happens once per request, so it is matched on the id when it arrives or right after ask:start returns.
+      glossly.on('ask:saved', (p) => {
+        if (p.requestId === current.current || waiting.current) setSaved(p);
+      }),
     ];
     return () => {
       offs.forEach((off) => off());
@@ -66,6 +74,7 @@ export function AskPanel({ s }: { s: OverlayState }) {
     early.current.clear();
     setAnswer({ status: 'starting' });
     setCopied(false);
+    setSaved(null);
     const { requestId } = await glossly.invoke('ask:start', { sessionId: s.sessionId, question });
     waiting.current = false;
     current.current = requestId;
@@ -127,6 +136,24 @@ export function AskPanel({ s }: { s: OverlayState }) {
               )}
               {answer.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and ask</button>}
             </div>
+          )}
+        </div>
+      )}
+
+      {saved && (
+        <div className="inline-note">
+          <Bookmark size={14} strokeWidth={1.75} aria-hidden />
+          <span>{saved.undone ? `Removed from ${saved.collection}.` : `Saved to ${saved.collection}.`}</span>
+          {!saved.undone && undoLeft > 0 && (
+            <button
+              className="ghost"
+              onClick={() =>
+                void glossly.invoke('save:undo', { itemId: saved.itemId }).then((r) => r.undone && setSaved({ ...saved, undone: true }))
+              }
+            >
+              <Undo2 size={14} strokeWidth={1.75} aria-hidden />
+              Undo ({undoLeft}s)
+            </button>
           )}
         </div>
       )}
