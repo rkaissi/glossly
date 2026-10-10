@@ -14,6 +14,10 @@ import { createTray } from './tray';
 const log = logger('main');
 
 app.setAppUserModelId('com.glossly.app');
+// Dev builds only: a throwaway profile (the single-instance lock is per profile), optionally
+// without the helper and hotkey, so it can run next to the real instance for settings tests.
+if (!app.isPackaged && process.env.GLOSSLY_USER_DATA) app.setPath('userData', process.env.GLOSSLY_USER_DATA);
+const noCapture = !app.isPackaged && process.env.GLOSSLY_NO_CAPTURE === '1';
 const primary = app.requestSingleInstanceLock();
 
 let quitting = false;
@@ -48,9 +52,12 @@ async function main(): Promise<void> {
 
   registerIpc({ services, overlay, capture, settingsWindow, hotkey, broadcastSettings });
 
-  helper.start();
-  if (!hotkey.register(services.settings.hotkey)) {
-    services.setSetting('pendingNotice', `The hotkey ${services.settings.hotkey} is taken by another app. Pick another in Settings.`);
+  if (noCapture) log.info('capture off (GLOSSLY_NO_CAPTURE)');
+  else {
+    helper.start();
+    if (!hotkey.register(services.settings.hotkey)) {
+      services.setSetting('pendingNotice', `The hotkey ${services.settings.hotkey} is taken by another app. Pick another in Settings.`);
+    }
   }
 
   const { refresh } = createTray({

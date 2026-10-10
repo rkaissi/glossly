@@ -148,11 +148,17 @@ export function registerIpc(deps: IpcDeps): void {
     log.info('exported');
     return { path: r.filePath };
   });
-  handle('data:delete-all', () => {
+  handle('data:delete-all', async () => {
     capture.close('delete_all');
-    services.deleteAll();
-    if (hotkey.change(services.settings.hotkey)) log.warn('default hotkey unavailable after delete-all');
+    await services.deleteAll();
     log.info('all data deleted');
+    broadcastSettings();
+  });
+  handle('settings:reset', () => {
+    capture.close('reset_settings');
+    services.resetSettings();
+    if (hotkey.change(services.settings.hotkey)) log.warn('default hotkey unavailable after reset');
+    log.info('settings reset');
     broadcastSettings();
   });
   handle('metrics:summary', (a) => services.metrics.summary(Math.min(Math.max(Math.trunc(num(a.days)), 1), 90)));

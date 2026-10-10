@@ -107,25 +107,53 @@ describe('Store', () => {
     expect(store.itemsWithoutVectors().length).toBe(3);
   });
 
-  it('exports everything and deletes everything', () => {
-    store = new Store(':memory:', { vecExtensionPath });
+  function fill(): string {
     store.ensureVectorModel('m', 4);
+    store.createCollection('Recipes');
     const item = store.insertItem({ collection_id: null, kind: 'note', text: 'x', why: 'y', source_app: null, window_title: null, data_json: null });
     store.setVector(item.id, unit(4, 0));
+    store.linkItemEntity(item.id, store.upsertEntity('person', 'Sam Lee'));
     store.insertEvent('hotkey', { ms: 3 });
     store.setSetting('localOnly', true);
+    store.setSetting('firstRunComplete', true);
+    store.replaceModels('groq', [{ model_id: 'qwen/qwen3.8-27b', display_name: 'Qwen', capabilities: {} }]);
+    store.setMeta('key_test:groq', '{"ok":true}');
+    return item.id;
+  }
 
+  it('exports everything', () => {
+    store = new Store(':memory:', { vecExtensionPath });
+    fill();
     const dump = store.exportAll() as { tables: Record<string, unknown[]> };
     expect(dump.tables.items).toHaveLength(1);
     expect(dump.tables.events).toHaveLength(1);
+    expect(dump.tables.settings).toHaveLength(2);
     expect(JSON.stringify(dump)).not.toContain('apiKey');
+  });
 
+  it('delete all data keeps settings, the model list, and meta', () => {
+    store = new Store(':memory:', { vecExtensionPath });
+    fill();
     store.deleteAll();
     expect(store.listItems()).toHaveLength(0);
     expect(store.listEvents()).toHaveLength(0);
-    expect(store.getSettings().localOnly).toBe(false);
+    expect(store.db.prepare('SELECT COUNT(*) AS n FROM entities').get()).toEqual({ n: 0 });
     expect(store.searchVectors(unit(4, 0))).toHaveLength(0);
-    expect(store.listCollections()).toHaveLength(4);
+    expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
+    expect(store.getSettings()).toMatchObject({ localOnly: true, firstRunComplete: true });
+    expect(store.listModels()).toHaveLength(1);
+    expect(store.getMeta('key_test:groq')).toBe('{"ok":true}');
+  });
+
+  it('reset settings keeps saved data', () => {
+    store = new Store(':memory:', { vecExtensionPath });
+    const id = fill();
+    store.resetSettings();
+    expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(store.getItem(id)).not.toBeNull();
+    expect(store.listCollections()).toHaveLength(5);
+    store.clearModels();
+    expect(store.listModels()).toHaveLength(0);
   });
 
   it('records events', () => {

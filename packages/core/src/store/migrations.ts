@@ -99,7 +99,7 @@ export const MIGRATIONS: string[] = [
   `,
 ];
 
-/** Tables included in export and cleared by delete-all, in foreign-key-safe delete order. */
+/** Tables included in export, in foreign-key-safe delete order. */
 export const DATA_TABLES = [
   'item_entities',
   'commitments',
@@ -114,3 +114,6 @@ export const DATA_TABLES = [
   'models',
   'settings',
 ] as const;
+
+/** What "Delete all data" clears: everything but settings and the model list (and meta). */
+export const USER_DATA_TABLES = DATA_TABLES.filter((t) => t !== 'models' && t !== 'settings');

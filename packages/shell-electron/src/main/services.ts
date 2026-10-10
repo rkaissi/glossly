@@ -144,17 +144,27 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
   }
 
   /**
-   * "Delete all data": wipes the database (items, people, metrics, settings, model list) and
-   * the saved keys, then reloads settings, so the app is back at first-run setup. The
-   * downloaded embedding model is kept.
+   * "Delete all data": saved items, entities, people, vectors, usage events, and collections
+   * (the defaults come back). Keys, settings, the model list, and the embedding model stay.
    */
-  deleteAll(): void {
+  async deleteAll(): Promise<void> {
+    // A save still being enriched would write its vector and entities after the wipe.
+    await Promise.race([this.save.idle(), new Promise((r) => setTimeout(r, 2000))]);
     this.store.deleteAll();
+  }
+
+  /**
+   * "Reset settings": removes every saved key, its test result, and the model list, and puts
+   * settings back to their defaults, so the app is back at first-run setup. Saved data stays.
+   */
+  resetSettings(): void {
     for (const p of PROVIDER_ORDER) {
       this.keys.remove(p);
       this.store.setMeta(`key_test:${p}`, 'null');
     }
     this.lastTests.clear();
+    this.store.clearModels();
+    this.store.resetSettings();
     this.settingsCache = this.store.getSettings();
     this.emit('settings', this.settingsCache);
   }

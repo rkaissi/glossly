@@ -3,7 +3,7 @@ import { uuidv7 } from 'uuidv7';
 import type { KnownPerson } from '../router/types';
 import { DEFAULT_COLLECTIONS, SETTINGS_MIGRATIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
 import { isoNow, type Collection, type Item } from '../types';
-import { DATA_TABLES, MIGRATIONS } from './migrations';
+import { DATA_TABLES, MIGRATIONS, USER_DATA_TABLES } from './migrations';
 
 export type EntityKind = 'person' | 'company' | 'product' | 'place' | 'other';
 
@@ -353,14 +353,26 @@ export class Store {
     };
   }
 
-  /** Deletes every row of user data, then re-creates the default collections. */
+  /**
+   * "Delete all data": every saved item, entity, person, vector, event, and collection, then
+   * re-creates the default collections. Settings, the model list, and meta stay.
+   */
   deleteAll(): void {
     this.tx(() => {
-      for (const t of DATA_TABLES) this.db.exec(`DELETE FROM ${t}`);
+      for (const t of USER_DATA_TABLES) this.db.exec(`DELETE FROM ${t}`);
       if (this.hasVectors && this.vectorTableExists()) this.db.exec('DELETE FROM item_vectors');
     });
     this.db.exec('VACUUM');
     this.ensureDefaultCollections();
+  }
+
+  /** "Reset settings": every stored setting goes back to its default (first run included). */
+  resetSettings(): void {
+    this.db.exec('DELETE FROM settings');
+  }
+
+  clearModels(): void {
+    this.db.exec('DELETE FROM models');
   }
 }
 

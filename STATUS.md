@@ -4,7 +4,7 @@ Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1). `doc
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 158 unit tests.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 160 unit tests.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -76,7 +76,7 @@ Pending your hand tests; see `evals/capture.md`. So far, Notepad passes on both 
 7. **The router's decision call** takes `{ context, features, collections }` instead of the spec's `(input, questions)`, since the questions are fixed by the output format.
 8. **Helper request arguments** are top-level JSON fields next to `cmd`.
 9. **Tier 2 on the hotkey path uses a focus hand-off.** UIA reads the focused element, but the bar holds focus after the hotkey. On an action click, Glossly briefly gives focus back to your app, reads tier 2, and takes focus back. Tier 2 is still read only on action click.
-10. **"Delete all data" is a full reset**: items, settings, and saved API keys all go, and setup runs again. Only the downloaded embedding model stays. (Open question below.)
+10. **"Delete all data" and "Reset settings" are separate (Step 12.4).** Delete all data removes saved items, collections (the four defaults come back), people and entities, embeddings, and usage metrics, and keeps your API keys, settings, model list, and the embedding model. Reset settings (its own button and confirm on the Data tab) removes the saved keys, their test results, and the model list, puts every setting back to its default (hotkey, models, per-app choices, learned toolbar waits), and starts setup again; saved items stay.
 11. **Setup's "Try it" step captures from the settings window itself**, only while that step is on screen. Every other Glossly window stays ignored.
 
 Also: Groq retired its llama chat models, so the default roles are Fast = Qwen 3.8 (fallback gpt-oss-20b), Chat = gpt-oss-120b (fallback Qwen 3.8), and Decision = the Fast model. Free-tier limits are per model, so spreading roles across models also spreads the rate limits.
@@ -99,7 +99,7 @@ Not verified live:
 - Every app in the Phase 0 list except Notepad, and every toolbar-overlap check.
 - `popups_near` against a real selection toolbar, so "move to the other side" has only been unit tested. The dot itself was checked live with `GLOSSLY_FORCE_DOT=1` (fake obstacles on both sides): it is a round 18 px mark at the end of the selection, clicks next to it go through to the app, and hovering it opens the bar.
 - The copy-fallback branch inside the app.
-- Changing the hotkey with the recorder, Export, "Delete all data" (destructive, so only reasoned through), and errors from refreshing the model catalog.
+- Changing the hotkey with the recorder, Export, "Delete all data" and "Reset settings" (destructive; to be checked on a throwaway copy of the profile), and errors from refreshing the model catalog.
 - `Ctrl+C` in the Ask panel.
 - The forced-focus path for when Windows refuses to give the bar focus (it didn't trigger in the repro attempt).
 - The taskbar fix on the auto path (it uses the same code as the hotkey path).
@@ -118,7 +118,7 @@ Known rough edges:
 
 - Pill speed: keep checking for toolbars but make it faster; a visible pill never moves.
 - Router timeout: raise it to 600 ms. **Done in Step 12.3** (Oct 10): the default `router.decisionTimeoutMs` is 600, and a stored value of exactly 400 (the old default) is moved to 600 once, the first time the new version opens the database (tracked in meta `settings_migrations`, so a 400 you set later is kept). The Models tab's Decision description shows the current budget.
-- Delete all data: keep API keys and settings. A separate "Reset settings" button clears settings and keys.
+- Delete all data: keep API keys and settings. A separate "Reset settings" button clears settings and keys. **Done in Step 12.4** (Oct 10); see decision 10.
 - Local only: strict. Nothing goes to a cloud model, including entity extraction and Ask. Local model support comes later (Step 20).
 - Packaging: after every Windows-buildable spec phase is done.
 - Router eval: one run at the end, once everything looks good.
@@ -130,7 +130,7 @@ The original questions:
 
 1. **Pill speed.** The pill took about 360 ms (250 ms toolbar wait plus `popups_near`) against the 150 ms target. Should it be faster and less careful about toolbars? One option is to show the pill at once and move it if a toolbar appears. (Answered; built in Step 12.2.)
 2. **Router timeout.** The model router missed its 400 ms budget on 2 of 6 live calls (404 and 418 ms) and fell back to rules. Raise `router.decisionTimeoutMs` to about 600 ms, or accept rules as the frequent fallback? (Answered; done in Step 12.3.)
-3. **"Delete all data".** It currently also removes saved API keys and resets settings. Is that what you want, or should keys and preferences survive it?
+3. **"Delete all data".** It currently also removes saved API keys and resets settings. Is that what you want, or should keys and preferences survive it? (Answered; done in Step 12.4.)
 4. **Local only.** It currently turns off only the router's model call, as the spec says. Save's entity extraction still calls the Fast model because you clicked an action. Should Local only also skip that?
 5. **Packaging.** The `electron-builder` config (helper output into `resources/helper`, `asarUnpack` for sqlite-vec and onnxruntime) isn't written. Do it before Phase 2, or when testers are lined up?
 6. **Router eval.** Can I run `pnpm eval` once to score the tuned prompt? If it stays under the rules' 90% slot match, I'd suggest using the model only for content type and collection, and computing people and commitment scores from rules.

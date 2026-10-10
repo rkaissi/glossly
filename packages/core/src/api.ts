@@ -257,8 +257,10 @@ export interface InvokeChannels {
   'roles:set': { args: RoleSetArgs; result: Settings['roles'] };
   /** Shows a save dialog. Null when cancelled. */
   'data:export': { args: void; result: { path: string } | null };
-  /** Wipes the database (items, people, metrics, settings, model list) and the saved keys. The embedding model files stay. */
+  /** Deletes items, entities, people, vectors, events, and collections (re-seeded). Keys, settings, the model list, and the embedding model stay. */
   'data:delete-all': { args: void; result: void };
+  /** Removes the saved keys, their test results, and the model list, resets settings to defaults (back to setup), and re-registers the default hotkey. Saved data stays. */
+  'settings:reset': { args: void; result: void };
   'metrics:summary': { args: { days: number }; result: MetricsSummary };
   'embed:status': { args: void; result: EmbedStatus };
   'embed:download': { args: void; result: void };

@@ -78,48 +78,95 @@ function Export() {
   );
 }
 
-function DeleteAll() {
+/** A destructive button behind an inline confirm. */
+function Destructive(props: {
+  title: string;
+  description: string;
+  warning: string;
+  button: string;
+  confirm: string;
+  done: string;
+  invoke: () => Promise<void>;
+  after?: () => void;
+}) {
   const [confirming, setConfirming] = useState(false);
+  const [done, setDone] = useState(false);
   const { busy, error, run } = useAction();
   const go = async () => {
     const ok = await run(async () => {
-      await glossly.invoke('data:delete-all');
+      await props.invoke();
       return true;
     });
     if (ok) {
       setConfirming(false);
-      location.hash = 'setup';
+      setDone(true);
+      props.after?.();
     }
   };
   return (
     <div className="field">
       <div className="field-label">
-        <strong>Delete all data</strong>
-        <p className="muted small">
-          Removes saved items, collections, people, usage metrics, settings, and your API keys from this computer. The embedding model stays downloaded.
-          Setup starts again afterwards.
-        </p>
+        <strong>{props.title}</strong>
+        <p className="muted small">{props.description}</p>
       </div>
       {confirming ? (
         <div className="confirm">
-          <span>This cannot be undone. Export first if you want a copy.</span>
+          <span>{props.warning}</span>
           <span className="spacer" />
           <button onClick={() => setConfirming(false)} disabled={busy}>
             Cancel
           </button>
           <button className="danger solid" onClick={() => void go()} disabled={busy}>
-            Delete everything
+            {props.confirm}
           </button>
         </div>
       ) : (
         <div className="row">
-          <button className="danger" onClick={() => setConfirming(true)}>
-            Delete all data…
+          <button
+            className="danger"
+            onClick={() => {
+              setDone(false);
+              setConfirming(true);
+            }}
+          >
+            {props.button}
           </button>
+          {done && <span className="ok small">{props.done}</span>}
         </div>
       )}
       {error && <p className="error small">{error}</p>}
     </div>
+  );
+}
+
+function DeleteAll() {
+  return (
+    <Destructive
+      title="Delete all data"
+      description="Removes saved items, collections, people, and usage metrics from this computer. Your API keys, settings, model list, and the embedding model stay."
+      warning="This cannot be undone. Export first if you want a copy."
+      button="Delete all data…"
+      confirm="Delete all data"
+      done="All saved data was deleted."
+      invoke={() => glossly.invoke('data:delete-all')}
+    />
+  );
+}
+
+function ResetSettings() {
+  return (
+    <Destructive
+      title="Reset settings"
+      description="Removes your saved API keys and puts every setting back to its default, including the hotkey, models, and per-app choices. Saved items stay. Setup starts again afterwards."
+      warning="You will need to add a key again."
+      button="Reset settings…"
+      confirm="Reset settings"
+      done="Settings were reset."
+      invoke={() => glossly.invoke('settings:reset')}
+      after={() => {
+        location.hash = 'setup';
+      }}
+    />
   );
 }
 
@@ -131,6 +178,7 @@ export function DataTab({ view }: { view: SettingsView }) {
       <Embeddings view={view} />
       <Export />
       <DeleteAll />
+      <ResetSettings />
     </section>
   );
 }
