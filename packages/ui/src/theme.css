@@ -148,6 +148,27 @@ button.ghost:hover:not(:disabled) {
 }
 button.danger {
   color: var(--danger);
+  border-color: var(--danger);
+}
+button.danger.solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+button.danger.solid:hover:not(:disabled),
+button.danger.solid:active:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+  filter: brightness(1.08);
+}
+.confirm.inline {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
 }
 button svg {
   flex: none;

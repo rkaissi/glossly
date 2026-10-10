@@ -297,6 +297,10 @@ kbd.hotkey {
   background: transparent;
   color: var(--muted);
 }
+button.icon-btn.danger,
+button.chip-x.danger {
+  color: var(--danger);
+}
 
 .confirm {
   display: flex;

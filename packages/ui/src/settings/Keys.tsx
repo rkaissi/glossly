@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { KeyStatus, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { InlineConfirm } from '../confirm';
 import { timeAgo } from './format';
 import { useAction } from './useAction';
 
@@ -8,6 +9,7 @@ import { useAction } from './useAction';
 export function KeyCard({ k }: { k: KeyStatus }) {
   const [value, setValue] = useState('');
   const [replacing, setReplacing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const { busy, error, setError, run } = useAction();
   const test = k.lastTest;
 
@@ -20,7 +22,6 @@ export function KeyCard({ k }: { k: KeyStatus }) {
     } else setError(r.error ?? 'The key did not work.');
   };
   const retest = () => void run(() => glossly.invoke('keys:test', { provider: k.provider }));
-  const remove = () => void run(() => glossly.invoke('keys:remove', { provider: k.provider }));
 
   const showInput = !k.hasKey || replacing;
   return (
@@ -54,9 +55,19 @@ export function KeyCard({ k }: { k: KeyStatus }) {
               Replace
             </button>
           )}
-          <button className="danger" disabled={busy} onClick={remove}>
-            Remove
-          </button>
+          {confirming ? (
+            <InlineConfirm
+              prompt={`Remove the ${k.label} key?`}
+              confirm="Remove"
+              busy={busy}
+              onConfirm={() => void run(() => glossly.invoke('keys:remove', { provider: k.provider }))}
+              onCancel={() => setConfirming(false)}
+            />
+          ) : (
+            <button className="danger" disabled={busy} onClick={() => setConfirming(true)}>
+              Remove
+            </button>
+          )}
         </div>
       )}
 

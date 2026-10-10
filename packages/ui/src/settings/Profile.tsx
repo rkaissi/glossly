@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import type { Identity, SettingsView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { InlineConfirm } from '../confirm';
 import { parseEmail, parseHandle } from './format';
 import { useAction } from './useAction';
 
@@ -117,13 +118,18 @@ const same = (a: Identity, b: Identity) => JSON.stringify(a) === JSON.stringify(
 function VoiceSamples() {
   const [samples, setSamples] = useState<VoiceSample[] | null>(null);
   const [text, setText] = useState('');
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   useEffect(() => {
     void glossly.invoke('voice:list').then(setSamples);
   }, []);
   const pasted = (samples ?? []).filter((v) => v.origin === 'pasted');
   const inserted = (samples ?? []).filter((v) => v.origin !== 'pasted');
-  const remove = (id: string) => void run(async () => setSamples(await glossly.invoke('voice:remove', { id })));
+  const remove = (id: string) =>
+    void run(async () => {
+      setSamples(await glossly.invoke('voice:remove', { id }));
+      setPendingId(null);
+    });
   const add = () =>
     void run(async () => {
       setSamples(await glossly.invoke('voice:add', { text }));
@@ -132,9 +138,13 @@ function VoiceSamples() {
   const sample = (v: VoiceSample) => (
     <li key={v.id}>
       <span className="grow voice-text">{v.text}</span>
-      <button className="icon-btn" title="Remove" aria-label="Remove sample" disabled={busy} onClick={() => remove(v.id)}>
-        <X size={15} strokeWidth={1.75} aria-hidden />
-      </button>
+      {pendingId === v.id ? (
+        <InlineConfirm prompt="Remove this sample?" confirm="Remove" busy={busy} onConfirm={() => remove(v.id)} onCancel={() => setPendingId(null)} />
+      ) : (
+        <button className="icon-btn danger" title="Remove" aria-label="Remove sample" disabled={busy} onClick={() => setPendingId(v.id)}>
+          <X size={15} strokeWidth={1.75} aria-hidden />
+        </button>
+      )}
     </li>
   );
   return (

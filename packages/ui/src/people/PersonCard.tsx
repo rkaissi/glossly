@@ -5,6 +5,7 @@ import { useState, type KeyboardEvent } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Bookmark, Check, ExternalLink, Pencil, Plus, X } from 'lucide-react';
 import type { CommitmentView, PersonCard } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { InlineConfirm } from '../confirm';
 import { appName, firstName, formatDay, formatDue } from '../dates';
 import { useAction } from '../settings/useAction';
 import './people.css';
@@ -97,6 +98,7 @@ function Note({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) 
 function Aliases({ card, onChange, removable }: { card: PersonCard; onChange: (c: PersonCard) => void; removable?: boolean }) {
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState('');
+  const [pending, setPending] = useState<PersonCard['aliases'][number] | null>(null);
   const { busy, error, run } = useAction();
   const add = () =>
     void run(async () => {
@@ -105,24 +107,39 @@ function Aliases({ card, onChange, removable }: { card: PersonCard; onChange: (c
       setValue('');
       setAdding(false);
     });
+  const remove = (a: PersonCard['aliases'][number]) =>
+    void run(async () => {
+      onChange(await glossly.invoke('people:alias-remove', { personId: card.id, kind: a.kind, value: a.value }));
+      setPending(null);
+    });
+  const label = (a: PersonCard['aliases'][number]) => (a.kind === 'handle' ? `@${a.value}` : a.value);
   return (
     <div className="aliases">
       {card.aliases.map((a) => (
         <span key={`${a.kind}:${a.value}`} className="alias" title={a.kind}>
-          {a.kind === 'handle' ? `@${a.value}` : a.value}
+          {label(a)}
           {removable && (
             <button
-              className="chip-x"
-              title={`Remove ${a.value}`}
-              aria-label={`Remove ${a.value}`}
+              className="chip-x danger"
+              title={`Remove ${label(a)}`}
+              aria-label={`Remove ${label(a)}`}
               disabled={busy}
-              onClick={() => void run(async () => onChange(await glossly.invoke('people:alias-remove', { personId: card.id, kind: a.kind, value: a.value })))}
+              onClick={() => setPending(a)}
             >
               <X size={11} strokeWidth={2} aria-hidden />
             </button>
           )}
         </span>
       ))}
+      {pending && removable && (
+        <InlineConfirm
+          prompt={`Remove ${label(pending)}?`}
+          confirm="Remove"
+          busy={busy}
+          onConfirm={() => remove(pending)}
+          onCancel={() => setPending(null)}
+        />
+      )}
       {adding ? (
         <input
           className="alias-input"

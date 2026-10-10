@@ -371,6 +371,13 @@ Helen"), else a Slack DM or Teams chat window title. Mentions: "Name <email>" pa
 
 The auto pill shows for any non-empty selection that is not a password. `capture.minWords` now defaults to 0 and the schema allows 0. A stored 3 (the old default) is migrated to 0 once; a value the user sets afterwards, including 3, is kept. Empty selections still do not show a pill. The hotkey's empty state is unchanged (Step 16).
 
+### Step 15.5.5: destructive controls are red and confirm (Oct 10)
+
+`pnpm typecheck` is clean. Not run live yet.
+
+- **Red.** `button.danger` now has a red border as well as red text, and the confirm button is solid red, in both windows. Delete person, Delete all data, Reset settings, and Merge were already behind a confirm; Merge's first button is red now too.
+- **Confirm before a saved record is destroyed.** Removing a saved alias, a voice sample, or an API key asks inline first (Remove / Cancel). A chip removed while typing a profile email or handle is still one click, because it is not saved yet. There is no separate saved-item delete control; Undo right after Save stays one click.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -428,7 +435,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
 2. ~~**Other buttons appear, then disappear, and key hints come and go with them.**~~ Done, see Step 15.5.2 above. Rayan (Oct 10): Who is this, Reply, and the other action buttons show and then disappear right away. Original notes: Rules paint slots 3 and 4 immediately (`Router.quick` in `expand` and on the hotkey path), then `routeModel` replaces them (`mergeRoute` keeps Ask and Save only). A button the rules showed and the model did not is drawn and then removed, and its `1`–`4` hint goes with it. When a model call is in flight, leave slots 3 and 4 empty until the model or the timeout fallback returns, then show that set and don't remove a button already on screen. Ask and Save never move. Key hints (`state.keyboard`) stay for the whole focused bar: on for the hotkey path and after the bar takes focus, off for an unfocused hover bar (the keyboard map isn't live there). They must not flicker because a slot was removed.
 3. ~~**Save to picks the best collection, once.**~~ Done, see Step 15.5.3 above. Original notes: `mergeRoute` locks the rules collection for the session, so the model's `best_collection` never reaches the button. When the route returns, update the Save label to that collection if the Save panel isn't open. One update, no further swaps.
 4. ~~**No word minimum.**~~ Done, see Step 15.5.4 above. Original notes: `capture.minWords` defaults to 3 and the schema rejects 0 (`settings.ts`, `gateAutoSelection`). The auto pill shows for any non-empty selection that isn't a password. Empty selections still don't show a pill. Migrate a stored 3 to 0 once, the same way Step 12.3 migrated the router timeout. The hotkey already opens with nothing selected; its empty state is Step 16, not this.
-5. **Delete buttons are red and ask first.** Person delete, Delete all data, and Reset settings already confirm; the button isn't red. Alias remove, voice-sample remove, API-key remove, and saved-item delete are one click. Make every control that destroys a saved record red, and put the same inline confirm in front of it. Removing a chip while typing a profile email can stay one click (it isn't saved yet).
+5. ~~**Delete buttons are red and ask first.**~~ Done, see Step 15.5.5 above. Original notes: Person delete, Delete all data, and Reset settings already confirm; the button isn't red. Alias remove, voice-sample remove, API-key remove, and saved-item delete are one click. Make every control that destroys a saved record red, and put the same inline confirm in front of it. Removing a chip while typing a profile email can stay one click (it isn't saved yet).
 6. **Show when a snippet was saved.** `items.created_at` already exists and isn't shown on the Save confirmation or the person's Saved list. Show it there ("Saved to Notes · just now", and the day on each saved row). Recall cards in Step 16 show it too.
 7. **Reply edits are already kept.** An inserted draft is stored as a voice sample, `inserted` or `inserted_edited` (Step 15.4), and the next Reply prompt gets up to 5 samples, pasted ones first. In this step, only check that the text stored is the edited text, put the newest edits ahead of older inserted ones, and add one line on the draft ("Edits are remembered"). No new learner.
 
@@ -488,7 +495,7 @@ Respect Local only (decision 12) in every new model call, and apply the Step 13 
 
 Answered on Oct 10: pill speed (stay careful about toolbars, make it faster, never move a visible pill), router timeout (raise it), Delete all data (keep keys and settings; add Reset settings), Local only (strict; local models later), packaging (after all phases), the eval run (once, at the end), the redesign direction, and the scope (all Windows phases before packaging).
 
-Answered the same afternoon, from the Discord and Outlook screenshots and the written list: people identification (model reads, code accepts; see decision 14 and Step 15.5), no word minimum, the bar and slot flicker, Save's collection, delete confirms, snippet timestamps, empty-selection search and paste, a save hotkey, Ask memory, todos then Google sync, privacy as a choice, polish, and a subscription parked. Step 15.5 is in progress: chunks 1 to 4 are done, chunk 5 (red delete confirms) is next.
+Answered the same afternoon, from the Discord and Outlook screenshots and the written list: people identification (model reads, code accepts; see decision 14 and Step 15.5), no word minimum, the bar and slot flicker, Save's collection, delete confirms, snippet timestamps, empty-selection search and paste, a save hotkey, Ask memory, todos then Google sync, privacy as a choice, polish, and a subscription parked. Step 15.5 is in progress: chunks 1 to 5 are done, chunk 6 (when a snippet was saved) is next.
 
 ## Things Rayan has to do himself
 

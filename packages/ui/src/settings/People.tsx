@@ -144,7 +144,7 @@ function Merge({ card }: { card: PersonCard }) {
             </option>
           ))}
         </select>
-        <button disabled={!pick || busy} onClick={() => setConfirming(true)}>
+        <button className="danger" disabled={!pick || busy} onClick={() => setConfirming(true)}>
           Merge…
         </button>
       </div>
