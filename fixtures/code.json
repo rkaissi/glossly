@@ -1,0 +1,65 @@
+{
+  "$comment": "5 code snippets.",
+  "cases": [
+    {
+      "id": "code-01",
+      "context": {
+        "text": "export function debounce<T extends (...args: never[]) => void>(fn: T, ms: number) {\n  let t: ReturnType<typeof setTimeout> | undefined;\n  return (...args: Parameters<T>) => {\n    clearTimeout(t);\n    t = setTimeout(() => fn(...args), ms);\n  };\n}",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "code.exe",
+        "window_title": "util.ts - web - Visual Studio Code",
+        "is_editable": true
+      },
+      "expected": { "content_type": "code", "slots": [] }
+    },
+    {
+      "id": "code-02",
+      "context": {
+        "text": "SELECT u.id, u.email, COUNT(o.id) AS orders\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nWHERE u.created_at >= '2026-01-01'\nGROUP BY u.id, u.email\nORDER BY orders DESC;",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Query editor - Supabase - Google Chrome",
+        "is_editable": true
+      },
+      "expected": { "content_type": "code", "slots": [] }
+    },
+    {
+      "id": "code-03",
+      "context": {
+        "text": "def retry(fn, attempts=3, delay=0.5):\n    for i in range(attempts):\n        try:\n            return fn()\n        except Exception:\n            if i == attempts - 1:\n                raise\n            time.sleep(delay * 2 ** i)",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Retry with backoff in Python - Stack Overflow - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "code", "slots": [] }
+    },
+    {
+      "id": "code-04",
+      "context": {
+        "text": "fn parse_port(s: &str) -> Result<u16, String> {\n    s.parse::<u16>().map_err(|e| format!(\"bad port {s}: {e}\"))\n}",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "src/config.rs at main - acme/server - GitHub - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "code", "slots": [] }
+    },
+    {
+      "id": "code-05",
+      "context": {
+        "text": "<button class=\"btn primary\" onclick=\"save()\">\n  <span>Save</span>\n</button>",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "devenv.exe",
+        "window_title": "Index.cshtml - Shop - Microsoft Visual Studio",
+        "is_editable": true
+      },
+      "expected": { "content_type": "code", "slots": [] }
+    }
+  ]
+}

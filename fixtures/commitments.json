@@ -1,0 +1,125 @@
+{
+  "$comment": "10 messages with commitments, in both directions (theirs to me and mine to them).",
+  "cases": [
+    {
+      "id": "cmt-01",
+      "context": {
+        "text": "Can you send me the signed NDA by Friday? Legal won't start the review without it.",
+        "context_before": "Helen Park  10:05 AM\n",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "Helen Park (DM) | Lumen - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "cmt-02",
+      "context": {
+        "text": "I'll get you the revised mockups by end of day tomorrow, and I'll loop in Jordan for the copy.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#design | Northwind - Slack",
+        "is_editable": true
+      },
+      "expected": { "content_type": "single_message", "slots": ["promises"] }
+    },
+    {
+      "id": "cmt-03",
+      "context": {
+        "text": "Marcus Bell  11:20 AM\nI'll own the migration script, should have a draft PR by Wednesday\nPriya Shah  11:22 AM\nGreat. Can you also write up the rollback steps?\nMarcus Bell  11:23 AM\nyep will do",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#platform | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "cmt-04",
+      "context": {
+        "text": "Hi Rayan,\n\nFollowing up on our call: we'll send the updated SOW next Tuesday. In the meantime, could you confirm the number of seats you need for the pilot?\n\nThanks,\nOmar",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Pilot next steps - omar@brightpath.ai - Gmail - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "cmt-05",
+      "context": {
+        "text": "Thanks for covering for me last week. I owe you one, lunch is on me next Thursday",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "ms-teams.exe",
+        "window_title": "Chat | Ahmed Karim | Microsoft Teams",
+        "is_editable": true
+      },
+      "expected": { "content_type": "single_message", "slots": ["promises"] }
+    },
+    {
+      "id": "cmt-06",
+      "context": {
+        "text": "dude can you return my drill this weekend? need it for the shelves",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "whatsapp.root.exe",
+        "window_title": "WhatsApp",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "cmt-07",
+      "context": {
+        "text": "Dana Ortiz  9:01 AM\nreminder: quarterly reviews are due the 15th\nDana Ortiz  9:02 AM\nplease get your self-assessments to me by the 12th so I have time to read them",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#team-leads | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "cmt-08",
+      "context": {
+        "text": "Let me know when you've had a chance to review the draft. I'm going to send it to the board on Monday either way.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "olk.exe",
+        "window_title": "Board memo draft - Outlook",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "cmt-09",
+      "context": {
+        "text": "Sure, I can take the Friday on-call shift. Remind me to swap it in PagerDuty",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "discord.exe",
+        "window_title": "#oncall - Infra Crew - Discord",
+        "is_editable": true
+      },
+      "expected": { "content_type": "single_message", "slots": ["promises"] }
+    },
+    {
+      "id": "cmt-10",
+      "context": {
+        "text": "Elena Moretti  4:40 PM\nCould you follow up with Fatima about the invoice? It's two weeks overdue\nSam Lee  4:45 PM\nOn it, I'll email her tonight",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#finance | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply", "promises"] }
+    }
+  ]
+}

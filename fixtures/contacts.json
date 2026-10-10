@@ -1,0 +1,65 @@
+{
+  "$comment": "5 contact blocks.",
+  "cases": [
+    {
+      "id": "ct-01",
+      "context": {
+        "text": "Helen Park\nHead of Partnerships, Lumen\nhelen.park@lumen.co\n+1 (415) 555-0142",
+        "context_before": "Best,\n\n",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Re: Proposal for Q1 rollout - Gmail - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "contact_info", "slots": ["who"] }
+    },
+    {
+      "id": "ct-02",
+      "context": {
+        "text": "Omar Haddad | Founder, BrightPath\nomar@brightpath.ai | brightpath.ai",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "olk.exe",
+        "window_title": "Pilot next steps - Outlook",
+        "is_editable": false
+      },
+      "expected": { "content_type": "contact_info", "slots": ["who"] }
+    },
+    {
+      "id": "ct-03",
+      "context": {
+        "text": "Dr. Mei Chen\nDepartment of Biology\nRoom 4.12, Science Hall\nmei.chen@univ.edu\n617-555-0199",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "msedge.exe",
+        "window_title": "Faculty directory - Microsoft Edge",
+        "is_editable": false
+      },
+      "expected": { "content_type": "contact_info", "slots": ["who"] }
+    },
+    {
+      "id": "ct-04",
+      "context": {
+        "text": "Ravi Patel\nSenior Recruiter at Halcyon\nlinkedin.com/in/ravipatel\nravi.p@halcyon.io",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Ravi Patel | LinkedIn - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "contact_info", "slots": ["who"] }
+    },
+    {
+      "id": "ct-05",
+      "context": {
+        "text": "Contact: Fatima Noor, Accounts Payable\nfatima.noor@northwind.com\nExt. 4471",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Invoice #2291 - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "contact_info", "slots": ["who"] }
+    }
+  ]
+}

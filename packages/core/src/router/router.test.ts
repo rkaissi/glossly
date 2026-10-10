@@ -53,6 +53,15 @@ describe('extractFeatures', () => {
     expect(extractFeatures(ctx('hi', { source_app: 'chrome.exe', window_title: 'Inbox - Gmail' })).messengerApp).toBe(true);
   });
 
+  it('does not mistake prose with code keywords for code, or speaker names for mentions', () => {
+    expect(extractFeatures(ctx('dude can you return my drill this weekend?')).codeScore).toBeLessThan(0.45);
+    expect(extractFeatures(ctx('try:\n    run()\nexcept Exception:\n    raise')).codeScore).toBeGreaterThanOrEqual(0.45);
+    expect(extractFeatures(ctx(THREAD)).namePairs).toEqual([]);
+    expect(extractFeatures(ctx('[10:31] Tomas Berg: ask Grace Hopper')).namePairs).toEqual(['Grace Hopper']);
+    expect(extractFeatures(ctx('Hi Rayan, thanks')).namePairs).toEqual([]);
+    expect(extractFeatures(ctx('p50 42ms, p90 118ms, p99 410ms, error rate 0.4%')).numericDensity).toBeGreaterThan(0.3);
+  });
+
   it('stays fast on large selections', () => {
     const big = ctx((THREAD + '\n' + TABLE + '\n' + ARTICLE + '\n').repeat(40));
     const t = performance.now();
@@ -70,6 +79,9 @@ describe('decideByRules', () => {
     expect(rules(ctx('lunch at noon works for me', { source_app: 'slack.exe' })).content_type).toBe('single_message');
     expect(rules(ctx('What does this flag actually do?')).content_type).toBe('question');
     expect(rules(ctx(ARTICLE)).content_type).toBe('article');
+    const paragraph = 'Spaced repetition works because forgetting is a signal. Each time you retrieve something as it fades, the trace becomes more durable, and the interval before the next review can grow longer. Short reviews beat cramming.';
+    expect(rules(ctx(paragraph)).content_type).toBe('article');
+    expect(rules(ctx(`${paragraph} John Snow agreed.`)).mentions_people).toBeLessThan(0.5);
     expect(rules(ctx('a few plain words')).content_type).toBe('other');
   });
 

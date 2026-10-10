@@ -1,0 +1,125 @@
+{
+  "$comment": "10 articles or docs.",
+  "cases": [
+    {
+      "id": "art-01",
+      "context": {
+        "text": "Spaced repetition works because forgetting is not a bug in memory but a signal. Each time you retrieve something just as it is about to fade, the trace becomes more durable, and the next interval before review can grow. The practical upshot is that short, frequent reviews beat long cramming sessions, and that the scheduling matters more than the total time spent. Most apps implement a variant of the SM-2 algorithm, adjusting the interval based on how hard each recall felt.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Why spaced repetition works - Medium - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-02",
+      "context": {
+        "text": "The Rate Limits API returns the remaining request budget for the current window in the X-RateLimit-Remaining header. When the budget reaches zero, requests fail with status 429 until the window resets, as indicated by X-RateLimit-Reset. Clients should back off exponentially and avoid retrying in a tight loop, since retries count against the same budget.",
+        "context_before": "## Rate limits\n\n",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Rate limits - API Reference - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-03",
+      "context": {
+        "text": "In 1854, John Snow mapped cholera deaths in London's Soho district and traced the outbreak to a single water pump on Broad Street. His map is often cited as a founding moment of epidemiology, though the officials of the time were slow to accept his conclusion that the disease spread through contaminated water rather than bad air.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "msedge.exe",
+        "window_title": "1854 Broad Street cholera outbreak - Wikipedia - Microsoft Edge",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-04",
+      "context": {
+        "text": "Our hybrid work policy asks every team member to be in the office on Tuesdays and Thursdays, with the remaining days flexible. Managers can approve exceptions for travel, caregiving, or focused project work. The goal is to protect time for collaboration without giving up the deep work that remote days make possible.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Employee Handbook - Notion - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-05",
+      "context": {
+        "text": "Sourdough relies on a stable culture of wild yeast and lactic acid bacteria. Feeding the starter at a consistent ratio, typically equal weights of flour and water, keeps the population balanced. A starter that doubles within four to six hours at room temperature is ready to bake with; one that smells sharply of acetone needs more frequent feedings.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "The Sourdough Guide - The Perfect Loaf - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-06",
+      "context": {
+        "text": "Product principles\n\n1. Speed is a feature. Every interaction should feel instant, and anything slower than 100 ms needs a visible response.\n2. Never surprise the user with data loss. Every destructive action is undoable or confirmed.\n3. Defaults matter more than settings. Most people never change them, so the defaults are the product.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Product principles - Google Docs - Google Chrome",
+        "is_editable": true
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-07",
+      "context": {
+        "text": "Researchers found that participants who took a 20-minute walk before a memory test recalled significantly more word pairs than those who sat quietly, though the effect faded when the test was delayed by a day. The authors caution that the sample was small and drawn entirely from one university.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Does walking boost memory? - ScienceDaily - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-08",
+      "context": {
+        "text": "To reset the device, hold the power and volume-down buttons together for ten seconds until the logo appears, then release both. The device will restart into recovery mode. Use the volume keys to select Factory reset and press power to confirm. This erases all data, so back up first.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "How to factory reset - Support - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-09",
+      "context": {
+        "text": "Event sourcing stores every change to application state as an immutable event, rather than overwriting the current state. The current state is derived by replaying events. This gives you a complete audit log and the ability to rebuild projections, at the cost of more complex queries and the need to version event schemas carefully as the system evolves.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "code.exe",
+        "window_title": "architecture.md - backend - Visual Studio Code",
+        "is_editable": true
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    },
+    {
+      "id": "art-10",
+      "context": {
+        "text": "The city council voted 7 to 2 on Tuesday to approve the new bike lane network, which will add 40 kilometers of protected lanes over the next three years. Supporters argued it would reduce traffic deaths, while opponents raised concerns about parking and delivery access for small businesses along the main corridors.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "msedge.exe",
+        "window_title": "Council approves bike lane plan - City News - Microsoft Edge",
+        "is_editable": false
+      },
+      "expected": { "content_type": "article", "slots": [] }
+    }
+  ]
+}

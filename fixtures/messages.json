@@ -1,0 +1,245 @@
+{
+  "$comment": "20 messages or threads. expected.slots is the ideal set for slots 3 and 4 (order ignored).",
+  "cases": [
+    {
+      "id": "msg-01",
+      "context": {
+        "text": "Priya Shah  9:14 AM\nDid anyone look at the onboarding numbers from last week?\nMarcus Bell  9:20 AM\nYeah, activation dropped about 4 points after the new signup form shipped",
+        "context_before": "",
+        "context_after": "\nPriya Shah  9:22 AM\nugh ok",
+        "source_app": "slack.exe",
+        "window_title": "#growth | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-02",
+      "context": {
+        "text": "Hey, quick one: is the staging database getting wiped tonight or tomorrow? I have a demo at 10 and want to make sure my test accounts survive.",
+        "context_before": "Dana Ortiz  4:51 PM\n",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "Dana Ortiz (DM) | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-03",
+      "context": {
+        "text": "lol that build was cursed. restarting the runner fixed it",
+        "context_before": "kevo — Today at 11:02 PM\n",
+        "context_after": "",
+        "source_app": "discord.exe",
+        "window_title": "#ci-fails - Indie Devs - Discord",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-04",
+      "context": {
+        "text": "Hi Rayan,\n\nThanks for sending the proposal over. The team liked the phased approach, but we need the pricing broken out per phase before legal will look at it. Could you share that version?\n\nBest,\nHelen",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Re: Proposal for Q1 rollout - helen.park@lumen.co - Gmail - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply", "promises"] }
+    },
+    {
+      "id": "msg-05",
+      "context": {
+        "text": "[10:31] tomas: anyone else seeing 502s on the EU cluster?\n[10:32] mei: yep, since about 10:25\n[10:33] tomas: ok paging infra",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "#ops-alerts - Mattermost - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-06",
+      "context": {
+        "text": "Congrats on the launch!! The new dashboard looks great, my whole team has been using it all morning",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "ms-teams.exe",
+        "window_title": "Chat | Ahmed Karim | Microsoft Teams",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-07",
+      "context": {
+        "text": "Mom: did you get the photos I sent? the ones from the lake\nMom: your aunt wants copies",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "whatsapp.root.exe",
+        "window_title": "WhatsApp",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-08",
+      "context": {
+        "text": "Your order #A-88213 has shipped and should arrive in 3 to 5 business days. Track it any time from your account page.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "olk.exe",
+        "window_title": "Your order has shipped - Outlook",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": [] }
+    },
+    {
+      "id": "msg-09",
+      "context": {
+        "text": "Sounds good, thanks for the heads up. I'll look at it after standup",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "Leo Grant (DM) | Northwind - Slack",
+        "is_editable": true
+      },
+      "expected": { "content_type": "single_message", "slots": ["promises"] }
+    },
+    {
+      "id": "msg-10",
+      "context": {
+        "text": "Jordan Wells  2:03 PM\nwhich font are we using on the new landing page?\nAisha Rahman  2:05 PM\nInter for body, Fraunces for headings\nJordan Wells  2:05 PM\nperfect thanks",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#design | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-11",
+      "context": {
+        "text": "Hi all, a reminder that the office is closed Monday for the holiday. Badge access will still work for anyone who needs to come in.",
+        "context_before": "From: Facilities Team\nTo: All Staff\n\n",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Office closed Monday - Outlook - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": [] }
+    },
+    {
+      "id": "msg-12",
+      "context": {
+        "text": "hey are you still up for climbing saturday? gym opens at 9",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "signal.exe",
+        "window_title": "Signal",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-13",
+      "context": {
+        "text": "Noah Fischer  8:40 AM\nmorning! the vendor sent over the revised contract\nNoah Fischer  8:41 AM\nmain change is the termination clause, 60 days instead of 30",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#legal | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-14",
+      "context": {
+        "text": "We regret to inform you that your application for the Senior Designer role will not be moving forward. We appreciate your interest in Halcyon.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Your application at Halcyon - careers@halcyon.io - Gmail - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-15",
+      "context": {
+        "text": "ok so I tried the patch and it fixes the crash on startup, but now the settings window opens blank on my second monitor",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "discord.exe",
+        "window_title": "#bug-reports - Glossly Testers - Discord",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-16",
+      "context": {
+        "text": "Elena Moretti  3:12 PM\nWho owns the billing migration now that Chris moved teams?\nSam Lee  3:15 PM\nI think it went to Fatima, but double check with her",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "slack.exe",
+        "window_title": "#platform | Northwind - Slack",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply", "who"] }
+    },
+    {
+      "id": "msg-17",
+      "context": {
+        "text": "Thanks so much for the intro to Grace! We're grabbing coffee next week",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "olk.exe",
+        "window_title": "RE: Intro: Grace <> Omar - Outlook",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-18",
+      "context": {
+        "text": "Hey team, I'm out sick today. Will be checking messages occasionally but please ping Ravi for anything urgent on the release.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "ms-teams.exe",
+        "window_title": "General | Release Squad | Microsoft Teams",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-19",
+      "context": {
+        "text": "Bea  7:02 PM\nfyi the restaurant moved our reservation to 8\nTheo  7:04 PM\nworks for me\nBea  7:04 PM\ncool see you there",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Messenger | Facebook - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+    },
+    {
+      "id": "msg-20",
+      "context": {
+        "text": "Your one-time passcode expires in 10 minutes. If you didn't request this, you can ignore this message.",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Sign-in attempt - Gmail - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "single_message", "slots": [] }
+    }
+  ]
+}

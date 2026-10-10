@@ -8,7 +8,7 @@ function contentType(f: Features): ContentType {
   if ((f.emails.length > 0 || f.phones.length > 0) && f.wordCount <= 60 && f.lineCount >= 2) return 'contact_info';
   if (f.messengerApp && f.wordCount <= 150) return f.chatLines >= 1 && f.lineCount >= 3 ? 'message_thread' : 'single_message';
   if (f.endsWithQuestion && f.wordCount <= 40) return 'question';
-  if (f.wordCount >= 60) return 'article';
+  if (f.wordCount >= 60 || (f.wordCount >= 35 && f.sentences >= 2)) return 'article';
   return 'other';
 }
 
@@ -41,13 +41,17 @@ export function decideByRules({ context, features: f, collections }: DecisionInp
   let authored = isMessage ? (f.messengerApp ? 0.7 : 0.55) : 0.1;
   if (context.is_editable) authored = Math.min(authored, 0.15);
 
+  // Names in articles, tables, and code are rarely people the user knows.
+  const weakNames = type === 'article' || type === 'table_or_numbers' || type === 'code';
   const mentions =
     f.knownPeople.length > 0
       ? 1
       : f.emails.length + f.handles.length > 0
         ? 0.7
         : f.namePairs.length > 0
-          ? 0.55
+          ? weakNames
+            ? 0.3
+            : 0.55
           : type === 'message_thread'
             ? 0.4
             : 0.1;

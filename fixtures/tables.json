@@ -1,0 +1,125 @@
+{
+  "$comment": "10 tables or number-heavy selections.",
+  "cases": [
+    {
+      "id": "tbl-01",
+      "context": {
+        "text": "Region\tQ1\tQ2\tQ3\nNorth\t120\t140\t162\nSouth\t90\t95\t101\nEast\t75\t80\t92\nWest\t70\t88\t97",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "excel.exe",
+        "window_title": "Sales FY26.xlsx - Excel",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-02",
+      "context": {
+        "text": "| Plan | Seats | Price/mo |\n| --- | --- | --- |\n| Starter | 5 | $49 |\n| Team | 25 | $199 |\n| Business | 100 | $699 |",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "code.exe",
+        "window_title": "pricing.md - website - Visual Studio Code",
+        "is_editable": true
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-03",
+      "context": {
+        "text": "date,visitors,signups\n2026-09-01,1203,41\n2026-09-02,1350,47\n2026-09-03,1188,39\n2026-09-04,1622,63\n2026-09-05,1710,58",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "notepad.exe",
+        "window_title": "traffic.csv - Notepad",
+        "is_editable": true
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-04",
+      "context": {
+        "text": "Revenue grew 18% to $4.2M, gross margin was 71%, and net retention came in at 112%. Burn fell to $310K per month from $420K.",
+        "context_before": "Q3 summary: ",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Q3 Investor Update - Google Docs - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-05",
+      "context": {
+        "text": "Name          Role        Start\nAisha Rahman  Designer    2024-03\nLeo Grant     Engineer    2025-01\nMei Chen      PM          2023-11",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Team roster - Notion - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-06",
+      "context": {
+        "text": "Benchmark\tv1.4\tv1.5\nCold start (ms)\t820\t610\nWarm start (ms)\t140\t120\nMemory (MB)\t310\t265\nBundle (KB)\t1840\t1710",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Release benchmarks - Confluence - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-07",
+      "context": {
+        "text": "Mon 7.2  Tue 6.8  Wed 7.9  Thu 5.5  Fri 8.1  Sat 9.0  Sun 8.4",
+        "context_before": "Sleep (hours): ",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Weekly health report - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-08",
+      "context": {
+        "text": "Item; Qty; Unit cost\nM3 bolts; 400; 0.04\nM3 nuts; 400; 0.02\nStandoffs 10mm; 120; 0.18\nHeat inserts; 200; 0.09",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "BOM rev C - Google Sheets - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-09",
+      "context": {
+        "text": "p50 42ms, p90 118ms, p99 410ms, max 2.3s, error rate 0.4%, 12.1k rpm",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "chrome.exe",
+        "window_title": "api-gateway latency - Grafana - Google Chrome",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    },
+    {
+      "id": "tbl-10",
+      "context": {
+        "text": "Team\tW\tL\tPts\nArsenal\t8\t1\t25\nLiverpool\t7\t2\t22\nChelsea\t6\t2\t20\nSpurs\t5\t3\t17",
+        "context_before": "",
+        "context_after": "",
+        "source_app": "msedge.exe",
+        "window_title": "Premier League table - BBC Sport - Microsoft Edge",
+        "is_editable": false
+      },
+      "expected": { "content_type": "table_or_numbers", "slots": ["visualize"] }
+    }
+  ]
+}
