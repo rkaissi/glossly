@@ -140,7 +140,7 @@ export interface AskDone {
 }
 export interface AskErrorEvent {
   requestId: string;
-  code: 'no_model' | 'invalid_output' | 'provider' | 'aborted' | 'timeout' | 'no_selection';
+  code: 'no_model' | 'local_only' | 'invalid_output' | 'provider' | 'aborted' | 'timeout' | 'no_selection';
   message: string;
 }
 

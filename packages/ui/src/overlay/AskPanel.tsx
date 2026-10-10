@@ -73,6 +73,11 @@ export function AskPanel({ s }: { s: OverlayState }) {
     if (queued.length) setAnswer((a) => queued.reduce<Answer | null>(apply, a) as Answer);
   };
 
+  const turnOffLocalOnly = async () => {
+    const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
+    if (!r.error) await submit();
+  };
+
   const text = answer && 'text' in answer ? answer.text : '';
 
   const copy = () => {
@@ -113,6 +118,7 @@ export function AskPanel({ s }: { s: OverlayState }) {
               {answer.code === 'no_model' && (
                 <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>
               )}
+              {answer.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and ask</button>}
             </p>
           )}
         </div>

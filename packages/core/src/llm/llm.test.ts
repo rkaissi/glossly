@@ -48,11 +48,13 @@ function jsonModel(...texts: string[]) {
   });
 }
 
-function roles(over: Partial<Settings['roles']>): Pick<Settings, 'roles' | 'actionModels'> {
-  return { roles: { ...DEFAULT_SETTINGS.roles, ...over }, actionModels: {} };
+type LlmSettings = Pick<Settings, 'roles' | 'actionModels' | 'localOnly'>;
+
+function roles(over: Partial<Settings['roles']>): LlmSettings {
+  return { roles: { ...DEFAULT_SETTINGS.roles, ...over }, actionModels: {}, localOnly: false };
 }
 
-function llmWith(models: Record<ModelRef, MockLanguageModelV4>, settings: Pick<Settings, 'roles' | 'actionModels'>, keys = ['groq', 'openai', 'anthropic']) {
+function llmWith(models: Record<ModelRef, MockLanguageModelV4>, settings: LlmSettings, keys = ['groq', 'openai', 'anthropic']) {
   const fallbacks: unknown[] = [];
   const llm = new AiSdkLlm({
     settings: () => settings,
@@ -121,6 +123,36 @@ describe('AiSdkLlm.stream', () => {
     const { llm } = llmWith({}, roles({ chat: CHAT }), []);
     expect(llm.hasModel('chat')).toBe(false);
     await expect(collect(llm.stream({ role: 'chat', instructions: 'i', prompt: 'p' }).textStream)).rejects.toMatchObject({ code: 'no_model' });
+  });
+});
+
+describe('AiSdkLlm with Local only on', () => {
+  it('refuses streams and structured calls before building or calling any model', async () => {
+    const chat = textModel(['never']);
+    const fast = jsonModel('{"answer":"yes","n":1}');
+    const built: string[] = [];
+    const settings = { ...roles({ chat: CHAT, fast: { model: 'openai:gpt-5-mini', fallback: null, manual: false } }), localOnly: true };
+    const llm = new AiSdkLlm({
+      settings: () => settings,
+      apiKey: () => 'k',
+      createModel: (ref) => {
+        built.push(ref);
+        return ref.startsWith('openai') ? fast : chat;
+      },
+    });
+    const r = llm.stream({ role: 'chat', instructions: 'i', prompt: 'p' });
+    await expect(collect(r.textStream)).rejects.toMatchObject({ name: 'LlmError', code: 'local_only' });
+    await expect(r.model).rejects.toMatchObject({ code: 'local_only' });
+    await expect(llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, z.object({ answer: z.string() }))).rejects.toMatchObject({
+      code: 'local_only',
+    });
+    expect(built).toEqual([]);
+    expect(chat.doStreamCalls).toHaveLength(0);
+    expect(fast.doGenerateCalls).toHaveLength(0);
+
+    // Turning it off takes effect on the next call.
+    settings.localOnly = false;
+    expect(await collect(llm.stream({ role: 'chat', instructions: 'i', prompt: 'p' }).textStream)).toBe('never');
   });
 });
 

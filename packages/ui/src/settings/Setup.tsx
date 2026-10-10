@@ -33,8 +33,8 @@ function Welcome({ view }: { view: SettingsView }) {
           <li>Glossly reads the text you select. It reads the text around it only when you open the bar or click an action.</li>
           <li>It never records keystrokes; the hotkey is its only keyboard shortcut. Password fields and password managers are never read.</li>
           <li>
-            Everything is stored on this computer. Selected text goes only to the provider whose key you add: when the bar opens, to pick actions (turn on
-            Local only in Settings to stop this), and when you click Ask or Save.
+            Everything is stored on this computer. Selected text goes only to the provider whose key you add: when the bar opens, to pick actions, and
+            when you click Ask or Save. Turn on Local only in Settings and nothing is sent at all.
           </li>
         </ul>
       </div>

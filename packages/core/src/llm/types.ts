@@ -29,7 +29,7 @@ export interface LlmProvider {
 
 export class LlmError extends Error {
   constructor(
-    readonly code: 'no_model' | 'invalid_output' | 'provider' | 'aborted' | 'timeout',
+    readonly code: 'no_model' | 'local_only' | 'invalid_output' | 'provider' | 'aborted' | 'timeout',
     message: string,
     readonly statusCode?: number,
   ) {

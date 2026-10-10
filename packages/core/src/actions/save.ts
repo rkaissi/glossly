@@ -50,6 +50,8 @@ export interface SaveResult {
 export interface EnrichResult {
   embedded: boolean;
   entities: number;
+  /** Set when entity extraction did not run because Local only was on. */
+  entitiesSkipped?: 'local_only';
   /** Set when the item was undone or deleted mid-way. */
   cancelled: boolean;
 }
@@ -186,7 +188,9 @@ export class SaveService {
         result.entities = await this.extractEntities(item, signal, alive);
       } catch (e) {
         if (!alive()) return { ...result, cancelled: true };
-        this.deps.metrics?.record('save_enrich_error', { stage: 'entities', code: errorCode(e) });
+        // Local only: the item stays saved and embedded, just without entities.
+        if (e instanceof LlmError && e.code === 'local_only') result.entitiesSkipped = 'local_only';
+        else this.deps.metrics?.record('save_enrich_error', { stage: 'entities', code: errorCode(e) });
       }
     }
     return { ...result, cancelled: !alive() };

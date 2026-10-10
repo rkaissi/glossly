@@ -210,6 +210,19 @@ describe('SaveService', () => {
     expect(store.entitiesForItem(saved.id).map((e) => e.id)).toEqual([existing]);
   });
 
+  it('saves and embeds but skips entities, with no error event, when Local only refuses the call', async () => {
+    const llm = new FakeLlm(() => {
+      throw new LlmError('local_only', 'Local only is on');
+    });
+    const { svc } = setup({ llm });
+    const { item: saved, enriched } = svc.save({ selection: selection(), collection: 'Notes' });
+    expect(await enriched).toEqual({ embedded: true, entities: 0, entitiesSkipped: 'local_only', cancelled: false });
+    expect(store.getItem(saved.id)).not.toBeNull();
+    expect(store.itemsWithoutVectors()).toHaveLength(0);
+    expect(store.entitiesForItem(saved.id)).toEqual([]);
+    expect(store.listEvents().map((e) => e.kind)).toEqual(['save_done']);
+  });
+
   it('creates a missing collection', () => {
     const { svc } = setup();
     const { item: saved } = svc.save({ selection: selection(), collection: 'Recipes' });

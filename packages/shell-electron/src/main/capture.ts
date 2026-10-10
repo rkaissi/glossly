@@ -793,6 +793,7 @@ export class Capture {
     const name = collection.trim() || s.route?.decisions.best_collection || 'Notes';
     const container = (await s.container) ?? null;
     const r = this.services.save.save({ selection: s.selection, container, collection: name, why });
+    void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     return { itemId: r.item.id, collection: name, undoUntil: r.undoUntil };
   }
 

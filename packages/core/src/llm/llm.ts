@@ -6,7 +6,7 @@ import { modelChain } from './roles';
 import { LlmError, type ChatRequest, type LlmProvider, type StreamResult } from './types';
 
 export interface AiSdkLlmDeps {
-  settings: () => Pick<Settings, 'roles' | 'actionModels'>;
+  settings: () => Pick<Settings, 'roles' | 'actionModels' | 'localOnly'>;
   /** Decrypted key for a provider, or null. Never logged. */
   apiKey: (provider: string) => string | null;
   /** Builds a model from a ref. Defaults to the provider registry; tests pass mocks. */
@@ -36,11 +36,19 @@ function toLlmError(e: unknown): LlmError {
   return new LlmError('provider', (inner as Error)?.message ?? 'Model call failed', status);
 }
 
-/** LlmProvider on the Vercel AI SDK: role resolution, 429/5xx fallback, one structured retry. */
+export const LOCAL_ONLY_MESSAGE = 'Local only is on, so nothing is sent to a model provider.';
+
+/**
+ * LlmProvider on the Vercel AI SDK: role resolution, 429/5xx fallback, one structured retry.
+ * Every model call goes through here, so this is the one place that enforces Local only: while
+ * it is on, every call fails with `local_only` before anything is sent (every provider is a
+ * cloud provider for now).
+ */
 export class AiSdkLlm implements LlmProvider {
   constructor(private readonly deps: AiSdkLlmDeps) {}
 
   private chain(role: RoleName, action?: string): { ref: ModelRef; model: LanguageModel }[] {
+    if (this.deps.settings().localOnly) throw new LlmError('local_only', LOCAL_ONLY_MESSAGE);
     const out: { ref: ModelRef; model: LanguageModel }[] = [];
     for (const ref of modelChain(role, this.deps.settings(), action)) {
       const key = this.deps.apiKey(parseRef(ref).provider);
@@ -54,7 +62,14 @@ export class AiSdkLlm implements LlmProvider {
   }
 
   stream(req: ChatRequest): StreamResult {
-    const chain = this.chain(req.role, req.action);
+    let chain: { ref: ModelRef; model: LanguageModel }[] = [];
+    let refused: LlmError | null = null;
+    try {
+      chain = this.chain(req.role, req.action);
+    } catch (e) {
+      if (!(e instanceof LlmError)) throw e;
+      refused = e;
+    }
     let resolveModel!: (r: ModelRef) => void;
     let rejectModel!: (e: unknown) => void;
     const model = new Promise<ModelRef>((res, rej) => {
@@ -65,6 +80,10 @@ export class AiSdkLlm implements LlmProvider {
     const deps = this.deps;
 
     async function* run(): AsyncGenerator<string> {
+      if (refused) {
+        rejectModel(refused);
+        throw refused;
+      }
       if (chain.length === 0) {
         const e = new LlmError('no_model', `No ${req.role} model is set up. Add a key in Settings.`);
         rejectModel(e);
