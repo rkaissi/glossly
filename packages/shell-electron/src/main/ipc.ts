@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { aliasKindOf, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type SetSettingResult, type SettingsKey } from '@glossly/core';
+import { aliasKindOf, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type PromiseSaveRow, type SetSettingResult, type SettingsKey } from '@glossly/core';
 import type { Capture } from './capture';
 import type { HotkeyManager } from './hotkey';
 import { logger } from './log';
@@ -96,6 +96,26 @@ export function registerIpc(deps: IpcDeps): void {
   handle('save:setWhy', (a) => services.save.setWhy(str(a.itemId, 100), str(a.why, 2000)));
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
+
+  // ---- What did I promise ----
+  handle('promises:extract', (a) => capture.extractPromises(num(a.sessionId)));
+  handle('promises:save', (a) => {
+    if (!Array.isArray(a.rows) || a.rows.length > 20) throw new Error('Invalid rows');
+    const rows = a.rows.map((raw): PromiseSaveRow => {
+      const r = obj(raw);
+      const owner = str(r.owner, 5);
+      if (owner !== 'me' && owner !== 'them') throw new Error('Invalid owner');
+      const due = r.due_at === null ? null : str(r.due_at, 40);
+      if (due !== null && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/.test(due)) throw new Error('Invalid date');
+      const p = r.person === null ? null : obj(r.person);
+      const person: PromiseSaveRow['person'] =
+        p === null ? null : p.kind === 'existing' ? { kind: 'existing', id: str(p.id, 100) } : p.kind === 'new' ? { kind: 'new', name: str(p.name, 100) } : null;
+      return { owner, text: str(r.text, 500), due_at: due, person };
+    });
+    const r = capture.savePromises(num(a.sessionId), rows);
+    broadcastPeople();
+    return r;
+  });
 
   // ---- people ----
   handle('who:get', (a) => capture.who(num(a.sessionId)));

@@ -27,6 +27,7 @@ export * from './people/names';
 export type * from './people/types';
 export * from './people/detect';
 export * from './people/resolve';
+export * from './people/dates';
 export * from './store/people';
 
 export * from './llm/types';
@@ -41,5 +42,6 @@ export * from './actions/context';
 export * from './actions/ask';
 export * from './actions/save';
 export * from './actions/who';
+export * from './actions/promises';
 
 export type * from './api';

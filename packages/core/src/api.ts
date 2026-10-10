@@ -15,7 +15,7 @@ import type { ContextualAction, ContentType, DecisionProviderId } from './router
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
-import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary } from './people/types';
+import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow } from './people/types';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
 export type { MetricsSummary } from './metrics';
@@ -29,7 +29,7 @@ export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } fro
 export type ActionId = 'ask' | 'save' | ContextualAction;
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save' | 'who';
+export type AvailableAction = 'ask' | 'save' | 'who' | 'promises';
 
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
 
@@ -149,6 +149,12 @@ export interface AskErrorEvent {
   message: string;
 }
 
+// ---- What did I promise ----
+
+export type PromisesResult =
+  | { ok: true; rows: PromiseRow[]; /** Who wrote the message, as detected, or null. */ author: string | null; authorIsMe: boolean; identitySet: boolean }
+  | { ok: false; code: AskErrorEvent['code']; message: string };
+
 // ---- Save ----
 
 export interface SaveArgs {
@@ -253,6 +259,11 @@ export interface InvokeChannels {
   'save:undo': { args: { itemId: string }; result: { undone: boolean } };
 
   'clipboard:write': { args: { text: string }; result: void };
+
+  /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
+  'promises:extract': { args: { sessionId: number }; result: PromisesResult };
+  /** Saves the rows the user kept. New people are created; the message is stored with its author. */
+  'promises:save': { args: { sessionId: number; rows: PromiseSaveRow[] }; result: { saved: number; created: number } };
 
   /** The people in the session's selection, each resolved against the people layer. Local only. */
   'who:get': { args: { sessionId: number }; result: WhoView };

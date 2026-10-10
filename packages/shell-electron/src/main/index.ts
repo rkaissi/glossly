@@ -5,6 +5,7 @@ import { HotkeyManager } from './hotkey';
 import { registerIpc } from './ipc';
 import { errorInfo, initLog, logger } from './log';
 import { Overlay } from './overlay';
+import { Reminders } from './reminders';
 import { userDataPath } from './paths';
 import { Services } from './services';
 import { SettingsWindow } from './settings-window';
@@ -78,6 +79,9 @@ async function main(): Promise<void> {
   });
   services.on('settings', refresh);
 
+  const reminders = new Reminders(services, () => settingsWindow.open('people'));
+  reminders.start();
+
   if (services.embed.downloaded || services.settings.firstRunComplete) services.embed.start();
   services.refreshIfStale().catch((e: unknown) => log.warn('catalog refresh failed', errorInfo(e)));
   if (!services.settings.firstRunComplete && !process.env.GLOSSLY_SMOKE) settingsWindow.open('setup');
@@ -90,6 +94,7 @@ async function main(): Promise<void> {
     e.preventDefault();
     quitting = true;
     capture.close('quit');
+    reminders.stop();
     hotkey.dispose();
     helper.stop();
     services

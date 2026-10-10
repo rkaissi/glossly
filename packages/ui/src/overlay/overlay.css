@@ -526,3 +526,126 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .row-tight button svg {
   margin-right: 2px;
 }
+
+/* ---- What did I promise ---- */
+
+.panel.promises:focus {
+  outline: none;
+}
+.promise-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.promise {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 8px 8px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.promise.highlight {
+  border-color: var(--ring);
+  background: var(--hover);
+}
+.promise.off .promise-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.promise .check {
+  margin-top: 7px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--primary-fg);
+}
+.promise .check.on,
+.promise .check.on:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.promise-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.promise-text {
+  width: 100%;
+  height: 32px;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 6px;
+  margin-left: -6px;
+  font-weight: 500;
+}
+.promise-text:hover,
+.promise-text:focus {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.promise-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+}
+.promise-meta .owner {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--pressed);
+  font-size: 12px;
+}
+.promise-meta select {
+  height: 24px;
+  max-width: 190px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.due-edit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 12px;
+  color: var(--fg-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.due-edit.overdue {
+  color: var(--danger);
+}
+/* The native date input sits invisibly on the chip; clicking opens its picker. */
+.due-edit input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+}
+.due-edit input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}

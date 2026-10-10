@@ -113,3 +113,29 @@ export interface PersonSummary {
   /** Latest interaction, or null. */
   last_seen: string | null;
 }
+
+// ---- What did I promise ----
+
+/** One candidate commitment, ready for the review list. */
+export interface PromiseRow {
+  key: string;
+  owner: CommitmentOwner;
+  text: string;
+  /** As the model returned it, or null. */
+  due_phrase: string | null;
+  /** Resolved by code: "YYYY-MM-DD", an ISO timestamp, or null ("No date"). */
+  due_at: string | null;
+  confidence: number;
+  selected: boolean;
+  person_name: string | null;
+  /** The person record the name resolved to; a fuzzy match is only a suggestion. */
+  match: { personId: string; name: string; kind: 'exact' | 'fuzzy' } | null;
+}
+
+/** A reviewed row to save. `person` is an existing record, a new one to create, or nobody. */
+export interface PromiseSaveRow {
+  owner: CommitmentOwner;
+  text: string;
+  due_at: string | null;
+  person: { kind: 'existing'; id: string } | { kind: 'new'; name: string } | null;
+}

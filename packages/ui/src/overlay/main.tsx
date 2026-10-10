@@ -12,6 +12,7 @@ import { AskPanel } from './AskPanel';
 import { Debug } from './Debug';
 import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
+import { PromisesPanel } from './PromisesPanel';
 import { SavePanel } from './SavePanel';
 import { WhoPanel } from './WhoPanel';
 
@@ -296,6 +297,8 @@ function Expanded({ s }: { s: OverlayState }) {
           <SavePanel key="save" s={s} />
         ) : s.panel === 'who' ? (
           <WhoPanel key="who" s={s} />
+        ) : s.panel === 'promises' ? (
+          <PromisesPanel key="promises" s={s} />
         ) : (
           <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
         ))}

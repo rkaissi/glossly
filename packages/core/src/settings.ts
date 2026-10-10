@@ -110,6 +110,9 @@ export const SettingsSchema = z.object({
     })
     .prefault({}),
 
+  /** Local hour when a commitment's due-date notification is shown (spec: 9:00). */
+  reminderHour: z.number().int().min(0).max(23).default(9),
+
   /** Notices shown once in the bar, e.g. a role's model disappeared. */
   pendingNotice: z.string().nullable().default(null),
 });

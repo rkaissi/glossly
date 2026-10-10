@@ -10,6 +10,9 @@ import {
   countWords,
   detectInputFor,
   detectPeople,
+  extractPromises,
+  resolvePerson,
+  savePromises,
   personBadges,
   whoFor,
   gateApp,
@@ -34,6 +37,8 @@ import {
   type ObstacleDebug,
   type OverlayState,
   type PillTiming,
+  type PromiseSaveRow,
+  type PromisesResult,
   type Placement,
   type Point,
   type Rect,
@@ -79,6 +84,10 @@ interface Session {
   placement: Placement['side'] | null;
   obstacles: ObstacleDebug[];
   pill: PillTiming | null;
+  /** The running "What did I promise" extraction. */
+  promisesCtl: AbortController | null;
+  /** Who wrote the selected message, from the last extraction: their person id (exact match only) and whether it was the user. */
+  author: { personId: string | null; isMe: boolean } | null;
 }
 
 /** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
@@ -329,6 +338,8 @@ export class Capture {
         placement: placement.side,
         obstacles: obstacleInfo,
         pill: { wait_ms: wait.ms, reason: wait.reason, polls: poll.polls, found: poll.found, baseline: before !== null },
+        promisesCtl: null,
+        author: null,
       };
       this.session = session;
       this.overlay.update(
@@ -512,6 +523,8 @@ export class Capture {
       placement: null,
       obstacles: [],
       pill: null,
+      promisesCtl: null,
+      author: null,
     };
     this.session = session;
 
@@ -755,6 +768,54 @@ export class Capture {
     return whoFor(this.services.people, s.selection, container, identity, this.services.store.listKnownPeople());
   }
 
+  /** What did I promise: one structured call for the commitments in the selected message. */
+  async extractPromises(sessionId: number): Promise<PromisesResult> {
+    const s = this.current(sessionId);
+    if (!s?.selection) return { ok: false, code: 'no_selection', message: 'Nothing is selected.' };
+    s.promisesCtl?.abort();
+    const ctl = new AbortController();
+    s.promisesCtl = ctl;
+    const identity = this.settings.identity;
+    const t = performance.now();
+    try {
+      const container = (await s.container) ?? null;
+      const people = this.services.people;
+      const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
+      const authorMatch = det.author ? resolvePerson(people, det.author, s.selection.source_app) : null;
+      s.author = { personId: authorMatch?.kind === 'exact' ? authorMatch.personId : null, isMe: det.authorIsMe };
+      const rows = await extractPromises(this.services.llm, people, this.settings, { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe }, ctl.signal);
+      this.services.metrics.record('promises_extracted', { count: rows.length, ms: ms(t) });
+      return {
+        ok: true,
+        rows,
+        author: det.authorIsMe ? null : (det.author?.name ?? det.author?.email ?? null),
+        authorIsMe: det.authorIsMe,
+        identitySet: identity.name.trim().length > 0,
+      };
+    } catch (e) {
+      const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
+      if (code !== 'aborted') this.services.metrics.record('promises_error', { code, ...(e instanceof LlmError && e.statusCode && { status: e.statusCode }) });
+      if (!(e instanceof LlmError) && code !== 'aborted') log.error('promises failed', errorInfo(e));
+      return { ok: false, code, message: e instanceof LlmError ? e.message : 'The model call failed.' };
+    } finally {
+      if (s.promisesCtl === ctl) s.promisesCtl = null;
+    }
+  }
+
+  savePromises(sessionId: number, rows: PromiseSaveRow[]): { saved: number; created: number } {
+    const s = this.current(sessionId);
+    if (!s?.selection) throw new Error('This selection is gone. Select the message again.');
+    const r = savePromises(this.services.people, rows, {
+      message: s.selection.text,
+      sourceApp: s.selection.source_app,
+      authorPersonId: s.author?.personId ?? null,
+      authorIsMe: s.author?.isMe ?? false,
+    });
+    this.services.metrics.record('promises_saved', { count: r.saved, created: r.created, offered: rows.length });
+    log.info('promises saved', r);
+    return r;
+  }
+
   /** Person badges from tier 1 (local, a few ms): a known person with open commitments or a note. */
   private badgesFor(s: Session): OverlayState['badges'] {
     if (!s.selection) return [];
@@ -864,6 +925,7 @@ export class Capture {
     this.stopWatch();
     if (!s) return;
     s.routeCtl?.abort();
+    s.promisesCtl?.abort();
     this.cancelAsks(s);
     this.session = null;
   }
