@@ -6,6 +6,7 @@ import {
   LlmStructuredDecision,
   Router,
   ask,
+  classifyObstacles,
   countWords,
   gateApp,
   gateAutoSelection,
@@ -20,7 +21,9 @@ import {
   type CommandResult,
   type ContainerContext,
   type HelperEvent,
+  type ObstacleDebug,
   type OverlayState,
+  type Placement,
   type Point,
   type Rect,
   type RouteResult,
@@ -61,7 +64,14 @@ interface Session {
   routeCtl: AbortController | null;
   asks: Map<string, AbortController>;
   timings: Record<string, number>;
+  placement: Placement['side'] | null;
+  obstacles: ObstacleDebug[];
 }
+
+type Popups = CommandResult<'popups_near'>['popups'];
+
+/** Synthetic obstacles above and below the selection, for checking the dot by hand (dev builds only). */
+const FORCE_DOT = !app.isPackaged && process.env.GLOSSLY_FORCE_DOT === '1';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const ms = (t: number) => Math.round(performance.now() - t);
@@ -106,6 +116,10 @@ export class Capture {
   private inputWatch = false;
   /** Set while focus is handed to the source app to read tier 2 on the hotkey path. */
   private bouncing = false;
+  /** Obstacles on screen at the last left mouse-down, so the pill ignores what was already there. */
+  private baseline: Promise<Popups | null> | null = null;
+  /** The session whose pill or dot is expanding (tier 1 is being read). */
+  private expanding: Session | null = null;
 
   /**
    * `captureSource` returns the HWND of the one Glossly window that may be read (the setup's
@@ -159,14 +173,16 @@ export class Capture {
     switch (ev.event) {
       case 'mouse_down': {
         this.autoGen++;
+        const inside = this.overlay.isVisible && contains(this.overlay.hitBounds(), toDipPoint(ev));
+        if (ev.button === 'left' && !inside) this.takeBaseline(ev);
         if (!this.overlay.isVisible || this.overlay.hasFocus) return;
-        if (!contains(this.overlay.bounds(), toDipPoint(ev))) this.close('click_outside');
+        if (!inside) this.close('click_outside');
         return;
       }
       case 'mouse_up': {
         if (!ev.drag && !ev.double) return;
         const p = toDipPoint(ev);
-        if (this.overlay.isVisible && contains(this.overlay.bounds(), p)) return;
+        if (this.overlay.isVisible && contains(this.overlay.hitBounds(), p)) return;
         void this.autoTrigger(ev, p);
         return;
       }
@@ -181,12 +197,29 @@ export class Capture {
 
   // ---- auto pill path ----
 
+  /**
+   * Snapshots the obstacles on screen when a selection may be starting: every popup-like
+   * window, plus the toolbar probes around the press point. A selection toolbar appears only
+   * after this, so popups_near results that match the snapshot are app chrome, not toolbars.
+   */
+  private takeBaseline(press: Point): void {
+    if (!this.helper.isReady) {
+      this.baseline = null;
+      return;
+    }
+    this.baseline = this.helper
+      .request('popups_near', { bounds: cursorRect(press), exclude_pids: [...this.ownPids()], all_windows: true })
+      .then((r) => r.popups)
+      .catch(() => null);
+  }
+
   private async autoTrigger(physical: Point, p: Point): Promise<void> {
     const gen = ++this.autoGen;
     const t0 = performance.now();
     const timings: Record<string, number> = {};
     const stale = () => gen !== this.autoGen;
     const settings = this.settings;
+    const baseline = this.baseline;
     try {
       let t = performance.now();
       const fg = await this.helper.request('foreground');
@@ -211,18 +244,28 @@ export class Capture {
       const popups = await this.helper
         .request('popups_near', { bounds: physBounds, exclude_pids: [...this.ownPids()] })
         .catch(() => ({ popups: [] }));
+      const before = baseline ? await baseline : null;
       timings.popups_near = ms(t);
       if (stale()) return;
 
       const bounds = toDipRect(physBounds);
+      const classified = classifyObstacles(popups.popups, before, physBounds);
+      const obstacles = classified.filter((o) => o.status === 'new').map((o) => toDipRect(o.popup.bounds));
+      if (FORCE_DOT) obstacles.push({ ...bounds, y: bounds.y - 80, h: 80 }, { ...bounds, y: bounds.y + bounds.h, h: 80 });
       const placement = placePill({
         selection: bounds,
         anchor: p,
-        obstacles: popups.popups.map((o) => toDipRect(o.bounds)),
+        obstacles,
         size: SIZES.pill,
+        dotWindow: SIZES.dot,
         workArea: workArea(p),
       });
       timings.total = ms(t0);
+      const obstacleInfo = classified.map((o): ObstacleDebug => {
+        const r = toDipRect(o.popup.bounds);
+        const { source, kind, class_name, process_name } = o.popup;
+        return { source, kind, w: Math.round(r.w), h: Math.round(r.h), side: o.side, status: o.status, class_name, process_name };
+      });
 
       this.endSession();
       const session: Session = {
@@ -251,6 +294,8 @@ export class Capture {
         routeCtl: null,
         asks: new Map(),
         timings,
+        placement: placement.side,
+        obstacles: obstacleInfo,
       };
       this.session = session;
       this.overlay.update(
@@ -266,7 +311,23 @@ export class Capture {
         },
         placement.rect,
       );
-      this.services.metrics.record('pill_shown', { method: sel.method, ms: timings.total, side: placement.side });
+      this.services.metrics.record('pill_shown', {
+        method: sel.method,
+        ms: timings.total,
+        side: placement.side,
+        baseline: before !== null,
+        obstacles: obstacleInfo.filter((o) => o.status === 'new').length,
+        ignored: obstacleInfo.filter((o) => o.status !== 'new').length,
+        // e.g. o1 = "window.tool_window.320x48.below.new"
+        ...Object.fromEntries(obstacleInfo.slice(0, 6).map((o, i) => [`o${i + 1}`, `${o.source}.${o.kind}.${o.w}x${o.h}.${o.side}.${o.status}`])),
+      });
+      if (obstacleInfo.length > 0) {
+        log.info('pill obstacles', {
+          side: placement.side,
+          baseline: before !== null,
+          obstacles: obstacleInfo.map((o) => `${o.source} ${o.kind} ${o.w}x${o.h} ${o.side} ${o.status} ${o.process_name} ${o.class_name}`),
+        });
+      }
       this.startWatch();
     } catch (e) {
       if (!(e instanceof HelperError)) log.error('auto capture failed', errorInfo(e));
@@ -380,6 +441,8 @@ export class Capture {
       routeCtl: null,
       asks: new Map(),
       timings,
+      placement: null,
+      obstacles: [],
     };
     this.session = session;
 
@@ -440,10 +503,15 @@ export class Capture {
   /** Pill to bar: tier-1 context, rules paint at once, the model fills slots 3 and 4. */
   async expand(sessionId: number, viaHotkey = false): Promise<void> {
     const s = this.current(sessionId);
-    if (!s || !s.selection) return;
+    if (!s || !s.selection || this.expanding === s) return;
     if (this.state.mode === 'bar' || this.state.mode === 'panel') return;
     const t = performance.now();
-    await this.readTier1(s);
+    this.expanding = s;
+    try {
+      await this.readTier1(s);
+    } finally {
+      this.expanding = null;
+    }
     if (!this.current(sessionId)) return;
     const quick = this.router().quick(toContext(s.selection));
     s.route = quick;
@@ -706,8 +774,15 @@ export class Capture {
     void this.setInputWatch(true);
     this.watchTimer = setInterval(() => {
       if (!this.overlay.isVisible || this.overlay.hasFocus) return;
-      const d = distanceToRect(screen.getCursorScreenPoint(), this.overlay.bounds());
-      if (d > this.settings.capture.hideDistancePx) this.close('mouse_away');
+      const cursor = screen.getCursorScreenPoint();
+      const hit = this.overlay.hitBounds();
+      // The dot's window is click-through, so its hover is detected here rather than relying
+      // on forwarded mouse events.
+      if (this.state.mode === 'dot' && this.session && contains(hit, cursor)) {
+        void this.expand(this.session.id);
+        return;
+      }
+      if (distanceToRect(cursor, hit) > this.settings.capture.hideDistancePx) this.close('mouse_away');
     }, WATCH_INTERVAL_MS);
   }
 
@@ -742,6 +817,8 @@ export class Capture {
       window_title: s.fg?.title ?? '',
       is_editable: sel?.is_editable ?? false,
       timings: { ...s.timings },
+      placement: s.placement,
+      obstacles: s.obstacles,
     };
   }
 

@@ -8,7 +8,10 @@ export interface Size {
 export interface Placement {
   mode: 'pill' | 'dot';
   side: 'below' | 'above' | 'end';
+  /** The window. */
   rect: Rect;
+  /** Dot mode: the visible dot inside `rect`, in the same space. The rest of the window is click-through. */
+  mark?: Rect;
 }
 
 export interface PlacementInput {
@@ -21,10 +24,18 @@ export interface PlacementInput {
   size: Size;
   workArea: Rect;
   gap?: number;
+  /** Diameter of the visible dot. */
   dotSize?: number;
+  /**
+   * The dot's window. Windows won't shrink the overlay below about 29x38 DIP, so the dot is
+   * drawn at a fixed spot inside a larger window instead of filling it.
+   */
+  dotWindow?: Size;
 }
 
 const MARGIN = 6;
+/** Room left of the dot inside its window, for its shadow. */
+const DOT_PAD = 6;
 
 function intersects(a: Rect, b: Rect, margin = 0): boolean {
   return a.x - margin < b.x + b.w && b.x < a.x + a.w + margin && a.y - margin < b.y + b.h && b.y < a.y + a.h + margin;
@@ -42,7 +53,8 @@ function clampX(x: number, w: number, area: Rect): number {
 export function placePill(input: PlacementInput): Placement {
   const { selection: sel, size, workArea: area, obstacles } = input;
   const gap = input.gap ?? 8;
-  const dot = input.dotSize ?? 12;
+  const dot = input.dotSize ?? 18;
+  const dotWin = input.dotWindow ?? { w: 40, h: 40 };
   const anchor = input.anchor ?? { x: sel.x + sel.w, y: sel.y + sel.h };
   const anchorX = Math.min(Math.max(anchor.x, sel.x), sel.x + sel.w);
 
@@ -56,18 +68,22 @@ export function placePill(input: PlacementInput): Placement {
   if (free(below)) return { mode: 'pill', side: 'below', rect: below };
   if (free(above)) return { mode: 'pill', side: 'above', rect: above };
 
-  // Both sides taken: a dot just past the end of the selection, on its last line.
-  const dotRect: Rect = {
-    x: clampX(anchorX + 4, dot, area),
-    y: Math.min(Math.max(anchor.y - Math.round(dot / 2), sel.y), sel.y + sel.h - dot),
-    w: dot,
-    h: dot,
+  // Both sides taken: a dot just past the end of the selection, centered on its last line.
+  // The window extends right and down from the dot, the directions Windows grows it in if it
+  // enforces a larger minimum size, so the dot's offset inside it stays put.
+  const offY = Math.round((dotWin.h - dot) / 2);
+  const markY = Math.min(Math.max(anchor.y - Math.round(dot / 2), sel.y), sel.y + sel.h - dot);
+  const win: Rect = {
+    x: clampX(anchorX + 4 - DOT_PAD, dotWin.w, area),
+    y: Math.min(Math.max(markY - offY, area.y), area.y + area.h - dotWin.h),
+    w: dotWin.w,
+    h: dotWin.h,
   };
-  return { mode: 'dot', side: 'end', rect: dotRect };
+  return { mode: 'dot', side: 'end', rect: win, mark: { x: win.x + DOT_PAD, y: win.y + offY, w: dot, h: dot } };
 }
 
 /** The expanded bar or panel: same rules, but never collapses to a dot. */
-export function placeBar(input: Omit<PlacementInput, 'dotSize'>): Placement {
+export function placeBar(input: Omit<PlacementInput, 'dotSize' | 'dotWindow'>): Placement {
   const p = placePill(input);
   if (p.mode === 'pill') return p;
   const { selection: sel, size, workArea: area } = input;

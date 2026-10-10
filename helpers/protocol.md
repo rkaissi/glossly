@@ -110,8 +110,19 @@ Lists popup windows and toolbar or menu elements near a selection, so the pill c
 | --- | --- |
 | `bounds` | Required rect: the selection bounds |
 | `exclude_pids` | Optional int array: the app's own processes |
+| `all_windows` | Optional bool, default false. Lists popup-like windows screen-wide and regardless of z-order (the UIA probes still run around `bounds`). The app takes this snapshot at `mouse_down` as a baseline, so obstacles that were already on screen before the selection are not counted |
 
-Result: `{"popups": [{"source": "window" | "uia", "kind": string, "bounds": rect}]}`. `kind` is `popup_window`, `tool_window`, `toolbar`, `menu`, or `tooltip`. The app decides which side of the selection each popup is on.
+Result: `{"popups": [{"source", "kind", "bounds", "id", "class_name", "process_name"}]}`.
+
+| Field | Notes |
+| --- | --- |
+| `source` | `window` (a top-level window) or `uia` (an element found by probing 18 and 42 px above and below the selection) |
+| `kind` | `popup_window`, `tool_window`, `toolbar`, `menu`, or `tooltip` |
+| `id` | Stable identity for diffing against the baseline: `w:<hwnd>` for windows, `u:<runtime id>` for UIA elements, `""` if the provider has none |
+| `class_name` | Window class or UIA class name, at most 60 characters. An identifier, never window or element text |
+| `process_name` | Owner process, as in `foreground` |
+
+Windows are counted when they are visible, not cloaked, popup-like (`WS_POPUP`, tool window, or topmost), not click-through (`WS_EX_TRANSPARENT`), 8 to 1400 by 8 to 700 px, and within 200 px sideways and 160 px vertically of `bounds`. Without `all_windows`, only windows above the foreground window in z-order count, since anything behind it cannot cover the selection. The app decides which side of the selection each popup is on.
 
 ### `copy_fallback`
 

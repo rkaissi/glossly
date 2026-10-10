@@ -4,7 +4,7 @@ Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1). `doc
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 143 unit tests.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 149 unit tests.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -97,7 +97,7 @@ Verified on this machine (Windows 11, 125% scaling):
 Not verified live:
 
 - Every app in the Phase 0 list except Notepad, and every toolbar-overlap check.
-- `popups_near` against a real app toolbar, so the "move to the other side" and dot placements have only been unit tested.
+- `popups_near` against a real selection toolbar, so "move to the other side" has only been unit tested. The dot itself was checked live with `GLOSSLY_FORCE_DOT=1` (fake obstacles on both sides): it is a round 18 px mark at the end of the selection, clicks next to it go through to the app, and hovering it opens the bar.
 - The copy-fallback branch inside the app.
 - Changing the hotkey with the recorder, Export, "Delete all data" (destructive, so only reasoned through), and errors from refreshing the model catalog.
 - `Ctrl+C` in the Ask panel.
@@ -122,7 +122,7 @@ Known rough edges:
 - Local only: strict. Nothing goes to a cloud model, including entity extraction and Ask. Local model support comes later (Step 20).
 - Packaging: after every Windows-buildable spec phase is done.
 - Router eval: one run at the end, once everything looks good.
-- New: the purple oval is the "dot" placement. Windows won't shrink the window below 29×38, which stretches the dot, and it shows too often because static toolbars count as obstacles. Fix in Step 12.
+- New: the purple oval is the "dot" placement. Windows won't shrink the window below 29×38, which stretches the dot, and it shows too often because static toolbars count as obstacles. **Fixed in Step 12** (Oct 10): the dot is a fixed 18 px circle inside a 40×40 click-through window, and only obstacles that appeared after the selection's mouse-down count. Already-present ones (menu bars, app chrome, unrelated always-on-top windows), tooltips, windows behind the app, click-through overlays, and anything covering the selection are ignored. Every pill now records what it found (source, kind, size, side, why it was or wasn't counted) in the debug view, the `pill_shown` event, and `main.log` ("pill obstacles"). Before the fix, 8 of 120 pills were dots and 9 went above.
 - New: a redesign with Windows 11 glass, monochrome, and a bar that fits its buttons (Step 13).
 
 The original questions:

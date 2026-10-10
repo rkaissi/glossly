@@ -14,7 +14,8 @@ const log = logger('overlay');
  */
 export const SIZES = {
   pill: { w: 168, h: 40 },
-  dot: { w: 16, h: 16 },
+  /** The dot's window; the visible dot is smaller (placement `mark`). Windows' minimum is about 29x38. */
+  dot: { w: 40, h: 40 },
   bar: { w: 560, h: 40 },
   panel: { w: 560, h: 300 },
 } satisfies Record<Exclude<OverlayMode, 'hidden'>, Size>;
@@ -47,6 +48,7 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   readonly win: BrowserWindow;
   private state: OverlayState = HIDDEN_STATE;
   private focused = false;
+  private clickThrough = false;
   private loaded: Promise<void>;
 
   constructor() {
@@ -123,6 +125,12 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
     return { x: b.x, y: b.y, w: b.width, h: b.height };
   }
 
+  /** The part that takes clicks: just the dot in dot mode, else the whole window. */
+  hitBounds(): Rect {
+    const p = this.state.placement;
+    return this.state.mode === 'dot' && p?.mark ? p.mark : this.bounds();
+  }
+
   isOwnWindow(id: number): boolean {
     return this.win.webContents.id === id;
   }
@@ -135,7 +143,22 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
       this.hideWindow();
       return;
     }
-    if (rect) this.win.setBounds({ x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.w), height: Math.round(rect.h) });
+    // In dot mode only the dot takes the mouse; moves are still forwarded so hovering it expands.
+    const clickThrough = state.mode === 'dot';
+    if (clickThrough !== this.clickThrough) {
+      this.clickThrough = clickThrough;
+      this.win.setIgnoreMouseEvents(clickThrough, { forward: true });
+    }
+    if (rect) {
+      this.win.setBounds({ x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.w), height: Math.round(rect.h) });
+      if (state.mode === 'dot') {
+        const b = this.win.getBounds();
+        const off = (a: number, e: number) => Math.abs(a - Math.round(e)) > 1;
+        if (off(b.x, rect.x) || off(b.y, rect.y) || off(b.width, rect.w) || off(b.height, rect.h)) {
+          log.warn('dot window resized by the OS', { x: b.x - rect.x, y: b.y - rect.y, w: b.width, h: b.height });
+        }
+      }
+    }
     if (!this.win.isVisible()) {
       if (this.focused) this.win.show();
       else this.win.showInactive();

@@ -38,14 +38,31 @@ body,
   animation: fade-in 120ms ease-out;
 }
 
+/* A fixed 18 px circle (placement.mark) inside a larger click-through window, with the
+   Glossly mark: a short highlight bar. */
 .dot {
   position: absolute;
-  inset: 0;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--bg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  display: grid;
+  place-items: center;
   animation: fade-in 120ms ease-out;
   cursor: pointer;
+}
+.dot::before {
+  content: '';
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--fg);
+}
+.dot:hover {
+  background: var(--bg-2);
 }
 
 .frame {
@@ -238,6 +255,10 @@ body,
   font: 11px/1.45 var(--mono);
   color: var(--muted);
   user-select: text;
+}
+.debug .ignored {
+  opacity: 0.6;
+  text-decoration: line-through;
 }
 .debug summary {
   cursor: pointer;

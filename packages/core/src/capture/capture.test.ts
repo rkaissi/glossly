@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
 import { keyMatches, resolveAppMode, siteKeyFor, stripBrowserSuffix } from './apps';
 import { countWords, gateAutoSelection, mayCopyFallback } from './gating';
+import { classifyObstacles, type Popup } from './obstacles';
 import { placeBar, placePill } from './placement';
 
 const s = DEFAULT_SETTINGS;
@@ -88,15 +89,30 @@ describe('placement', () => {
     expect(p.rect.y + p.rect.h).toBeLessThanOrEqual(selection.y);
   });
 
-  it('collapses to a 12 px dot when both sides are taken', () => {
+  it('collapses to a dot drawn inside a larger window when both sides are taken', () => {
     const obstacles = [
       { x: 500, y: 340, w: 420, h: 48 },
       { x: 500, y: 428, w: 420, h: 36 },
     ];
     const p = placePill({ selection, anchor: { x: 840, y: 410 }, obstacles, size, workArea });
     expect(p).toMatchObject({ mode: 'dot', side: 'end' });
-    expect(p.rect.w).toBe(12);
-    expect(p.rect.x).toBe(844);
+    // The window is at least Windows' minimum (29x38 DIP); the dot is a fixed 18 px circle.
+    expect(p.rect).toMatchObject({ w: 40, h: 40 });
+    expect(p.mark).toEqual({ x: 844, y: 401, w: 18, h: 18 });
+    // The dot sits inside the window, centered on the selection's last line.
+    expect(p.mark!.x - p.rect.x).toBe(6);
+    expect(p.mark!.y + 9).toBe(410);
+  });
+
+  it('keeps the dot window on screen at the right edge', () => {
+    const obstacles = [
+      { x: 1700, y: 340, w: 220, h: 48 },
+      { x: 1700, y: 428, w: 220, h: 36 },
+    ];
+    const p = placePill({ selection: { x: 1800, y: 400, w: 118, h: 20 }, obstacles, size, workArea });
+    expect(p.mode).toBe('dot');
+    expect(p.rect.x + p.rect.w).toBeLessThanOrEqual(1920);
+    expect(p.mark!.x).toBe(p.rect.x + 6);
   });
 
   it('goes above at the bottom of the screen and stays inside the work area', () => {
@@ -112,5 +128,52 @@ describe('placement', () => {
     ];
     const p = placeBar({ selection, obstacles, size: { w: 420, h: 48 }, workArea });
     expect(p.mode).toBe('pill');
+  });
+});
+
+describe('obstacles', () => {
+  const selection = { x: 600, y: 400, w: 240, h: 20 };
+  const popup = (over: Partial<Popup> = {}): Popup => ({
+    source: 'uia',
+    kind: 'toolbar',
+    bounds: { x: 600, y: 340, w: 300, h: 40 },
+    id: 'u:42.1',
+    class_name: 'menu',
+    process_name: 'chrome.exe',
+    ...over,
+  });
+
+  it('counts everything but tooltips and covering windows without a baseline', () => {
+    const found = [
+      popup(),
+      popup({ kind: 'tooltip', bounds: { x: 600, y: 430, w: 80, h: 20 }, id: 'u:7' }),
+      popup({ source: 'window', kind: 'popup_window', bounds: { x: 0, y: 0, w: 1400, h: 700 }, id: 'w:9' }),
+    ];
+    expect(classifyObstacles(found, null, selection).map((o) => [o.status, o.side])).toEqual([
+      ['new', 'above'],
+      ['tooltip', 'below'],
+      ['covers_selection', 'overlap'],
+    ]);
+  });
+
+  it('skips what was already there at mouse-down', () => {
+    const chrome = popup({ source: 'window', kind: 'tool_window', bounds: { x: 500, y: 430, w: 600, h: 30 }, id: 'w:5' });
+    const baseline = [popup(), chrome];
+    const fresh = popup({ id: 'u:42.2', bounds: { x: 620, y: 430, w: 200, h: 36 } });
+    const out = classifyObstacles([popup(), chrome, fresh], baseline, selection);
+    expect(out.map((o) => o.status)).toEqual(['preexisting', 'preexisting', 'new']);
+  });
+
+  it('counts a known window again if it moved or was replaced', () => {
+    const before = popup({ source: 'window', kind: 'tool_window', id: 'w:5' });
+    const moved = { ...before, bounds: { ...before.bounds, y: 430 } };
+    const replaced = { ...before, id: 'w:6' };
+    expect(classifyObstacles([moved, replaced], [before], selection).map((o) => o.status)).toEqual(['new', 'new']);
+  });
+
+  it('matches by class name when the provider gives no id', () => {
+    const before = popup({ id: '' });
+    expect(classifyObstacles([popup({ id: '' })], [before], selection)[0]!.status).toBe('preexisting');
+    expect(classifyObstacles([popup({ id: '', class_name: 'other' })], [before], selection)[0]!.status).toBe('new');
   });
 });

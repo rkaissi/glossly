@@ -62,13 +62,20 @@ export const Commands = {
     }),
   },
   popups_near: {
-    args: z.object({ bounds: RectSchema, exclude_pids: z.array(z.number().int()).optional() }),
+    args: z.object({
+      bounds: RectSchema,
+      exclude_pids: z.array(z.number().int()).optional(),
+      all_windows: z.boolean().optional(),
+    }),
     result: z.object({
       popups: z.array(
         z.object({
           source: z.enum(['window', 'uia']),
           kind: z.enum(['popup_window', 'tool_window', 'toolbar', 'menu', 'tooltip']),
           bounds: RectSchema,
+          id: z.string(),
+          class_name: z.string(),
+          process_name: z.string(),
         }),
       ),
     }),

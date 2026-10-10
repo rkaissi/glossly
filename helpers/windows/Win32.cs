@@ -54,7 +54,7 @@ internal static class Win32
     public const uint WM_QUIT = 0x0012, WM_GETOBJECT = 0x003D;
     public const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 0x0002;
     public const int GWL_STYLE = -16, GWL_EXSTYLE = -20;
-    public const long WS_POPUP = 0x80000000L, WS_EX_TOOLWINDOW = 0x00000080L, WS_EX_TOPMOST = 0x00000008L, WS_EX_NOACTIVATE = 0x08000000L;
+    public const long WS_POPUP = 0x80000000L, WS_EX_TOOLWINDOW = 0x00000080L, WS_EX_TOPMOST = 0x00000008L, WS_EX_NOACTIVATE = 0x08000000L, WS_EX_TRANSPARENT = 0x00000020L;
     public const int SW_RESTORE = 9;
     public const uint SMTO_ABORTIFHUNG = 0x0002;
     public const int DWMWA_CLOAKED = 14;

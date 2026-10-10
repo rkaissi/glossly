@@ -10,6 +10,7 @@ export * from './helper/client';
 export * from './capture/apps';
 export * from './capture/gating';
 export * from './capture/placement';
+export * from './capture/obstacles';
 
 export * from './router/types';
 export * from './router/features';

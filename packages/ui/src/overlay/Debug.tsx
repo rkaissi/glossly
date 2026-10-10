@@ -32,6 +32,16 @@ export function Debug({ d, slots }: { d: SelectionDebug; slots: SlotsView | null
       </summary>
       <div>route: {route}</div>
       <div>timings: {timings || 'none'}</div>
+      {d.placement && (
+        <div>
+          pill: {d.placement === 'end' ? 'dot' : d.placement} · obstacles: {d.obstacles.length === 0 && 'none'}
+          {d.obstacles.map((o, i) => (
+            <div key={i} className={o.status === 'new' ? undefined : 'ignored'}>
+              {`${o.side} ${o.source} ${o.kind} ${o.w}×${o.h} · ${o.status} · ${o.process_name} ${clip(o.class_name, 40)}`}
+            </div>
+          ))}
+        </div>
+      )}
       <div>title: {clip(d.window_title, 120)}</div>
       <div className="ctx">
         {clip(d.context_before, 500, true)}

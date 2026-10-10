@@ -19,8 +19,48 @@
         "ok": true,
         "result": {
           "popups": [
-            { "source": "window", "kind": "tool_window", "bounds": { "x": 590, "y": 340, "w": 420, "h": 48 } },
-            { "source": "uia", "kind": "toolbar", "bounds": { "x": 600, "y": 428, "w": 380, "h": 36 } }
+            {
+              "source": "window",
+              "kind": "tool_window",
+              "bounds": { "x": 590, "y": 340, "w": 420, "h": 48 },
+              "id": "w:1312456",
+              "class_name": "NetUIHWND",
+              "process_name": "winword.exe"
+            },
+            {
+              "source": "uia",
+              "kind": "toolbar",
+              "bounds": { "x": 600, "y": 428, "w": 380, "h": 36 },
+              "id": "u:42.65844.4.312",
+              "class_name": "notion-text-action-menu",
+              "process_name": "notion.exe"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "baseline snapshot at mouse-down",
+      "request": {
+        "id": 10,
+        "cmd": "popups_near",
+        "bounds": { "x": 711, "y": 402, "w": 2, "h": 20 },
+        "exclude_pids": [4410],
+        "all_windows": true
+      },
+      "response": {
+        "id": 10,
+        "ok": true,
+        "result": {
+          "popups": [
+            {
+              "source": "window",
+              "kind": "popup_window",
+              "bounds": { "x": 1500, "y": 40, "w": 360, "h": 220 },
+              "id": "w:722110",
+              "class_name": "Chrome_WidgetWin_1",
+              "process_name": "spotify.exe"
+            }
           ]
         }
       }

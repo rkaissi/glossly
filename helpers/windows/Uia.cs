@@ -19,7 +19,8 @@ internal sealed record Rect(int X, int Y, int W, int H)
 internal sealed record SelectionResult(string Text, string Method, Rect? Bounds, bool IsEditable, bool IsPassword, string ControlType, bool Truncated);
 internal sealed record ContextResult(string Before, string After);
 internal sealed record ContainerResult(string Text, int SelectionStart, int SelectionLength, string Source, string ContainerType);
-internal sealed record Popup(string Source, string Kind, Rect Bounds);
+/// <summary>An obstacle near the selection. Id, class, and process are identifiers only, never window or element text.</summary>
+internal sealed record Popup(string Source, string Kind, Rect Bounds, string Id, string ClassName, string ProcessName);
 
 /// <summary>
 /// UI Automation reads. Must be used from one MTA thread (the main thread, which processes
@@ -233,29 +234,48 @@ internal sealed class Uia : IDisposable
 
     // ---- popups and toolbars near the selection ----
 
-    public List<Popup> PopupsNear(Rect sel, HashSet<int> excludePids)
+    /// <summary>
+    /// Popup windows and toolbar or menu elements near <paramref name="sel"/>. With
+    /// <paramref name="allWindows"/> (the app's baseline snapshot at mouse-down) windows are
+    /// listed screen-wide and regardless of z-order; the UIA probes stay around <paramref name="sel"/>.
+    /// </summary>
+    public List<Popup> PopupsNear(Rect sel, HashSet<int> excludePids, bool allWindows)
     {
         var sw = Stopwatch.StartNew();
         var found = new List<Popup>();
         var fg = GetForegroundWindow();
         var region = new Rect(sel.X - 200, sel.Y - 160, sel.W + 400, sel.H + 320);
+        var names = new Dictionary<int, string>();
+        string Proc(int pid) => names.TryGetValue(pid, out var n) ? n : names[pid] = Focus.ProcessName(pid);
 
+        // EnumWindows goes from the top of the z-order down; windows after the foreground
+        // window are behind it and cannot cover the selection.
+        bool behindFg = false;
         EnumWindows((h, _) =>
         {
-            if (h == fg || !IsWindowVisible(h) || IsCloaked(h)) return true;
+            if (h == fg)
+            {
+                behindFg = true;
+                if (!allWindows) return true;
+            }
+            if (behindFg && !allWindows) return true;
+            if (!IsWindowVisible(h) || IsCloaked(h)) return true;
             long style = (long)GetWindowLongPtr(h, GWL_STYLE);
             long ex = (long)GetWindowLongPtr(h, GWL_EXSTYLE);
             bool popupLike = (style & WS_POPUP) != 0 || (ex & (WS_EX_TOOLWINDOW | WS_EX_TOPMOST)) != 0;
             if (!popupLike) return true;
+            // Click-through overlays (recorders, game overlays) never block a click on the pill.
+            if ((ex & WS_EX_TRANSPARENT) != 0) return true;
             var cls = ClassName(h);
             if (cls is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd" or "Progman" or "WorkerW") return true;
             if (!GetWindowRect(h, out var r)) return true;
             var rect = new Rect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
             if (rect.W < 8 || rect.H < 8 || rect.W > 1400 || rect.H > 700) return true;
-            if (!Intersects(rect, region)) return true;
+            if (!allWindows && !Intersects(rect, region)) return true;
             GetWindowThreadProcessId(h, out uint pid);
             if (excludePids.Contains((int)pid)) return true;
-            found.Add(new Popup("window", (ex & WS_EX_TOOLWINDOW) != 0 ? "tool_window" : "popup_window", rect));
+            var kind = (ex & WS_EX_TOOLWINDOW) != 0 ? "tool_window" : "popup_window";
+            found.Add(new Popup("window", kind, rect, $"w:{h.ToInt64()}", Clip(cls), Proc((int)pid)));
             return true;
         }, IntPtr.Zero);
 
@@ -288,7 +308,14 @@ internal sealed class Uia : IDisposable
                 {
                     var b = Safe(() => el.BoundingRectangle);
                     var rect = Rect.From(b);
-                    if (!rect.IsEmpty && rect.H < 300 && seen.Add(rect)) found.Add(new Popup("uia", kind, rect));
+                    int pid = Safe(() => el.Properties.ProcessId.ValueOrDefault);
+                    if (!rect.IsEmpty && rect.H < 300 && !excludePids.Contains(pid) && seen.Add(rect))
+                    {
+                        var rid = Safe(() => el.Properties.RuntimeId.ValueOrDefault);
+                        var id = rid is { Length: > 0 } ? "u:" + string.Join(".", rid) : "";
+                        var cls = Safe(() => el.Properties.ClassName.ValueOrDefault) ?? "";
+                        found.Add(new Popup("uia", kind, rect, id, Clip(cls), pid > 0 ? Proc(pid) : "unknown"));
+                    }
                     break;
                 }
                 if (ct is ControlType.Window or ControlType.Document) break;
@@ -301,6 +328,8 @@ internal sealed class Uia : IDisposable
 
     private static bool Intersects(Rect a, Rect b) =>
         a.X < b.X + b.W && b.X < a.X + a.W && a.Y < b.Y + b.H && b.Y < a.Y + a.H;
+
+    private static string Clip(string s) => s.Length <= 60 ? s : s[..60];
 
     // ---- helpers ----
 

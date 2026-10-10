@@ -5,6 +5,7 @@
  * Main owns the selection session. Renderers never send selection or context text back; they
  * refer to the current session by `sessionId`.
  */
+import type { ClassifiedObstacle, ObstacleStatus } from './capture/obstacles';
 import type { Placement } from './capture/placement';
 import type { EmbedProgress } from './embed/types';
 import type { CatalogModel } from './llm/catalog';
@@ -26,6 +27,8 @@ export type AvailableAction = 'ask' | 'save';
 
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
 
+type ObstacleSide = ClassifiedObstacle['side'];
+
 /** What the debug view shows. Only present when settings.debugView is on. */
 export interface SelectionDebug {
   text: string;
@@ -38,6 +41,22 @@ export interface SelectionDebug {
   is_editable: boolean;
   /** ms per capture stage, e.g. { selection: 12, popups_near: 4 }. */
   timings: Record<string, number>;
+  /** Where the pill went (auto path), or null on the hotkey path. */
+  placement: Placement['side'] | null;
+  /** What popups_near found (auto path). Identifiers and sizes only, never text. */
+  obstacles: ObstacleDebug[];
+}
+
+export interface ObstacleDebug {
+  source: 'window' | 'uia';
+  kind: string;
+  /** Size in DIP. */
+  w: number;
+  h: number;
+  side: ObstacleSide;
+  status: ObstacleStatus;
+  class_name: string;
+  process_name: string;
 }
 
 export interface SlotView {

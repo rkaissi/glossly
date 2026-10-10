@@ -33,9 +33,19 @@ function Overlay() {
   }, []);
 
   if (!s || s.mode === 'hidden') return null;
-  if (s.mode === 'dot') return <div className="dot" title="Glossly" onMouseEnter={() => expand(s.sessionId)} />;
+  if (s.mode === 'dot') return <Dot s={s} />;
   if (s.mode === 'pill') return <Pill s={s} />;
   return <Expanded key={s.sessionId} s={s} />;
+}
+
+/**
+ * Shown when toolbars sit both above and below the selection. Drawn at `placement.mark`
+ * inside a larger click-through window; hovering it expands into the bar.
+ */
+function Dot({ s }: { s: OverlayState }) {
+  const p = s.placement;
+  const pos = p?.mark ? { left: p.mark.x - p.rect.x, top: p.mark.y - p.rect.y } : { left: 0, top: 0 };
+  return <div className="dot" style={pos} title="Glossly" onMouseEnter={() => expand(s.sessionId)} />;
 }
 
 /** Ask and Save only. Hovering expands it into the bar; nothing is sent to a model yet. */
