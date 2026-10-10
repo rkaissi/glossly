@@ -15,6 +15,8 @@ Spec sections that matter for this scope: Core user flow (incl. Coexisting with 
 - .NET SDK 10.0.401 and Windows Desktop runtime 10.0.12. Visual Studio 2026 Community is installed.
 - The agent shell often returns empty output; requesting `all` permissions fixes it. PowerShell shows stderr lines from pnpm as red "NativeCommandError" text even when the command succeeds, so check `$LASTEXITCODE`.
 - The display is at 125% scaling, so the helper's physical-pixel coordinates are 1.25 × DIP.
+- Cursor's agent shell can set `ELECTRON_RUN_AS_NODE`; clear it (`Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue`) before launching Electron from it.
+- `packages/*/node_modules/.bin` once held stale shims from an isolated-layout install (pointing into `node_modules/.pnpm`). They were deleted on Oct 10; if `electron-vite` ever fails with "Cannot find module ...\packages\shell-electron\node_modules\electron-vite", delete that `.bin` folder again.
 - `GROQ_API_KEY` is set as a Windows user environment variable (set by Rayan on Oct 9 with `setx`). It is only for command-line evals (`pnpm eval` runs the LLM router eval when it is present); the app itself gets keys through the settings UI and `safeStorage`. Shells started before it was set (including a long-lived agent shell) don't see it; load it with `$env:GROQ_API_KEY = [Environment]::GetEnvironmentVariable('GROQ_API_KEY','User')`. Never print or log its value.
 
 ## Pinned versions (all checked for compatibility)
@@ -31,6 +33,7 @@ electron 44.7.0 (Node 24.21 inside), electron-vite 5.0.0, vite 7.3.7 (electron-v
 6. **Package manager:** pnpm. Rayan is more used to npm, so keep instructions simple.
 7. **`DecisionProvider.decide(input, signal)`** takes `{ context, features, collections }` instead of the spec's `(input, questions)`; the questions are fixed by our output contract.
 8. **Helper request arguments are top-level fields** next to `cmd` (e.g. `{"id":3,"cmd":"context","before":500,"after":500}`).
+9. **Tier 2 on the hotkey path uses a focus hand-off.** The helper reads from the focused element, and on the hotkey path the overlay holds focus. So when an action is clicked, the shell calls `restore_focus` on the source window, reads `context_container`, then gives focus back to the overlay (helper `restore_focus` on the overlay's HWND, then `win.focus()`). This keeps the rule "tier 2 is read on action click" without reading it early. Blur-to-close is suppressed during the hand-off. Copy-fallback selections skip tier 2.
 
 ## Done
 
@@ -90,11 +93,35 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **Result** (`groq:qwen/qwen3.8-27b`, 60 cases, 0 errors): **100% type accuracy, 61.7% slot match**, median 247 ms, 3 calls over 400 ms. Rules-only: 98.3% type accuracy, 90% slot match. Almost every slot miss came from the model scoring `mentions_people` high when the only names were chat speaker headers (it added Who to 17 cases), plus a low `contains_commitment` on 6 commitment cases. `prompts/router-decision.md` now spells out what counts and what doesn't for both fields. **The tuned prompt has not been re-run** (rate limits); run `pnpm eval` once when convenient and record the slot number here.
 - The router's 400 ms timeout means a slow call falls back to rules, so the LLM path's slot accuracy matters only when it beats rules. If the re-run stays below the rules' 90%, consider using the model only for `content_type` and `best_collection`, and computing people and commitment scores from rules.
 
+### Step 6: Electron shell (complete)
+
+120 unit tests pass (7 new in `packages/shell-electron/src/main/view.test.ts`); `pnpm typecheck` is clean for all three packages; `pnpm --filter @glossly/shell-electron build` works.
+
+- `electron.vite.config.ts`: main has two entries (`index`, `embed-worker`); `@glossly/core` is bundled (it ships TS), while `sqlite-vec` and `@huggingface/transformers` stay external (they were added to the shell's `dependencies` for that). The preload is built as CJS (`out/preload/index.cjs`) so windows can be sandboxed. The renderer root is `../ui` with two pages, `overlay.html` and `settings.html`, output to `out/renderer`. A build-only plugin injects a strict CSP (the dev server needs an inline refresh script). The shell tsconfig includes `../core/src/env.d.ts` for the `?raw` imports; the UI tsconfig uses `types: ["node"]` because the API types reach `node:sqlite` transitively. `productName: "Glossly"`, so userData is `%APPDATA%\Glossly` (DB `glossly.db`, `keys\<provider>.bin`, `models\` for embeddings, `logs\main.log`).
+- `src/main/`:
+  - `index.ts`: single-instance lock, wiring, tray, hotkey, and first-run (opens `settings.html#setup` while `firstRunComplete` is false). It stays alive when all windows close, and `before-quit` shuts down cleanly.
+  - `paths.ts`: helper path (dev build output, `resources/helper/` when packaged, or `GLOSSLY_HELPER_PATH`) and renderer URLs.
+  - `log.ts`: logs codes and timings only.
+  - `helper-manager.ts`: spawn, `HelperClient`, restart with 0.5 to 10 s backoff, and `mouse_hook` re-sent on every `ready`.
+  - `keys.ts`: `safeStorage` files, with decrypted keys cached in memory only.
+  - `services.ts`: Store (sqlite-vec path rewritten to `app.asar.unpacked` when packaged; falls back to no vectors if the extension fails), settings cache plus `setSetting` (Zod-validated per key), `AiSdkLlm`, `SaveService`, `Metrics`, key add, test, and remove (the live test is `listModels`, which also stores the catalog, and results persist in meta `key_test:<p>`), `refreshModels`, `refreshIfStale` (24 h), `applyRoleUpdate` (notices go to `pendingNotice`), and `setRole` (manual picks).
+  - `embed-host.ts` plus `embed-worker.ts` and `embed-protocol.ts`: a `utilityProcess` running `@glossly/core/embed`. Meta `embed_downloaded` marks the model as present. It starts at launch if downloaded or `firstRunComplete`, otherwise on `embed:download`, and it backfills `itemsWithoutVectors` once ready. **Not run yet** (the model has never been downloaded).
+  - `overlay.ts`: one transparent, frameless, `focusable:false`, always-on-top (`pop-up-menu`) window, shown with `showInactive`. `focus()` is called only on the hotkey path or for Ask and Save panels. `resize()` keeps the selection-side edge fixed. `SIZES`: pill 168x40, dot 16x16, bar 460x56, panel 460x320 (DIP).
+  - `capture.ts`: the session. Auto path: drag or double-click `mouse_up` (ignored inside the overlay or for own pids), then `foreground`, `gateApp`, `selection`, `gateAutoSelection`, the rest of the 250 ms wait, `popups_near` with own pids excluded, `placePill`, and show. A generation counter drops stale captures. While the pill or unfocused bar is shown, `input_watch` is on, and it hides on `keyboard_activity`, `wheel`, a `mouse_down` outside it, or the cursor going more than 200 px away (80 ms poll). A focused overlay closes on blur instead. Hotkey path: as in the spec, plus notices for blocked or off apps, password fields, and a helper that's down. Pressing the hotkey over a visible pill expands it and focuses. Expand reads tier 1, paints with `Router.quick`, then `Router.route` fills slots 3 and 4 (`mergeRoute` keeps slots 1 and 2 fixed). Action click records `action_clicked {action, ms}`, reads tier 2 once (see decision 9), and opens the panel. Ask streams to the sender via `ask:chunk`, `ask:done`, and `ask:error`; free-form Ask works with no selection if a question is typed. Also Save, undo, set-why, and "Don't show here" (sets the site key to hotkey-only). `pendingNotice` is shown once in the bar, then cleared. Badges are always `[]` in Phase 1.
+  - `ipc.ts`: every `InvokeChannels` handler, accepting only the overlay or settings webContents, with light argument checks. `settings:set` refuses `roles` (use `roles:set`) and re-registers the hotkey, keeping the old one on failure.
+  - `hotkey.ts`, `settings-window.ts` (external links open in the browser; navigation is locked), `tray.ts` (icon drawn in code; menu: Settings, Debug view toggle, Quit).
+  - `view.ts`: pure helpers (slot labels, `growFrom`, `distanceToRect`).
+  - `smoke.ts`: dev checks via `GLOSSLY_SMOKE=hotkey|auto`, which log counts and timings only and then quit.
+- `src/preload/index.ts`: `window.glossly` (`GlosslyBridge`), with `on()` limited to the push channels.
+- `packages/ui`: **placeholder only**. `overlay/main.tsx` renders the pill, slot buttons, close, and a debug block, and reports its size; `settings/main.tsx` dumps the `SettingsView` JSON. `src/bridge.ts` exports `glossly`. Step 4 replaces both.
+- **Live results (Notepad, Win11, Oct 10):** Hotkey path: UIA read 35 words in 60 ms, total 96 ms; rules routing (`no_model`) gave slot 3 = promises; Save to "Reading" then Undo left 0 items. Auto path (scripted drag): pill below the selection, with timings foreground 12 ms, selection 54 ms, wait 184 ms, `popups_near` 98 ms, **total 358 ms**; expand plus tier 1 took 21 ms. The spec's 150 ms pill target conflicts with its own 250 ms toolbar wait; `popups_near` adds about 100 ms after it. Consider lowering `pillDelayMs`, or showing the pill at once and moving it if a toolbar appears. Not yet verified live: the tier-2 focus hand-off timing (a re-run was interrupted), Ask streaming (needs a key added through the UI), embeddings download, and `popups_near` against real toolbars.
+- How to smoke-test: build, open a test app with a selection, then `$env:GLOSSLY_SMOKE='hotkey'; Start-Process node_modules\electron\dist\electron.exe packages\shell-electron -RedirectStandardOutput <log>`, and re-activate the test app within the delay (`GLOSSLY_SMOKE_DELAY_MS`, default 3000). In smoke mode the setup window doesn't open.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
 2. ~~Core tests and fixtures~~ (done, see Step 4 above). LLM router eval run (see Step 5); one re-run of the tuned prompt is pending.
-3. **Shell** (`packages/shell-electron`, electron-vite; renderer root should point at `../ui`; no `electron.vite.config.ts` exists yet):
+3. ~~**Shell**~~ (done, see Step 6 above; original plan kept for reference):
    - Tray, plus overlay windows created once at launch (`focusable:false`, `showInactive`, always on top, skip taskbar; call `setFocusable(true)` only on the hotkey path or when an action needs typing).
    - `globalShortcut` hotkey (configurable).
    - Helper manager: spawn `helpers/windows/bin/Debug/net10.0-windows/glossly-helper.exe` in dev, or from `resources/` when packaged; wrap it in `HelperClient`; restart it automatically and re-send `mouse_hook` on `ready`. Convert physical pixels with `screen.screenToDipRect`.
@@ -102,14 +129,17 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
    - Hotkey path: `foreground`, then `selection`, then `copy_fallback` if `mayCopyFallback`, then `context`. Open the bar focused. If nothing was found, show the "nothing selected" state.
    - Expand: tier-1 `context`, then `Router.quick` to paint, then `Router.route` to fill slots 3 and 4.
    - Keys: one `safeStorage`-encrypted file per provider in userData. Embeddings run in a `utilityProcess` using `@glossly/core/embed`. Store at `userData/glossly.db`. IPC uses `contextIsolation` with a preload `contextBridge`.
-4. **UI** (`packages/ui`, React):
+4. **UI** (`packages/ui`, React). **Next.** Replace the placeholders in `src/overlay/main.tsx` and `src/settings/main.tsx`; keep `overlay.html`, `settings.html`, and `src/bridge.ts`. Everything goes through `glossly.invoke`/`glossly.on` using the types in `@glossly/core/api` (import types only). The overlay must report its size with `overlay:resize` for bar and panel modes, call `bar:expand` on pill or dot hover, and render nothing in `hidden` mode. Keyboard handling only applies when `state.keyboard` is true. The settings page reads `location.hash` (`setup`, `keys`, `models`, `general`, `data`, `metrics`) and must set `firstRunComplete` to true at the end of setup (then call `embed:download` if the embed state is `not_downloaded`). Collections for Save's `Tab` cycling come from `settings:get` (`collections`).
    - Pill and bar: fixed slots that fade in, badges, and a debug view showing captured text, method, and tier-1 context. Panel: Ask stream; Save with `Tab` cycling through collections, the "why" field, and undo. Later-phase actions in slots 3 and 4 show a "Coming in a later phase" panel.
    - Keyboard map per the spec.
    - First-run setup: Welcome (privacy summary plus the embedding-download notice), Keys (live test, Groq first and labeled free), Models and roles, Try it.
    - Settings tabs: Keys; Models; General (hotkey, local-only, per-app modes, block list); Data (export, delete all); Metrics table.
 5. **Verify:** run `pnpm typecheck`, `pnpm test`, and `pnpm dev`. Then write `STATUS.md` and `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit.
 
-## Open question for Rayan (note in STATUS.md)
+## Open questions for Rayan (note in STATUS.md)
+
+- The auto pill takes about 360 ms (250 ms toolbar wait plus `popups_near`), against the spec's 150 ms target. Should it be faster but less careful about toolbars?
+- Packaging (`electron-builder` config: helper publish output into `resources/helper`, `asarUnpack` for sqlite-vec and onnxruntime) is not written yet.
 
 "Local only" currently means only the router's model call is disabled, as the spec says. Save's entity extraction (Fast model) still runs because the user clicked an action. Should local-only also skip it?
 

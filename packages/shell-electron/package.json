@@ -1,6 +1,7 @@
 {
   "name": "@glossly/shell-electron",
   "private": true,
+  "productName": "Glossly",
   "version": "0.1.0",
   "type": "module",
   "description": "Glossly: highlight text anywhere, act on it.",
@@ -14,7 +15,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@glossly/core": "workspace:*"
+    "@glossly/core": "workspace:*",
+    "@huggingface/transformers": "^4.3.1",
+    "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {
     "@glossly/ui": "workspace:*",
