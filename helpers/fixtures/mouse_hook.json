@@ -1,0 +1,15 @@
+{
+  "cmd": "mouse_hook",
+  "cases": [
+    {
+      "name": "on",
+      "request": { "id": 7, "cmd": "mouse_hook", "enabled": true },
+      "response": { "id": 7, "ok": true, "result": { "enabled": true } }
+    },
+    {
+      "name": "off",
+      "request": { "id": 9, "cmd": "mouse_hook", "enabled": false },
+      "response": { "id": 9, "ok": true, "result": { "enabled": false } }
+    }
+  ]
+}

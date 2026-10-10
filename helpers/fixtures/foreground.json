@@ -1,0 +1,35 @@
+{
+  "cmd": "foreground",
+  "cases": [
+    {
+      "name": "Slack desktop",
+      "request": { "id": 2, "cmd": "foreground" },
+      "response": {
+        "id": 2,
+        "ok": true,
+        "result": {
+          "handle": 1050708,
+          "pid": 20300,
+          "process_name": "slack.exe",
+          "title": "#design - Acme - Slack",
+          "class_name": "Chrome_WidgetWin_1"
+        }
+      }
+    },
+    {
+      "name": "Google Docs in Chrome",
+      "request": { "id": 5, "cmd": "foreground" },
+      "response": {
+        "id": 5,
+        "ok": true,
+        "result": {
+          "handle": 722856,
+          "pid": 8812,
+          "process_name": "chrome.exe",
+          "title": "Q4 plan - Google Docs - Google Chrome",
+          "class_name": "Chrome_WidgetWin_1"
+        }
+      }
+    }
+  ]
+}

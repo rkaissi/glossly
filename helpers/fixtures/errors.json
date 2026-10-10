@@ -1,0 +1,20 @@
+{
+  "cmd": "*",
+  "cases": [
+    {
+      "name": "unknown command",
+      "request": { "id": 5, "cmd": "nope" },
+      "response": { "id": 5, "ok": false, "error": { "code": "unknown_command", "message": "Unknown command: nope" } }
+    },
+    {
+      "name": "invalid JSON",
+      "request": "not json",
+      "response": { "id": null, "ok": false, "error": { "code": "bad_request", "message": "Invalid JSON" } }
+    },
+    {
+      "name": "wrong argument type",
+      "request": { "id": 6, "cmd": "context", "before": "x" },
+      "response": { "id": 6, "ok": false, "error": { "code": "bad_request", "message": "An argument has the wrong type" } }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "cmd": "input_watch",
+  "cases": [
+    {
+      "name": "on",
+      "request": { "id": 8, "cmd": "input_watch", "enabled": true },
+      "response": { "id": 8, "ok": true, "result": { "enabled": true } }
+    }
+  ]
+}

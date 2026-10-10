@@ -46,7 +46,10 @@ internal static class Win32
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     public const int WH_MOUSE_LL = 14;
+    public const int WM_MOUSEMOVE = 0x0200;
     public const int WM_LBUTTONDOWN = 0x0201, WM_LBUTTONUP = 0x0202, WM_RBUTTONDOWN = 0x0204, WM_MBUTTONDOWN = 0x0207;
+    public const int WM_XBUTTONDOWN = 0x020B;
+    public const int OBJID_CLIENT = -4, UIA_ROOT_OBJECT_ID = -25;
     public const int WM_MOUSEWHEEL = 0x020A, WM_MOUSEHWHEEL = 0x020E;
     public const uint WM_QUIT = 0x0012, WM_GETOBJECT = 0x003D;
     public const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 0x0002;

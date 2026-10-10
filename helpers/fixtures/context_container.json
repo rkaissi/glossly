@@ -1,0 +1,50 @@
+{
+  "cmd": "context_container",
+  "cases": [
+    {
+      "name": "whole document fits",
+      "request": { "id": 4, "cmd": "context_container", "max_chars": 8000 },
+      "response": {
+        "id": 4,
+        "ok": true,
+        "result": {
+          "text": "First paragraph with some words before the target.\r\nThe quick brown fox jumps over the lazy dog.\r\nAnd some trailing words after it.",
+          "selection_start": 56,
+          "selection_length": 21,
+          "source": "container",
+          "container_type": "document"
+        }
+      }
+    },
+    {
+      "name": "message list in Slack",
+      "request": { "id": 11, "cmd": "context_container" },
+      "response": {
+        "id": 11,
+        "ok": true,
+        "result": {
+          "text": "Sam Lee 10:42 AM\nCan you send the onboarding deck by Friday?\nPriya 10:45 AM\nI'll review it after.",
+          "selection_start": 17,
+          "selection_length": 43,
+          "source": "container",
+          "container_type": "list"
+        }
+      }
+    },
+    {
+      "name": "fallback to tier 1",
+      "request": { "id": 12, "cmd": "context_container", "max_chars": 8000 },
+      "response": {
+        "id": 12,
+        "ok": true,
+        "result": {
+          "text": "before text. Selected words here. after text.",
+          "selection_start": 13,
+          "selection_length": 20,
+          "source": "tier1",
+          "container_type": "none"
+        }
+      }
+    }
+  ]
+}

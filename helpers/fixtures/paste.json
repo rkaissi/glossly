@@ -1,0 +1,15 @@
+{
+  "cmd": "paste",
+  "cases": [
+    {
+      "name": "paste replaces selection",
+      "request": { "id": 9, "cmd": "paste", "text": "slow red cat crawls" },
+      "response": { "id": 9, "ok": true, "result": { "pasted": true } }
+    },
+    {
+      "name": "missing text",
+      "request": { "id": 10, "cmd": "paste" },
+      "response": { "id": 10, "ok": false, "error": { "code": "bad_request", "message": "Missing text" } }
+    }
+  ]
+}

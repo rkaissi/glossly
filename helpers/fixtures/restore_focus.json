@@ -1,0 +1,15 @@
+{
+  "cmd": "restore_focus",
+  "cases": [
+    {
+      "name": "restored after dummy key",
+      "request": { "id": 20, "cmd": "restore_focus", "handle": 722856 },
+      "response": { "id": 20, "ok": true, "result": { "restored": true, "method": "dummy_key" } }
+    },
+    {
+      "name": "window closed",
+      "request": { "id": 10, "cmd": "restore_focus", "handle": 1 },
+      "response": { "id": 10, "ok": false, "error": { "code": "window_gone", "message": "The window no longer exists" } }
+    }
+  ]
+}

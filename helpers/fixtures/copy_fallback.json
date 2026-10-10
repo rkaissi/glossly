@@ -1,0 +1,20 @@
+{
+  "cmd": "copy_fallback",
+  "cases": [
+    {
+      "name": "WinForms text box without TextPattern",
+      "request": { "id": 5, "cmd": "copy_fallback" },
+      "response": { "id": 5, "ok": true, "result": { "text": "quick brown fox jumps", "method": "copy", "clipboard_restored": true } }
+    },
+    {
+      "name": "app did not copy in time",
+      "request": { "id": 6, "cmd": "copy_fallback", "timeout_ms": 120 },
+      "response": { "id": 6, "ok": true, "result": { "text": "", "method": "copy", "clipboard_restored": true } }
+    },
+    {
+      "name": "password field",
+      "request": { "id": 8, "cmd": "copy_fallback" },
+      "response": { "id": 8, "ok": false, "error": { "code": "password_field", "message": "Focused element is a password field" } }
+    }
+  ]
+}

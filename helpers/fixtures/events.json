@@ -1,0 +1,13 @@
+{
+  "events": [
+    { "event": "ready", "version": "0.1.0", "protocol": 1, "pid": 10648 },
+    { "event": "mouse_down", "x": 500, "y": 413, "button": "left" },
+    { "event": "mouse_up", "x": 500, "y": 413, "drag": false, "double": false },
+    { "event": "mouse_down", "x": 375, "y": 413, "button": "left" },
+    { "event": "mouse_up", "x": 525, "y": 415, "drag": true, "double": false },
+    { "event": "mouse_up", "x": 438, "y": 413, "drag": false, "double": true },
+    { "event": "mouse_down", "x": 900, "y": 120, "button": "right" },
+    { "event": "wheel" },
+    { "event": "keyboard_activity" }
+  ]
+}

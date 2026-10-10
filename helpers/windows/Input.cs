@@ -16,7 +16,14 @@ internal static class Input
         U = new InputUnion { ki = new KEYBDINPUT { wVk = vk, dwFlags = up ? KEYEVENTF_KEYUP : 0, dwExtraInfo = Signature } },
     };
 
-    private static void Send(params INPUT[] inputs) => SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+    /// <summary>Tick of our last SendInput. GetLastInputInfo counts injected keys, so input_watch ignores these.</summary>
+    public static long LastInjectedTick;
+
+    private static void Send(params INPUT[] inputs)
+    {
+        Interlocked.Exchange(ref LastInjectedTick, Environment.TickCount64);
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+    }
 
     private static bool IsDown(ushort vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
 

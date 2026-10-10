@@ -1,0 +1,70 @@
+using System.Diagnostics;
+using static Glossly.Helper.Win32;
+
+namespace Glossly.Helper;
+
+internal sealed record ForegroundResult(long Handle, int Pid, string ProcessName, string Title, string ClassName);
+internal sealed record RestoreFocusResult(bool Restored, string Method);
+
+internal static class Focus
+{
+    public static ForegroundResult Foreground()
+    {
+        var h = GetForegroundWindow();
+        if (h == IntPtr.Zero) throw new HelperException("no_foreground", "No foreground window");
+        GetWindowThreadProcessId(h, out uint pid);
+        return new ForegroundResult(h.ToInt64(), (int)pid, ProcessName((int)pid), WindowTitle(h), ClassName(h));
+    }
+
+    public static string ProcessName(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return p.ProcessName.ToLowerInvariant() + ".exe";
+        }
+        catch { return "unknown"; }
+    }
+
+    public static RestoreFocusResult Restore(long handle)
+    {
+        var h = new IntPtr(handle);
+        if (!IsWindow(h)) throw new HelperException("window_gone", "The window no longer exists");
+        if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
+        if (GetForegroundWindow() == h) return new RestoreFocusResult(true, "already");
+
+        Input.ReleaseModifiers();
+        if (SetForegroundWindow(h) && Verify(h)) return new RestoreFocusResult(true, "direct");
+
+        // Windows only lets a process take the foreground right after it received input.
+        Input.TapDummyKey();
+        if (SetForegroundWindow(h) && Verify(h)) return new RestoreFocusResult(true, "dummy_key");
+
+        var fg = GetForegroundWindow();
+        uint fgThread = GetWindowThreadProcessId(fg, out _);
+        uint me = GetCurrentThreadId();
+        bool attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+        try
+        {
+            BringWindowToTop(h);
+            SetForegroundWindow(h);
+        }
+        finally
+        {
+            if (attached) AttachThreadInput(me, fgThread, false);
+        }
+        if (Verify(h)) return new RestoreFocusResult(true, "attach_thread_input");
+        throw new HelperException("focus_failed", "Could not bring the window to the foreground");
+    }
+
+    private static bool Verify(IntPtr h, int timeoutMs = 200)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        while (true)
+        {
+            if (GetForegroundWindow() == h) return true;
+            if (Environment.TickCount64 >= deadline) return false;
+            Thread.Sleep(10);
+        }
+    }
+}

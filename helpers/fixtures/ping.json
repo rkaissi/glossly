@@ -1,0 +1,10 @@
+{
+  "cmd": "ping",
+  "cases": [
+    {
+      "name": "pong",
+      "request": { "id": 1, "cmd": "ping" },
+      "response": { "id": 1, "ok": true, "result": { "pong": true, "version": "0.1.0", "protocol": 1 } }
+    }
+  ]
+}

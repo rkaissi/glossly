@@ -1,0 +1,24 @@
+{
+  "cmd": "context",
+  "cases": [
+    {
+      "name": "tier 1 around a selection",
+      "request": { "id": 3, "cmd": "context", "before": 30, "after": 30 },
+      "response": {
+        "id": 3,
+        "ok": true,
+        "result": { "before": "words before the target.\r\nThe ", "after": " over the lazy dog.\r\nAnd some " }
+      }
+    },
+    {
+      "name": "no selection",
+      "request": { "id": 4, "cmd": "context" },
+      "response": { "id": 4, "ok": false, "error": { "code": "no_selection", "message": "No UI Automation selection found" } }
+    },
+    {
+      "name": "password field",
+      "request": { "id": 7, "cmd": "context" },
+      "response": { "id": 7, "ok": false, "error": { "code": "password_field", "message": "Focused element is a password field" } }
+    }
+  ]
+}
