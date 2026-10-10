@@ -34,14 +34,15 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
 }
 
 /**
- * Ask and Save stay as first painted. Slots 3 and 4 fill in when the route settles.
- * A contextual button already on screen is kept: a later result may add one, not take one away.
+ * Ask stays as first painted. Save's collection updates once, when the route settles,
+ * unless the Save panel is already open. A contextual button already on screen is kept.
  */
-export function mergeRoute(prev: SlotsView, next: SlotsView): SlotsView {
+export function mergeRoute(prev: SlotsView, next: SlotsView, opts?: { keepSave?: boolean }): SlotsView {
+  const saveSettled = prev.stage === 'model' || prev.stage === 'rules_fallback';
   return {
     ...next,
     slot1: prev.slot1,
-    slot2: prev.slot2,
+    slot2: opts?.keepSave || saveSettled ? prev.slot2 : next.slot2,
     slot3: shownSlot(prev.slot3, next.slot3),
     slot4: shownSlot(prev.slot4, next.slot4),
     more: shownMore(prev.more, next.more),

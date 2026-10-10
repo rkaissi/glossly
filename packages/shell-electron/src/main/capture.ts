@@ -692,7 +692,8 @@ export class Capture {
       s.timings.route = Math.round(r.ms);
       const prev = this.state.slots;
       const next = slotsView(r, r.fallback ? 'rules_fallback' : 'model');
-      this.overlay.patch({ slots: prev ? mergeRoute(prev, next) : next, debug: this.debugFor(s) });
+      const saveOpen = this.state.mode === 'panel' && this.state.panel === 'save';
+      this.overlay.patch({ slots: prev ? mergeRoute(prev, next, { keepSave: saveOpen }) : next, debug: this.debugFor(s) });
       const routed = {
         provider: r.decisions.provider,
         fallback: r.fallback ?? 'none',
