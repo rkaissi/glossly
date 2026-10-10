@@ -4,7 +4,7 @@ Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1). `doc
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 160 unit tests.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 169 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -95,6 +95,7 @@ Verified on this machine (Windows 11, 125% scaling):
 - First-run setup end to end: key test, model catalog, role defaults, Try it, Finish, then the embedding download and backfill.
 - `pnpm dev` with hot reload in both windows (main-process edits need a restart).
 - Step 12 (Oct 10): pill timings above; the router answering in 330 and 446 ms against its 600 ms budget; Delete all data on a throwaway profile copy (items, entities, and events gone; the key, settings, and model list kept); Reset settings there (key, models, and settings gone; back to the setup's Welcome step); Local only (rules routing, Save kept the item and its embedding but skipped entities, Ask showed "Local only is on" and its button turned it off and answered).
+- Step 13 redesign (Oct 10): the acrylic pill, bar, menu, Ask panel (streaming), Save panel, and the dot, in light and dark mode; the bar keeps the menu, Ask, and Save exactly in place as slots fill and the menu opens (pixel-identical); mica settings with all five tabs; setup's four steps on a throwaway profile.
 - Fixes from the last two rounds: a second launch no longer runs a second copy of the app (it just opens Settings in the running one), `pnpm test` no longer runs the evals, settings Fast Refresh no longer falls back to a full reload, and the overlay no longer shows an Electron taskbar button when it takes focus (verified on the hotkey path).
 
 Not verified live:

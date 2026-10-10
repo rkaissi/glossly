@@ -1,20 +1,26 @@
 # Drives the desktop for live UI checks: sends keys and mouse input, takes screenshots.
 # Coordinates are physical pixels. Screenshots and the sample file go to $env:TEMP\glossly-live.
 #
-#   scripts/ui-drive.ps1 notepad            open a sample message in Notepad (a tab if Notepad is open) at 100,100
+#   scripts/ui-drive.ps1 notepad [file]     open a sample message (or <file> in the screenshot folder) in Notepad
+#                                           (a tab if Notepad is open) at 100,100
 #
 # `focus` taps Alt so SetForegroundWindow is allowed, which can leave Notepad showing its menu
 # key tips; send `key Esc` and click into the text before `selectall`.
 #   scripts/ui-drive.ps1 focus notepad      bring a process's window to the front
 #   scripts/ui-drive.ps1 focustitle Glossly bring a window to the front by exact title (Electron windows)
 #   scripts/ui-drive.ps1 selectall | hotkey (Ctrl+Alt+Space)
-#   scripts/ui-drive.ps1 key Enter|Tab|Esc|Left|Right|<digit or letter>
+#   scripts/ui-drive.ps1 key Enter|Tab|Esc|Left|Right|Up|Down|<digit or letter>
 #   scripts/ui-drive.ps1 type "text"        SendKeys syntax
 #   scripts/ui-drive.ps1 drag "x1,y1,x2,y2" | move "x,y" | click "x,y"
 #   scripts/ui-drive.ps1 shot <name>        full primary screen to <name>.png
+#   scripts/ui-drive.ps1 shotrect "x,y,w,h,name"   one region (physical px) to <name>.png, full resolution
+#   scripts/ui-drive.ps1 diffrect "x,y,w,h,a,b"    share of pixels that differ in that region between a.png and b.png
+#   scripts/ui-drive.ps1 theme get | theme "1,0"   Windows app and system theme (1 light, 0 dark), broadcast so apps follow
 #
 # Run a whole sequence in one shell command: Cursor takes focus back between agent commands,
-# which closes a focused bar and sends later keys to the wrong window.
+# which closes a focused bar and sends later keys to the wrong window. In Claude Code, run it
+# with PowerShell 7 (`pwsh -NoProfile -File scripts/ui-drive.ps1 ...`): Windows PowerShell's
+# Add-Type writes a DLL to %TEMP%, which is denied there.
 param([string]$cmd, [string]$arg = '')
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms
 Add-Type @"
@@ -29,6 +35,7 @@ public static class GlosslyDrive {
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, uint d, UIntPtr e);
   [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int w, int hh, bool r);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, UIntPtr w, string l, uint flags, uint timeout, out UIntPtr result);
 }
 "@
 $W = [GlosslyDrive]
@@ -52,6 +59,7 @@ switch ($cmd) {
       Set-Content $file "Hi Rayan, thanks for the update on the launch plan. I'll send the revised budget by Friday, and can you confirm the venue booking with Sam Carter before the end of the week? Let me know if anything changes."
     }
     # Windows 11 Notepad opens the file as a tab in an existing window; never kill the user's Notepad.
+    if ($arg) { $file = Join-Path $dir $arg }
     Start-Process notepad.exe $file
     Start-Sleep 2
     $p = Get-Process notepad | Where-Object MainWindowHandle -ne 0 | Select-Object -First 1
@@ -74,7 +82,7 @@ switch ($cmd) {
   'selectall' { Chord @(0x11) 0x41 }
   'hotkey' { Chord @(0x11, 0x12) 0x20 }
   'key' {
-    $map = @{ Enter = 0x0D; Tab = 0x09; Esc = 0x1B; Right = 0x27; Left = 0x25 }
+    $map = @{ Enter = 0x0D; Tab = 0x09; Esc = 0x1B; Right = 0x27; Left = 0x25; Up = 0x26; Down = 0x28 }
     Tap $(if ($map.ContainsKey($arg)) { $map[$arg] } else { [byte][char]$arg.ToUpper() })
   }
   'type' { [System.Windows.Forms.SendKeys]::SendWait($arg) }
@@ -100,6 +108,36 @@ switch ($cmd) {
     [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
     $bmp.Save("$dir\$arg.png", [System.Drawing.Imaging.ImageFormat]::Png)
     "$dir\$arg.png"
+  }
+  'shotrect' {
+    $p = $arg.Split(',')
+    $bmp = New-Object System.Drawing.Bitmap ([int]$p[2]), ([int]$p[3])
+    [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen([int]$p[0], [int]$p[1], 0, 0, $bmp.Size)
+    $bmp.Save("$dir\$($p[4]).png", [System.Drawing.Imaging.ImageFormat]::Png)
+    "$dir\$($p[4]).png"
+  }
+  'diffrect' {
+    $p = $arg.Split(',')
+    $a = [System.Drawing.Bitmap]::FromFile("$dir\$($p[4]).png")
+    $b = [System.Drawing.Bitmap]::FromFile("$dir\$($p[5]).png")
+    $x0 = [int]$p[0]; $y0 = [int]$p[1]; $w = [int]$p[2]; $h = [int]$p[3]; $n = 0
+    for ($y = $y0; $y -lt $y0 + $h; $y += 2) { for ($x = $x0; $x -lt $x0 + $w; $x += 2) { if ($a.GetPixel($x, $y) -ne $b.GetPixel($x, $y)) { $n++ } } }
+    $total = [Math]::Ceiling($w / 2) * [Math]::Ceiling($h / 2)
+    "differing pixels: $n of $total sampled ($([Math]::Round(100 * $n / $total, 2))%)"
+  }
+  'theme' {
+    # `theme get` prints the current values; `theme "apps,system"` sets them (1 light, 0 dark).
+    # Note both values before changing them and put back exactly those afterwards.
+    $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+    if ($arg -ne 'get') {
+      $v = Point $arg
+      Set-ItemProperty $key AppsUseLightTheme $v[0]
+      Set-ItemProperty $key SystemUsesLightTheme $v[1]
+      $r = [UIntPtr]::Zero
+      $W::SendMessageTimeout([IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'ImmersiveColorSet', 2, 2000, [ref]$r) | Out-Null
+    }
+    $t = Get-ItemProperty $key
+    "AppsUseLightTheme=$($t.AppsUseLightTheme) SystemUsesLightTheme=$($t.SystemUsesLightTheme)"
   }
   default { throw "Unknown command: $cmd" }
 }

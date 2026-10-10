@@ -373,8 +373,10 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   align-items: center;
   gap: 8px;
 }
-/* The streaming cursor: a neutral block that pulses. */
-.cursor::after {
+/* The streaming cursor: a neutral dot that pulses, inline at the end of the last block (or the
+   last list item), not on a line of its own. */
+.answer.cursor > :last-child:not(ul, ol)::after,
+.answer.cursor > :is(ul, ol):last-child > li:last-child::after {
   content: '';
   display: inline-block;
   width: 8px;
