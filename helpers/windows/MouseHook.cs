@@ -20,6 +20,7 @@ internal static class MouseHook
 
     private static readonly object Gate = new();
     private static readonly HookProc Proc = Callback; // kept alive for the hook's lifetime
+    private static readonly WinEventProc ForegroundProc = OnForeground;
     private static Thread? _thread;
     private static uint _threadId;
 
@@ -79,11 +80,18 @@ internal static class MouseHook
             if (hook == IntPtr.Zero) error = $"SetWindowsHookEx failed ({Marshal.GetLastWin32Error()})";
             ready.Set();
             if (hook == IntPtr.Zero) return;
+            // Foreground changes arrive on this thread's message loop too (out of context).
+            var fgHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, ForegroundProc, 0, 0,
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
             try
             {
                 while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { }
             }
-            finally { UnhookWindowsHookEx(hook); }
+            finally
+            {
+                if (fgHook != IntPtr.Zero) UnhookWinEvent(fgHook);
+                UnhookWindowsHookEx(hook);
+            }
         }) { IsBackground = true, Name = "mouse-hook" };
         t.Start();
         ready.Wait();
@@ -149,6 +157,14 @@ internal static class MouseHook
                 }
                 break;
         }
+    }
+
+    /// <summary>Another window came to the front. Reported only while input_watch is on.</summary>
+    private static void OnForeground(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
+    {
+        if (!_watchInput || hwnd == IntPtr.Zero) return;
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        Output.Event("foreground", new { Handle = hwnd.ToInt64(), Pid = (int)pid });
     }
 
     private static void PollLoop()

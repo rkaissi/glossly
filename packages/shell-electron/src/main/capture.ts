@@ -196,6 +196,14 @@ export class Capture {
       case 'keyboard_activity':
         if (this.overlay.isVisible && !this.overlay.hasFocus) this.close(ev.event);
         return;
+      case 'foreground': {
+        // The overlay belongs to the window the text was selected in: close it when another
+        // app's window comes to the front. (A focused overlay already closes on blur.)
+        if (!this.overlay.isVisible || this.overlay.hasFocus) return;
+        if (ev.handle === this.session?.fg?.handle || this.ownPids().has(ev.pid)) return;
+        this.close('foreground');
+        return;
+      }
       default:
         return;
     }
@@ -814,7 +822,9 @@ export class Capture {
     const hadFocus = this.overlay.hasFocus;
     this.endSession();
     this.overlay.update({ ...HIDDEN_STATE, sessionId: s.id });
-    if (hadFocus && s.fg && reason !== 'blur') {
+    if (reason === 'foreground' || reason === 'settings') log.info('overlay closed', { reason });
+    // Focus goes back to the source app, unless it already left (blur) or the settings window is taking it.
+    if (hadFocus && s.fg && reason !== 'blur' && reason !== 'settings') {
       void this.helper.request('restore_focus', { handle: s.fg.handle }).catch(() => {});
     }
   }

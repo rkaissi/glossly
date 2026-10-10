@@ -164,7 +164,10 @@ export function registerIpc(deps: IpcDeps): void {
   handle('metrics:summary', (a) => services.metrics.summary(Math.min(Math.max(Math.trunc(num(a.days)), 1), 90)));
   handle('embed:status', () => services.embed.getStatus());
   handle('embed:download', () => services.embed.start());
-  handle('settings:open', (a) => {
+  handle('settings:open', (a, e) => {
+    // From the overlay (its menu, or "Add a key"): the bar's job is done; close it so it
+    // doesn't sit on top of the settings window.
+    if (overlay.isOwnWindow(e.sender.id)) capture.close('settings');
     const tab = a?.tab;
     settingsWindow.open(tab && (TABS as readonly string[]).includes(tab) ? tab : undefined);
   });

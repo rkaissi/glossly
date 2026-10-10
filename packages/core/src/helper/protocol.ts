@@ -142,6 +142,7 @@ export const EventSchema = z.discriminatedUnion('event', [
   z.object({ event: z.literal('mouse_up'), x: z.number().int(), y: z.number().int(), drag: z.boolean(), double: z.boolean() }),
   z.object({ event: z.literal('wheel') }),
   z.object({ event: z.literal('keyboard_activity') }),
+  z.object({ event: z.literal('foreground'), handle: z.number().int(), pid: z.number().int() }),
 ]);
 export type HelperEvent = z.infer<typeof EventSchema>;
 

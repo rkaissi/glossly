@@ -44,6 +44,12 @@ internal static class Win32
 
     public delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    public delegate void WinEventProc(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
+    public const uint EVENT_SYSTEM_FOREGROUND = 3;
+    public const uint WINEVENT_OUTOFCONTEXT = 0;
+    public const uint WINEVENT_SKIPOWNPROCESS = 2;
+    [DllImport("user32.dll")] public static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr mod, WinEventProc proc, uint pid, uint thread, uint flags);
+    [DllImport("user32.dll")] public static extern bool UnhookWinEvent(IntPtr hook);
 
     public const int WH_MOUSE_LL = 14;
     public const int WM_MOUSEMOVE = 0x0200;

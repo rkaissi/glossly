@@ -49,7 +49,7 @@ describe('helper protocol fixtures', () => {
     const { events } = JSON.parse(readFileSync(join(dir, 'events.json'), 'utf8')) as { events: unknown[] };
     for (const e of events) EventSchema.parse(e);
     expect(new Set(events.map((e) => (e as { event: string }).event))).toEqual(
-      new Set(['ready', 'mouse_down', 'mouse_up', 'wheel', 'keyboard_activity']),
+      new Set(['ready', 'mouse_down', 'mouse_up', 'wheel', 'keyboard_activity', 'foreground']),
     );
   });
 });

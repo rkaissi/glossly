@@ -96,6 +96,7 @@ Verified on this machine (Windows 11, 125% scaling):
 - `pnpm dev` with hot reload in both windows (main-process edits need a restart).
 - Step 12 (Oct 10): pill timings above; the router answering in 330 and 446 ms against its 600 ms budget; Delete all data on a throwaway profile copy (items, entities, and events gone; the key, settings, and model list kept); Reset settings there (key, models, and settings gone; back to the setup's Welcome step); Local only (rules routing, Save kept the item and its embedding but skipped entities, Ask showed "Local only is on" and its button turned it off and answered).
 - Step 13 redesign (Oct 10): the acrylic pill, bar, menu, Ask panel (streaming), Save panel, and the dot, in light and dark mode; the bar keeps the menu, Ask, and Save exactly in place as slots fill and the menu opens (pixel-identical); mica settings with all five tabs; setup's four steps on a throwaway profile.
+- The overlay closes when another app's window comes to the front, and choosing Settings in the bar's menu closes the bar and brings the settings window in front (Oct 10, after Step 13; checked live on both paths).
 - Fixes from the last two rounds: a second launch no longer runs a second copy of the app (it just opens Settings in the running one), `pnpm test` no longer runs the evals, settings Fast Refresh no longer falls back to a full reload, and the overlay no longer shows an Electron taskbar button when it takes focus (verified on the hotkey path).
 
 Not verified live:

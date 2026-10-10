@@ -202,6 +202,7 @@ Event lines have an `event` field and no `id`.
 | `mouse_up` | `x`, `y`, `drag`, `double` | Left button release. `drag`: moved more than 4 px since the press. `double`: a second click within the system double-click time and 4 px |
 | `wheel` | | Vertical or horizontal wheel, at most every 100 ms |
 | `keyboard_activity` | | Non-mouse input, while `input_watch` is on. Reported 50 to 100 ms after it happens |
+| `foreground` | `handle`, `pid` | Another window came to the front (`EVENT_SYSTEM_FOREGROUND`), while `input_watch` is on. The app closes the pill or unfocused bar unless it is the source window or one of its own |
 
 The helper's own injected input (copy, paste, focus tricks) never produces events.
 
