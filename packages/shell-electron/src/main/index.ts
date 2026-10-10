@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   const overlay = new Overlay();
   const helper = new HelperManager();
   const settingsWindow = new SettingsWindow();
-  const capture = new Capture(helper, overlay, services);
+  const capture = new Capture(helper, overlay, services, () => settingsWindow.captureSourceHandle());
   const hotkey = new HotkeyManager(() => {
     capture.hotkey().catch((e: unknown) => log.error('hotkey failed', errorInfo(e)));
   });

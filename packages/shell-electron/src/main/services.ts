@@ -2,6 +2,8 @@ import { EventEmitter } from 'node:events';
 import { getLoadablePath } from 'sqlite-vec';
 import {
   AiSdkLlm,
+  DEFAULT_BLOCK_LIST,
+  DEFAULT_HOTKEY_ONLY,
   Metrics,
   PROVIDER_ORDER,
   PROVIDERS,
@@ -137,7 +139,24 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
       models: this.catalog(),
       embed: this.embed.getStatus(),
       platform: process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : 'win32',
+      builtins: { blockList: DEFAULT_BLOCK_LIST, hotkeyOnly: DEFAULT_HOTKEY_ONLY },
     };
+  }
+
+  /**
+   * "Delete all data": wipes the database (items, people, metrics, settings, model list) and
+   * the saved keys, then reloads settings, so the app is back at first-run setup. The
+   * downloaded embedding model is kept.
+   */
+  deleteAll(): void {
+    this.store.deleteAll();
+    for (const p of PROVIDER_ORDER) {
+      this.keys.remove(p);
+      this.store.setMeta(`key_test:${p}`, 'null');
+    }
+    this.lastTests.clear();
+    this.settingsCache = this.store.getSettings();
+    this.emit('settings', this.settingsCache);
   }
 
   // ---- keys and catalog ----

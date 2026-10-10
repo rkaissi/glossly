@@ -150,7 +150,8 @@ export function registerIpc(deps: IpcDeps): void {
   });
   handle('data:delete-all', () => {
     capture.close('delete_all');
-    services.store.deleteAll();
+    services.deleteAll();
+    if (hotkey.change(services.settings.hotkey)) log.warn('default hotkey unavailable after delete-all');
     log.info('all data deleted');
     broadcastSettings();
   });
@@ -160,5 +161,9 @@ export function registerIpc(deps: IpcDeps): void {
   handle('settings:open', (a) => {
     const tab = a?.tab;
     settingsWindow.open(tab && (TABS as readonly string[]).includes(tab) ? tab : undefined);
+  });
+  handle('setup:try-it', (a, e) => {
+    if (!settingsWindow.isOwnWindow(e.sender.id)) throw new Error('Settings window only');
+    settingsWindow.setTryIt(obj(a).active === true);
   });
 }

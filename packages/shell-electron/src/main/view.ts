@@ -72,3 +72,8 @@ export function distanceToRect(p: Point, r: Rect): number {
 }
 
 export const contains = (r: Rect, p: Point) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
+
+/** An HWND from BrowserWindow.getNativeWindowHandle(), as the number the helper uses. */
+export function hwndFromBuffer(buf: Buffer): number {
+  return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
+}

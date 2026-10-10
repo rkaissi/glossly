@@ -107,10 +107,15 @@ export class Capture {
   /** Set while focus is handed to the source app to read tier 2 on the hotkey path. */
   private bouncing = false;
 
+  /**
+   * `captureSource` returns the HWND of the one Glossly window that may be read (the setup's
+   * "Try it" step), or null. Every other Glossly window, the overlay included, is ignored.
+   */
   constructor(
     private readonly helper: HelperManager,
     private readonly overlay: Overlay,
     private readonly services: Services,
+    private readonly captureSource: () => number | null = () => null,
   ) {
     helper.on('event', (ev) => this.onHelperEvent(ev));
     helper.on('down', () => {
@@ -133,6 +138,15 @@ export class Capture {
     const pids = new Set(app.getAppMetrics().map((m) => m.pid));
     if (this.helper.pid) pids.add(this.helper.pid);
     return pids;
+  }
+
+  private isOwn(fg: Foreground): boolean {
+    return this.ownPids().has(fg.pid) && fg.handle !== this.captureSource();
+  }
+
+  /** The "Don't show here" key; none for Glossly's own Try-it window. */
+  private siteKey(fg: Foreground): string | null {
+    return fg.handle === this.captureSource() ? null : siteKeyFor({ process_name: fg.process_name, title: fg.title });
   }
 
   private current(id: number): Session | null {
@@ -177,7 +191,7 @@ export class Capture {
       let t = performance.now();
       const fg = await this.helper.request('foreground');
       timings.foreground = ms(t);
-      if (stale() || this.ownPids().has(fg.pid)) return;
+      if (stale() || this.isOwn(fg)) return;
       const appId = { process_name: fg.process_name, title: fg.title };
       if (!gateApp(appId, 'auto', settings).ok) return;
 
@@ -230,7 +244,7 @@ export class Capture {
         },
         bounds,
         anchor: p,
-        siteKey: siteKeyFor(appId),
+        siteKey: this.siteKey(fg),
         tier1Read: false,
         container: null,
         route: null,
@@ -269,12 +283,13 @@ export class Capture {
       this.stopWatch();
       if (this.state.mode !== 'bar' && this.state.mode !== 'panel') await this.expand(s.id, true);
       if (this.current(s.id)) {
-        this.overlay.focus();
+        this.focusOverlay();
         this.overlay.patch({ keyboard: true });
       }
       return;
     }
-    if (s && this.overlay.hasFocus) {
+    // A bar that never got the OS focus (Windows refused it) falls through to a fresh capture.
+    if (s && this.overlay.hasFocus && this.overlay.osFocused) {
       this.close('hotkey_toggle');
       return;
     }
@@ -292,7 +307,7 @@ export class Capture {
       let t = performance.now();
       fg = await this.helper.request('foreground');
       timings.foreground = ms(t);
-      if (this.ownPids().has(fg.pid)) fg = null;
+      if (this.isOwn(fg)) fg = null;
     } catch (e) {
       notice = this.helperNotice(e);
     }
@@ -358,7 +373,7 @@ export class Capture {
       selection,
       bounds,
       anchor: physBounds ? { x: bounds.x + bounds.w, y: bounds.y + bounds.h } : cursor,
-      siteKey: fg ? siteKeyFor({ process_name: fg.process_name, title: fg.title }) : null,
+      siteKey: fg ? this.siteKey(fg) : null,
       tier1Read: false,
       container: null,
       route: null,
@@ -376,7 +391,7 @@ export class Capture {
     const quick = selection ? this.router().quick(toContext(selection)) : null;
     session.route = quick;
     timings.total = ms(t0);
-    this.overlay.focus();
+    this.focusOverlay();
     this.overlay.update(
       {
         ...HIDDEN_STATE,
@@ -395,6 +410,24 @@ export class Capture {
     );
     this.services.metrics.record('bar_shown', { trigger: 'hotkey', ms: timings.total, has_selection: Boolean(selection) });
     if (selection) void this.routeModel(session);
+  }
+
+  /**
+   * Focuses the overlay. Windows may refuse the foreground change (for example while the
+   * source app is in its Alt menu mode); then the helper forces it with restore_focus.
+   */
+  private focusOverlay(): void {
+    this.overlay.focus();
+    setTimeout(() => {
+      if (!this.overlay.hasFocus || this.overlay.osFocused || this.bouncing) return;
+      void this.helper
+        .request('restore_focus', { handle: this.overlay.nativeHandle() })
+        .then((r) => {
+          log.info('overlay focus forced', { method: r.method });
+          if (this.overlay.hasFocus) this.overlay.focus();
+        })
+        .catch(() => log.warn('overlay could not take focus'));
+    }, 80);
   }
 
   private helperNotice(e: unknown): string {
@@ -503,7 +536,7 @@ export class Capture {
     const from = this.state.placement?.rect ?? this.overlay.bounds();
     const side = this.state.placement?.side ?? 'below';
     const rect = growFrom(from, side, SIZES.panel, workArea(s.anchor));
-    if (isAvailable(action) && !this.overlay.hasFocus) this.overlay.focus();
+    if (isAvailable(action) && !this.overlay.hasFocus) this.focusOverlay();
     this.overlay.patch(
       { mode: 'panel', panel: action, placement: { mode: 'pill', side, rect }, keyboard: this.overlay.hasFocus, debug: this.debugFor(s) },
       rect,

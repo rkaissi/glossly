@@ -13,6 +13,10 @@ import type { ContextualAction, ContentType, DecisionProviderId } from './router
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 
+export type { CatalogModel, Capabilities } from './llm/catalog';
+export type { MetricsSummary } from './metrics';
+export type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
+
 // ---- overlay state (main -> overlay renderer) ----
 
 export type ActionId = 'ask' | 'save' | ContextualAction;
@@ -161,6 +165,8 @@ export interface SettingsView {
   models: CatalogModel[];
   embed: EmbedStatus;
   platform: 'win32' | 'darwin' | 'linux';
+  /** Built-in app lists, shown read-only next to the user's own entries. */
+  builtins: { blockList: readonly string[]; hotkeyOnly: readonly string[] };
 }
 
 export interface SetSettingResult {
@@ -218,11 +224,17 @@ export interface InvokeChannels {
   'roles:set': { args: RoleSetArgs; result: Settings['roles'] };
   /** Shows a save dialog. Null when cancelled. */
   'data:export': { args: void; result: { path: string } | null };
+  /** Wipes the database (items, people, metrics, settings, model list) and the saved keys. The embedding model files stay. */
   'data:delete-all': { args: void; result: void };
   'metrics:summary': { args: { days: number }; result: MetricsSummary };
   'embed:status': { args: void; result: EmbedStatus };
   'embed:download': { args: void; result: void };
   'settings:open': { args: { tab?: 'keys' | 'models' | 'general' | 'data' | 'metrics' }; result: void };
+  /**
+   * The setup's "Try it" step is showing: the settings window may be a capture source (it is
+   * otherwise ignored like every Glossly window). Cleared when the window closes.
+   */
+  'setup:try-it': { args: { active: boolean }; result: void };
 }
 
 /** Main -> renderer pushes (webContents.send / ipcRenderer.on). */

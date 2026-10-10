@@ -3,6 +3,7 @@ import { BrowserWindow, screen } from 'electron';
 import type { OverlayMode, OverlayState, Placement, Rect, Size } from '@glossly/core';
 import { logger } from './log';
 import { preloadPath, rendererUrl } from './paths';
+import { hwndFromBuffer } from './view';
 
 const log = logger('overlay');
 
@@ -107,8 +108,14 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
     return this.state.mode !== 'hidden' && this.win.isVisible();
   }
 
+  /** The overlay asked for focus (it may not have it yet, see `osFocused`). */
   get hasFocus(): boolean {
     return this.focused;
+  }
+
+  /** Windows actually gave the overlay the foreground. */
+  get osFocused(): boolean {
+    return !this.win.isDestroyed() && this.win.isFocused();
   }
 
   bounds(): Rect {
@@ -179,7 +186,6 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
 
   /** Native HWND as a number, for the helper's restore_focus. */
   nativeHandle(): number {
-    const buf = this.win.getNativeWindowHandle();
-    return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
+    return hwndFromBuffer(this.win.getNativeWindowHandle());
   }
 }
