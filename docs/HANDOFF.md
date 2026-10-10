@@ -4,9 +4,9 @@ Read this first (and `AGENTS.md` for the standing working rules), then `docs/Hig
 
 ## Scope
 
-Build Phases 0 and 1 of the spec, then stop for review. Commit to `main` as each milestone chunk lands. At the end, write `STATUS.md` (spec: "Instructions for the coding agent", item 8). **Status: Phases 0 and 1 are built and written up in `STATUS.md`; waiting on Rayan's review and hand tests.**
+Phases 0 and 1 are built and written up in `STATUS.md` (Steps 1 to 11). Rayan reviewed them on Oct 10 and widened the scope. The order is now: fixes from his review, a redesign, then every spec phase that can be built on Windows (Phases 2, 3, and the Windows parts of 4), then one `pnpm eval` run, then `electron-builder` packaging, then local model support. Details are in "Next steps" below. Commit to `main` per chunk, update this file and `STATUS.md` at the end of each phase (spec: "Instructions for the coding agent", item 8), and stop after each chunk to hand off.
 
-Spec sections that matter for this scope: Core user flow (incl. Coexisting with app selection toolbars), Architecture and stack, Capture layer, Router and action bar, Actions (Ask and Save only for Phase 1), Data model, Model providers, Privacy and safety rules, Milestones (Phase 0 and 1). People layer, Reply, Recall, and Visualize are later phases; keep the design compatible with them but don't build them.
+For the follow-ups, Phase 0 and 1 sections of the spec still apply. Phases 2 and up use People layer, Reply, Recall, Visualize, Data model, Evals and local metrics, and Milestones. macOS work (the Swift helper and macOS onboarding) waits for a Mac; keep everything outside `helpers/windows` OS-neutral.
 
 ## Environment (verified)
 
@@ -35,9 +35,10 @@ electron 44.7.0 (Node 24.21 inside), electron-vite 5.0.0, vite 7.3.7 (electron-v
 7. **`DecisionProvider.decide(input, signal)`** takes `{ context, features, collections }` instead of the spec's `(input, questions)`; the questions are fixed by our output contract.
 8. **Helper request arguments are top-level fields** next to `cmd` (e.g. `{"id":3,"cmd":"context","before":500,"after":500}`).
 9. **Tier 2 on the hotkey path uses a focus hand-off.** The helper reads from the focused element, and on the hotkey path the overlay holds focus. So when an action is clicked, the shell calls `restore_focus` on the source window, reads `context_container`, then gives focus back to the overlay (helper `restore_focus` on the overlay's HWND, then `win.focus()`). This keeps the rule "tier 2 is read on action click" without reading it early. Blur-to-close is suppressed during the hand-off. Copy-fallback selections skip tier 2.
-10. **"Delete all data" is a full reset.** The store's `deleteAll()` already cleared the `settings` and `models` tables, so the shell now matches it: `Services.deleteAll()` also removes every saved key and its last test result, reloads settings (back to defaults, `firstRunComplete` false), re-registers the default hotkey, and the settings window goes to `#setup`. Only the downloaded embedding model stays. The Data tab says exactly this.
+10. **"Delete all data" is a full reset (being changed, see Next steps, Step 12).** Currently the store's `deleteAll()` clears the `settings` and `models` tables, and `Services.deleteAll()` also removes every saved key and its last test result, reloads settings (back to defaults, `firstRunComplete` false), re-registers the default hotkey, and sends the settings window to `#setup`. Rayan decided on Oct 10 that Delete all data must keep keys and settings, with a separate "Reset settings" button for settings and keys.
 11. **"Try it" captures from the settings window itself.** While the setup's Try-it step is mounted, the renderer sets `setup:try-it {active:true}`, and capture accepts the settings window's HWND as a source (`Capture`'s `captureSource` callback; every other Glossly window, the overlay included, stays ignored). The flag clears on unmount, window close, and any full reload. "Don't show here" is hidden for that window (it would otherwise set `electron.exe` to hotkey-only).
-
+12. **Local only is strict (decided Oct 10, built in Step 12).** Nothing leaves the machine while it is on: the router uses rules, Save stores and embeds locally but skips entity extraction, and every model action (Ask now; Reply, Who, promises extraction, and Visualize's LLM fallback later) shows "Local only is on" with a way to turn it off. This goes beyond the spec, which only disables the router's call. Once local model support exists (Step 19), those calls go to the local model instead.
+13. **Redesign (decided Oct 10, built in Step 13).** Frosted glass using real Windows 11 acrylic, light or dark following the system theme; monochrome, with no color accent; inspired by the ChatGPT and Codex apps. The bar fits its buttons, and a Glossly menu button sits at the left so that nothing ever moves when slots fill. Covers the overlay, the settings window, and setup.
 ## Done
 
 ### Step 1: C# helper (complete, committed `ac6510a`)
@@ -189,18 +190,64 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
    - Keys: one `safeStorage`-encrypted file per provider in userData. Embeddings run in a `utilityProcess` using `@glossly/core/embed`. Store at `userData/glossly.db`. IPC uses `contextIsolation` with a preload `contextBridge`.
 4. ~~**UI**~~ (done: overlay in Step 7, settings window and first-run setup with the Try-it capture change in Step 8; Ask streaming verified live in Step 8).
 5. ~~Write up~~ (done, see Step 11: `STATUS.md` and `evals/capture.md`).
-6. **Next: Rayan's review.** Phases 0 and 1 stop here. Waiting on Rayan to fill in `evals/capture.md` and answer the open questions below. Then fix what the hand tests turn up (likely candidates: apps where UIA reads nothing, `popups_near` misplacing the pill next to a real toolbar, additions to `DEFAULT_HOTKEY_ONLY`), apply his answers (pill speed, router timeout, delete-all scope, local-only scope), record the results in `STATUS.md`, and only then start Phase 2. Don't run `pnpm eval` unless Rayan asks.
 
-## Open questions for Rayan (note in STATUS.md)
+Rayan's review answers (Oct 10) set the order below. Each numbered step is one or more commits; stop and hand off after each.
 
-- The auto pill takes about 360 ms (250 ms toolbar wait plus `popups_near`), against the spec's 150 ms target. Should it be faster but less careful about toolbars?
-- The model router's 400 ms budget timed out on two of six live calls (404 and 418 ms). Raise `router.decisionTimeoutMs` to about 600 ms, or keep rules as the frequent fallback?
-- "Delete all data" now also removes the saved API keys and resets settings (decision 10). Is that the intended meaning, or should keys and preferences survive it?
-- Packaging (`electron-builder` config: helper publish output into `resources/helper`, `asarUnpack` for sqlite-vec and onnxruntime) is not written yet.
-- "Local only" currently means only the router's model call is disabled, as the spec says. Save's entity extraction (Fast model) still runs because the user clicked an action. Should local-only also skip it?
-- May the agent run `pnpm eval` once to score the tuned router prompt (Step 5)? If slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection`.
+### Step 12 (next): fixes from Rayan's review
+
+1. **The "purple oval" bug.** Rayan sometimes sees a purple oval instead of the pill. Diagnosis: it is the `dot` placement, which shows when `placePill` finds obstacles both below and above the selection. In his real events, 8 of 106 `pill_shown` were `side: end` (dot) and 9 were `above`. Two problems:
+   - **Shape.** `placePill` makes a 12x12 DIP rect (its default `dotSize`; `SIZES.dot` says 16 and is unused for placement), but Windows won't shrink this window below **29x38 DIP**. A standalone Electron 44 test with the overlay's exact options measured `getBounds()` = 29x38 after `setBounds` to 12x12 or 16x16, hidden or shown. `.dot` uses `inset: 0` with `border-radius: 50%`, so it stretches into a 29x38 oval. Fix: draw the dot at a fixed size inside a window of at least the minimum size, with the empty area click-through (`setIgnoreMouseEvents(true, { forward: true })` while the pointer isn't over the dot). Make it look intentional in the new design (a small glass circle with the Glossly mark) and keep it at the end of the selection.
+   - **Too many dots: likely false obstacles.** `PopupsNear` in `helpers/windows/Uia.cs` counts any visible popup, tool, or topmost window from another process within 200 px sideways and 160 px vertically of the selection (up to 1400x700), plus any UIA `ToolBar`, `Menu`, `MenuBar`, or `ToolTip` found within 6 parents of 6 probe points 18 and 42 px above and below the selection. That catches static app chrome (a browser's toolbar, an app's menu bar or ribbon, a web page's nav marked as a toolbar or menu) and unrelated always-on-top windows, not just a toolbar that appeared for this selection. Fix: only count obstacles that **appeared after the selection started**. Snapshot the windows and probe results at `mouse_down` (the drag gives free time), and diff at check time; keep tooltips out of it. First add the obstacles' source, kind, and size (never text) to the debug view and the `pill_shown` log line, so the change can be checked against Rayan's real apps.
+2. **Pill speed, staying careful about toolbars.** The pill must never move once shown, since the user may already be clicking it. Today: about 250 ms wait plus 100 ms for `popups_near`, for a total of 315 to 360 ms. Ideas, in order of value:
+   - Make `popups_near` cheaper: take the `mouse_down` snapshot (above) so the check after mouse-up is only a diff, run the window enumeration and UIA probes in parallel, and cut probes that rarely hit.
+   - Poll instead of waiting the full 250 ms: from about 100 ms after mouse-up, check for new obstacles every 30 to 40 ms. Show as soon as a new toolbar is found (placed on the other side), or once the app's wait has passed with none found.
+   - Per-app wait: the full wait only for apps and sites known to show selection toolbars (Notion, Google Docs, Word, Slack, Medium, Outlook), learned per app key when a toolbar appears there, and a short wait (around 80 to 120 ms) everywhere else. Store what was learned locally (process name or site key plus a delay; no text).
+   - Report the new numbers in the debug view and `STATUS.md`. The spec's 150 ms is the goal where no toolbar is expected.
+3. **Router timeout:** raise the `router.decisionTimeoutMs` default from 400 to 600 ms. Users who saved the old default keep 400 because settings are stored per key, so migrate a stored value of exactly 400 to 600 once. Update `STATUS.md`.
+4. **Delete all data versus Reset settings** (decision 10). "Delete all data" removes items, entities, people, vectors, events, and collections (re-seeded), and keeps keys, settings, the model catalog, and the embedding model. A new "Reset settings" button (Data tab, own inline confirm) removes saved keys and their test results, resets settings to defaults, re-registers the default hotkey, and returns to setup. Change `Store.deleteAll()` so it no longer clears `settings` and `models`, and add a store method for the reset. Update the Data tab copy and the store tests.
+5. **Strict Local only** (decision 12). Skip Save's entity extraction (the item is saved and embedded; mark it so entities can be backfilled if Local only is turned off later, or leave it, whichever is simpler and stated in `STATUS.md`). Ask with Local only on shows "Local only is on" plus a button that turns it off (or opens General). The General tab copy says plainly that nothing is sent to a model provider while it is on. Put the check in one place (for example `AiSdkLlm` refusing with an `LlmError` code `local_only` when the setting is on), so later actions can't forget it, plus a unit test.
+
+### Step 13: redesign (overlay, settings window, setup)
+
+Decision 13. Inspiration: the ChatGPT and Codex desktop apps. Refined and modern; "Glossly" suggests gloss, so glass suits it.
+
+- **Material.** Spike first: Electron 44's `backgroundMaterial: 'acrylic'` (Windows 11 22H2 and later) on the overlay, with `nativeTheme` for light and dark. Check that it works with `focusable: false`, `showInactive`, `setBounds` resizes, the always-on-top level, and the click-through dot. Acrylic needs a non-transparent window, so check what happens to rounded corners (DWM's `DWMWA_WINDOW_CORNER_PREFERENCE` gives Windows 11 rounding on popups; the helper or a small native call could set it) and to the window's minimum size. If acrylic doesn't work for the overlay, fall back to a transparent window with a CSS glass look (translucent fill, a 1 px inner highlight, a soft shadow drawn inside the window), and note why. The settings window gets `mica` (Windows 11's standard window material).
+- **Colors.** Monochrome. Light: white glass, near-black text, black primary buttons. Dark: smoked glass, near-white text, white primary buttons. Grays for borders, hover, and muted text. Use one set of CSS variables in `theme.css` for both windows, and remove the purple everywhere, including the dot, chips, the streaming cursor, and focus rings (use a neutral ring).
+- **Type and shape.** Segoe UI Variable, slightly larger and calmer than now; generous rounding (pill and bar about 12 to 14 px, buttons about 8 px); soft shadows; subtle 120 to 180 ms fades; line icons (an icon set such as `lucide-react`, checked for React 19 support, or a few inline SVG components).
+- **Bar width fits the buttons** (Rayan's feedback: the bar is often too wide). Layout: a Glossly menu button first, then Ask, Save, slot 3, slot 4. The menu holds More (the extra actions), "Don't show here (site)", Settings, and Close. The pill uses the same leading menu button, so expanding the pill keeps the menu, Ask, and Save in place. Slots 3 and 4 append to the right and the window grows rightward from a fixed left edge, so nothing on screen moves. When the selection is near the right edge of the screen, pick the left edge at first paint so the widest possible bar (both slots at the label cap) still fits, because shifting the window later would move every button. The panel (Ask, Save) can be wider than the bar (about 480 to 560 px). Update `SIZES`, `overlay.css`, `growFrom`, and `resize()`. The window's minimum size (29x38 DIP) is fine for the pill and bar.
+- **Keyboard map stays as in the spec.** `Tab` opens More (now inside the menu, with its first item highlighted); `1` to `4`, `Enter`, `Esc`, and `Ctrl+C` are unchanged. Update `keys.ts` and its tests.
+- **Settings window and setup:** the same tokens, a ChatGPT-style sidebar, cards with plenty of spacing, and the same controls restyled. No behavior changes.
+- Verify through a Composer or Grok subagent with screenshots in light and dark mode: the pill, the dot, the bar with 0, 1, and 2 slots, the More menu, the Ask panel while streaming, the Save panel, and every settings tab. Give Rayan the screenshot paths that matter.
+
+### Step 14: Rayan's hand tests (any time)
+
+Rayan fills in `evals/capture.md`. Fix what it turns up (apps where UIA reads nothing, pill placement next to real toolbars, additions to `DEFAULT_HOTKEY_ONLY`), and record results in `STATUS.md`. This is the remaining Phase 0 sign-off, and it can happen in parallel with Steps 15 to 17.
+
+### Steps 15 to 17: the remaining spec phases (Windows)
+
+15. **Phase 2: people layer and Reply** (spec: People layer, Reply, Data model, and the Phase 2 checklist). Includes the "You" identity at first run, which also fixes Ask treating the reader as a message's author. Reply's scoring also needs a fix for automated mail (see Step 4's remaining misses).
+16. **Phase 3: Recall and Visualize**, including the search box when nothing is selected. Ask's `related` notes come from Recall (currently `related: []` in `capture.ts`).
+17. **Phase 4, Windows parts:** eval runners for every eval in the spec's table (commitments, date resolver, recall, visualize, router), optional decision providers behind settings (Jev, OpenAI Decisions; check their current docs), metrics view (done; extend it for the Phase 2 and 3 metrics), and Export and Delete all verified live. Skip the Swift helper and macOS onboarding.
+
+Respect Local only (decision 12) in every new model call, and apply the Step 13 design to every new panel.
+
+### Step 18: one eval run
+
+Once everything above is done and looks good, run `pnpm eval` once (Rayan approved one run; Groq free-tier limits). Record every number in `STATUS.md`, including the tuned router prompt's slot match (Step 5). If the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection`, and compute people and commitment scores from rules.
+
+### Step 19: packaging
+
+`electron-builder` config: the helper's `pnpm helper:publish` output into `resources/helper`, `asarUnpack` for sqlite-vec's DLL and onnxruntime, an NSIS installer, and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). `pnpm dist` already exists but has no config. Test the installed app end to end through a subagent.
+
+### Step 20: local model support (extra, v2)
+
+Add a local provider (for example an OpenAI-compatible endpoint such as Ollama or LM Studio) to the catalog and roles. With Local only on, model calls go to the local model instead of being refused; with none configured, Local only behaves as in decision 12.
+
+## Open questions for Rayan
+
+None right now. Answered on Oct 10: pill speed (stay careful about toolbars, make it faster, never move a visible pill), router timeout (raise it), Delete all data (keep keys and settings; add Reset settings), Local only (strict; local models later), packaging (after all phases), the eval run (once, at the end), the redesign direction, and the scope (all Windows phases before packaging).
 
 ## Things Rayan has to do himself
 
 - ~~Get a Groq API key (free) for testing model calls.~~ Done: set as the `GROQ_API_KEY` user environment variable (see Environment).
-- Hand-test capture across the listed apps and record the results in `evals/capture.md`.
+- Hand-test capture across the listed apps and record the results in `evals/capture.md` (Step 14).

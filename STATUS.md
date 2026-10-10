@@ -114,6 +114,19 @@ Known rough edges:
 
 ## Open questions for you
 
+**Answered Oct 10** (the plan is in `docs/HANDOFF.md`, Steps 12 to 20):
+
+- Pill speed: keep checking for toolbars but make it faster; a visible pill never moves.
+- Router timeout: raise it to 600 ms.
+- Delete all data: keep API keys and settings. A separate "Reset settings" button clears settings and keys.
+- Local only: strict. Nothing goes to a cloud model, including entity extraction and Ask. Local model support comes later (Step 20).
+- Packaging: after every Windows-buildable spec phase is done.
+- Router eval: one run at the end, once everything looks good.
+- New: the purple oval is the "dot" placement. Windows won't shrink the window below 29×38, which stretches the dot, and it shows too often because static toolbars count as obstacles. Fix in Step 12.
+- New: a redesign with Windows 11 glass, monochrome, and a bar that fits its buttons (Step 13).
+
+The original questions:
+
 1. **Pill speed.** The pill takes about 360 ms (250 ms toolbar wait plus `popups_near`) against the 150 ms target. Should it be faster and less careful about toolbars? One option is to show the pill at once and move it if a toolbar appears.
 2. **Router timeout.** The model router missed its 400 ms budget on 2 of 6 live calls (404 and 418 ms) and fell back to rules. Raise `router.decisionTimeoutMs` to about 600 ms, or accept rules as the frequent fallback?
 3. **"Delete all data".** It currently also removes saved API keys and resets settings. Is that what you want, or should keys and preferences survive it?
