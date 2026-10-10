@@ -94,7 +94,7 @@ export function SavePanel({ s }: { s: OverlayState }) {
           <Check size={17} strokeWidth={2} aria-hidden />
           <span>
             Saved to {phase.done.collection}
-            <span className="muted"> · {s.wordCount} words</span>
+            <span className="muted"> · just now</span>
           </span>
         </h2>
       ) : phase.kind === 'undone' ? (
