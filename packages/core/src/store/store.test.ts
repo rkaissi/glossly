@@ -68,6 +68,32 @@ describe('Store', () => {
     }
   });
 
+  it('moves a stored word minimum of exactly 3 to 0, once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glossly-store-'));
+    const path = join(dir, 'g.db');
+    try {
+      const capture = (minWords: number) => ({ ...DEFAULT_SETTINGS.capture, minWords });
+      store = new Store(path);
+      store.setSetting('capture', capture(3));
+      store.db.prepare("DELETE FROM meta WHERE key = 'settings_migrations'").run();
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().capture.minWords).toBe(0);
+      store.setSetting('capture', capture(3));
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().capture.minWords).toBe(3);
+      store.setSetting('capture', capture(5));
+      store.db.prepare("DELETE FROM meta WHERE key = 'settings_migrations'").run();
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().capture.minWords).toBe(5);
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('stores items with entities and deletes orphans with the item', () => {
     store = new Store(':memory:');
     const notes = store.collectionByName('Notes')!;

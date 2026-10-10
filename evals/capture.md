@@ -9,7 +9,7 @@ Turn on **Debug view** first (tray menu, or Settings > General). The debug panel
 Use a selection of 3 or more words of ordinary text (a message, a paragraph).
 
 1. **Auto pill:** drag-select with the mouse. Pass if the pill appears near the end of the selection.
-2. **Double-click:** double-click a word, then shift-click to extend to 3+ words, or double-click inside a 3+ word line in apps that select by line. Pass if the pill appears. (A single double-clicked word should *not* show it: 3-word minimum.)
+2. **Double-click:** double-click a word. Pass if the pill appears. There is no word minimum; only an empty selection is skipped.
 3. **Hotkey:** select with the keyboard (`Shift+arrows`), press `Ctrl+Alt+Space`. Pass if the bar opens with the right text. In the debug view, `method: uia` means accessibility worked; `method: copy` means the clipboard fallback was used. Check your clipboard still holds what it had before.
 4. **Tier 2:** in the bar, click Ask (or press `1` after the hotkey). Pass if the debug `timings` line shows `tier2 1`. Selections made through the clipboard fallback (`method: copy`) skip tier 2, so mark those n/a.
 5. **Pill hides:** with the pill showing, type a key, scroll, click elsewhere, or move the mouse far away. Pass if it disappears each time and your typing went to the app.

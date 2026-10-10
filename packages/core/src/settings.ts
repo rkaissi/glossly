@@ -56,7 +56,7 @@ export const SettingsSchema = z.object({
 
   capture: z
     .object({
-      minWords: z.number().int().min(1).default(3),
+      minWords: z.number().int().min(0).default(0),
       /** The full wait for a selection toolbar, in apps known or learned to show one. From mouse-up. */
       pillDelayMs: z.number().int().min(0).default(250),
       /** The wait everywhere else. */
@@ -136,6 +136,12 @@ export const SETTINGS_MIGRATIONS: { key: SettingsKey; migrate: (stored: unknown)
     key: 'router',
     migrate: (r) =>
       r && typeof r === 'object' && (r as { decisionTimeoutMs?: unknown }).decisionTimeoutMs === 400 ? { ...r, decisionTimeoutMs: 600 } : undefined,
+  },
+  // Oct 10: the auto pill no longer requires 3 words. A stored 3 (the old default) becomes 0; any other value stays.
+  {
+    key: 'capture',
+    migrate: (c) =>
+      c && typeof c === 'object' && (c as { minWords?: unknown }).minWords === 3 ? { ...c, minWords: 0 } : undefined,
   },
 ];
 

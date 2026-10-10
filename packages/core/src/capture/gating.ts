@@ -37,8 +37,8 @@ export function gateAutoSelection(
   if (!g.ok) return g;
   if (sel.is_password) return { ok: false, reason: 'password', mode: g.mode };
   if (!sel.text.trim()) return { ok: false, reason: 'empty', mode: g.mode };
-  if (countWords(sel.text, settings.capture.minWords) < settings.capture.minWords)
-    return { ok: false, reason: 'too_short', mode: g.mode };
+  const min = settings.capture.minWords;
+  if (min > 0 && countWords(sel.text, min) < min) return { ok: false, reason: 'too_short', mode: g.mode };
   return g;
 }
 

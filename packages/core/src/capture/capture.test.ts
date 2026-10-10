@@ -55,9 +55,13 @@ describe('gating', () => {
     expect(countWords('我们明天开会讨论')).toBeGreaterThanOrEqual(3);
   });
 
-  it('applies the 3-word minimum, password, and per-app mode', () => {
-    expect(gateAutoSelection({ text: 'one two three', is_password: false }, slack, s).ok).toBe(true);
-    expect(gateAutoSelection({ text: 'one two', is_password: false }, slack, s)).toMatchObject({ ok: false, reason: 'too_short' });
+  it('shows the pill for any non-empty selection, and still skips passwords and empty text', () => {
+    expect(gateAutoSelection({ text: 'one', is_password: false }, slack, s).ok).toBe(true);
+    expect(gateAutoSelection({ text: 'one two', is_password: false }, slack, s).ok).toBe(true);
+    expect(gateAutoSelection({ text: 'one two', is_password: false }, slack, { ...s, capture: { ...s.capture, minWords: 3 } })).toMatchObject({
+      ok: false,
+      reason: 'too_short',
+    });
     expect(gateAutoSelection({ text: '', is_password: true }, slack, s)).toMatchObject({ ok: false, reason: 'password' });
     expect(gateAutoSelection({ text: '  ', is_password: false }, slack, s)).toMatchObject({ ok: false, reason: 'empty' });
     const hk = { ...s, appModes: { 'slack.exe': 'hotkey' as const } };
