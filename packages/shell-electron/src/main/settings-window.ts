@@ -1,6 +1,6 @@
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, nativeTheme, shell } from 'electron';
 import { logger } from './log';
-import { preloadPath, rendererUrl } from './paths';
+import { hasWindowMaterial, preloadPath, rendererUrl } from './paths';
 import { hwndFromBuffer } from './view';
 
 const log = logger('settings-window');
@@ -40,14 +40,17 @@ export class SettingsWindow {
       existing.focus();
       return;
     }
+    const mica = hasWindowMaterial();
     const win = new BrowserWindow({
-      width: 920,
-      height: 680,
+      width: 960,
+      height: 700,
       minWidth: 720,
       minHeight: 520,
       show: false,
       title: 'Glossly',
       autoHideMenuBar: true,
+      // Windows 11 mica behind the page (Step 13); a plain themed background otherwise.
+      ...(mica ? { backgroundMaterial: 'mica' as const } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff' }),
       webPreferences: {
         preload: preloadPath(),
         contextIsolation: true,
@@ -69,14 +72,14 @@ export class SettingsWindow {
       return { action: 'deny' };
     });
     win.webContents.on('will-navigate', (e, url) => {
-      if (url.split('#')[0] !== rendererUrl('settings')) e.preventDefault();
+      if (url.split(/[?#]/)[0] !== rendererUrl('settings')) e.preventDefault();
     });
     // A reload or crash unmounts the Try-it step without telling main.
     win.webContents.on('did-start-navigation', (d) => {
       if (!d.isSameDocument && d.isMainFrame) this.tryIt = false;
     });
     this.win = win;
-    win.loadURL(rendererUrl('settings', hash)).catch((e: Error) => log.error('failed to load', { message: e.message.slice(0, 200) }));
+    win.loadURL(rendererUrl('settings', hash, mica ? 'material=mica' : '')).catch((e: Error) => log.error('failed to load', { message: e.message.slice(0, 200) }));
   }
 
   send(channel: string, payload: unknown): void {

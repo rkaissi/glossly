@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { AppMode, SettingsKey, SettingsView } from '@glossly/core/api';
+import { X } from 'lucide-react';
 import { glossly } from '../bridge';
 import { formatAccelerator, normalizeAppKey, toAccelerator } from './format';
 import { useAction } from './useAction';
@@ -159,7 +160,7 @@ function AppModes({ view }: { view: SettingsView }) {
                   update(next);
                 }}
               >
-                ✕
+                <X size={15} strokeWidth={1.75} aria-hidden />
               </button>
             </li>
           ))}
@@ -189,7 +190,7 @@ function BlockList({ view }: { view: SettingsView }) {
             <li key={key}>
               <code className="grow">{key}</code>
               <button className="icon-btn" title={`Remove ${key}`} disabled={busy} onClick={() => void set('blockList', list.filter((k) => k !== key))}>
-                ✕
+                <X size={15} strokeWidth={1.75} aria-hidden />
               </button>
             </li>
           ))}

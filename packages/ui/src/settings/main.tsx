@@ -2,8 +2,10 @@
 // #general, #data, #metrics). Main changes the hash on an open window to switch tabs.
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Activity, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { GlosslyMark } from '../icons';
 import '../theme.css';
 import './settings.css';
 import { DataTab } from './Data';
@@ -21,6 +23,11 @@ const TABS = [
   { id: 'metrics', label: 'Metrics' },
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
+
+const TAB_ICONS: Record<Tab, LucideIcon> = { keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
+
+// Main loads the page with ?material=mica when the window is Windows 11 mica.
+document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
 
 const isTab = (h: string): h is Tab => TABS.some((t) => t.id === h);
 const readHash = () => location.hash.replace(/^#/, '');
@@ -56,15 +63,23 @@ function App() {
   return (
     <div className="settings">
       <nav>
-        <div className="brand">Glossly</div>
-        {TABS.map((t) => (
-          <a key={t.id} href={`#${t.id}`} className={t.id === tab ? 'current' : undefined} aria-current={t.id === tab ? 'page' : undefined}>
-            {t.label}
-          </a>
-        ))}
+        <div className="brand">
+          <GlosslyMark size={18} />
+          Glossly
+        </div>
+        {TABS.map((t) => {
+          const Icon = TAB_ICONS[t.id];
+          return (
+            <a key={t.id} href={`#${t.id}`} className={t.id === tab ? 'current' : undefined} aria-current={t.id === tab ? 'page' : undefined}>
+              <Icon size={16} strokeWidth={1.75} aria-hidden />
+              {t.label}
+            </a>
+          );
+        })}
         <span className="spacer" />
         {!view.settings.firstRunComplete && (
           <a href="#setup" className="setup-link">
+            <Sparkles size={16} strokeWidth={1.75} aria-hidden />
             Finish setup
           </a>
         )}

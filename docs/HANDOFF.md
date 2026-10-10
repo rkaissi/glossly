@@ -246,7 +246,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 
 ### Step 13.2: tokens and overlay (Oct 10, done; not run live yet)
 
-170 unit tests pass; `pnpm typecheck` is clean; an `electron-vite build` into a scratch folder works (the shared renderer chunk is the same size as before, so lucide tree-shakes).
+169 unit tests pass; `pnpm typecheck` is clean; an `electron-vite build` into a scratch folder works (the shared renderer chunk is the same size as before, so lucide tree-shakes).
 
 - **Tokens** (`packages/ui/src/theme.css`, both windows): monochrome light and dark sets from `prefers-color-scheme` (`--fg`, `--fg-2`, `--muted`, `--glass` (the tint laid over acrylic so text stays readable), `--glass-solid` (no acrylic: Windows 10 and the dot), `--surface`, `--hover`, `--pressed`, `--border`, `--border-strong`, `--primary` (near-black in light, near-white in dark), `--ring` (neutral focus ring), `--select`, plus `--danger`, `--ok`, `--warn` for status text only), radii 8, 12, 16, `--fade` 150 ms, Segoe UI Variable Text at 14 px (Display for headings). Base styles for buttons (`primary`, `ghost`, `danger`), inputs, kbd, checkbox. No purple anywhere: the old `--accent` variables are gone, and the tray icon is a near-black disc (near-white when the system is dark).
 - **Icons:** `lucide-react` 1.48.0 (peer `react ^19.0.0`; pinned to a release from Sep 24 rather than the day-old latest). `src/icons.tsx` has `ActionIcon` (ask MessageCircle, save Bookmark, reply Reply, who UserRoundSearch, promises ListChecks, visualize ChartColumn) and `GlosslyMark` (a highlight stroke over a line).
@@ -256,6 +256,14 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **Keys** (`keys.ts`): `moreOpen` became `menuOpen` and the command `{kind: 'menu'}`. `Tab` opens the menu with More's first item highlighted; `ArrowDown` and `ArrowUp` move like Right and Left (for the vertical list); `1` to `4`, `Enter`, `Esc` (closes the menu first), and `Ctrl+C` are unchanged. In a panel, `Esc` closes an open menu before going back to the bar. Tests cover the new cases.
 - **Panels:** Ask has a composer (input with a round black send button, `ArrowUp`), a neutral pulsing dot as the streaming cursor, and a Copy button with an icon; Save has monochrome chips (selected = primary), a check line after saving, and an Undo icon; the later-phase panel shows the action's icon.
 - The settings window still uses its old stylesheet in this commit (some old variables no longer exist); 13.3 restyles it.
+
+### Step 13.3: settings window and setup (Oct 10, done; not run live yet)
+
+169 unit tests pass; `pnpm typecheck` is clean. No behavior changes.
+
+- **Window** (`settings-window.ts`): `backgroundMaterial: 'mica'` when `hasWindowMaterial()`, else a themed `backgroundColor` (`#ffffff` or `#212121`); 960x700 (was 920x680). The page loads with `?material=mica`; `will-navigate` now compares the URL up to `?` or `#`.
+- **Layout** (`settings.css`, `main.tsx`): a ChatGPT-style sidebar (220 px; the Glossly mark and name, then Keys, Models, General, Data, Metrics with line icons; the current tab is a gray pill; "Finish setup" is an outlined item at the bottom) on the window's material, and the page on `--page` (translucent white or dark over mica, solid without it) with a hairline between them, content centered at 720 px. Every `.field` (General, Data), `.card` (Keys, setup), `.role`, `.stat`, `.catalog` group, `.list`, and table is a card (`--card`, hairline, 12 px radius, small shadow). Display font for headings (26 and 22 px). Links are underlined in the text color. The tag that marked the roles using a model ("accent") is a gray fill. App-list remove buttons use the X icon.
+- **Setup:** the stepper is centered, the current step's number is a black (white in dark) circle, done steps show a check in the text color; sample text and the chat message are cards; the footer buttons are 36 px.
 
 ## Next steps, in order
 
