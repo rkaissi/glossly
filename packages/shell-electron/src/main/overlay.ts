@@ -19,6 +19,7 @@ export const SIZES = {
   dot: { w: 40, h: 40 },
   bar: { w: 200, h: 40 },
   panel: { w: 520, h: 300 },
+  toast: { w: 260, h: 40 },
 } satisfies Record<Exclude<OverlayMode, 'hidden'>, Size>;
 
 /**
@@ -45,6 +46,7 @@ export const HIDDEN_STATE: OverlayState = {
   badges: [],
   panel: null,
   notice: null,
+  saved: null,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
@@ -261,7 +263,7 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
    */
   resize(sessionId: number, w: number, h: number): void {
     const s = this.state;
-    if (sessionId !== s.sessionId || (s.mode !== 'bar' && s.mode !== 'panel')) return;
+    if (sessionId !== s.sessionId || (s.mode !== 'bar' && s.mode !== 'panel' && s.mode !== 'toast')) return;
     if (!Number.isFinite(w) || !Number.isFinite(h)) return;
     const cur = this.bounds();
     const nw = Math.round(clamp(w, LIMITS.minW, LIMITS.maxW));

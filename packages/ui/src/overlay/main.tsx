@@ -2,7 +2,7 @@
 // pushes OverlayState; this side only renders it and sends clicks and keys back.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { EyeOff, History, Info, Settings, UserRound, X } from 'lucide-react';
+import { Check, EyeOff, History, Info, Settings, Undo2, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { ActionIcon, GlosslyMark } from '../icons';
@@ -17,6 +17,7 @@ import { PromisesPanel } from './PromisesPanel';
 import { RecallPanel } from './RecallPanel';
 import { ReplyPanel } from './ReplyPanel';
 import { SavePanel } from './SavePanel';
+import { SavedToast, useSecondsLeft } from './SavedToast';
 import { SearchPanel } from './SearchPanel';
 import { WhoPanel } from './WhoPanel';
 
@@ -54,6 +55,7 @@ function Overlay() {
   if (!s || s.mode === 'hidden') return null;
   if (s.mode === 'dot') return <Dot s={s} />;
   if (s.mode === 'pill') return <Pill s={s} />;
+  if (s.mode === 'toast') return <SavedToast s={s} />;
   return <Expanded key={s.sessionId} s={s} />;
 }
 
@@ -94,10 +96,18 @@ function Pill({ s }: { s: OverlayState }) {
         <ActionIcon action="ask" />
         <span>Ask</span>
       </button>
-      <button className="slot save" onClick={() => run(s.sessionId, { slot: 2 })}>
-        <ActionIcon action="save" />
-        <span>Save</span>
-      </button>
+      {s.saved ? (
+        // Autosave: already saved. The bar it expands into offers Undo.
+        <button className="slot save" title={`Saved to ${s.saved.collection}`} onClick={() => expand(s.sessionId)}>
+          <Check size={16} strokeWidth={2} aria-hidden />
+          <span>Saved</span>
+        </button>
+      ) : (
+        <button className="slot save" onClick={() => run(s.sessionId, { slot: 2 })}>
+          <ActionIcon action="save" />
+          <span>Save</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -113,6 +123,7 @@ function Expanded({ s }: { s: OverlayState }) {
   });
   const id = s.sessionId;
   const items = barItems(s.slots, s.hasSelection, menuOpen);
+  const undoLeft = useSecondsLeft(s.saved?.undoUntil);
   const hl = Math.min(highlight, items.length - 1);
 
   // Main sizes the window; report the content's real size after every change.
@@ -211,7 +222,20 @@ function Expanded({ s }: { s: OverlayState }) {
         <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
         {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
         {/* Nothing selected: nothing to save, so Search and the paste actions sit next to Ask. */}
-        {s.hasSelection && slotButton({ slot: 2 }, save, { cls: 'save' })}
+        {s.hasSelection && !s.saved && slotButton({ slot: 2 }, save, { cls: 'save' })}
+        {s.hasSelection && s.saved && (
+          // Already saved (autosave): slot 2 undoes it while the undo window lasts.
+          <button
+            key="slot2:saved"
+            className={['slot save', isHighlighted({ slot: 2 }) && 'highlight'].filter(Boolean).join(' ')}
+            title={undoLeft > 0 ? `Undo: remove it from ${s.saved.collection}` : `Saved to ${s.saved.collection}`}
+            disabled={undoLeft === 0}
+            onClick={() => run(id, { slot: 2 })}
+          >
+            {s.keyboard && undoLeft > 0 ? <kbd>2</kbd> : undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
+            <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : `Saved to ${s.saved.collection}`}</span>
+          </button>
+        )}
         {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
         {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
         {s.badges.map((b) =>

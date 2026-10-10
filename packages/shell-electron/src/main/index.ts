@@ -1,7 +1,7 @@
 import { app } from 'electron';
 import { Capture } from './capture';
 import { HelperManager } from './helper-manager';
-import { HotkeyManager } from './hotkey';
+import { HotkeyManager, SaveHotkey } from './hotkey';
 import { registerIpc } from './ipc';
 import { errorInfo, initLog, logger } from './log';
 import { Overlay } from './overlay';
@@ -42,6 +42,17 @@ async function main(): Promise<void> {
   const hotkey = new HotkeyManager(() => {
     capture.hotkey().catch((e: unknown) => log.error('hotkey failed', errorInfo(e)));
   });
+  const saveHotkey = new SaveHotkey(() => {
+    capture.saveHotkey().catch((e: unknown) => log.error('save hotkey failed', errorInfo(e)));
+  });
+  /** Matches the save hotkey to the Save mode. A fallback shortcut is stored; a failure becomes a notice. */
+  const syncSaveHotkey = (): string | null => {
+    if (noCapture) return null;
+    const r = saveHotkey.sync(services.settings);
+    if (r.accelerator && r.accelerator !== services.settings.saveHotkey) services.setSetting('saveHotkey', r.accelerator);
+    if (r.error) services.setSetting('pendingNotice', r.error);
+    return r.error ?? null;
+  };
 
   let pending = false;
   const broadcastSettings = () => {
@@ -61,7 +72,7 @@ async function main(): Promise<void> {
   };
   services.embed.on('status', (s) => settingsWindow.send('embed:progress', s));
 
-  registerIpc({ services, overlay, capture, settingsWindow, hotkey, broadcastSettings, broadcastPeople });
+  registerIpc({ services, overlay, capture, settingsWindow, hotkey, saveHotkey, syncSaveHotkey, broadcastSettings, broadcastPeople });
 
   if (noCapture) log.info('capture off (GLOSSLY_NO_CAPTURE)');
   else {
@@ -69,6 +80,7 @@ async function main(): Promise<void> {
     if (!hotkey.register(services.settings.hotkey)) {
       services.setSetting('pendingNotice', `The hotkey ${services.settings.hotkey} is taken by another app. Pick another in Settings.`);
     }
+    syncSaveHotkey();
   }
 
   const { refresh } = createTray({
@@ -96,6 +108,7 @@ async function main(): Promise<void> {
     capture.close('quit');
     reminders.stop();
     hotkey.dispose();
+    saveHotkey.dispose();
     helper.stop();
     services
       .shutdown()

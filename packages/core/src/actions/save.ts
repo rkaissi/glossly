@@ -37,6 +37,8 @@ export interface SaveInput {
   /** Collection name. Created if it does not exist yet. */
   collection: string;
   why?: string | null;
+  /** How the save was asked for, for metrics only. */
+  via?: 'panel' | 'hotkey' | 'autosave';
 }
 
 export interface SaveResult {
@@ -125,8 +127,17 @@ export class SaveService {
     });
     const undoUntil = this.now() + settings.save.undoSeconds * 1000;
     this.undoDeadlines.set(item.id, undoUntil);
-    this.deps.metrics?.record('save_done', { method: selection.method, trigger: selection.trigger, has_why: Boolean(item.why) });
+    this.deps.metrics?.record('save_done', { method: selection.method, trigger: selection.trigger, has_why: Boolean(item.why), via: input.via ?? 'panel' });
     return { item, undoUntil, enriched: this.startEnrich(item) };
+  }
+
+  /** Moves a saved item to another collection (created if needed). Returns the collection's name, or null if the item is gone. */
+  move(itemId: string, collection: string): string | null {
+    const { store } = this.deps;
+    if (!store.getItem(itemId)) return null;
+    const c = store.collectionByName(collection) ?? store.createCollection(collection);
+    store.setItemCollection(itemId, c.id);
+    return c.name;
   }
 
   /** Deletes the item if still inside the undo window. Returns whether it was undone. */

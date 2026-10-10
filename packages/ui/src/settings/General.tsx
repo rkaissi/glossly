@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { AppMode, SettingsKey, SettingsView } from '@glossly/core/api';
+import type { AppMode, Settings, SettingsKey, SettingsView } from '@glossly/core/api';
 import { X } from 'lucide-react';
 import { glossly } from '../bridge';
 import { formatAccelerator, normalizeAppKey, toAccelerator } from './format';
@@ -18,10 +18,10 @@ function useSetting() {
   return { ...a, set };
 }
 
-function Hotkey({ view }: { view: SettingsView }) {
+/** Shows a shortcut and records a new one: hold Ctrl, Alt, or Win and press a key. */
+function ShortcutRecorder({ value, fallback, busy, onSet }: { value: string; fallback: string; busy: boolean; onSet: (accelerator: string) => void }) {
   const [recording, setRecording] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
-  const { busy, error, setError, set } = useSetting();
 
   const onKeyDown = (e: KeyboardEvent) => {
     e.preventDefault();
@@ -38,15 +38,11 @@ function Hotkey({ view }: { view: SettingsView }) {
     }
     setRecording(false);
     setHint(null);
-    void set('hotkey', r.accelerator);
+    onSet(r.accelerator);
   };
 
   return (
-    <div className="field">
-      <div className="field-label">
-        <strong>Hotkey</strong>
-        <p className="muted small">Opens the bar for the current selection, in any app. It is the only keyboard shortcut Glossly listens for.</p>
-      </div>
+    <>
       <div className="row">
         {recording ? (
           <input
@@ -59,24 +55,92 @@ function Hotkey({ view }: { view: SettingsView }) {
             onBlur={() => setRecording(false)}
           />
         ) : (
-          <kbd className="hotkey">{formatAccelerator(view.settings.hotkey)}</kbd>
+          <kbd className="hotkey">{formatAccelerator(value)}</kbd>
         )}
-        <button
-          disabled={busy || recording}
-          onClick={() => {
-            setError(null);
-            setRecording(true);
-          }}
-        >
+        <button disabled={busy || recording} onClick={() => setRecording(true)}>
           Change
         </button>
-        {view.settings.hotkey !== 'Control+Alt+Space' && (
-          <button disabled={busy} onClick={() => void set('hotkey', 'Control+Alt+Space')}>
+        {value !== fallback && (
+          <button disabled={busy} onClick={() => onSet(fallback)}>
             Reset
           </button>
         )}
       </div>
       {recording && <p className="muted small">{hint ?? 'Hold Ctrl, Alt, or Win and press a key. Esc cancels.'}</p>}
+    </>
+  );
+}
+
+function Hotkey({ view }: { view: SettingsView }) {
+  const { busy, error, setError, set } = useSetting();
+  return (
+    <div className="field">
+      <div className="field-label">
+        <strong>Hotkey</strong>
+        <p className="muted small">Opens the bar for the current selection, in any app. With nothing selected, it opens search.</p>
+      </div>
+      <ShortcutRecorder
+        value={view.settings.hotkey}
+        fallback="Control+Alt+Space"
+        busy={busy}
+        onSet={(acc) => {
+          setError(null);
+          void set('hotkey', acc);
+        }}
+      />
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
+const SAVE_MODES: { mode: Settings['saveMode']; label: string; desc: string }[] = [
+  { mode: 'manual', label: 'Manual', desc: 'The bar shows Save to the collection Glossly picks. Click it to choose and save.' },
+  { mode: 'hotkey', label: 'Manual, plus a save hotkey', desc: 'Save stays in the bar, and a second shortcut saves the selection straight away, with Undo.' },
+  { mode: 'autosave', label: 'Autosave on highlight', desc: 'Every highlight that shows the pill is saved as you make it. The bar offers Undo instead of Save.' },
+];
+
+/** Save mode (decision 15), next to the main hotkey. */
+function SaveMode({ view }: { view: SettingsView }) {
+  const { busy, error, setError, set } = useSetting();
+  const mode = view.settings.saveMode;
+  return (
+    <div className="field">
+      <div className="field-label">
+        <strong>Saving</strong>
+        <p className="muted small">Every save goes to the collection Glossly picks for the selection, and can be undone for {view.settings.save.undoSeconds} seconds.</p>
+      </div>
+      <div className="choices" role="radiogroup" aria-label="Save mode">
+        {SAVE_MODES.map((m) => (
+          <label key={m.mode} className={`choice${mode === m.mode ? ' selected' : ''}`}>
+            <input
+              type="radio"
+              name="saveMode"
+              checked={mode === m.mode}
+              disabled={busy}
+              onChange={() => {
+                setError(null);
+                void set('saveMode', m.mode);
+              }}
+            />
+            <span>
+              <strong>{m.label}</strong>
+              <span className="muted small block">{m.desc}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {mode === 'hotkey' && (
+        <ShortcutRecorder
+          value={view.settings.saveHotkey}
+          fallback="Control+Alt+S"
+          busy={busy}
+          onSet={(acc) => {
+            setError(null);
+            void set('saveHotkey', acc);
+          }}
+        />
+      )}
+      {mode === 'autosave' && <p className="muted small">Passwords and empty selections are never saved, and the same text is not saved twice while it stays selected.</p>}
       {error && <p className="error small">{error}</p>}
     </div>
   );
@@ -211,6 +275,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
     <section>
       <h2>General</h2>
       <Hotkey view={view} />
+      <SaveMode view={view} />
       <Toggle
         view={view}
         k="localOnly"

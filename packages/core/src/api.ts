@@ -34,7 +34,8 @@ export type ActionId = 'ask' | 'save' | BarAction | 'recall';
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
 export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'search' | 'recall' | 'paste_list' | 'paste_summary';
 
-export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
+/** `toast`: the small "Saved to Notes · Undo" strip after the save hotkey; it never takes focus. */
+export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel' | 'toast';
 
 type ObstacleSide = ClassifiedObstacle['side'];
 
@@ -108,6 +109,15 @@ export interface SlotsView {
 
 export type Badge = { kind: 'recall'; count: number } | { kind: 'person'; personId: string; label: string };
 
+/** A save made without the Save panel: by the save hotkey (shown as a toast) or by autosave (the pill and bar show it). */
+export interface SavedNotice {
+  itemId: string;
+  collection: string;
+  /** Epoch ms. Undo works until then. */
+  undoUntil: number;
+  via: 'hotkey' | 'autosave';
+}
+
 export interface OverlayState {
   /** New for every selection; stale requests carrying an old id are ignored. */
   sessionId: number;
@@ -128,6 +138,8 @@ export interface OverlayState {
   panel: ActionId | null;
   /** One-time notice, e.g. a role's model went away. */
   notice: string | null;
+  /** This selection is already saved (save hotkey or autosave); Save becomes Undo. */
+  saved: SavedNotice | null;
 }
 
 // ---- Ask ----
@@ -292,6 +304,8 @@ export interface InvokeChannels {
   'save:save': { args: SaveArgs; result: SaveDone };
   'save:setWhy': { args: { itemId: string; why: string }; result: boolean };
   'save:undo': { args: { itemId: string }; result: { undone: boolean } };
+  /** Undoes the session's save hotkey or autosave save (SavedNotice). */
+  'saved:undo': { args: { sessionId: number }; result: { undone: boolean } };
 
   'clipboard:write': { args: { text: string }; result: void };
 

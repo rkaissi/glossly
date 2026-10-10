@@ -40,6 +40,14 @@ export const SettingsSchema = z.object({
   firstRunComplete: z.boolean().default(false),
   /** Electron accelerator syntax. */
   hotkey: z.string().default('Control+Alt+Space'),
+  /**
+   * Save mode (decision 15). manual: the Save button opens the Save panel. hotkey: the same,
+   * plus `saveHotkey` saves the selection straight away. autosave: a highlight that shows the
+   * pill is saved as it is captured, and the bar offers Undo instead of Save.
+   */
+  saveMode: z.enum(['manual', 'hotkey', 'autosave']).default('manual'),
+  /** Registered only in the "hotkey" Save mode. */
+  saveHotkey: z.string().default('Control+Alt+S'),
   localOnly: z.boolean().default(false),
   debugView: z.boolean().default(true),
   identity: IdentitySchema.prefault({}),

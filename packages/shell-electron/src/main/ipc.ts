@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { aliasKindOf, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type PromiseSaveRow, type SetSettingResult, type SettingsKey } from '@glossly/core';
 import type { Capture } from './capture';
-import type { HotkeyManager } from './hotkey';
+import type { HotkeyManager, SaveHotkey } from './hotkey';
 import { logger } from './log';
 import type { Overlay } from './overlay';
 import type { Services } from './services';
@@ -22,6 +22,9 @@ export interface IpcDeps {
   capture: Capture;
   settingsWindow: SettingsWindow;
   hotkey: HotkeyManager;
+  saveHotkey: SaveHotkey;
+  /** Registers or unregisters the save hotkey to match the settings; queues a notice if it can't. */
+  syncSaveHotkey: () => string | null;
   /** Pushes the settings view to every window. */
   broadcastSettings: () => void;
   /** Tells every window that people or commitments changed. */
@@ -43,7 +46,7 @@ const obj = (v: unknown): Record<string, unknown> => {
 };
 
 export function registerIpc(deps: IpcDeps): void {
-  const { services, overlay, capture, settingsWindow, hotkey, broadcastSettings, broadcastPeople } = deps;
+  const { services, overlay, capture, settingsWindow, hotkey, saveHotkey, syncSaveHotkey, broadcastSettings, broadcastPeople } = deps;
   const people = services.people;
 
   const trusted = (e: IpcMainInvokeEvent) => overlay.isOwnWindow(e.sender.id) || settingsWindow.isOwnWindow(e.sender.id);
@@ -95,6 +98,7 @@ export function registerIpc(deps: IpcDeps): void {
   handle('save:save', (a) => capture.save(num(a.sessionId), str(a.collection, 100), a.why === undefined ? undefined : str(a.why, 2000)));
   handle('save:setWhy', (a) => services.save.setWhy(str(a.itemId, 100), str(a.why, 2000)));
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
+  handle('saved:undo', (a) => capture.undoSaved(num(a.sessionId)));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
 
   // ---- Recall and search ----
@@ -244,7 +248,15 @@ export function registerIpc(deps: IpcDeps): void {
     const key = str(a.key, 50) as SettingsKey;
     if (key === 'roles') throw new Error('Use roles:set');
     if (key === 'hotkey') {
-      const err = hotkey.change(str(a.value, 100));
+      const value = str(a.value, 100);
+      if (services.settings.saveMode === 'hotkey' && value === services.settings.saveHotkey) {
+        return { settings: services.settings, error: 'That is already the save hotkey. Pick a different shortcut.' };
+      }
+      const err = hotkey.change(value);
+      if (err) return { settings: services.settings, error: err };
+    }
+    if (key === 'saveHotkey' && services.settings.saveMode === 'hotkey') {
+      const err = saveHotkey.change(str(a.value, 100), services.settings.hotkey);
       if (err) return { settings: services.settings, error: err };
     }
     try {
@@ -252,8 +264,9 @@ export function registerIpc(deps: IpcDeps): void {
     } catch {
       return { settings: services.settings, error: 'That value is not valid.' };
     }
+    const error = key === 'saveMode' ? syncSaveHotkey() : null;
     broadcastSettings();
-    return { settings: services.settings };
+    return { settings: services.settings, ...(error && { error }) };
   });
   handle('keys:add', async (a) => {
     const r = await services.addKey(str(a.provider, 30), str(a.key, 500));
@@ -306,6 +319,7 @@ export function registerIpc(deps: IpcDeps): void {
     capture.close('reset_settings');
     services.resetSettings();
     if (hotkey.change(services.settings.hotkey)) log.warn('default hotkey unavailable after reset');
+    syncSaveHotkey();
     log.info('settings reset');
     broadcastSettings();
   });

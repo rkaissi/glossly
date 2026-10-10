@@ -237,6 +237,15 @@ describe('SaveService', () => {
     expect(store.collectionByName('Recipes')?.id).toBe(saved.collection_id);
   });
 
+  it('moves a saved item to another collection, and records how it was saved', () => {
+    const { svc } = setup();
+    const { item: saved } = svc.save({ selection: selection(), collection: 'Notes', via: 'autosave' });
+    expect(svc.move(saved.id, 'Reading')).toBe('Reading');
+    expect(store.getItem(saved.id)?.collection_id).toBe(store.collectionByName('Reading')?.id);
+    expect(svc.move('missing', 'Reading')).toBeNull();
+    expect(store.listEvents()[0]?.payload).toMatchObject({ via: 'autosave' });
+  });
+
   it('undoes within the window and not after', async () => {
     let t = 1_000_000;
     const { svc } = setup({ now: () => t });

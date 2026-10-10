@@ -427,6 +427,17 @@ A review of the 15.5 commits, with fixes. 345 unit tests pass; `pnpm typecheck` 
 - **Reading of the plan.** "Show paste only when nothing is selected or the focused control is editable, so a highlight isn't replaced": paste is offered only when nothing is selected, so a highlight is never replaced; editability then only decides whether it is a top slot or waits under More.
 - `insertReply` now goes through the shared `insertText`; Reply behaves as before. New channels `paste:compose` and `paste:insert`; new settings `paste {recentCount, recentDays}`; new action ids `paste_list` and `paste_summary`.
 
+### Step 16.3: Save mode (Oct 10, decision 15)
+
+355 unit tests pass; `pnpm typecheck` is clean. Not run live yet.
+
+- **Setting.** `saveMode` (`manual`, the default; `hotkey`; `autosave`) and `saveHotkey` (`Control+Alt+S`). General has a "Saving" field under the hotkey: three choices, the shortcut recorder under "Manual, plus a save hotkey" (the same recorder as the main hotkey, now `ShortcutRecorder`), and the undo window in the description. Every save goes to the autoselected collection.
+- **Manual** is unchanged.
+- **Save hotkey** (`SaveHotkey` in `hotkey.ts`, registered only in that mode, re-synced on every mode change and on Reset settings). If the default is taken it tries `Control+Alt+Shift+S`, then `Control+Shift+Alt+B`, and stores what it got; a shortcut the user picked does not fall back, and the old one is kept with an error. It can't equal the main hotkey (checked both ways). Pressing it (`Capture.saveHotkey`): foreground, gate, selection (passwords never; copy fallback where the hotkey would use it), tier 1, then `Router.route` (the model's collection when it answers within the router budget, else the rules'), then Save with `via: 'hotkey'`. A small toast (overlay mode `toast`, shown without focus) says "Saved to Reading" with Undo and a countdown; it ignores typing and app switches and closes when the undo window ends, on a click elsewhere, or on a scroll. With nothing selected it says so for two seconds.
+- **Autosave on highlight.** When the auto pill shows (not for the hotkey bar, not for hotkey-only apps, not in the Try-it window), the selection is saved at once to the rules' collection (`via: 'autosave'`). The pill shows "Saved" instead of Save; the bar shows "Undo save (Ns)" in slot 2 (key `2`), then "Saved to Reading" once the window is over. When the route settles, the item moves once to the route's collection if that differs (`SaveService.move`), the same rule as the Save label in 15.5.3. The same text in the same window is not saved again while the last autosave is still the latest (it shows that save instead). After Undo, slot 2 is the normal Save again.
+- Metrics: `save_done` now has `via` (`panel`, `hotkey`, `autosave`); `save_hotkey` counts presses. New channel `saved:undo`; `OverlayState.saved` (`SavedNotice`).
+- **Cost to know about.** Autosave runs Save's entity extraction (one Fast call) on every highlight that shows the pill, and the save hotkey runs the router's call. With Groq's free tier, heavy highlighting in autosave can hit its per-minute limits; the item is still saved and embedded when that call fails.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

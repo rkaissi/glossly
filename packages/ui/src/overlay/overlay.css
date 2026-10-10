@@ -847,3 +847,37 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 button.badge {
   cursor: pointer;
 }
+
+/* ---- Save hotkey toast ---- */
+
+html[data-material='acrylic'] body[data-mode='toast'] {
+  background: var(--glass);
+}
+.toast {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 40px;
+  padding: 0 6px 0 12px;
+  gap: 8px;
+  white-space: nowrap;
+  color: var(--fg);
+  animation: fade-in 120ms ease-out;
+}
+.toast.above {
+  top: auto;
+  bottom: 0;
+}
+html:not([data-material='acrylic']) .toast {
+  background: var(--glass-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.toast-text {
+  font-size: 13px;
+}
+.toast button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}

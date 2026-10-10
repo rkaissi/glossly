@@ -216,7 +216,8 @@ select optgroup {
   color: CanvasText;
 }
 
-input[type='checkbox'] {
+input[type='checkbox'],
+input[type='radio'] {
   accent-color: var(--primary);
   width: 16px;
   height: 16px;

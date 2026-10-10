@@ -57,6 +57,7 @@ import {
   type Rect,
   type RouteResult,
   type SaveDone,
+  type SavedNotice,
   type SelectionPayload,
   type SelectionContext,
   type Trigger,
@@ -122,6 +123,10 @@ interface Session {
   focusEditable: boolean | null;
   /** The running paste summary. */
   pasteCtl: AbortController | null;
+  /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
+  saved: SavedNotice | null;
+  /** Autosave moves its item to the route's collection once; set after that. */
+  savedSettled: boolean;
 }
 
 /** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
@@ -178,6 +183,8 @@ export class Capture {
   private bouncing = false;
   /** The session whose pill or dot is expanding (tier 1 is being read). */
   private expanding: Session | null = null;
+  /** The last autosave, so the same text in the same window isn't saved twice. */
+  private lastAutosave: { handle: number; text: string; notice: SavedNotice } | null = null;
   /** Epoch ms until which a hotkey-opened bar stays up. 0 when not settling. */
   private settleUntil = 0;
 
@@ -385,12 +392,16 @@ export class Capture {
         askRelated: null,
         focusEditable: null,
         pasteCtl: null,
+        saved: null,
+        savedSettled: false,
       };
       this.session = session;
+      if (settings.saveMode === 'autosave' && session.siteKey !== null) this.autosave(session);
       this.overlay.update(
         {
           ...HIDDEN_STATE,
           sessionId: session.id,
+          saved: session.saved,
           mode: placement.mode,
           placement,
           hasSelection: true,
@@ -582,6 +593,8 @@ export class Capture {
       askRelated: null,
       focusEditable,
       pasteCtl: null,
+      saved: null,
+      savedSettled: false,
     };
     this.session = session;
 
@@ -753,7 +766,8 @@ export class Capture {
       const prev = this.state.slots;
       const next = slotsView(r, r.fallback ? 'rules_fallback' : 'model');
       const saveOpen = this.state.mode === 'panel' && this.state.panel === 'save';
-      this.overlay.patch({ slots: prev ? mergeRoute(prev, next, { keepSave: saveOpen }) : next, debug: this.debugFor(s) });
+      const slots = prev ? mergeRoute(prev, next, { keepSave: saveOpen }) : next;
+      this.overlay.patch({ slots, debug: this.debugFor(s), saved: this.settleAutosave(s, slots.slot2.collection) });
       const routed = {
         provider: r.decisions.provider,
         fallback: r.fallback ?? 'none',
@@ -777,6 +791,10 @@ export class Capture {
     const action = 'slot' in target ? actionForSlot(this.state.slots, target.slot) : target.action;
     if (!action) return;
     if (!s.selection && !WITHOUT_SELECTION.includes(action)) return;
+    if (action === 'save' && s.saved) {
+      this.undoSaved(sessionId);
+      return;
+    }
     this.stopWatch();
     this.services.metrics.record('action_clicked', { action, ms: ms(s.t0), trigger: s.trigger });
     if (action === 'recall') this.services.metrics.record('recall_opened', { count: this.visibleRecall(s).length });
@@ -1124,6 +1142,163 @@ export class Capture {
     }
   }
 
+  // ---- Save modes (decision 15) ----
+
+  /** Autosave: the highlight is saved to the rules' collection as the pill shows. */
+  private autosave(s: Session): void {
+    if (!s.selection || !s.fg) return;
+    const last = this.lastAutosave;
+    if (last && last.handle === s.fg.handle && last.text === s.selection.text) {
+      // The same text is still selected: show that save again instead of saving twice.
+      if (this.services.store.getItem(last.notice.itemId)) {
+        s.saved = last.notice;
+        s.savedSettled = true;
+      }
+      return;
+    }
+    const collection = this.router().quick(toContext(s.selection)).decisions.best_collection;
+    const r = this.services.save.save({ selection: s.selection, container: null, collection, via: 'autosave' });
+    void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
+    s.saved = { itemId: r.item.id, collection, undoUntil: r.undoUntil, via: 'autosave' };
+    this.lastAutosave = { handle: s.fg.handle, text: s.selection.text, notice: s.saved };
+    log.info('autosaved');
+  }
+
+  /** When the route settles, an autosaved item moves to its collection once (the same choice as the Save label). */
+  private settleAutosave(s: Session, collection: string): SavedNotice | null {
+    const saved = s.saved;
+    if (!saved || saved.via !== 'autosave' || s.savedSettled) return saved;
+    s.savedSettled = true;
+    if (collection === saved.collection) return saved;
+    const moved = this.services.save.move(saved.itemId, collection);
+    if (!moved) return saved;
+    s.saved = { ...saved, collection: moved };
+    if (this.lastAutosave?.notice.itemId === saved.itemId) this.lastAutosave.notice = s.saved;
+    return s.saved;
+  }
+
+  undoSaved(sessionId: number): { undone: boolean } {
+    const s = this.current(sessionId);
+    if (!s?.saved) return { undone: false };
+    const undone = this.services.save.undo(s.saved.itemId);
+    if (this.lastAutosave?.notice.itemId === s.saved.itemId) this.lastAutosave = null;
+    if (undone) {
+      s.saved = null;
+      if (this.state.mode === 'toast') this.close('toast_undone');
+      else this.overlay.patch({ saved: null });
+    }
+    log.info('saved undo', { undone });
+    return { undone };
+  }
+
+  /**
+   * The save hotkey: saves the selection to the route's collection with no panel, and shows a
+   * small toast with Undo that never takes focus. Passwords and empty selections are never saved.
+   */
+  async saveHotkey(): Promise<void> {
+    this.services.metrics.record('save_hotkey');
+    const settings = this.settings;
+    const cursor = screen.getCursorScreenPoint();
+    const t0 = performance.now();
+    let fg: Foreground;
+    let sel: CommandResult<'selection'> | null = null;
+    try {
+      fg = await this.helper.request('foreground');
+      if (this.isOwn(fg)) return;
+      const appId = { process_name: fg.process_name, title: fg.title };
+      if (!gateApp(appId, 'hotkey', settings).ok) return;
+      try {
+        sel = await this.helper.request('selection', { max_chars: MAX_SELECTION_CHARS });
+      } catch (e) {
+        if (e instanceof HelperError && e.code === 'password_field') return;
+      }
+      if (sel?.is_password) return;
+      let text = sel?.text ?? '';
+      let method: SelectionPayload['method'] = sel?.method ?? 'uia';
+      if (mayCopyFallback(sel, appId, settings)) {
+        text = (await this.helper.request('copy_fallback', { timeout_ms: settings.capture.copyTimeoutMs })).text;
+        method = 'copy';
+      }
+      if (!text.trim()) {
+        this.showToast(null, sel?.bounds ?? null, cursor, 'Nothing is selected to save.');
+        return;
+      }
+      const selection: SelectionPayload = {
+        text,
+        context_before: '',
+        context_after: '',
+        source_app: fg.process_name,
+        window_title: fg.title,
+        captured_at: isoNow(),
+        method,
+        trigger: 'hotkey',
+        is_editable: sel?.is_editable ?? false,
+        foreground_handle: fg.handle,
+      };
+      if (method !== 'copy') {
+        const n = settings.capture.contextChars;
+        const ctx = await this.helper.request('context', { before: n, after: n }).catch(() => null);
+        if (ctx) {
+          selection.context_before = ctx.before;
+          selection.context_after = ctx.after;
+        }
+      }
+      // The same choice as the Save label: the route's collection when it settles in time, else the rules'.
+      const route = await this.router().route(toContext(selection));
+      const collection = route.decisions.best_collection;
+      const r = this.services.save.save({ selection, container: null, collection, via: 'hotkey' });
+      void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
+      log.info('saved by hotkey', { ms: ms(t0), fallback: route.fallback ?? 'none' });
+      this.showToast({ itemId: r.item.id, collection, undoUntil: r.undoUntil, via: 'hotkey' }, sel?.bounds ?? null, cursor, null, fg);
+    } catch (e) {
+      if (!(e instanceof HelperError)) log.error('save hotkey failed', errorInfo(e));
+    }
+  }
+
+  /** The small strip after the save hotkey. It shows inactive, so typing stays in the app. */
+  private showToast(saved: SavedNotice | null, physBounds: Rect | null, cursor: Point, notice: string | null, fg: Foreground | null = null): void {
+    this.endSession();
+    const bounds = physBounds ? toDipRect(physBounds) : cursorRect(cursor);
+    const anchor = physBounds ? { x: bounds.x + bounds.w, y: bounds.y + bounds.h } : cursor;
+    const session: Session = {
+      id: this.nextSessionId++,
+      trigger: 'hotkey',
+      t0: performance.now(),
+      fg,
+      selection: null,
+      bounds,
+      anchor,
+      siteKey: null,
+      tier1Read: false,
+      container: null,
+      route: null,
+      routeCtl: null,
+      asks: new Map(),
+      timings: {},
+      placement: null,
+      obstacles: [],
+      pill: null,
+      promisesCtl: null,
+      whoCtl: null,
+      author: null,
+      reply: null,
+      recall: null,
+      recallDismissed: new Set(),
+      askRelated: null,
+      focusEditable: null,
+      pasteCtl: null,
+      saved,
+      savedSettled: true,
+    };
+    this.session = session;
+    const placement = placeBar({ selection: bounds, anchor, obstacles: [], size: SIZES.toast, growW: SIZES.toast.w + 80, workArea: workArea(anchor) });
+    this.overlay.update({ ...HIDDEN_STATE, sessionId: session.id, mode: 'toast', placement, saved, notice }, placement.rect);
+    const ttl = saved ? Math.max(1500, saved.undoUntil - Date.now()) : 2000;
+    setTimeout(() => {
+      if (this.current(session.id) && this.state.mode === 'toast') this.close('toast_done');
+    }, ttl);
+  }
+
   // ---- Recall and search ----
 
   private recallDeps() {
@@ -1301,6 +1476,8 @@ export class Capture {
    * so the next vanish can be told apart from a real dismiss.
    */
   private activityHide(signal: HideSignal, ownForeground = false): void {
+    // The save toast stays through typing and app switches; it closes on its timer, a click, or a scroll.
+    if (this.state.mode === 'toast' && signal !== 'wheel') return;
     const input = {
       signal,
       visible: this.overlay.isVisible,

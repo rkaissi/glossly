@@ -179,6 +179,10 @@ export class Store {
     return this.db.prepare('SELECT * FROM items ORDER BY created_at DESC, rowid DESC LIMIT ?').all(limit) as unknown as Item[];
   }
 
+  setItemCollection(id: string, collectionId: string): void {
+    this.db.prepare('UPDATE items SET collection_id = ? WHERE id = ?').run(collectionId, id);
+  }
+
   updateItemWhy(id: string, why: string | null): void {
     this.db.prepare('UPDATE items SET why = ? WHERE id = ?').run(why, id);
   }

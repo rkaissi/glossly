@@ -688,3 +688,26 @@ th {
   resize: vertical;
   font: inherit;
 }
+
+/* Save mode: one choice per row, the picked one outlined. */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.choice.selected {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.choice input {
+  margin-top: 3px;
+}
