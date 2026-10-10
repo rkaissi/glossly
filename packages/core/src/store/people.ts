@@ -460,11 +460,12 @@ export class PeopleRepo {
     this.db.prepare('DELETE FROM voice_samples WHERE id = ?').run(id);
   }
 
-  /** Up to `n` samples for a Reply prompt: pasted ones first, then the latest inserted replies. */
+  /** Up to `n` samples for a Reply prompt: pasted ones first, then edits, then other inserted replies. Newest first within each. */
   voiceForPrompt(n = 5): string[] {
     const all = this.voiceSamples();
     const pasted = all.filter((v) => v.origin === 'pasted');
-    const inserted = all.filter((v) => v.origin !== 'pasted');
-    return [...pasted, ...inserted].slice(0, n).map((v) => v.text);
+    const edited = all.filter((v) => v.origin === 'inserted_edited');
+    const inserted = all.filter((v) => v.origin === 'inserted');
+    return [...pasted, ...edited, ...inserted].slice(0, n).map((v) => v.text);
   }
 }

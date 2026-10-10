@@ -104,6 +104,8 @@ describe('PeopleRepo', () => {
     r.addVoice('my pasted sample', 'pasted');
     expect(r.voiceSamples().filter((v) => v.origin === 'inserted')).toHaveLength(20);
     expect(r.voiceForPrompt(3)).toEqual(['my pasted sample', 'reply 24', 'reply 23']);
+    r.addVoice('please send the deck', 'inserted_edited');
+    expect(r.voiceForPrompt(3)).toEqual(['my pasted sample', 'please send the deck', 'reply 24']);
   });
 
   it('deletes a person with their records', () => {

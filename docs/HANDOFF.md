@@ -382,6 +382,10 @@ The auto pill shows for any non-empty selection that is not a password. `capture
 
 The Save confirmation now reads "Saved to Notes · just now". Each row in a person's Saved list already shows the day (`formatDay` on `items.created_at`: Today, Yesterday, or a date). Recall cards in Step 16 show it too.
 
+### Step 15.5.7: reply edits are kept (Oct 10)
+
+Insert already stores the text the panel sends, which is the edited draft when one was typed (`insertReply` trims that string and marks it `inserted_edited`). `voiceForPrompt` still puts pasted samples first, then edited inserts, then other inserts, newest first within each group, and still caps at 5. The Reply panel says "Edits are remembered." No new learner.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -441,7 +445,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
 4. ~~**No word minimum.**~~ Done, see Step 15.5.4 above. Original notes: `capture.minWords` defaults to 3 and the schema rejects 0 (`settings.ts`, `gateAutoSelection`). The auto pill shows for any non-empty selection that isn't a password. Empty selections still don't show a pill. Migrate a stored 3 to 0 once, the same way Step 12.3 migrated the router timeout. The hotkey already opens with nothing selected; its empty state is Step 16, not this.
 5. ~~**Delete buttons are red and ask first.**~~ Done, see Step 15.5.5 above. Original notes: Person delete, Delete all data, and Reset settings already confirm; the button isn't red. Alias remove, voice-sample remove, API-key remove, and saved-item delete are one click. Make every control that destroys a saved record red, and put the same inline confirm in front of it. Removing a chip while typing a profile email can stay one click (it isn't saved yet).
 6. ~~**Show when a snippet was saved.**~~ Done, see Step 15.5.6 above. Original notes: `items.created_at` already exists and isn't shown on the Save confirmation or the person's Saved list. Show it there ("Saved to Notes · just now", and the day on each saved row). Recall cards in Step 16 show it too.
-7. **Reply edits are already kept.** An inserted draft is stored as a voice sample, `inserted` or `inserted_edited` (Step 15.4), and the next Reply prompt gets up to 5 samples, pasted ones first. In this step, only check that the text stored is the edited text, put the newest edits ahead of older inserted ones, and add one line on the draft ("Edits are remembered"). No new learner.
+7. ~~**Reply edits are already kept.**~~ Done, see Step 15.5.7 above. Original notes: An inserted draft is stored as a voice sample, `inserted` or `inserted_edited` (Step 15.4), and the next Reply prompt gets up to 5 samples, pasted ones first. In this step, only check that the text stored is the edited text, put the newest edits ahead of older inserted ones, and add one line on the draft ("Edits are remembered"). No new learner.
 
 8. **Who is this identifies the wrong people.** This is the important bug. Regex is the whole implementation (`people/detect.ts` calls `extractFeatures`; `actions/who.ts` says it makes no model call). On Rayan's two captures it both invents people and misses the real ones.
 
@@ -499,7 +503,7 @@ Respect Local only (decision 12) in every new model call, and apply the Step 13 
 
 Answered on Oct 10: pill speed (stay careful about toolbars, make it faster, never move a visible pill), router timeout (raise it), Delete all data (keep keys and settings; add Reset settings), Local only (strict; local models later), packaging (after all phases), the eval run (once, at the end), the redesign direction, and the scope (all Windows phases before packaging).
 
-Answered the same afternoon, from the Discord and Outlook screenshots and the written list: people identification (model reads, code accepts; see decision 14 and Step 15.5), no word minimum, the bar and slot flicker, Save's collection, delete confirms, snippet timestamps, empty-selection search and paste, a save hotkey, Ask memory, todos then Google sync, privacy as a choice, polish, and a subscription parked. Step 15.5 is in progress: chunks 1 to 6 are done, chunk 7 (reply edits) is next.
+Answered the same afternoon, from the Discord and Outlook screenshots and the written list: people identification (model reads, code accepts; see decision 14 and Step 15.5), no word minimum, the bar and slot flicker, Save's collection, delete confirms, snippet timestamps, empty-selection search and paste, a save hotkey, Ask memory, todos then Google sync, privacy as a choice, polish, and a subscription parked. Step 15.5 is in progress: chunks 1 to 7 are done, chunk 8 (Who is this) is next.
 
 ## Things Rayan has to do himself
 

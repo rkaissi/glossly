@@ -242,6 +242,7 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
           })}
         </ul>
       )}
+      {done && drafts.length > 0 && <p className="muted">Edits are remembered.</p>}
 
       {stream.status === 'error' && (
         <div className="answer-error">
