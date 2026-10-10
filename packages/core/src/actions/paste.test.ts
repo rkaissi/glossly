@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
 import { assignEmptySlots, scoreEmptyActions } from '../router/slots';
 import { Store } from '../store/store';
-import { buildPasteSummaryPrompt, pasteList, recentSnippets } from './paste';
+import { buildPasteSummaryPrompt, pasteAsSaved, pasteList, recentSnippets } from './paste';
 
 const at = (daysAgo: number) => {
   const d = new Date(Date.UTC(2026, 9, 10, 12) - daysAgo * 86_400_000);
@@ -22,6 +22,7 @@ describe('paste', () => {
       const items = recentSnippets(store, DEFAULT_SETTINGS, Date.UTC(2026, 9, 10, 12));
       expect(items.map((i) => i.text)).toEqual(['Budget is 40k', 'The launch moved\nto Thursday']);
       expect(pasteList(items)).toBe('- The launch moved to Thursday\n- Budget is 40k');
+      expect(pasteAsSaved(items)).toBe('The launch moved\nto Thursday\n\nBudget is 40k');
       expect(buildPasteSummaryPrompt(items)).toContain('<snippet n="1" saved="2026-10-08">');
     } finally {
       store.close();

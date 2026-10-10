@@ -2,6 +2,7 @@
 // short summary written by the Chat model. Either way the text is shown first and pasted only
 // when the user says so.
 import pastePrompt from '../../prompts/paste-summary.md?raw';
+import { cleanText } from '../capture/clean';
 import type { LlmProvider } from '../llm/types';
 import type { Settings } from '../settings';
 import type { Store } from '../store/store';
@@ -25,8 +26,16 @@ export function recentSnippets(store: Store, settings: Pick<Settings, 'paste'>, 
 export function pasteList(items: Pick<Item, 'text'>[]): string {
   return [...items]
     .reverse()
-    .map((it) => `- ${clip(oneLine(it.text), MAX_LIST_ITEM)}`)
+    .map((it) => `- ${clip(oneLine(cleanText(it.text)), MAX_LIST_ITEM)}`)
     .join('\n');
+}
+
+/** The snippets as they were saved (cleaned of capture artifacts), oldest first, a blank line between them. */
+export function pasteAsSaved(items: Pick<Item, 'text'>[]): string {
+  return [...items]
+    .reverse()
+    .map((it) => cleanText(it.text))
+    .join('\n\n');
 }
 
 export function buildPasteSummaryPrompt(items: Pick<Item, 'text' | 'why' | 'created_at'>[]): string {

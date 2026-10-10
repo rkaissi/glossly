@@ -7,6 +7,7 @@ import {
   Router,
   ask,
   classifyObstacles,
+  cleanText,
   countWords,
   detectInputFor,
   detectPeople,
@@ -29,6 +30,7 @@ import {
   recall as recallFor,
   visualize,
   assignEmptySlots,
+  pasteAsSaved,
   pasteList,
   pasteSummary,
   recentSnippets,
@@ -79,6 +81,8 @@ import { Lru, actionForSlot, contains, distanceToRect, emptySlotsView, growFrom,
 const log = logger('capture');
 
 const WATCH_INTERVAL_MS = 80;
+/** After a click outside a focused bar, how long to let Windows move the foreground before checking it. */
+const CLICK_SETTLE_MS = 120;
 /** Who and Visualize results kept per input (see `whoCache`). */
 const MODEL_CACHE_SIZE = 20;
 const MAX_SELECTION_CHARS = 20_000;
@@ -256,15 +260,40 @@ export class Capture {
     return this.session && this.session.id === id ? this.session : null;
   }
 
+  /** The helper's selection, with what other apps leave in copied text (OBJ, invisible characters) cleaned out. */
+  private async readSelection(): Promise<CommandResult<'selection'>> {
+    const sel = await this.helper.request('selection', { max_chars: MAX_SELECTION_CHARS });
+    return { ...sel, text: cleanText(sel.text) };
+  }
+
+  /**
+   * Whether Windows really has the overlay in front. Electron's isFocused() can say yes after
+   * the hotkey's focus request was refused, and then no blur ever comes. Null when the helper
+   * can't tell.
+   */
+  private async overlayInFront(): Promise<boolean | null> {
+    try {
+      return (await this.helper.request('foreground')).handle === this.overlay.nativeHandle();
+    } catch {
+      return null;
+    }
+  }
+
   // ---- helper events ----
 
   private onHelperEvent(ev: HelperEvent): void {
     switch (ev.event) {
       case 'mouse_down': {
         this.autoGen++;
-        const inside = this.overlay.isVisible && contains(this.overlay.hitBounds(), toDipPoint(ev));
-        if (!this.overlay.isVisible || this.overlay.hasFocus) return;
-        if (!inside) this.close('click_outside');
+        if (!this.overlay.isVisible || contains(this.overlay.hitBounds(), toDipPoint(ev))) return;
+        if (!this.overlay.hasFocus) {
+          this.close('click_outside');
+          return;
+        }
+        // A focused bar closes on blur. If Windows never put it in front, no blur comes and the
+        // bar would stay up, so once the click has landed, check what is really in front.
+        const id = this.session?.id;
+        setTimeout(() => void this.closeIfNotInFront(id), CLICK_SETTLE_MS);
         return;
       }
       case 'mouse_up': {
@@ -313,7 +342,7 @@ export class Capture {
       if (!gateApp(appId, 'auto', settings).ok) return;
 
       t = performance.now();
-      const sel = await this.helper.request('selection', { max_chars: MAX_SELECTION_CHARS });
+      const sel = await this.readSelection();
       timings.selection = ms(t);
       if (stale()) return;
       if (!gateAutoSelection(sel, appId, settings).ok) return;
@@ -547,7 +576,7 @@ export class Capture {
           let sel: CommandResult<'selection'> | null = null;
           let password = false;
           try {
-            sel = await this.helper.request('selection', { max_chars: MAX_SELECTION_CHARS });
+            sel = await this.readSelection();
             password = sel.is_password;
           } catch (e) {
             if (e instanceof HelperError && e.code === 'password_field') password = true;
@@ -564,7 +593,7 @@ export class Capture {
             t = performance.now();
             const cf = await this.helper.request('copy_fallback', { timeout_ms: settings.capture.copyTimeoutMs });
             timings.copy_fallback = ms(t);
-            text = cf.text;
+            text = cleanText(cf.text);
             method = 'copy';
           }
 
@@ -671,8 +700,10 @@ export class Capture {
   private focusOverlay(settle = false): void {
     if (settle) this.armHotkeySettle();
     this.overlay.focus();
-    setTimeout(() => {
-      if (!this.overlay.hasFocus || this.overlay.osFocused || this.bouncing) return;
+    setTimeout(async () => {
+      if (!this.overlay.hasFocus || this.bouncing) return;
+      // Asks Windows, not Electron: isFocused() can be true while another window is in front.
+      if ((await this.overlayInFront()) !== false || !this.overlay.hasFocus || this.bouncing) return;
       void this.helper
         .request('restore_focus', { handle: this.overlay.nativeHandle() })
         .then((r) => {
@@ -739,8 +770,8 @@ export class Capture {
     const t = performance.now();
     try {
       const ctx = await this.helper.request('context', { before: n, after: n });
-      s.selection.context_before = ctx.before;
-      s.selection.context_after = ctx.after;
+      s.selection.context_before = cleanText(ctx.before, { trimEdges: false });
+      s.selection.context_after = cleanText(ctx.after, { trimEdges: false });
     } catch {
       /* no tier 1 (copy fallback, or the app lost its selection): route on the selection alone */
     }
@@ -1158,7 +1189,7 @@ ${s.selection.text}`;
     if (items.length === 0) return { ok: false, code: 'no_selection', message: `Nothing saved in the last ${this.settings.paste.recentDays} days.` };
     if (kind === 'list') {
       this.services.metrics.record('paste_composed', { kind, count: items.length, ms: 0 });
-      return { ok: true, text: pasteList(items), count: items.length };
+      return { ok: true, text: pasteList(items), asSaved: pasteAsSaved(items), count: items.length };
     }
     s.pasteCtl?.abort();
     const ctl = new AbortController();
@@ -1186,7 +1217,7 @@ ${s.selection.text}`;
     if (!s) throw new Error('This bar is gone. Press the hotkey again.');
     const item = this.services.store.getItem(itemId);
     if (!item) throw new Error('That item no longer exists.');
-    return this.insertText(s, item.text, 'search', (how) => this.services.metrics.record('search_inserted', { how, ms: ms(s.t0) }));
+    return this.insertText(s, cleanText(item.text), 'search', (how) => this.services.metrics.record('search_inserted', { how, ms: ms(s.t0) }));
   }
 
   async insertPaste(sessionId: number, text: string, kind: 'list' | 'summary', edited: boolean): Promise<ReplyInsertResult> {
@@ -1325,7 +1356,7 @@ ${s.selection.text}`;
       const appId = { process_name: fg.process_name, title: fg.title };
       if (!gateApp(appId, 'hotkey', settings).ok) return;
       try {
-        sel = await this.helper.request('selection', { max_chars: MAX_SELECTION_CHARS });
+        sel = await this.readSelection();
       } catch (e) {
         if (e instanceof HelperError && e.code === 'password_field') return;
       }
@@ -1333,7 +1364,7 @@ ${s.selection.text}`;
       let text = sel?.text ?? '';
       let method: SelectionPayload['method'] = sel?.method ?? 'uia';
       if (mayCopyFallback(sel, appId, settings)) {
-        text = (await this.helper.request('copy_fallback', { timeout_ms: settings.capture.copyTimeoutMs })).text;
+        text = cleanText((await this.helper.request('copy_fallback', { timeout_ms: settings.capture.copyTimeoutMs })).text);
         method = 'copy';
       }
       if (!text.trim()) {
@@ -1356,8 +1387,8 @@ ${s.selection.text}`;
         const n = settings.capture.contextChars;
         const ctx = await this.helper.request('context', { before: n, after: n }).catch(() => null);
         if (ctx) {
-          selection.context_before = ctx.before;
-          selection.context_after = ctx.after;
+          selection.context_before = cleanText(ctx.before, { trimEdges: false });
+          selection.context_after = cleanText(ctx.after, { trimEdges: false });
         }
       }
       // The same choice as the Save label: the route's collection when it settles in time, else the rules'.
@@ -1590,6 +1621,15 @@ ${s.selection.text}`;
     if (focused && s.fg && reason !== 'blur' && reason !== 'settings' && !reason.endsWith('_inserted')) {
       void this.helper.request('restore_focus', { handle: s.fg.handle }).catch(() => {});
     }
+  }
+
+  /** A click outside a focused bar: close it unless the overlay is still the window in front (a dropdown or date picker it opened). */
+  private async closeIfNotInFront(id: number | undefined): Promise<void> {
+    if (id === undefined || this.session?.id !== id || !this.overlay.isVisible || !this.overlay.hasFocus || this.bouncing) return;
+    if ((await this.overlayInFront()) !== false) return;
+    if (this.session?.id !== id || !this.overlay.isVisible || this.bouncing) return;
+    log.info('overlay was not in front');
+    this.close('click_outside');
   }
 
   /** Ignores hide signals for a short time after the hotkey opens the bar. */

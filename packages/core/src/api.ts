@@ -206,7 +206,16 @@ export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; rea
 // ---- Paste (nothing selected) ----
 
 export type PasteKind = 'list' | 'summary';
-export type PasteCompose = { ok: true; text: string; /** Snippets used. */ count: number } | { ok: false; code: AskErrorEvent['code']; message: string };
+export type PasteCompose =
+  | {
+      ok: true;
+      text: string;
+      /** List only: the snippets in full, as saved, for "As saved" in the panel. */
+      asSaved?: string;
+      /** Snippets used. */
+      count: number;
+    }
+  | { ok: false; code: AskErrorEvent['code']; message: string };
 
 // ---- What did I promise ----
 

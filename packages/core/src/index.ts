@@ -8,6 +8,7 @@ export * from './helper/protocol';
 export * from './helper/client';
 
 export * from './capture/apps';
+export * from './capture/clean';
 export * from './capture/gating';
 export * from './capture/placement';
 export * from './capture/obstacles';

@@ -6,14 +6,16 @@ import { ActionIcon } from '../icons';
 
 /**
  * Paste for the bar with nothing selected: the recent snippets as a list, or a short summary.
- * The text is shown and editable first; Enter pastes it into the app (or copies it when the
- * focused control doesn't take text).
+ * The list can switch to the snippets as saved (full text, original line breaks). The text is
+ * shown and editable first; Enter pastes it into the app (or copies it when the focused
+ * control doesn't take text).
  */
 export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
   const [composed, setComposed] = useState<PasteCompose | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [form, setForm] = useState<'list' | 'as_saved'>('list');
   const editor = useRef<HTMLTextAreaElement>(null);
 
   const compose = async () => {
@@ -34,12 +36,19 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
   }, [s.keyboard, composed]);
 
   const ready = composed?.ok === true && text.trim().length > 0;
+  const original = composed?.ok ? (form === 'as_saved' && composed.asSaved !== undefined ? composed.asSaved : composed.text) : '';
+  // Switching the form replaces the box with that form; edits to the other one are dropped.
+  const switchForm = (next: 'list' | 'as_saved') => {
+    if (!composed?.ok || next === form) return;
+    setForm(next);
+    setText(next === 'as_saved' && composed.asSaved !== undefined ? composed.asSaved : composed.text);
+  };
 
   const insert = async () => {
     if (!ready || busy || !composed?.ok) return;
     setBusy(true);
     try {
-      const r = await glossly.invoke('paste:insert', { sessionId: s.sessionId, kind, text, edited: text !== composed.text });
+      const r = await glossly.invoke('paste:insert', { sessionId: s.sessionId, kind, text, edited: text !== original });
       // On success the bar has closed; a copy keeps the panel open with how to paste.
       if (r.result === 'copied') {
         setNote(r.reason === 'not_editable' ? 'Copied. Click where it should go and press Ctrl+V.' : 'Copied. Paste with Ctrl+V.');
@@ -81,6 +90,27 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
         </span>
       </h2>
 
+      {composed?.ok && composed.asSaved !== undefined && (
+        <div className="chips" role="radiogroup" aria-label="Format">
+          {(
+            [
+              ['list', 'List'],
+              ['as_saved', 'As saved'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              role="radio"
+              aria-checked={form === value}
+              className={`chip${form === value ? ' selected' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => switchForm(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {!composed && <p className="muted">{kind === 'list' ? 'Gathering…' : 'Summarizing…'}</p>}
       {composed?.ok && (
         <textarea

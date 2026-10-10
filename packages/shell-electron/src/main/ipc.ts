@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
-import { aliasKindOf, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type PromiseSaveRow, type SetSettingResult, type SettingsKey } from '@glossly/core';
+import { aliasKindOf, cleanText, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type PromiseSaveRow, type SetSettingResult, type SettingsKey } from '@glossly/core';
 import type { Capture } from './capture';
 import type { HotkeyManager, SaveHotkey } from './hotkey';
 import { logger } from './log';
@@ -120,7 +120,7 @@ export function registerIpc(deps: IpcDeps): void {
   handle('items:copy', (a) => {
     const item = services.store.getItem(str(a.itemId, 100));
     if (!item) throw new Error('That item no longer exists.');
-    clipboard.writeText(item.text);
+    clipboard.writeText(cleanText(item.text));
   });
   handle('items:insert', (a) => capture.insertItem(num(a.sessionId), str(a.itemId, 100)));
 
