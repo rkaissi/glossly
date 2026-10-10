@@ -17,8 +17,8 @@ export interface DetectedPerson {
   knownId: string | null;
   /** Model-written role ("recruiter at NVIDIA"). Blank on the local pass. */
   detail?: string | null;
-  /** Model-written relation. Blank on the local pass. */
-  relation?: string | null;
+  /** Model-written line about this person. Blank on the local pass. */
+  about?: string | null;
   /** The model's guess at how the user knows them, to prefill Create person. Null on the local pass. */
   relationship?: Relationship | null;
 }

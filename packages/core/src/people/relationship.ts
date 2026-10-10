@@ -1,5 +1,6 @@
 // How the user knows a person. Reply learns per relationship (friends, colleagues, ...) as well
-// as per person, since one person rarely gives enough replies to learn from. Unknown is null.
+// as per person, since one person rarely gives enough replies to learn from. Other covers a
+// relationship the text does not make clearer. Null is only for a person saved with none set.
 
 export const RELATIONSHIPS = ['friend', 'family', 'colleague', 'professional', 'acquaintance', 'stranger', 'other'] as const;
 export type Relationship = (typeof RELATIONSHIPS)[number];

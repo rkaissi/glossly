@@ -5,6 +5,7 @@ import whoPrompt from '../../prompts/who.md?raw';
 import type { LlmProvider } from '../llm/types';
 import { type DetectedPerson, type DetectInput, type Detection } from '../people/detect';
 import { describeIdentity } from '../people/names';
+import { RELATIONSHIPS } from '../people/relationship';
 import { acceptWhoRows, localWho, whoCorpus } from '../people/who-judge';
 import { resolvePerson } from '../people/resolve';
 import type { PersonCard } from '../people/types';
@@ -40,8 +41,8 @@ export const WhoPeopleSchema = z.object({
       email: z.string(),
       handle: z.string(),
       role: z.string(),
-      relation: z.string(),
-      relationship: z.string(),
+      about: z.string(),
+      relationship: z.enum(RELATIONSHIPS),
       // Not bounded here: one row scored 85 would fail the whole call. acceptWhoRows reads it.
       confidence: z.number(),
       evidence: z.string(),

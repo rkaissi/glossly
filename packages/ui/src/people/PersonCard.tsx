@@ -1,4 +1,4 @@
-// The person card (spec: Who is this): name, aliases, how you know them, open commitments
+// The person card (spec: Who is this): name, aliases, about them, open commitments
 // split into "You owe" and "They owe", recent interactions, and saved items that mention
 // them. Shared by the overlay's Who panel and the settings window's full record.
 import { useState, type KeyboardEvent } from 'react';
@@ -75,13 +75,13 @@ function Note({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) 
     ) : (
       <button className="ghost add-note" onClick={() => setEditing(true)}>
         <Plus size={14} strokeWidth={1.75} aria-hidden />
-        How do you know {firstName(card.name)}?
+        About {firstName(card.name)}
       </button>
     );
   }
   return (
     <div className="note-edit">
-      <textarea autoFocus rows={2} value={text} maxLength={1000} placeholder="How you know them" onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} />
+      <textarea autoFocus rows={2} value={text} maxLength={1000} placeholder="About this person" aria-label="About" onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} />
       <div className="row-tight">
         <button className="primary" disabled={busy} onClick={save}>
           Save note

@@ -15,7 +15,7 @@ export interface Person {
   id: string;
   entity_id: string | null;
   name: string;
-  /** How you know them (user-written). */
+  /** About this person. The model can prefill it; the user can edit it. */
   note: string | null;
   /** Friend, colleague, ...; null when unknown. Reply learns per relationship. */
   relationship: Relationship | null;

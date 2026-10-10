@@ -15,8 +15,8 @@ export interface WhoCandidate {
   email: string;
   handle: string;
   role: string;
-  relation: string;
-  /** One of RELATIONSHIPS, or anything else for unknown. Optional: the local pass never guesses. */
+  about: string;
+  /** One of RELATIONSHIPS. Optional: the local pass never guesses. */
   relationship?: string;
   confidence: number;
   evidence: string;
@@ -81,7 +81,7 @@ function mergeInto(keep: WhoCandidate, drop: WhoCandidate, preferName: string): 
   if (!keep.email && drop.email) keep.email = drop.email;
   if (!keep.handle && drop.handle) keep.handle = drop.handle;
   if (!keep.role && drop.role) keep.role = drop.role;
-  if (!keep.relation && drop.relation) keep.relation = drop.relation;
+  if (!keep.about && drop.about) keep.about = drop.about;
   if (!asRelationship(keep.relationship) && asRelationship(drop.relationship)) keep.relationship = drop.relationship;
   keep.confidence = Math.max(keep.confidence, drop.confidence);
 }
@@ -183,7 +183,7 @@ function attachContacts(rows: WhoCandidate[], corpus: string): WhoCandidate[] {
       email: kind === 'email' ? norm : '',
       handle: kind === 'handle' ? norm : '',
       role: '',
-      relation: '',
+      about: '',
       confidence: 1,
       evidence: value,
     });
@@ -217,7 +217,7 @@ function toDetected(r: WhoCandidate): DetectedPerson | null {
     role: 'mentioned',
     knownId: null,
     detail: r.role.trim() || null,
-    relation: r.relation.trim() || null,
+    about: r.about.trim() || null,
     relationship: asRelationship(r.relationship),
   };
 }
@@ -278,7 +278,7 @@ function loneSpeakers(corpus: string): string[] {
 export function localWho(input: DetectInput, me: Identity): DetectedPerson[] {
   const corpus = whoCorpus(input);
   const found = new Map<string, WhoCandidate>();
-  const blank = { role: '', relation: '', confidence: 1 };
+  const blank = { role: '', about: '', confidence: 1 };
   for (const h of headerNames(corpus)) {
     addLocal(found, { name: h.name ?? '', email: h.email ?? '', handle: '', evidence: h.email ?? h.name ?? '', ...blank }, me);
   }
@@ -289,6 +289,6 @@ export function localWho(input: DetectInput, me: Identity): DetectedPerson[] {
     if (speaker) addLocal(found, { name: speaker, email: '', handle: '', evidence: speaker, ...blank }, me);
   }
   for (const name of loneSpeakers(corpus)) addLocal(found, { name, email: '', handle: '', evidence: name, ...blank }, me);
-  const people = acceptWhoRows([...found.values()], corpus, me).map((p) => ({ ...p, detail: null, relation: null, relationship: null }));
+  const people = acceptWhoRows([...found.values()], corpus, me).map((p) => ({ ...p, detail: null, about: null, relationship: null }));
   return people.slice(0, WHO_MAX_PEOPLE);
 }

@@ -90,5 +90,7 @@ describe('Reply', () => {
     reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [] });
     expect(calls[0]).toMatchObject({ role: 'chat', action: 'reply' });
     expect(calls[0]!.instructions).toContain('Write exactly 3 drafts');
+    expect(calls[0]!.instructions).toContain('write all three drafts in line with it');
+    expect(calls[0]!.instructions).not.toContain('deliberately differs');
   });
 });

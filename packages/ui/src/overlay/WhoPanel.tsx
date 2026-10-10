@@ -62,6 +62,8 @@ function SameQuestion({ entry, onResolved }: { entry: WhoEntry; onResolved: (car
                   name: d.name ?? d.email ?? d.handle ?? 'Unnamed',
                   ...(d.email && { email: d.email }),
                   ...(d.handle && { handle: d.handle }),
+                  ...(noteFrom(d) && { note: noteFrom(d) }),
+                  relationship: d.relationship ?? 'other',
                 }),
               ),
             )
@@ -76,7 +78,7 @@ function SameQuestion({ entry, onResolved }: { entry: WhoEntry; onResolved: (car
 }
 
 function noteFrom(detected: DetectedPerson | null): string {
-  return [detected?.detail, detected?.relation].filter((s) => s && s.trim()).join('. ');
+  return [detected?.detail, detected?.about].filter((s) => s && s.trim()).join('. ');
 }
 
 /** Spec: no match, so offer "Create person" with the detected name, email, handle, and note prefilled. */
@@ -85,8 +87,7 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
   const [email, setEmail] = useState(detected?.email ?? '');
   const [handle, setHandle] = useState(detected?.handle ?? '');
   const [note, setNote] = useState(noteFrom(detected));
-  // The model's guess, editable; empty is unknown.
-  const [relationship, setRelationship] = useState<Relationship | ''>(detected?.relationship ?? '');
+  const [relationship, setRelationship] = useState<Relationship>(detected?.relationship ?? 'other');
   const { busy, error, run } = useAction();
   const create = () =>
     void run(async () => {
@@ -97,7 +98,7 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
           ...(email.trim() && { email: email.trim() }),
           ...(handle.trim() && { handle: handle.trim().replace(/^@+/, '') }),
           ...(note.trim() && { note: note.trim() }),
-          relationship: relationship || null,
+          relationship,
         }),
       );
     });
@@ -114,9 +115,8 @@ function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null
         <input value={name} placeholder="Name" aria-label="Name" spellCheck={false} onChange={(e) => setName(e.target.value)} />
         <input value={email} placeholder="Email (optional)" aria-label="Email" spellCheck={false} onChange={(e) => setEmail(e.target.value)} />
         <input value={handle} placeholder="Handle (optional)" aria-label="Handle" spellCheck={false} onChange={(e) => setHandle(e.target.value)} />
-        <input className="wide" value={note} placeholder="How do you know them? (optional)" aria-label="Note" onChange={(e) => setNote(e.target.value)} />
-        <select value={relationship} aria-label="Relationship" onChange={(e) => setRelationship(e.target.value as Relationship | '')}>
-          <option value="">Relationship: unknown</option>
+        <input className="wide" value={note} placeholder="About this person (optional)" aria-label="About" onChange={(e) => setNote(e.target.value)} />
+        <select value={relationship} aria-label="Relationship" onChange={(e) => setRelationship(e.target.value as Relationship)}>
           {RELATIONSHIP_OPTIONS.map(([value, text]) => (
             <option key={value} value={value}>
               {text}
