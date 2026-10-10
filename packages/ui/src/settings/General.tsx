@@ -215,7 +215,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
         view={view}
         k="localOnly"
         label="Local only"
-        desc="While this is on, nothing is sent to a model provider. Slots 3 and 4 come from local rules, Save stores and embeds on this computer but skips finding people and companies, and Ask is turned off."
+        desc="While this is on, nothing is sent to a model provider. Slots 3 and 4 come from local rules, Save stores and embeds on this computer but skips finding people and companies, and Ask, Reply, and What did I promise are turned off. Who is this keeps working, since it never uses a model."
       />
       <Toggle view={view} k="debugView" label="Debug view" desc="Shows capture method, timings, and routing details at the bottom of the bar." />
       <AppModes view={view} />

@@ -10,7 +10,7 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   visualize: 'Visualize',
 };
 
-const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises'];
+const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply'];
 export const isAvailable = (a: ActionId): a is AvailableAction => (AVAILABLE as readonly string[]).includes(a);
 
 function slot(action: ActionId, score?: number): SlotView {

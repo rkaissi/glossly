@@ -37,9 +37,9 @@ export function decideByRules({ context, features: f, collections }: DecisionInp
   const type = contentType(f);
   const isMessage = type === 'message_thread' || type === 'single_message';
 
-  // Text in an editable field is usually the user's own draft.
+  // Text in an editable field is usually the user's own draft; automated mail has nobody to answer.
   let authored = isMessage ? (f.messengerApp ? 0.7 : 0.55) : 0.1;
-  if (context.is_editable) authored = Math.min(authored, 0.15);
+  if (context.is_editable || f.automated || f.authorIsMe) authored = Math.min(authored, 0.15);
 
   // Names in articles, tables, and code are rarely people the user knows.
   const weakNames = type === 'article' || type === 'table_or_numbers' || type === 'code';

@@ -1,0 +1,85 @@
+// Reply (spec: Actions, Reply with context): three intent-labeled drafts, streamed on the Chat
+// role, written with what the user knows about the person and in the user's own voice.
+import replyPrompt from '../../prompts/reply.md?raw';
+import type { LlmProvider, StreamResult } from '../llm/types';
+import type { DetectedPerson } from '../people/detect';
+import { describeIdentity } from '../people/names';
+import type { PersonCard } from '../people/types';
+import type { Settings } from '../settings';
+import type { ContainerContext, SelectionPayload } from '../types';
+import { contextWindow } from './context';
+
+export interface ReplyInput {
+  selection: SelectionPayload;
+  container?: ContainerContext | null;
+  author: DetectedPerson | null;
+  authorIsMe: boolean;
+  /** The author's record, when they resolved exactly. */
+  person: PersonCard | null;
+  /** 3 to 5 samples of how the user writes (Profile, plus replies they inserted). */
+  voice: string[];
+}
+
+const MAX_SELECTION = 6000;
+const THREAD_CHARS = 6000;
+const MAX_VOICE = 5;
+const MAX_VOICE_CHARS = 600;
+const SELECTION_MARK = '[SELECTION]';
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+const day = (iso: string) => {
+  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+};
+
+/** The person record for the prompt: note, open commitments both ways, and recent messages. */
+function personSection(p: PersonCard): string[] {
+  const out = [`## What you know about ${p.name}`];
+  if (p.note) out.push(`How the user knows them: ${clip(p.note, 400)}`);
+  const due = (d: string | null) => (d ? ` (due ${day(d)})` : '');
+  if (p.youOwe.length) out.push('The user owes them:', ...p.youOwe.map((c) => `- ${c.text}${due(c.due_at)}`));
+  if (p.theyOwe.length) out.push('They owe the user:', ...p.theyOwe.map((c) => `- ${c.text}${due(c.due_at)}`));
+  if (p.interactions.length) {
+    out.push('Recent messages:', ...p.interactions.slice(0, 5).map((i) => `- ${day(i.occurred_at)}, ${i.direction === 'inbound' ? 'from them' : 'from the user'}: ${clip(i.text, 300)}`));
+  }
+  if (out.length === 1) out.push('Nothing saved yet.');
+  return out;
+}
+
+export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: ReplyInput, now: Date = new Date()): string {
+  const { selection } = input;
+  const win = contextWindow(selection, input.container, THREAD_CHARS);
+  const thread = win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length);
+  const a = input.author;
+  const to = input.authorIsMe
+    ? 'The user wrote the selected message; draft a follow-up to the other people in the thread.'
+    : a
+      ? [a.name, a.email, a.handle && `@${a.handle}`].filter(Boolean).join(', ')
+      : 'Unknown: whoever wrote the selected message.';
+  const parts = ['## The user', describeIdentity(settings.identity) ?? 'Unknown.', '', '## Replying to', to, ''];
+  if (input.person) parts.push(...personSection(input.person), '');
+  const voice = input.voice.slice(0, MAX_VOICE);
+  parts.push('## Voice samples (how the user writes)');
+  if (voice.length) voice.forEach((v) => parts.push('<sample>', clip(v, MAX_VOICE_CHARS), '</sample>'));
+  else parts.push('None yet. Keep it natural and brief.');
+  parts.push(
+    '',
+    '## App',
+    `${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''}`,
+    '',
+    '## Today',
+    now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+    '',
+    '## Selected message',
+    '<selection>',
+    clip(selection.text, MAX_SELECTION),
+    '</selection>',
+  );
+  if (thread.trim() !== SELECTION_MARK) parts.push('', `## Thread (${SELECTION_MARK} marks the selected message)`, '<thread>', thread, '</thread>');
+  return parts.join('\n');
+}
+
+/** Streams the three drafts on the Chat role, action "reply". Local only refuses in the LLM layer. */
+export function reply(llm: LlmProvider, settings: Pick<Settings, 'identity'>, input: ReplyInput, signal?: AbortSignal): StreamResult {
+  return llm.stream({ role: 'chat', action: 'reply', instructions: replyPrompt, prompt: buildReplyPrompt(settings, input), signal, maxOutputTokens: 1200 });
+}

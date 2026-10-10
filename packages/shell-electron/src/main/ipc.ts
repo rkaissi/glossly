@@ -97,6 +97,17 @@ export function registerIpc(deps: IpcDeps): void {
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
 
+  // ---- Reply ----
+  handle('reply:start', (a, e) => capture.startReply(num(a.sessionId), e.sender));
+  handle('reply:cancel', (a) => capture.cancelReply(str(a.requestId, 100)));
+  handle('reply:insert', async (a) => {
+    if (typeof a.edited !== 'boolean') throw new Error('Invalid argument');
+    const r = await capture.insertReply(num(a.sessionId), str(a.text, 10_000), a.edited, optStr(a.personId, 100));
+    broadcastPeople();
+    return r;
+  });
+  handle('reply:copied', (a) => capture.replyCopied(num(a.sessionId)));
+
   // ---- What did I promise ----
   handle('promises:extract', (a) => capture.extractPromises(num(a.sessionId)));
   handle('promises:save', (a) => {
@@ -187,6 +198,16 @@ export function registerIpc(deps: IpcDeps): void {
     const status = optStr(a?.status, 10) as CommitmentStatus | undefined;
     if (status && !STATUSES.includes(status)) throw new Error('Invalid status');
     return people.commitments(status ? { status } : {});
+  });
+  handle('voice:list', () => people.voiceSamples());
+  handle('voice:add', (a) => {
+    if (people.voiceSamples().filter((v) => v.origin === 'pasted').length >= 5) throw new Error('Keep at most 5 samples; remove one first.');
+    people.addVoice(str(a.text, 2000), 'pasted');
+    return people.voiceSamples();
+  });
+  handle('voice:remove', (a) => {
+    people.deleteVoice(str(a.id, 100));
+    return people.voiceSamples();
   });
   handle('commitments:set-status', (a) => {
     const status = str(a.status, 10) as CommitmentStatus;

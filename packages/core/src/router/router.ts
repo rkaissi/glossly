@@ -1,4 +1,4 @@
-import type { Settings } from '../settings';
+import type { Identity, Settings } from '../settings';
 import { extractFeatures, type Features } from './features';
 import { decideByRules } from './rules';
 import { assignSlots } from './slots';
@@ -20,6 +20,8 @@ export interface RouterDeps {
   settings: () => Pick<Settings, 'router' | 'localOnly'>;
   collections: () => string[];
   people?: () => KnownPerson[];
+  /** The user's identity, to tell their own messages apart. */
+  identity?: () => Identity;
   now?: () => number;
 }
 
@@ -29,7 +31,7 @@ export class Router {
   /** Rules only: instant, used to paint the bar before the model answers. */
   quick(context: SelectionContext): RouteResult {
     const start = this.now();
-    const features = extractFeatures(context, this.deps.people?.() ?? []);
+    const features = extractFeatures(context, this.deps.people?.() ?? [], this.deps.identity?.());
     const decisions = decideByRules({ context, features, collections: this.deps.collections() });
     return {
       decisions,
@@ -43,7 +45,7 @@ export class Router {
   async route(context: SelectionContext, signal?: AbortSignal): Promise<RouteResult> {
     const start = this.now();
     const settings = this.deps.settings();
-    const features = extractFeatures(context, this.deps.people?.() ?? []);
+    const features = extractFeatures(context, this.deps.people?.() ?? [], this.deps.identity?.());
     const input = { context, features, collections: this.deps.collections() };
 
     let decisions: Decisions | null = null;

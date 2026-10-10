@@ -1,6 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import type { Identity, SettingsView } from '@glossly/core/api';
+import type { Identity, SettingsView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { parseEmail, parseHandle } from './format';
 import { useAction } from './useAction';
@@ -113,6 +113,62 @@ export function IdentityForm({ value, onChange, autoFocus }: { value: Identity; 
 
 const same = (a: Identity, b: Identity) => JSON.stringify(a) === JSON.stringify(b);
 
+/** Spec: Reply's voice samples are up to 5 pasted here, plus replies you inserted. */
+function VoiceSamples() {
+  const [samples, setSamples] = useState<VoiceSample[] | null>(null);
+  const [text, setText] = useState('');
+  const { busy, error, run } = useAction();
+  useEffect(() => {
+    void glossly.invoke('voice:list').then(setSamples);
+  }, []);
+  const pasted = (samples ?? []).filter((v) => v.origin === 'pasted');
+  const inserted = (samples ?? []).filter((v) => v.origin !== 'pasted');
+  const remove = (id: string) => void run(async () => setSamples(await glossly.invoke('voice:remove', { id })));
+  const add = () =>
+    void run(async () => {
+      setSamples(await glossly.invoke('voice:add', { text }));
+      setText('');
+    });
+  const sample = (v: VoiceSample) => (
+    <li key={v.id}>
+      <span className="grow voice-text">{v.text}</span>
+      <button className="icon-btn" title="Remove" aria-label="Remove sample" disabled={busy} onClick={() => remove(v.id)}>
+        <X size={15} strokeWidth={1.75} aria-hidden />
+      </button>
+    </li>
+  );
+  return (
+    <div className="field">
+      <div className="field-label">
+        <strong>How you write</strong>
+        <p className="muted small">
+          Paste up to 5 messages you wrote, so Reply drafts sound like you. Replies you insert are added on their own (the last 20 are kept). Samples
+          are sent to your model provider only inside a Reply request.
+        </p>
+      </div>
+      {pasted.length > 0 && <ul className="list">{pasted.map(sample)}</ul>}
+      {pasted.length < 5 && (
+        <div className="voice-add">
+          <textarea rows={3} value={text} maxLength={2000} placeholder="Paste a message you wrote" onChange={(e) => setText(e.target.value)} />
+          <div className="row">
+            <button disabled={busy || !text.trim()} onClick={add}>
+              Add sample
+            </button>
+            <span className="muted small">{pasted.length} of 5</span>
+          </div>
+        </div>
+      )}
+      {inserted.length > 0 && (
+        <details className="small">
+          <summary className="muted">From replies you inserted ({inserted.length})</summary>
+          <ul className="list">{inserted.map(sample)}</ul>
+        </details>
+      )}
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
 export function ProfileTab({ view }: { view: SettingsView }) {
   const saved = view.settings.identity;
   const [draft, setDraft] = useState<Identity>(saved);
@@ -156,6 +212,7 @@ export function ProfileTab({ view }: { view: SettingsView }) {
           {error && <span className="error small">{error}</span>}
         </div>
       </div>
+      <VoiceSamples />
     </section>
   );
 }

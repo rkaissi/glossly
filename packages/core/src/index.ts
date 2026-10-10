@@ -43,5 +43,6 @@ export * from './actions/ask';
 export * from './actions/save';
 export * from './actions/who';
 export * from './actions/promises';
+export * from './actions/reply';
 
 export type * from './api';

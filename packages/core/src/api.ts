@@ -15,7 +15,7 @@ import type { ContextualAction, ContentType, DecisionProviderId } from './router
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
-import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow } from './people/types';
+import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, VoiceSample } from './people/types';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
 export type { MetricsSummary } from './metrics';
@@ -29,7 +29,7 @@ export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } fro
 export type ActionId = 'ask' | 'save' | ContextualAction;
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save' | 'who' | 'promises';
+export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply';
 
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
 
@@ -149,6 +149,33 @@ export interface AskErrorEvent {
   message: string;
 }
 
+// ---- Reply ----
+
+/** Who the drafts answer: the detected author, and their person record when they resolved. */
+export interface ReplyTo {
+  name: string | null;
+  personId: string | null;
+  match: 'exact' | 'fuzzy' | 'none';
+  /** The user wrote the selected message; the drafts are follow-ups. */
+  authorIsMe: boolean;
+}
+export interface ReplyStart {
+  /** Chunks, done, and errors arrive on reply:chunk, reply:done, and reply:error with this id. */
+  requestId: string;
+  to: ReplyTo;
+  identitySet: boolean;
+}
+export interface ReplyInsertArgs {
+  sessionId: number;
+  text: string;
+  /** The user changed the draft before inserting. */
+  edited: boolean;
+  /** Set when the user added the author to their people from the panel. */
+  personId?: string;
+}
+/** inserted: pasted into the source app. copied: on the clipboard instead (focus failed, or the focused field doesn't take text). */
+export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; reason: 'focus' | 'not_editable' | 'paste' };
+
 // ---- What did I promise ----
 
 export type PromisesResult =
@@ -260,6 +287,14 @@ export interface InvokeChannels {
 
   'clipboard:write': { args: { text: string }; result: void };
 
+  /** Streams three drafts (Chat role) to the sender's reply:* channels. */
+  'reply:start': { args: { sessionId: number }; result: ReplyStart };
+  'reply:cancel': { args: { requestId: string }; result: void };
+  /** Gives focus back to the source window and pastes (spec: Inserting text). Never sends. */
+  'reply:insert': { args: ReplyInsertArgs; result: ReplyInsertResult };
+  /** Ctrl+C or the Copy button: counted for metrics only. */
+  'reply:copied': { args: { sessionId: number }; result: void };
+
   /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
   'promises:extract': { args: { sessionId: number }; result: PromisesResult };
   /** Saves the rows the user kept. New people are created; the message is stored with its author. */
@@ -283,6 +318,10 @@ export interface InvokeChannels {
   'people:merge': { args: { keepId: string; dropId: string }; result: PersonCard };
   'people:delete': { args: { personId: string }; result: void };
   'commitments:list': { args: { status?: CommitmentStatus }; result: CommitmentView[] };
+  /** Voice samples for Reply: pasted ones (at most 5) and the replies the user inserted. */
+  'voice:list': { args: void; result: VoiceSample[] };
+  'voice:add': { args: { text: string }; result: VoiceSample[] };
+  'voice:remove': { args: { id: string }; result: VoiceSample[] };
   'commitments:set-status': { args: { id: string; status: CommitmentStatus }; result: void };
 
   'settings:get': { args: void; result: SettingsView };
@@ -317,6 +356,9 @@ export interface PushChannels {
   'ask:chunk': AskChunk;
   'ask:done': AskDone;
   'ask:error': AskErrorEvent;
+  'reply:chunk': AskChunk;
+  'reply:done': AskDone;
+  'reply:error': AskErrorEvent;
   'embed:progress': EmbedStatus;
   'settings:changed': SettingsView;
   /** People, aliases, commitments, or interactions changed; views re-fetch. */

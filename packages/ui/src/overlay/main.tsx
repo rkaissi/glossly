@@ -13,6 +13,7 @@ import { Debug } from './Debug';
 import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { PromisesPanel } from './PromisesPanel';
+import { ReplyPanel } from './ReplyPanel';
 import { SavePanel } from './SavePanel';
 import { WhoPanel } from './WhoPanel';
 
@@ -299,6 +300,8 @@ function Expanded({ s }: { s: OverlayState }) {
           <WhoPanel key="who" s={s} />
         ) : s.panel === 'promises' ? (
           <PromisesPanel key="promises" s={s} />
+        ) : s.panel === 'reply' ? (
+          <ReplyPanel key="reply" s={s} />
         ) : (
           <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
         ))}

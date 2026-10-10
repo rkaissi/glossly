@@ -668,3 +668,19 @@ th {
   font: 600 18px/1.3 var(--font-display);
   width: 320px;
 }
+
+.voice-text {
+  white-space: pre-wrap;
+  font-size: 13px;
+  padding: 6px 0;
+}
+.voice-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.voice-add textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+}

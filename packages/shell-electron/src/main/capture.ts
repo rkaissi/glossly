@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { app, screen, type WebContents } from 'electron';
+import { app, clipboard, screen, type WebContents } from 'electron';
 import {
   HelperError,
   LlmError,
@@ -23,6 +23,7 @@ import {
   learnToolbarWait,
   mayCopyFallback,
   pillWait,
+  reply,
   placeBar,
   placePill,
   pollForToolbar,
@@ -39,6 +40,9 @@ import {
   type PillTiming,
   type PromiseSaveRow,
   type PromisesResult,
+  type ReplyInsertResult,
+  type ReplyStart,
+  type ReplyTo,
   type Placement,
   type Point,
   type Rect,
@@ -88,6 +92,8 @@ interface Session {
   promisesCtl: AbortController | null;
   /** Who wrote the selected message, from the last extraction: their person id (exact match only) and whether it was the user. */
   author: { personId: string | null; isMe: boolean } | null;
+  /** The latest Reply request: drafts done, and whether one was inserted or copied (else it counts as discarded). */
+  reply: { requestId: string; ctl: AbortController; personId: string | null; done: boolean; used: boolean } | null;
 }
 
 /** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
@@ -340,6 +346,7 @@ export class Capture {
         pill: { wait_ms: wait.ms, reason: wait.reason, polls: poll.polls, found: poll.found, baseline: before !== null },
         promisesCtl: null,
         author: null,
+        reply: null,
       };
       this.session = session;
       this.overlay.update(
@@ -525,6 +532,7 @@ export class Capture {
       pill: null,
       promisesCtl: null,
       author: null,
+      reply: null,
     };
     this.session = session;
 
@@ -643,6 +651,7 @@ export class Capture {
       settings: () => sv.settings,
       collections: () => sv.collections(),
       people: () => sv.store.listKnownPeople(),
+      identity: () => sv.settings.identity,
     });
   }
 
@@ -766,6 +775,142 @@ export class Capture {
     if (!s?.selection) return { entries: [], identitySet: identity.name.trim().length > 0 };
     const container = (await s.container) ?? null;
     return whoFor(this.services.people, s.selection, container, identity, this.services.store.listKnownPeople());
+  }
+
+  // ---- Reply ----
+
+  /** Three drafts to the selected message's author, streamed to `target` on reply:*. */
+  async startReply(sessionId: number, target: WebContents): Promise<ReplyStart> {
+    const requestId = randomUUID();
+    const identity = this.settings.identity;
+    const identitySet = identity.name.trim().length > 0;
+    const send = <T>(channel: string, payload: T) => {
+      if (!target.isDestroyed()) target.send(channel, payload);
+    };
+    const fail = (code: AskErrorEvent['code'], message: string) => send<AskErrorEvent>('reply:error', { requestId, code, message });
+    const s = this.current(sessionId);
+    if (!s?.selection) {
+      setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
+      return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet };
+    }
+    s.reply?.ctl.abort();
+    const ctl = new AbortController();
+    const state = { requestId, ctl, personId: null as string | null, done: false, used: false };
+    s.reply = state;
+
+    const container = (await s.container) ?? null;
+    const people = this.services.people;
+    const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
+    const match = det.author ? resolvePerson(people, det.author, s.selection.source_app) : null;
+    const person = match?.kind === 'exact' ? people.card(match.personId) : null;
+    state.personId = person?.id ?? null;
+    const a = det.author;
+    const to: ReplyTo = {
+      name: person?.name ?? a?.name ?? a?.email ?? (a?.handle ? `@${a.handle}` : null),
+      personId: state.personId,
+      match: match?.kind ?? 'none',
+      authorIsMe: det.authorIsMe,
+    };
+    const input = { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe, person, voice: people.voiceForPrompt(5) };
+
+    void (async () => {
+      const t = performance.now();
+      let firstMs: number | null = null;
+      try {
+        const r = reply(this.services.llm, this.settings, input, ctl.signal);
+        for await (const text of r.textStream) {
+          firstMs ??= ms(t);
+          send('reply:chunk', { requestId, text });
+        }
+        const model = await r.model;
+        state.done = true;
+        send('reply:done', { requestId, model });
+        this.services.metrics.record('reply_drafts', { first_token_ms: firstMs ?? -1, total_ms: ms(t), person: Boolean(person) });
+      } catch (e) {
+        const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
+        const message = e instanceof LlmError ? e.message : 'The model call failed.';
+        if (code !== 'aborted') this.services.metrics.record('reply_error', { code, ...(e instanceof LlmError && e.statusCode && { status: e.statusCode }) });
+        fail(code, message);
+      }
+    })();
+    return { requestId, to, identitySet };
+  }
+
+  cancelReply(requestId: string): void {
+    const r = this.session?.reply;
+    if (r?.requestId === requestId) r.ctl.abort();
+  }
+
+  /** Ctrl+C or Copy in the Reply panel. */
+  replyCopied(sessionId: number): void {
+    const s = this.current(sessionId);
+    if (s?.reply) s.reply.used = true;
+    this.services.metrics.record('reply_copied');
+  }
+
+  /**
+   * Inserts a draft (spec: Inserting text): focus back to the source window, then paste. Reply
+   * never sends. When focus can't be restored, or the focused field doesn't take text, the
+   * draft goes on the clipboard instead and the panel says so. An inserted reply is stored as a
+   * voice sample and, when the author is a known person, as an interaction with them.
+   */
+  async insertReply(sessionId: number, text: string, edited: boolean, personId?: string): Promise<ReplyInsertResult> {
+    const s = this.current(sessionId);
+    if (!s?.selection || !s.fg) throw new Error('This selection is gone. Select the message again.');
+    const draft = text.trim();
+    if (!draft) throw new Error('The draft is empty.');
+    const people = this.services.people;
+    const pid = personId && people.get(personId) ? personId : (s.reply?.personId ?? null);
+    const sourceApp = s.selection.source_app;
+    const record = (how: 'inserted' | 'copied') => {
+      if (s.reply) s.reply.used = true;
+      people.addVoice(draft, edited ? 'inserted_edited' : 'inserted');
+      if (pid) people.addInteraction({ person_id: pid, direction: 'outbound', text: draft, source_app: sourceApp });
+      this.services.metrics.record('reply_inserted', { how, edited, person: Boolean(pid), ms: ms(s.t0) });
+    };
+    const copy = (reason: 'focus' | 'not_editable' | 'paste'): ReplyInsertResult => {
+      clipboard.writeText(draft);
+      record('copied');
+      log.info('reply copied', { reason });
+      return { result: 'copied', reason };
+    };
+    const refocus = async () => {
+      await this.helper.request('restore_focus', { handle: this.overlay.nativeHandle() }).catch(() => {});
+      this.overlay.focus();
+    };
+
+    this.bouncing = true;
+    try {
+      try {
+        await this.helper.request('restore_focus', { handle: s.fg.handle });
+      } catch {
+        await refocus();
+        return copy('focus');
+      }
+      // Does the focused element take text? Unknown (no text provider found) still pastes.
+      let editable: boolean | null = null;
+      try {
+        editable = (await this.helper.request('selection', { max_chars: 1 })).is_editable;
+      } catch {
+        editable = null;
+      }
+      if (editable === false) {
+        await refocus();
+        return copy('not_editable');
+      }
+      if (s.reply) s.reply.used = true;
+      this.close('reply_inserted');
+      try {
+        await this.helper.request('paste', { text: draft });
+      } catch {
+        return copy('paste');
+      }
+      record('inserted');
+      log.info('reply inserted', { edited, editable: editable ?? 'unknown' });
+      return { result: 'inserted' };
+    } finally {
+      this.bouncing = false;
+    }
   }
 
   /** What did I promise: one structured call for the commitments in the selected message. */
@@ -914,8 +1059,9 @@ export class Capture {
     this.endSession();
     this.overlay.update({ ...HIDDEN_STATE, sessionId: s.id });
     if (reason === 'foreground' || reason === 'settings') log.info('overlay closed', { reason });
-    // Focus goes back to the source app, unless it already left (blur) or the settings window is taking it.
-    if (hadFocus && s.fg && reason !== 'blur' && reason !== 'settings') {
+    // Focus goes back to the source app, unless it already left (blur), the settings window is
+    // taking it, or Reply already handed it back to paste.
+    if (hadFocus && s.fg && reason !== 'blur' && reason !== 'settings' && reason !== 'reply_inserted') {
       void this.helper.request('restore_focus', { handle: s.fg.handle }).catch(() => {});
     }
   }
@@ -926,6 +1072,8 @@ export class Capture {
     if (!s) return;
     s.routeCtl?.abort();
     s.promisesCtl?.abort();
+    s.reply?.ctl.abort();
+    if (s.reply?.done && !s.reply.used) this.services.metrics.record('reply_discarded');
     this.cancelAsks(s);
     this.session = null;
   }

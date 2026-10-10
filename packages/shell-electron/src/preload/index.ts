@@ -1,7 +1,18 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { GlosslyBridge, PushChannel } from '@glossly/core/api';
 
-const PUSH: readonly PushChannel[] = ['overlay:state', 'ask:chunk', 'ask:done', 'ask:error', 'embed:progress', 'settings:changed', 'people:changed'];
+const PUSH: readonly PushChannel[] = [
+  'overlay:state',
+  'ask:chunk',
+  'ask:done',
+  'ask:error',
+  'reply:chunk',
+  'reply:done',
+  'reply:error',
+  'embed:progress',
+  'settings:changed',
+  'people:changed',
+];
 
 const bridge: GlosslyBridge = {
   invoke: ((channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args)) as GlosslyBridge['invoke'],

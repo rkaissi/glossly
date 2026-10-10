@@ -26,7 +26,7 @@ function Welcome({ view }: { view: SettingsView }) {
       <ul className="intro">
         <li>Select text in any app and a small pill appears next to it.</li>
         <li>Hover it, or press {formatAccelerator(view.settings.hotkey)}, to open a bar of actions picked for what you selected.</li>
-        <li>Ask a question about it, or save it to a collection with a note on why.</li>
+        <li>Ask about it, save it with a note on why, draft a reply to a message, see who someone is, or keep track of what you promised.</li>
       </ul>
       <div className="card">
         <h3>Privacy</h3>
@@ -35,7 +35,7 @@ function Welcome({ view }: { view: SettingsView }) {
           <li>It never records keystrokes; the hotkey is its only keyboard shortcut. Password fields and password managers are never read.</li>
           <li>
             Everything is stored on this computer. Selected text goes only to the provider whose key you add: when the bar opens, to pick actions, and
-            when you click Ask or Save. Turn on Local only in Settings and nothing is sent at all.
+            when you click Ask, Save, Reply, or What did I promise. Turn on Local only in Settings and nothing is sent at all.
           </li>
         </ul>
       </div>

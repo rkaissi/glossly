@@ -1,4 +1,6 @@
 import { countWords } from '../capture/gating';
+import { isMe } from '../people/names';
+import type { Identity } from '../settings';
 import type { KnownPerson, SelectionContext } from './types';
 
 /** Deterministic, local features of a selection. Must stay well under 5 ms. */
@@ -22,6 +24,10 @@ export interface Features {
   endsWithQuestion: boolean;
   codeScore: number;
   ideaWords: boolean;
+  /** Automated or broadcast mail (no-reply, receipts, shipping, one-time codes, notices to everyone): nobody to reply to. */
+  automated: boolean;
+  /** The last chat header up to the end of the selection is the user's own. */
+  authorIsMe: boolean;
 }
 
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
@@ -59,6 +65,11 @@ const COMMITMENT =
   /\b(?:I'll|I will|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you)\b/gi;
 const DATE_WORD =
   /\b(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|end of (?:day|week|month)|eod|eow|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{1,2}(?::\d{2})?\s?[ap]m)\b/i;
+const AUTOMATED =
+  /\b(?:no-?reply|do not reply|don't reply to this|this is an automated|automated (?:message|email|notification)|automatically generated|unsubscribe|one-time (?:pass)?code|passcode|verification code|security code|sign-in attempt|confirm your email|verify your email|reset your password|your order|order #|has shipped|out for delivery|tracking number|track your (?:order|package)|your receipt|receipt for|invoice #|payment (?:received|confirmation))\b/i;
+// "Hi all, a reminder that..." is a notice to everyone, not a message to answer.
+const BROADCAST_GREETING = /^\s*(?:hi|hello|hey|dear|good morning)\s+(?:all|everyone|everybody|colleagues)\b/i;
+const BROADCAST_WORDS = /\b(?:reminder|announce|announcement|please note|heads up|fyi)\b/i;
 const IDEA = /\b(?:idea|what if|we could|imagine|brainstorm|concept|maybe we|someday)\b/i;
 // Keywords are also common English words ("can you return my drill"), so they only count
 // on a line that also has code punctuation.
@@ -116,7 +127,13 @@ function unique(xs: Iterable<string>): string[] {
   return [...new Set(xs)];
 }
 
-export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = []): Features {
+function lastSpeaker(text: string): string | null {
+  let speaker: string | null = null;
+  for (const line of text.split(/\r?\n/)) speaker = chatSpeaker(line) ?? speaker;
+  return speaker;
+}
+
+export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [], me?: Identity): Features {
   const text = ctx.text;
   const lines = text.split(/\r?\n/);
   const app = ctx.source_app.toLowerCase();
@@ -159,5 +176,7 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     endsWithQuestion: /\?\s*$/.test(text),
     codeScore,
     ideaWords: IDEA.test(text),
+    automated: AUTOMATED.test(text) || AUTOMATED.test(ctx.window_title) || (BROADCAST_GREETING.test(text) && BROADCAST_WORDS.test(text)),
+    authorIsMe: me ? isMe(lastSpeaker(`${ctx.context_before}${text}`), me) : false,
   };
 }
