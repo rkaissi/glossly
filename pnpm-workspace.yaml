@@ -1,0 +1,15 @@
+packages:
+  - packages/*
+
+nodeLinker: hoisted
+
+minimumReleaseAgeExclude:
+  - ai@7.0.137
+
+allowBuilds:
+  electron: true
+  esbuild: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true
+  electron-winstaller: false

@@ -1,0 +1,12 @@
+node_modules/
+out/
+dist/
+release/
+*.log
+.vite/
+evals/results/
+
+helpers/windows/bin/
+helpers/windows/obj/
+helpers/windows/publish/
+helpers/fixtures/recorded/local-*
