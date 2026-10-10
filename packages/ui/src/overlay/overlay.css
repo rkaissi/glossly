@@ -147,6 +147,11 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .pill .slot.save {
   width: 80px;
 }
+/* "Saved" is one letter longer than "Save": tighter padding keeps it in the same 80 px. */
+.pill .slot.save.saved {
+  padding: 0 8px;
+  gap: 5px;
+}
 .slot.fresh {
   animation: fade-in 180ms ease-out;
 }
@@ -914,6 +919,7 @@ html:not([data-material='acrylic']) .toast {
   font-weight: 600;
   color: var(--fg-2);
 }
+.viz-table th.num,
 .viz-table td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;

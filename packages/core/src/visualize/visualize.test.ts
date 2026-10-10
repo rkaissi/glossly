@@ -58,6 +58,11 @@ describe('prepareSpec', () => {
     expect(prepareSpec('not json', table)).toEqual({ ok: false, reason: 'not_json' });
   });
 
+  it('drops a tooltip: true under encoding instead of refusing the whole spec', () => {
+    const slip = JSON.stringify({ data: { name: 'table' }, mark: { type: 'bar', tooltip: true }, encoding: { x: { field: 'Region', type: 'nominal' }, y: { field: 'Q1', type: 'quantitative' }, tooltip: true } });
+    expect(prepareSpec(slip, table).ok).toBe(true);
+  });
+
   it('accepts fields a fold transform creates', () => {
     const folded = JSON.stringify({
       data: { name: 'table' },

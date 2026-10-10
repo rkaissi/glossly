@@ -1,6 +1,6 @@
 # Glossly status: Phases 0 to 3
 
-Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, not run live yet). `docs/HANDOFF.md` has the detailed build notes.
+Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the detailed build notes.
 
 ## Summary
 
@@ -61,7 +61,7 @@ The app lives in the tray. The default hotkey is `Ctrl+Alt+Space`. Data is in `%
 
 Built ahead of schedule because the privacy rules require them from day one or the work was cheap: JSON export and "Delete all data" (Data tab), and the local metrics view (Metrics tab; spec Phase 4).
 
-## Phase 3: Recall and Visualize (Step 16, built Oct 10; not run live yet)
+## Phase 3: Recall and Visualize (Step 16, built and checked live Oct 10)
 
 | Spec check | Status | Notes |
 | --- | --- | --- |

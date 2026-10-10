@@ -99,7 +99,7 @@ function Pill({ s }: { s: OverlayState }) {
       </button>
       {s.saved ? (
         // Autosave: already saved. The bar it expands into offers Undo.
-        <button className="slot save" title={`Saved to ${s.saved.collection}`} onClick={() => expand(s.sessionId)}>
+        <button className="slot save saved" title={`Saved to ${s.saved.collection}`} onClick={() => expand(s.sessionId)}>
           <Check size={16} strokeWidth={2} aria-hidden />
           <span>Saved</span>
         </button>

@@ -27,5 +27,7 @@ export type VisualizeResult =
       /** One line for the panel, e.g. why the table is shown instead of a chart. */
       note: string | null;
       csv: string;
+      /** Why the model's spec was refused (a code such as "schema" or "unknown_field"), for the log. */
+      rejected?: string;
     }
   | { ok: false; code: 'no_table' | 'no_selection' | 'local_only' | 'no_model' | 'provider' | 'invalid_output' | 'aborted' | 'timeout'; message: string };

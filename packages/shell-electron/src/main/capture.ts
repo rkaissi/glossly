@@ -1068,7 +1068,7 @@ export class Capture {
         s.visual = r;
         this.services.metrics.record('visualize_done', { source: r.table.source, rows: r.table.rows.length, chart: r.chartBy ?? 'table', ms: ms(t) });
       } else if (r.code !== 'aborted') this.services.metrics.record('visualize_error', { code: r.code });
-      log.info('visualized', { ok: r.ok, ...(r.ok ? { source: r.table.source, chart: r.chartBy ?? 'table' } : { code: r.code }), ms: ms(t) });
+      log.info('visualized', { ok: r.ok, ...(r.ok ? { source: r.table.source, chart: r.chartBy ?? 'table', ...(r.rejected && { rejected: r.rejected }) } : { code: r.code }), ms: ms(t) });
       return r;
     } finally {
       if (s.visualCtl === ctl) s.visualCtl = null;

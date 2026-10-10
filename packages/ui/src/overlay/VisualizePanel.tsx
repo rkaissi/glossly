@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Image as ImageIcon, RotateCcw, Table, Undo2 } from 'lucide-react';
-import type { Cell, OverlayState, SaveDone, VisualizeResult } from '@glossly/core/api';
+import type { Cell, FieldType, OverlayState, SaveDone, VisualizeResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { ActionIcon } from '../icons';
 import { useSecondsLeft } from './SavedToast';
@@ -50,14 +50,16 @@ function chartConfig(): Record<string, unknown> {
   };
 }
 
-function TableView({ columns, rows }: { columns: string[]; rows: Cell[][] }) {
+function TableView({ columns, rows, types }: { columns: string[]; rows: Cell[][]; types: FieldType[] }) {
   return (
     <div className="viz-table">
       <table>
         <thead>
           <tr>
-            {columns.map((c) => (
-              <th key={c}>{c}</th>
+            {columns.map((c, i) => (
+              <th key={c} className={types[i] === 'quantitative' ? 'num' : undefined}>
+                {c}
+              </th>
             ))}
           </tr>
         </thead>
@@ -105,21 +107,30 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
     if (!spec || !chartShown || !chartEl.current) return;
     let finalize: (() => void) | null = null;
     let live = true;
-    void import('vega-embed').then(async ({ default: embed }) => {
-      if (!live || !chartEl.current) return;
-      const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-      const r = await embed(chartEl.current, { ...spec, config: chartConfig() } as never, {
-        actions: false,
-        renderer: 'svg',
-        tooltip: { theme: dark ? 'dark' : 'light' },
+    void Promise.all([import('vega-embed'), import('vega-interpreter')])
+      .then(async ([{ default: embed }, { expressionInterpreter }]) => {
+        if (!live || !chartEl.current) return;
+        const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+        const r = await embed(chartEl.current, { ...spec, config: chartConfig() } as never, {
+          actions: false,
+          renderer: 'svg',
+          tooltip: { theme: dark ? 'dark' : 'light' },
+          // The page's CSP forbids eval, so expressions run through vega's interpreter instead of new Function.
+          ast: true,
+          expr: expressionInterpreter,
+        });
+        if (!live) {
+          r.finalize();
+          return;
+        }
+        view.current = r.view;
+        finalize = () => r.finalize();
+      })
+      .catch(() => {
+        if (!live) return;
+        setShowTable(true);
+        setNote("The chart couldn't be drawn, so here is the table.");
       });
-      if (!live) {
-        r.finalize();
-        return;
-      }
-      view.current = r.view;
-      finalize = () => r.finalize();
-    });
     return () => {
       live = false;
       view.current = null;
@@ -182,7 +193,7 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
       {result?.ok && result.note && <p className="muted small-text">{result.note}</p>}
       {result?.ok && result.chartBy === 'rules' && !result.note && <p className="muted small-text">A plain chart picked by rules, since no model is used.</p>}
       {chartShown && <div ref={chartEl} className="viz-chart" />}
-      {result?.ok && (!spec || showTable) && <TableView columns={result.table.columns} rows={result.table.rows} />}
+      {result?.ok && (!spec || showTable) && <TableView columns={result.table.columns} rows={result.table.rows} types={result.types} />}
 
       {(note || saved) && (
         <div className="inline-note">

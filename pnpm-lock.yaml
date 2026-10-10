@@ -260,6 +260,9 @@ importers:
       vega-embed:
         specifier: ^7.3.0
         version: 7.3.0(vega-lite@6.5.0(vega@6.4.0))(vega@6.4.0)
+      vega-interpreter:
+        specifier: ^2.3.2
+        version: 2.3.2
       vega-lite:
         specifier: ^6.5.0
         version: 6.5.0(vega@6.4.0)

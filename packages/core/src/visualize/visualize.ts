@@ -59,6 +59,12 @@ export function prepareSpec(json: string, table: ParsedTable): { ok: true; spec:
   const spec = { ...(raw as Record<string, unknown>) };
   delete spec.config;
   delete spec.data;
+  // A common slip: `"tooltip": true` under encoding, which the schema refuses. The mark's tooltip covers it.
+  const enc = spec.encoding as Record<string, unknown> | undefined;
+  if (enc && typeof enc === 'object' && enc.tooltip === true) {
+    const { tooltip: _drop, ...rest } = enc;
+    spec.encoding = rest;
+  }
 
   let reason: string | null = null;
   const fields = new Set<string>();
@@ -172,6 +178,7 @@ export async function visualize(deps: VisualizeDeps, text: string, signal?: Abor
   }
 
   let note: string | null = null;
+  let rejected: string | undefined;
   try {
     const out = await deps.llm.structured(
       { role: 'fast', action: 'visualize_chart', instructions: chartPrompt, prompt: buildChartPrompt(table, types), signal, temperature: 0, maxOutputTokens: 1200 },
@@ -181,11 +188,12 @@ export async function visualize(deps: VisualizeDeps, text: string, signal?: Abor
       const prepared = prepareSpec(out.spec_json, table);
       if (prepared.ok) return { ok: true, table, types, spec: prepared.spec, chartBy: 'model', note: null, csv };
       note = "The model's chart didn't check out";
+      rejected = prepared.reason;
     } else note = 'The model found no chart that fits';
   } catch (e) {
     if (signal?.aborted) return failure(e, signal);
     note = "The model didn't answer";
   }
   // Spec: when the chart fails, show the parsed table.
-  return { ok: true, table, types, spec: null, chartBy: null, note: `${note}, so here is the table.`, csv };
+  return { ok: true, table, types, spec: null, chartBy: null, note: `${note}, so here is the table.`, csv, ...(rejected && { rejected }) };
 }
