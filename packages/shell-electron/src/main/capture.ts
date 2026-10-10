@@ -41,7 +41,7 @@ import {
 } from '@glossly/core';
 import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
-import { HIDDEN_STATE, SIZES, type Overlay } from './overlay';
+import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
 import { actionForSlot, contains, distanceToRect, growFrom, isAvailable, mergeRoute, slotsView } from './view';
 
@@ -275,6 +275,7 @@ export class Capture {
         anchor: p,
         obstacles,
         size: SIZES.pill,
+        growW: MAX_W,
         dotWindow: SIZES.dot,
         workArea: workArea(p),
       });
@@ -505,7 +506,7 @@ export class Capture {
       await this.readTier1(session);
       if (!this.current(session.id)) return;
     }
-    const placement = placeBar({ selection: session.bounds, anchor: session.anchor, obstacles: [], size: SIZES.bar, workArea: workArea(session.anchor) });
+    const placement = placeBar({ selection: session.bounds, anchor: session.anchor, obstacles: [], size: SIZES.bar, growW: MAX_W, workArea: workArea(session.anchor) });
     const quick = selection ? this.router().quick(toContext(selection)) : null;
     session.route = quick;
     timings.total = ms(t0);
@@ -575,7 +576,7 @@ export class Capture {
     const rect =
       from && from.mode === 'pill'
         ? growFrom(from.rect, from.side, SIZES.bar, area)
-        : placeBar({ selection: s.bounds, anchor: s.anchor, obstacles: [], size: SIZES.bar, workArea: area }).rect;
+        : placeBar({ selection: s.bounds, anchor: s.anchor, obstacles: [], size: SIZES.bar, growW: MAX_W, workArea: area }).rect;
     const side = from?.mode === 'pill' ? from.side : rect.y >= s.bounds.y + s.bounds.h ? 'below' : 'above';
     s.timings.expand = ms(t);
     this.overlay.patch(
@@ -660,7 +661,8 @@ export class Capture {
 
     const from = this.state.placement?.rect ?? this.overlay.bounds();
     const side = this.state.placement?.side ?? 'below';
-    const rect = growFrom(from, side, SIZES.panel, workArea(s.anchor));
+    // Never narrower than the bar it opens under; the renderer then reports the real size.
+    const rect = growFrom(from, side, { w: Math.max(from.w, SIZES.panel.w), h: SIZES.panel.h }, workArea(s.anchor));
     if (isAvailable(action) && !this.overlay.hasFocus) this.focusOverlay();
     this.overlay.patch(
       { mode: 'panel', panel: action, placement: { mode: 'pill', side, rect }, keyboard: this.overlay.hasFocus, debug: this.debugFor(s) },
@@ -712,7 +714,8 @@ export class Capture {
     this.cancelAsks(s);
     const from = this.state.placement?.rect ?? this.overlay.bounds();
     const side = this.state.placement?.side ?? 'below';
-    const rect = growFrom(from, side, SIZES.bar, workArea(s.anchor));
+    // Keep the width until the renderer reports the bar's own size, so the row never clips.
+    const rect = growFrom(from, side, { w: from.w, h: SIZES.bar.h }, workArea(s.anchor));
     this.overlay.patch({ mode: 'bar', panel: null, placement: { mode: 'pill', side, rect } }, rect);
   }
 

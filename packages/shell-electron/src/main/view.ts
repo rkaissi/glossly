@@ -57,7 +57,9 @@ export function clampRect(r: Rect, area: Rect): Rect {
 
 /**
  * Grows the window from `from` to `size`, keeping its left edge and the edge next to the
- * selection fixed, so the buttons already on screen stay where they are.
+ * selection fixed, so the buttons already on screen stay where they are. Placement picked
+ * the left edge with room for the widest bar (overlay.ts MAX_W), so the clamp only shifts
+ * the window if something larger than that is asked for.
  */
 export function growFrom(from: Rect, side: 'below' | 'above' | 'end', size: Size, area: Rect): Rect {
   const y = side === 'above' ? from.y + from.h - size.h : from.y;

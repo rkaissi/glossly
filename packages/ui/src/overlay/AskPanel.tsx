@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { ArrowUp, Check, Copy } from 'lucide-react';
 import type { AskErrorEvent, OverlayState } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { AnswerText } from './AnswerText';
@@ -101,25 +102,31 @@ export function AskPanel({ s }: { s: OverlayState }) {
 
   return (
     <div className="panel" onKeyDown={onKeyDown}>
-      <div className="panel-input">
+      <div className="composer">
         <input ref={input} value={question} placeholder={placeholder} spellCheck={false} onChange={(e) => setQuestion(e.target.value)} />
-        <button className="primary" onClick={() => void submit()} disabled={!s.hasSelection && !question.trim()}>
-          {busy ? 'Asking…' : 'Ask'}
+        <button
+          className="primary send"
+          title={busy ? 'Asking…' : 'Ask'}
+          aria-label="Ask"
+          onClick={() => void submit()}
+          disabled={!s.hasSelection && !question.trim()}
+        >
+          <ArrowUp size={16} strokeWidth={2} aria-hidden />
         </button>
       </div>
 
       {answer && (
         <div className={`answer${busy ? ' cursor' : ''}`}>
-          {answer.status === 'starting' && <p className="muted">Thinking…</p>}
+          {answer.status === 'starting' && <p className="thinking">Thinking…</p>}
           {text && <AnswerText text={text} />}
           {answer.status === 'error' && (
-            <p className="error">
-              {answer.message}{' '}
+            <div className="answer-error">
+              <span className="error">{answer.message}</span>
               {answer.code === 'no_model' && (
                 <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>
               )}
               {answer.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and ask</button>}
-            </p>
+            </div>
           )}
         </div>
       )}
@@ -127,7 +134,12 @@ export function AskPanel({ s }: { s: OverlayState }) {
       <div className="panel-foot">
         {answer?.status === 'done' && <span>{answer.model}</span>}
         <span className="spacer" />
-        {text && !busy && <button onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>}
+        {text && !busy && (
+          <button className="ghost" onClick={copy}>
+            {copied ? <Check size={14} strokeWidth={2} aria-hidden /> : <Copy size={14} strokeWidth={1.75} aria-hidden />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        )}
         {s.keyboard && (
           <span>
             <kbd>Enter</kbd> ask · <kbd>Ctrl+C</kbd> copy · <kbd>Esc</kbd> back

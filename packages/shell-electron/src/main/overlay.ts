@@ -2,25 +2,35 @@ import { EventEmitter } from 'node:events';
 import { BrowserWindow, screen } from 'electron';
 import type { OverlayMode, OverlayState, Placement, Rect, Size } from '@glossly/core';
 import { logger } from './log';
-import { preloadPath, rendererUrl } from './paths';
+import { hasWindowMaterial, preloadPath, rendererUrl } from './paths';
 import { hwndFromBuffer } from './view';
 
 const log = logger('overlay');
 
 /**
- * Window sizes in DIP. The renderer reports its real size for the bar and panel. The bar and
- * panel widths match the UI's fixed width (packages/ui overlay.css), so the controls on the
- * right never shift when slots 3 and 4 fill in.
+ * Window sizes in DIP. The pill is fixed (packages/ui overlay.css: menu 32, Ask 72, Save 80
+ * in a 40 px row). The bar and panel start at these sizes and then fit their content: the
+ * renderer reports its size and `resize()` grows the window rightward from its left edge,
+ * so nothing on screen moves when slots 3 and 4 fill in.
  */
 export const SIZES = {
-  pill: { w: 168, h: 40 },
+  pill: { w: 200, h: 40 },
   /** The dot's window; the visible dot is smaller (placement `mark`). Windows' minimum is about 29x38. */
   dot: { w: 40, h: 40 },
-  bar: { w: 560, h: 40 },
-  panel: { w: 560, h: 300 },
+  bar: { w: 200, h: 40 },
+  panel: { w: 520, h: 300 },
 } satisfies Record<Exclude<OverlayMode, 'hidden'>, Size>;
 
-const LIMITS = { minW: 120, maxW: 680, minH: 16, maxH: 640 };
+/**
+ * The widest the bar or panel can get: menu, Ask, Save, and two slots at the 172 px label
+ * cap (644), plus room for a badge. Placement picks the left edge so this fits on screen.
+ */
+export const MAX_W = 680;
+
+const LIMITS = { minW: 40, maxW: MAX_W, minH: 16, maxH: 640 };
+
+/** DWM corner preference, set through the helper (Electron has no API for it). */
+export type Corners = 'round' | 'default';
 
 export const HIDDEN_STATE: OverlayState = {
   sessionId: 0,
@@ -50,14 +60,25 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   private focused = false;
   private clickThrough = false;
   private loaded: Promise<void>;
+  /** Windows 11 acrylic behind the pill, bar, and panel (Step 13.1 spike). */
+  private readonly acrylic = hasWindowMaterial();
+  /** What the window shows now: acrylic glass, or clear for the dot. */
+  private material: 'glass' | 'clear' = 'glass';
+  /** Acrylic comes back paler after the window was focused and hidden; re-applied on next show. */
+  private materialStale = false;
+  private corners: Corners | null = null;
+  private setCorners: ((c: Corners) => Promise<void>) | null = null;
 
   constructor() {
     super();
     this.win = new BrowserWindow({
       show: false,
       frame: false,
+      // Transparent keeps the bounds exact; acrylic still fills the whole window rect, and DWM
+      // rounds it once the helper sets the corner preference.
       transparent: true,
       backgroundColor: '#00000000',
+      ...(this.acrylic && { backgroundMaterial: 'acrylic' as const }),
       resizable: false,
       movable: false,
       minimizable: false,
@@ -92,7 +113,7 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
 
   private async load(): Promise<void> {
     try {
-      await this.win.loadURL(rendererUrl('overlay'));
+      await this.win.loadURL(rendererUrl('overlay', '', this.acrylic ? 'material=acrylic' : ''));
     } catch (e) {
       log.error('overlay failed to load', { message: (e as Error).message.slice(0, 200) });
     }
@@ -100,6 +121,46 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
 
   whenLoaded(): Promise<void> {
     return this.loaded;
+  }
+
+  /** Wires the helper's window_corners; applied whenever the material changes. */
+  useCorners(set: (c: Corners) => Promise<void>): void {
+    this.setCorners = set;
+    this.refreshCorners();
+  }
+
+  /** Sets the corner preference again (the helper just started, so an earlier try may have failed). */
+  refreshCorners(): void {
+    this.corners = null;
+    this.applyCorners();
+  }
+
+  private applyCorners(): void {
+    if (!this.acrylic || !this.setCorners) return;
+    const want: Corners = this.material === 'glass' ? 'round' : 'default';
+    if (want === this.corners) return;
+    this.corners = want;
+    this.setCorners(want).catch(() => {
+      // Helper not ready or restarting: try again on the next change.
+      if (this.corners === want) this.corners = null;
+    });
+  }
+
+  /**
+   * Acrylic for the pill, bar, and panel; clear for the dot, whose window is mostly
+   * click-through and draws its own small circle. 'none' alone turns a transparent window
+   * opaque white, so the clear background color is set again after it.
+   */
+  private setMaterial(glass: boolean): void {
+    if (!this.acrylic) return;
+    const want = glass ? 'glass' : 'clear';
+    if (want === this.material && !(glass && this.materialStale)) return;
+    this.win.setBackgroundMaterial('none');
+    this.win.setBackgroundColor('#00000000');
+    if (glass) this.win.setBackgroundMaterial('acrylic');
+    this.material = want;
+    if (glass) this.materialStale = false;
+    this.applyCorners();
   }
 
   get current(): OverlayState {
@@ -143,6 +204,9 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
       this.hideWindow();
       return;
     }
+    // Material changes go in before the window shows, so it never flashes the wrong look.
+    this.setMaterial(state.mode !== 'dot');
+    this.applyCorners();
     // In dot mode only the dot takes the mouse; moves are still forwarded so hovering it expands.
     const clickThrough = state.mode === 'dot';
     if (clickThrough !== this.clickThrough) {
@@ -183,13 +247,18 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   private hideWindow(): void {
     this.win.hide();
     if (this.focused) {
+      this.materialStale = true;
       this.focused = false;
       this.win.setFocusable(false);
       this.win.setSkipTaskbar(true);
     }
   }
 
-  /** The renderer measured its content. Keeps the edge next to the selection fixed. */
+  /**
+   * The renderer measured its content. Keeps the left edge and the edge next to the selection
+   * fixed, so the window only grows rightward and away from the selection. Placement already
+   * left room for MAX_W on the right; the clamp below is only a safety net.
+   */
   resize(sessionId: number, w: number, h: number): void {
     const s = this.state;
     if (sessionId !== s.sessionId || (s.mode !== 'bar' && s.mode !== 'panel')) return;

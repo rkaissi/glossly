@@ -70,6 +70,12 @@ describe('growFrom', () => {
     expect(growFrom({ x: 100, y: 200, w: 168, h: 40 }, 'above', { w: 460, h: 300 }, area)).toEqual({ x: 100, y: 0, w: 460, h: 300 });
   });
 
+  it('keeps the left edge as the bar grows rightward to its widest', () => {
+    // Placement left room for 680 px at x 320, so growing never shifts the window.
+    expect(growFrom({ x: 320, y: 200, w: 200, h: 40 }, 'below', { w: 680, h: 40 }, area)).toEqual({ x: 320, y: 200, w: 680, h: 40 });
+    expect(growFrom({ x: 320, y: 500, w: 680, h: 40 }, 'above', { w: 680, h: 320 }, area)).toEqual({ x: 320, y: 220, w: 680, h: 320 });
+  });
+
   it('stays inside the work area', () => {
     expect(growFrom({ x: 900, y: 780, w: 168, h: 40 }, 'below', { w: 460, h: 56 }, area)).toEqual({ x: 540, y: 744, w: 460, h: 56 });
   });

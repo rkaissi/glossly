@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Check, Undo2 } from 'lucide-react';
 import type { OverlayState, SaveDone } from '@glossly/core/api';
 import { glossly } from '../bridge';
 
@@ -89,9 +90,12 @@ export function SavePanel({ s }: { s: OverlayState }) {
   return (
     <div className="panel" onKeyDown={onKeyDown}>
       {saved ? (
-        <h2>
-          Saved to {phase.done.collection}
-          <span className="muted"> · {s.wordCount} words</span>
+        <h2 className="saved-line">
+          <Check size={17} strokeWidth={2} aria-hidden />
+          <span>
+            Saved to {phase.done.collection}
+            <span className="muted"> · {s.wordCount} words</span>
+          </span>
         </h2>
       ) : phase.kind === 'undone' ? (
         <h2>{phase.ok ? `Removed from ${phase.collection}.` : 'Too late to undo; the item is kept.'}</h2>
@@ -119,7 +123,12 @@ export function SavePanel({ s }: { s: OverlayState }) {
             onChange={(e) => setWhy(e.target.value)}
           />
           {saved ? (
-            left > 0 && <button onClick={() => void undo()}>Undo ({left}s)</button>
+            left > 0 && (
+              <button onClick={() => void undo()}>
+                <Undo2 size={15} strokeWidth={1.75} aria-hidden />
+                Undo ({left}s)
+              </button>
+            )
           ) : (
             <button className="primary" onClick={() => void save()} disabled={phase.kind === 'saving'}>
               {phase.kind === 'saving' ? 'Saving…' : `Save to ${collection}`}

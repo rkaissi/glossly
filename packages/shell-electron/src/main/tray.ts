@@ -1,7 +1,12 @@
-import { Menu, nativeImage, Tray } from 'electron';
+import { Menu, nativeImage, nativeTheme, Tray } from 'electron';
 
-/** A 32x32 tray icon drawn in code: a violet disc with a white highlight bar. */
-function trayIcon(): Electron.NativeImage {
+/**
+ * A 32x32 tray icon drawn in code, monochrome: a near-black disc with a white highlight bar,
+ * inverted when the system is dark.
+ */
+function trayIcon(dark: boolean): Electron.NativeImage {
+  const disc = dark ? 0xec : 0x1a;
+  const mark = dark ? 0x1a : 0xff;
   const size = 32;
   const buf = Buffer.alloc(size * size * 4);
   const c = (size - 1) / 2;
@@ -12,9 +17,7 @@ function trayIcon(): Electron.NativeImage {
       const bar = y >= 14 && y <= 18 && x >= 8 && x <= 23;
       const i = (y * size + x) * 4;
       // BGRA
-      buf[i] = bar ? 255 : 0xf5;
-      buf[i + 1] = bar ? 255 : 0x5e;
-      buf[i + 2] = bar ? 255 : 0x6d;
+      buf[i] = buf[i + 1] = buf[i + 2] = bar ? mark : disc;
       buf[i + 3] = Math.round(alpha * 255);
     }
   }
@@ -29,7 +32,8 @@ export interface TrayActions {
 }
 
 export function createTray(actions: TrayActions): { tray: Tray; refresh: () => void } {
-  const tray = new Tray(trayIcon());
+  const tray = new Tray(trayIcon(nativeTheme.shouldUseDarkColors));
+  nativeTheme.on('updated', () => tray.setImage(trayIcon(nativeTheme.shouldUseDarkColors)));
   tray.setToolTip('Glossly');
   const refresh = () =>
     tray.setContextMenu(

@@ -1,40 +1,80 @@
+/*
+ * Shared tokens for the overlay and the settings window (Step 13 redesign). Monochrome: no
+ * accent color anywhere. Light and dark follow the system theme. The windows themselves are
+ * Windows 11 acrylic (overlay) and mica (settings); `--glass` is the tint laid over them so
+ * text stays readable on busy backgrounds.
+ */
 :root {
-  color-scheme: dark;
-  --bg: #1f1d2b;
-  --bg-2: #2a2739;
-  --bg-3: #37334b;
-  --fg: #f2f1f7;
-  --muted: #a29fb8;
-  --border: #3d3955;
-  --accent: #7c6cf6;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(124, 108, 246, 0.22);
-  --danger: #ff8080;
-  --ok: #6fd08c;
-  --warn: #f0c060;
-  --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  font: 13px/1.4 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: light;
+  --fg: #0d0d0d;
+  --fg-2: #4b4b4b;
+  --muted: #7a7a7a;
+  --faint: #a3a3a3;
+  --glass: rgba(255, 255, 255, 0.58);
+  /* Used where there is no acrylic or mica behind (Windows 10, the dot). */
+  --glass-solid: rgba(250, 250, 250, 0.97);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(0, 0, 0, 0.035);
+  --hover: rgba(0, 0, 0, 0.055);
+  --pressed: rgba(0, 0, 0, 0.09);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --primary: #0d0d0d;
+  --primary-fg: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ring: rgba(0, 0, 0, 0.42);
+  --select: rgba(0, 0, 0, 0.12);
+  --danger: #b42318;
+  --ok: #1f7a43;
+  --warn: #8a5a00;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --fade: 150ms;
+  --mono: 'Cascadia Mono', ui-monospace, Consolas, monospace;
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font: 14px/1.45 var(--font);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root {
-    color-scheme: light;
-    --bg: #ffffff;
-    --bg-2: #f2f1f7;
-    --bg-3: #e4e2ee;
-    --fg: #1d1b26;
-    --muted: #686580;
-    --border: #d6d3e3;
-    --accent: #5b4be0;
-    --accent-soft: rgba(91, 75, 224, 0.14);
-    --danger: #c43c3c;
-    --ok: #23864a;
-    --warn: #9a6a00;
+    color-scheme: dark;
+    --fg: #ececec;
+    --fg-2: #c2c2c2;
+    --muted: #949494;
+    --faint: #6b6b6b;
+    --glass: rgba(28, 28, 28, 0.5);
+    --glass-solid: rgba(36, 36, 36, 0.97);
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-2: rgba(255, 255, 255, 0.045);
+    --hover: rgba(255, 255, 255, 0.075);
+    --pressed: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --primary: #ececec;
+    --primary-fg: #0d0d0d;
+    --primary-hover: #ffffff;
+    --ring: rgba(255, 255, 255, 0.5);
+    --select: rgba(255, 255, 255, 0.16);
+    --danger: #ff8a80;
+    --ok: #7fd6a0;
+    --warn: #e8c070;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
   }
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: var(--select);
 }
 
 button,
@@ -46,32 +86,58 @@ textarea {
 }
 
 button {
-  background: var(--bg-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: var(--surface-2);
   border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 4px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--fade) ease,
+    opacity var(--fade) ease;
 }
 button:hover:not(:disabled) {
-  background: var(--bg-3);
+  background: var(--hover);
+}
+button:active:not(:disabled) {
+  background: var(--pressed);
 }
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 button.primary {
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: var(--primary);
+  color: var(--primary-fg);
 }
 button.primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-  background: var(--accent);
+  background: var(--primary-hover);
 }
+button.ghost {
+  background: transparent;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.danger {
+  color: var(--danger);
+}
+button svg {
+  flex: none;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid var(--accent);
+textarea:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
@@ -80,18 +146,52 @@ input[type='password'],
 input:not([type]),
 select,
 textarea {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 8px;
+  height: 34px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  transition: border-color var(--fade) ease;
+}
+textarea {
+  height: auto;
+  padding: 8px 10px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--ring);
+}
+select option,
+select optgroup {
+  background: Canvas;
+  color: CanvasText;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
 }
 
 kbd {
-  font: 11px var(--mono);
+  font: 11px/16px var(--mono);
+  min-width: 18px;
   padding: 0 4px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  text-align: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
   color: var(--muted);
+  background: transparent;
+}
+
+a {
+  color: inherit;
 }
 
 .muted {
@@ -110,5 +210,12 @@ kbd {
   }
   to {
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
   }
 }

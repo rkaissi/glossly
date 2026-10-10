@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { release } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app } from 'electron';
@@ -21,11 +22,21 @@ export const preloadPath = () => join(outMain, '../preload/index.cjs');
 export const embedWorkerPath = () => join(outMain, 'embed-worker.js');
 
 /** URL for a renderer page: the Vite dev server in dev, the built file otherwise. */
-export function rendererUrl(page: 'overlay' | 'settings', hash = ''): string {
+export function rendererUrl(page: 'overlay' | 'settings', hash = '', query = ''): string {
   const dev = process.env.ELECTRON_RENDERER_URL;
-  const h = hash ? `#${hash}` : '';
+  const h = (query ? `?${query}` : '') + (hash ? `#${hash}` : '');
   if (dev) return `${dev}/${page}.html${h}`;
   return `file://${join(outMain, `../renderer/${page}.html`).replace(/\\/g, '/')}${h}`;
 }
 
-export const userDataPath = (...parts: string[]) => join(app.getPath('userData'), ...parts);
+/**
+ * Windows 11 22H2 (build 22621) and later draw `backgroundMaterial` (acrylic, mica). Dev
+ * builds can turn it off with GLOSSLY_NO_MATERIAL=1 to check the fallback look.
+ */
+export function hasWindowMaterial(): boolean {
+  if (process.platform !== 'win32') return false;
+  if (!app.isPackaged && process.env.GLOSSLY_NO_MATERIAL === '1') return false;
+  return Number(release().split('.')[2] ?? 0) >= 22621;
+}
+
+export const userDataPath =(...parts: string[]) => join(app.getPath('userData'), ...parts);

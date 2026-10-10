@@ -125,6 +125,18 @@ describe('placement', () => {
     expect(p.rect.x + p.rect.w).toBeLessThanOrEqual(1920);
   });
 
+  it('picks a left edge with room for the widest bar near the right edge', () => {
+    // Centered on the anchor the pill would start at 1770; the bar can grow to 680 px.
+    const sel = { x: 1700, y: 400, w: 160, h: 20 };
+    const p = placePill({ selection: sel, obstacles: [], size: { w: 200, h: 40 }, growW: 680, workArea });
+    expect(p.rect.x).toBe(1920 - 680);
+    expect(p.rect.w).toBe(200);
+    // Away from the edge it stays centered on the anchor.
+    expect(placePill({ selection, obstacles: [], size: { w: 200, h: 40 }, growW: 680, workArea }).rect.x).toBe(740);
+    const bar = placeBar({ selection: sel, obstacles: [], size: { w: 200, h: 40 }, growW: 680, workArea });
+    expect(bar.rect.x + 680).toBeLessThanOrEqual(1920);
+  });
+
   it('the bar never becomes a dot', () => {
     const obstacles = [
       { x: 0, y: 340, w: 1920, h: 48 },

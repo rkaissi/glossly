@@ -1,8 +1,14 @@
 /*
- * The overlay window is transparent and sized by main. The pill fills the fixed 168x40 pill
- * window; the bar and panel are a fixed 560 px wide (SIZES in shell-electron overlay.ts) and
- * report their height. When the bar sits above the selection, everything stacks upward from
- * the bottom edge so the button row stays next to the selection and never moves.
+ * The overlay window is sized by main to fit exactly what is drawn here, because on Windows 11
+ * the whole window is acrylic glass (html[data-material='acrylic']; DWM rounds its corners and
+ * draws the shadow). Without acrylic (Windows 10) the window is transparent and the pill and
+ * frame draw a solid rounded card instead.
+ *
+ * Geometry (keep in sync with SIZES in shell-electron overlay.ts): the row is 40 px tall with
+ * 4 px padding and 4 px gaps: menu 32, Ask 72, Save 80, so the pill is 200x40. The bar uses the
+ * same row, so expanding a pill keeps the menu, Ask, and Save in place; slots 3 and 4 append on
+ * the right and the window grows rightward from a fixed left edge. When the bar sits above the
+ * selection, everything stacks upward so the row stays next to the selection.
  */
 html,
 body,
@@ -13,15 +19,15 @@ body,
   overflow: hidden;
   user-select: none;
 }
+html[data-material='acrylic'] body:is([data-mode='pill'], [data-mode='bar'], [data-mode='panel']) {
+  background: var(--glass);
+}
 
 .pill,
 .frame {
   position: absolute;
   left: 0;
   top: 0;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
   color: var(--fg);
 }
 .pill.above,
@@ -29,44 +35,41 @@ body,
   top: auto;
   bottom: 0;
 }
+html:not([data-material='acrylic']) :is(.pill, .frame) {
+  background: var(--glass-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
 
 .pill {
+  width: 200px;
   height: 40px;
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
   animation: fade-in 120ms ease-out;
 }
 
-/* A fixed 18 px circle (placement.mark) inside a larger click-through window, with the
-   Glossly mark: a short highlight bar. */
+/* The dot: a fixed 18 px circle (placement.mark) inside a larger click-through window. The
+   window has no acrylic in dot mode, so the circle is drawn here. */
 .dot {
   position: absolute;
-  box-sizing: border-box;
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  background: var(--glass-solid);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   display: grid;
   place-items: center;
+  color: var(--fg);
   animation: fade-in 120ms ease-out;
   cursor: pointer;
 }
-.dot::before {
-  content: '';
-  width: 8px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--fg);
-}
 .dot:hover {
-  background: var(--bg-2);
+  border-color: var(--ring);
 }
 
 .frame {
-  width: 560px;
+  width: max-content;
+  min-width: 200px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -74,118 +77,242 @@ body,
 .frame.above {
   flex-direction: column-reverse;
 }
-.frame > * + * {
+.frame.has-menu {
+  min-width: 248px;
+}
+.frame.has-strip {
+  min-width: 380px;
+}
+.frame.has-debug {
+  min-width: 460px;
+}
+.frame.has-panel {
+  min-width: 520px;
+}
+/* Everything under the row takes the row's width instead of widening the bar. */
+.frame > :not(.row) {
+  width: 0;
+  min-width: 100%;
   border-top: 1px solid var(--border);
 }
-.frame.above > * + * {
+.frame.above > :not(.row) {
   border-top: none;
   border-bottom: 1px solid var(--border);
 }
 
 .row {
-  height: 38px;
+  height: 40px;
   flex: none;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 4px;
+  padding: 4px;
 }
-.spacer {
-  flex: 1;
+
+.menu-btn {
+  width: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--fg-2);
+  flex: none;
+}
+.menu-btn.open {
+  background: var(--pressed);
+  color: var(--fg);
 }
 
 .slot {
-  height: 30px;
+  height: 32px;
   max-width: 172px;
   padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
+  gap: 7px;
+  justify-content: flex-start;
+  background: transparent;
   overflow: hidden;
-  text-overflow: ellipsis;
   flex: none;
 }
 .slot > span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.slot.ask {
+  min-width: 72px;
+}
+.slot.save {
+  min-width: 80px;
+}
+.pill .slot.ask {
+  width: 72px;
+}
+.pill .slot.save {
+  width: 80px;
+}
 .slot.fresh {
   animation: fade-in 180ms ease-out;
 }
 .slot.later {
-  color: var(--muted);
+  color: var(--fg-2);
 }
 .slot.highlight {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1.5px var(--ring);
 }
 .slot.active {
-  background: var(--accent-soft);
+  background: var(--pressed);
 }
 .slot kbd {
-  padding: 0 3px;
-}
-
-.icon {
-  width: 28px;
-  height: 30px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
   padding: 0;
-  background: transparent;
-  color: var(--muted);
-  flex: none;
+  line-height: 14px;
 }
 
 .badge {
-  font-size: 11px;
-  padding: 2px 8px;
+  font-size: 12px;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  color: var(--fg-2);
   white-space: nowrap;
+  flex: none;
   animation: fade-in 180ms ease-out;
+}
+
+/* The Glossly menu: More (the extra actions), then Don't show here, Settings, and Close. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 1px;
+  animation: fade-in 120ms ease-out;
+}
+.menu-label {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 10px 2px;
+}
+.menu-item {
+  width: 100%;
+  height: 32px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--fg);
+}
+.menu-item > span {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menu-item.later {
+  color: var(--fg-2);
+}
+.menu-item.highlight {
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1.5px var(--ring);
+}
+.menu-item svg {
+  color: var(--fg-2);
+}
+.menu-empty {
+  padding: 4px 10px 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
 }
 
 .strip {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 8px;
-  font-size: 12px;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--fg-2);
 }
-.notice {
-  color: var(--warn);
+.strip svg {
+  flex: none;
+  margin-top: 2px;
 }
 
 .panel {
-  padding: 10px 12px;
+  padding: 12px 14px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  animation: fade-in 140ms ease-out;
+  gap: 10px;
+  animation: fade-in 150ms ease-out;
 }
 .panel h2 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
+  font: 600 15px/1.35 var(--font-display);
 }
 .panel p {
   margin: 0;
 }
 .panel-input {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 .panel-input input {
   flex: 1;
   min-width: 0;
 }
+
+/* The Ask box: an input with a round send button inside it. */
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 4px 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  transition: border-color var(--fade) ease;
+}
+.composer:focus-within {
+  border-color: var(--ring);
+}
+.composer input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.composer input:focus-visible {
+  outline: none;
+}
+.send {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+
 .panel-foot {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 24px;
   font-size: 12px;
   color: var(--muted);
+}
+.panel-foot button {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.spacer {
+  flex: 1;
 }
 
 .answer {
@@ -193,66 +320,111 @@ body,
   overflow-y: auto;
   user-select: text;
   padding-right: 4px;
+  line-height: 1.55;
 }
 .answer p,
 .answer ul,
 .answer ol,
 .answer pre {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+}
+.answer > :last-child {
+  margin-bottom: 0;
 }
 .answer ul,
 .answer ol {
-  padding-left: 20px;
+  padding-left: 22px;
+}
+.answer li + li {
+  margin-top: 3px;
 }
 .answer h3 {
   margin: 0 0 6px;
-  font-size: 13px;
+  font: 600 14px/1.4 var(--font-display);
 }
 .answer code {
-  font: 12px var(--mono);
-  background: var(--bg-2);
-  padding: 0 3px;
-  border-radius: 3px;
+  font: 12.5px var(--mono);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 0 4px;
+  border-radius: 5px;
 }
 .answer pre {
-  background: var(--bg-2);
-  padding: 8px;
-  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
 }
 .answer pre code {
   background: none;
+  border: none;
   padding: 0;
 }
 .answer p {
   white-space: pre-wrap;
 }
+.answer .thinking {
+  color: var(--muted);
+}
+.answer-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* The streaming cursor: a neutral block that pulses. */
 .cursor::after {
-  content: '▍';
-  color: var(--accent);
-  animation: fade-in 600ms ease-in-out infinite alternate;
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--fg);
+  animation: pulse 900ms ease-in-out infinite alternate;
+}
+@keyframes pulse {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 0.9;
+  }
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 .chip {
-  padding: 3px 10px;
+  height: 28px;
+  padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   background: transparent;
+  font-size: 13px;
 }
-.chip.selected {
-  background: var(--accent);
-  color: var(--accent-fg);
-  border-color: var(--accent);
+.chip.selected,
+.chip.selected:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--primary-fg);
+  border-color: var(--primary);
+}
+.saved-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.saved-line svg {
+  flex: none;
+  color: var(--fg-2);
 }
 
 .debug {
-  padding: 6px 8px;
-  font: 11px/1.45 var(--mono);
+  padding: 8px 12px;
+  font: 11px/1.5 var(--mono);
   color: var(--muted);
   user-select: text;
 }
@@ -272,6 +444,6 @@ body,
   word-break: break-word;
 }
 .debug mark {
-  background: var(--accent-soft);
+  background: var(--select);
   color: var(--fg);
 }

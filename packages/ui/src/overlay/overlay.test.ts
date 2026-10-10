@@ -19,10 +19,10 @@ const slots: SlotsView = {
 };
 
 const key = (k: string, mods: Partial<KeyInput> = {}): KeyInput => ({ key: k, ctrl: false, alt: false, meta: false, shift: false, ...mods });
-const ctx = (over: Partial<BarKeyContext> = {}): BarKeyContext => ({ items: barItems(slots, true, false), highlight: 0, moreOpen: false, ...over });
+const ctx = (over: Partial<BarKeyContext> = {}): BarKeyContext => ({ items: barItems(slots, true, false), highlight: 0, menuOpen: false, ...over });
 
 describe('barItems', () => {
-  it('lists filled slots, and More only when open', () => {
+  it('lists filled slots, and More only while the menu is open', () => {
     expect(barItems(slots, true, false)).toEqual([{ slot: 1 }, { slot: 2 }, { slot: 3 }]);
     expect(barItems(slots, true, true)).toEqual([{ slot: 1 }, { slot: 2 }, { slot: 3 }, { action: 'visualize' }]);
   });
@@ -39,19 +39,28 @@ describe('barKey', () => {
   });
   it('runs the highlighted item on Enter', () => {
     expect(barKey(key('Enter'), ctx({ highlight: 1 }))).toEqual({ kind: 'run', target: { slot: 2 } });
-    expect(barKey(key('Enter'), ctx({ items: barItems(slots, true, true), moreOpen: true, highlight: 3 }))).toEqual({
+    expect(barKey(key('Enter'), ctx({ items: barItems(slots, true, true), menuOpen: true, highlight: 3 }))).toEqual({
       kind: 'run',
       target: { action: 'visualize' },
     });
   });
-  it('toggles More on Tab and closes it before the bar on Esc', () => {
-    expect(barKey(key('Tab'), ctx())).toEqual({ kind: 'more', open: true });
-    expect(barKey(key('Escape'), ctx({ moreOpen: true }))).toEqual({ kind: 'more', open: false });
+  it('opens the menu (with More) on Tab, and closes it before the bar on Esc', () => {
+    expect(barKey(key('Tab'), ctx())).toEqual({ kind: 'menu', open: true });
+    expect(barKey(key('Tab'), ctx({ menuOpen: true }))).toEqual({ kind: 'menu', open: false });
+    expect(barKey(key('Escape'), ctx({ menuOpen: true }))).toEqual({ kind: 'menu', open: false });
     expect(barKey(key('Escape'), ctx())).toEqual({ kind: 'close' });
   });
   it('wraps the highlight with the arrow keys', () => {
     expect(barKey(key('ArrowLeft'), ctx())).toEqual({ kind: 'highlight', index: 2 });
     expect(barKey(key('ArrowRight'), ctx({ highlight: 2 }))).toEqual({ kind: 'highlight', index: 0 });
+  });
+  it('moves through More with Down and Up while the menu is open', () => {
+    const open = ctx({ items: barItems(slots, true, true), menuOpen: true, highlight: 3 });
+    expect(barKey(key('ArrowUp'), open)).toEqual({ kind: 'highlight', index: 2 });
+    expect(barKey(key('ArrowDown'), open)).toEqual({ kind: 'highlight', index: 0 });
+  });
+  it('keeps 1 to 4 working while the menu is open', () => {
+    expect(barKey(key('3'), ctx({ items: barItems(slots, true, true), menuOpen: true }))).toEqual({ kind: 'run', target: { slot: 3 } });
   });
   it('lets modified keys through', () => {
     expect(barKey(key('1', { ctrl: true }), ctx())).toBeNull();

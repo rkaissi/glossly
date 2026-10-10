@@ -1,5 +1,6 @@
 import type { ActionId } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { ActionIcon } from '../icons';
 
 const ABOUT: Partial<Record<ActionId, { title: string; text: string }>> = {
   reply: { title: 'Reply', text: 'Drafts three replies with what you know about the person, and inserts the one you pick.' },
@@ -13,7 +14,10 @@ export function LaterPanel({ action, sessionId, keyboard }: { action: ActionId; 
   const about = ABOUT[action] ?? { title: action, text: '' };
   return (
     <div className="panel">
-      <h2>{about.title}</h2>
+      <h2 className="saved-line">
+        <ActionIcon action={action} size={17} />
+        <span>{about.title}</span>
+      </h2>
       <p>{about.text}</p>
       <p className="muted">Coming in a later phase. The router suggested it for this selection, and the click was counted.</p>
       <div className="panel-foot">

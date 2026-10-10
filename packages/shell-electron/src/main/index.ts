@@ -30,6 +30,12 @@ async function main(): Promise<void> {
   const services = new Services();
   const overlay = new Overlay();
   const helper = new HelperManager();
+  // Windows 11 rounding for the acrylic overlay; the helper sets DWM's corner preference.
+  overlay.useCorners(async (corners) => {
+    const r = await helper.request('window_corners', { handle: overlay.nativeHandle(), corners });
+    if (!r.applied) log.warn('overlay corners not applied', { corners });
+  });
+  helper.on('ready', () => overlay.refreshCorners());
   const settingsWindow = new SettingsWindow();
   const capture = new Capture(helper, overlay, services, () => settingsWindow.captureSourceHandle());
   const hotkey = new HotkeyManager(() => {

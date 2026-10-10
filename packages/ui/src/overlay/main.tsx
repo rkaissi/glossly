@@ -1,9 +1,11 @@
-// The overlay renderer: pill, dot, bar, and panels in one transparent window. Main owns the
-// session and pushes OverlayState; this side only renders it and sends clicks and keys back.
+// The overlay renderer: pill, dot, bar, and panels in one window. Main owns the session and
+// pushes OverlayState; this side only renders it and sends clicks and keys back.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { EyeOff, Info, Settings, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { ActionIcon, GlosslyMark } from '../icons';
 import '../theme.css';
 import './overlay.css';
 import { AskPanel } from './AskPanel';
@@ -12,10 +14,16 @@ import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { SavePanel } from './SavePanel';
 
+// Main loads the page with ?material=acrylic when the window is Windows 11 acrylic glass.
+document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
+
 const expand = (sessionId: number) => void glossly.invoke('bar:expand', { sessionId });
 const run = (sessionId: number, target: BarItem) => void glossly.invoke('bar:run', { sessionId, ...target });
 
 const badgeLabel = (b: Badge) => (b.kind === 'recall' ? `${b.count} related` : b.label);
+
+/** Set when the pill's menu button is clicked: the bar it expands into opens with the menu. */
+let openMenuOnExpand = false;
 
 function Overlay() {
   const [s, setS] = useState<OverlayState | null>(null);
@@ -32,6 +40,11 @@ function Overlay() {
     return off;
   }, []);
 
+  // The glass tint covers the whole window, except in dot mode (a clear window with a small circle).
+  useLayoutEffect(() => {
+    document.body.dataset.mode = s?.mode ?? 'hidden';
+  }, [s?.mode]);
+
   if (!s || s.mode === 'hidden') return null;
   if (s.mode === 'dot') return <Dot s={s} />;
   if (s.mode === 'pill') return <Pill s={s} />;
@@ -45,18 +58,39 @@ function Overlay() {
 function Dot({ s }: { s: OverlayState }) {
   const p = s.placement;
   const pos = p?.mark ? { left: p.mark.x - p.rect.x, top: p.mark.y - p.rect.y } : { left: 0, top: 0 };
-  return <div className="dot" style={pos} title="Glossly" onMouseEnter={() => expand(s.sessionId)} />;
+  return (
+    <div className="dot" style={pos} title="Glossly" onMouseEnter={() => expand(s.sessionId)}>
+      <GlosslyMark size={12} />
+    </div>
+  );
 }
 
-/** Ask and Save only. Hovering expands it into the bar; nothing is sent to a model yet. */
+function MenuButton({ open, onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button className={`menu-btn${open ? ' open' : ''}`} title="Glossly menu" aria-haspopup="menu" aria-expanded={open} onClick={onClick}>
+      <GlosslyMark />
+    </button>
+  );
+}
+
+/** The menu, Ask, and Save. Hovering expands it into the bar; nothing is sent to a model yet. */
 function Pill({ s }: { s: OverlayState }) {
   return (
-    <div className={`pill${s.placement?.side === 'above' ? ' above' : ''}`} onMouseEnter={() => expand(s.sessionId)}>
-      <button className="slot" onClick={() => run(s.sessionId, { slot: 1 })}>
-        Ask
+    <div className={`pill row${s.placement?.side === 'above' ? ' above' : ''}`} onMouseEnter={() => expand(s.sessionId)}>
+      <MenuButton
+        open={false}
+        onClick={() => {
+          openMenuOnExpand = true;
+          expand(s.sessionId);
+        }}
+      />
+      <button className="slot ask" onClick={() => run(s.sessionId, { slot: 1 })}>
+        <ActionIcon action="ask" />
+        <span>Ask</span>
       </button>
-      <button className="slot" onClick={() => run(s.sessionId, { slot: 2 })}>
-        Save
+      <button className="slot save" onClick={() => run(s.sessionId, { slot: 2 })}>
+        <ActionIcon action="save" />
+        <span>Save</span>
       </button>
     </div>
   );
@@ -66,10 +100,13 @@ function Pill({ s }: { s: OverlayState }) {
 function Expanded({ s }: { s: OverlayState }) {
   const ref = useRef<HTMLDivElement>(null);
   const [highlight, setHighlight] = useState(0);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(() => {
+    const open = openMenuOnExpand;
+    openMenuOnExpand = false;
+    return open;
+  });
   const id = s.sessionId;
-  const items = barItems(s.slots, s.hasSelection, moreOpen);
+  const items = barItems(s.slots, s.hasSelection, menuOpen);
   const hl = Math.min(highlight, items.length - 1);
 
   // Main sizes the window; report the content's real size after every change.
@@ -85,6 +122,14 @@ function Expanded({ s }: { s: OverlayState }) {
     return () => ro.disconnect();
   }, [id]);
 
+  const toggleMenu = (open: boolean) => {
+    // Opening with Tab highlights More's first item; closing from there goes back to Ask.
+    const closed = barItems(s.slots, s.hasSelection, false).length;
+    setMenuOpen(open);
+    if (!open) setHighlight((h) => (h >= closed ? 0 : h));
+    else if (s.keyboard && s.hasSelection && s.slots?.more.length) setHighlight(closed);
+  };
+
   // The keyboard map is live only on the hotkey path (or once a panel has taken focus).
   useEffect(() => {
     if (!s.keyboard) return;
@@ -93,48 +138,46 @@ function Expanded({ s }: { s: OverlayState }) {
       if (s.mode === 'panel') {
         if (e.key === 'Escape') {
           e.preventDefault();
-          void glossly.invoke('bar:back', { sessionId: id });
+          if (menuOpen) setMenuOpen(false);
+          else void glossly.invoke('bar:back', { sessionId: id });
         }
         return;
       }
-      const cmd = barKey({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey, shift: e.shiftKey }, { items, highlight: hl, moreOpen });
+      const cmd = barKey({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey, shift: e.shiftKey }, { items, highlight: hl, menuOpen });
       if (!cmd) return;
       e.preventDefault();
-      if (cmd.kind === 'run') run(id, cmd.target);
-      else if (cmd.kind === 'highlight') setHighlight(cmd.index);
-      else if (cmd.kind === 'more') {
-        // Opening More highlights its first item; closing it from there goes back to Ask.
-        const closed = barItems(s.slots, s.hasSelection, false).length;
-        setMoreOpen(cmd.open);
-        if (!cmd.open) setHighlight((h) => (h >= closed ? 0 : h));
-        else if (s.slots?.more.length) setHighlight(closed);
-      } else void glossly.invoke('bar:close', { sessionId: id });
+      if (cmd.kind === 'run') {
+        setMenuOpen(false);
+        run(id, cmd.target);
+      } else if (cmd.kind === 'highlight') setHighlight(cmd.index);
+      else if (cmd.kind === 'menu') toggleMenu(cmd.open);
+      else void glossly.invoke('bar:close', { sessionId: id });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const slotButton = (target: BarItem, view: SlotView, opts: { fresh?: boolean; disabled?: boolean; hint?: string } = {}) => {
+  const isHighlighted = (target: BarItem) => s.keyboard && s.mode === 'bar' && sameItem(items[hl], target);
+  const titleFor = (view: SlotView) => {
+    const title = view.available ? view.label : `${view.label}: coming in a later phase`;
+    return view.score !== undefined ? `${title} (score ${view.score.toFixed(2)})` : title;
+  };
+
+  const slotButton = (target: { slot: 1 | 2 | 3 | 4 }, view: SlotView, opts: { cls?: string; fresh?: boolean; disabled?: boolean } = {}) => {
     const active = s.mode === 'panel' && s.panel === view.action;
-    const cls = [
-      'slot',
-      opts.fresh && 'fresh',
-      !view.available && 'later',
-      s.keyboard && s.mode === 'bar' && sameItem(items[hl], target) && 'highlight',
-      active && 'active',
-    ]
+    const cls = ['slot', opts.cls, opts.fresh && 'fresh', !view.available && 'later', isHighlighted(target) && 'highlight', active && 'active']
       .filter(Boolean)
       .join(' ');
-    const title = view.available ? view.label : `${view.label}: coming in a later phase`;
     return (
       <button
-        key={'slot' in target ? `slot${target.slot}:${view.action}` : `more:${view.action}`}
+        key={`slot${target.slot}:${view.action}`}
         className={cls}
-        title={view.score !== undefined ? `${title} (score ${view.score.toFixed(2)})` : title}
+        title={titleFor(view)}
         disabled={opts.disabled}
         onClick={() => !active && run(id, target)}
       >
-        {s.keyboard && opts.hint && <kbd>{opts.hint}</kbd>}
+        {/* The number takes the icon's 16 px, so turning the keyboard map on moves nothing. */}
+        {s.keyboard ? <kbd>{target.slot}</kbd> : <ActionIcon action={view.action} />}
         <span>{view.label}</span>
       </button>
     );
@@ -144,61 +187,96 @@ function Expanded({ s }: { s: OverlayState }) {
   const ask: SlotView = slots?.slot1 ?? { action: 'ask', label: 'Ask', available: true };
   const save: SlotView = slots?.slot2 ?? { action: 'save', label: 'Save', available: true };
   const more = slots?.more ?? [];
+  const strip = Boolean(s.notice) || !s.hasSelection;
+  const frameCls = [
+    'frame',
+    s.placement?.side === 'above' && 'above',
+    menuOpen && 'has-menu',
+    strip && 'has-strip',
+    s.debug && 'has-debug',
+    s.mode === 'panel' && 'has-panel',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div ref={ref} className={`frame${s.placement?.side === 'above' ? ' above' : ''}`}>
+    <div ref={ref} className={frameCls}>
       <div className="row">
-        {slotButton({ slot: 1 }, ask, { hint: '1' })}
-        {slotButton({ slot: 2 }, save, { hint: '2', disabled: !s.hasSelection })}
-        {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true, hint: '3' })}
-        {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true, hint: '4' })}
-        <span className="spacer" />
+        <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
+        {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
+        {slotButton({ slot: 2 }, save, { cls: 'save', disabled: !s.hasSelection })}
+        {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
+        {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
         {s.badges.map((b) => (
           <span key={b.kind === 'recall' ? 'recall' : b.personId} className="badge">
             {badgeLabel(b)}
           </span>
         ))}
-        {s.hasSelection && more.length > 0 && (
-          <button className="slot" title="More actions" onClick={() => setMoreOpen((o) => !o)}>
-            {s.keyboard && <kbd>Tab</kbd>}
-            <span>More</span>
-          </button>
-        )}
-        <button className="icon" title="Options" onClick={() => setMenuOpen((o) => !o)}>
-          ⋯
-        </button>
-        <button className="icon" title="Close" onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>
-          ✕
-        </button>
       </div>
 
-      {moreOpen && s.mode === 'bar' && (
-        <div className="strip">
-          {more.length > 0 ? (
-            more.map((m) => slotButton({ action: m.action }, m))
-          ) : (
-            <span className="muted">No other actions fit this selection.</span>
-          )}
-        </div>
-      )}
-
       {menuOpen && (
-        <div className="strip">
+        <div className="menu" role="menu">
+          {s.hasSelection && (
+            <>
+              <div className="menu-label">
+                More actions {s.keyboard && s.mode === 'bar' && <kbd>Tab</kbd>}
+              </div>
+              {more.length > 0 ? (
+                more.map((m) => (
+                  <button
+                    key={m.action}
+                    role="menuitem"
+                    className={`menu-item${m.available ? '' : ' later'}${isHighlighted({ action: m.action }) ? ' highlight' : ''}`}
+                    title={titleFor(m)}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      run(id, { action: m.action });
+                    }}
+                  >
+                    <ActionIcon action={m.action} />
+                    <span>{m.label}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="menu-empty">No other actions fit this selection.</div>
+              )}
+              <div className="menu-sep" />
+            </>
+          )}
           {s.siteKey && (
             <button
+              role="menuitem"
+              className="menu-item"
               title="Show the bar here only when you press the hotkey"
               onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
             >
-              Don't show here ({s.siteKey})
+              <EyeOff size={16} strokeWidth={1.75} aria-hidden />
+              <span>Don't show here ({s.siteKey})</span>
             </button>
           )}
-          <button onClick={() => void glossly.invoke('settings:open', {})}>Settings</button>
+          <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('settings:open', {})}>
+            <Settings size={16} strokeWidth={1.75} aria-hidden />
+            <span>Settings</span>
+          </button>
+          <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>
+            <X size={16} strokeWidth={1.75} aria-hidden />
+            <span>Close</span>
+            {s.keyboard && <kbd>Esc</kbd>}
+          </button>
         </div>
       )}
 
-      {s.notice && <div className="strip notice">{s.notice}</div>}
+      {s.notice && (
+        <div className="strip">
+          <Info size={15} strokeWidth={1.75} aria-hidden />
+          <span>{s.notice}</span>
+        </div>
+      )}
       {!s.hasSelection && !s.notice && (
-        <div className="strip muted">Nothing selected. Ask a question, or select text and press the hotkey again.</div>
+        <div className="strip">
+          <Info size={15} strokeWidth={1.75} aria-hidden />
+          <span>Nothing selected. Ask a question, or select text and press the hotkey again.</span>
+        </div>
       )}
 
       {s.mode === 'panel' &&

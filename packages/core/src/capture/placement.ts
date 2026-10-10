@@ -23,6 +23,13 @@ export interface PlacementInput {
   obstacles: Rect[];
   size: Size;
   workArea: Rect;
+  /**
+   * The widest the window can grow to the right (the bar with both slots at the label cap, or
+   * a panel). The window only grows rightward from its left edge, so the left edge is picked
+   * now, at first paint, with room for this width; nothing has to shift later. Defaults to
+   * `size.w`.
+   */
+  growW?: number;
   gap?: number;
   /** Diameter of the visible dot. */
   dotSize?: number;
@@ -45,6 +52,11 @@ function clampX(x: number, w: number, area: Rect): number {
   return Math.min(Math.max(x, area.x), area.x + area.w - w);
 }
 
+/** Like clampX, but leaves room on the right for the window to grow to `reach`. */
+function leftEdge(x: number, w: number, reach: number, area: Rect): number {
+  return Math.max(area.x, Math.min(clampX(x, w, area), area.x + area.w - Math.max(w, reach)));
+}
+
 /**
  * Places the pill near the end of the selection without covering the app's own toolbar:
  * below by default, above if something is below (or there is no room), and a small dot at
@@ -58,7 +70,7 @@ export function placePill(input: PlacementInput): Placement {
   const anchor = input.anchor ?? { x: sel.x + sel.w, y: sel.y + sel.h };
   const anchorX = Math.min(Math.max(anchor.x, sel.x), sel.x + sel.w);
 
-  const x = clampX(anchorX - Math.round(size.w / 2), size.w, area);
+  const x = leftEdge(anchorX - Math.round(size.w / 2), size.w, input.growW ?? size.w, area);
   const below: Rect = { x, y: sel.y + sel.h + gap, w: size.w, h: size.h };
   const above: Rect = { x, y: sel.y - gap - size.h, w: size.w, h: size.h };
 
@@ -88,7 +100,7 @@ export function placeBar(input: Omit<PlacementInput, 'dotSize' | 'dotWindow'>): 
   if (p.mode === 'pill') return p;
   const { selection: sel, size, workArea: area } = input;
   const gap = input.gap ?? 8;
-  const x = clampX(sel.x + sel.w - size.w, size.w, area);
+  const x = leftEdge(sel.x + sel.w - size.w, size.w, input.growW ?? size.w, area);
   const belowY = sel.y + sel.h + gap;
   const y = belowY + size.h <= area.y + area.h ? belowY : Math.max(area.y, sel.y - gap - size.h);
   return { mode: 'pill', side: y >= belowY ? 'below' : 'above', rect: { x, y, w: size.w, h: size.h } };

@@ -1,5 +1,7 @@
 // The bar's keyboard map (spec, Core user flow). Pure, so it is unit-tested. Panels handle
-// their own keys (Enter, Tab, Ctrl+C); Esc in a panel goes back to the bar.
+// their own keys (Enter, Tab, Ctrl+C); Esc in a panel goes back to the bar. More lives in the
+// Glossly menu at the left of the bar: Tab opens the menu with More's first item highlighted,
+// and More's items then join what Enter and the arrow keys move through.
 import type { ActionId, SlotsView } from '@glossly/core/api';
 
 export type BarItem = { slot: 1 | 2 | 3 | 4 } | { action: ActionId };
@@ -16,23 +18,24 @@ export interface BarKeyContext {
   /** From barItems(): what Enter and the arrow keys move through. */
   items: BarItem[];
   highlight: number;
-  moreOpen: boolean;
+  /** The Glossly menu (with More inside it) is open. */
+  menuOpen: boolean;
 }
 
 export type BarCommand =
   | { kind: 'run'; target: BarItem }
   | { kind: 'highlight'; index: number }
-  | { kind: 'more'; open: boolean }
+  | { kind: 'menu'; open: boolean }
   | { kind: 'close' };
 
-/** The bar's actionable items in screen order: slots 1 to 4, then "More" when it is open. */
-export function barItems(slots: SlotsView | null, hasSelection: boolean, moreOpen: boolean): BarItem[] {
+/** The bar's actionable items: slots 1 to 4, then More's actions while the menu is open. */
+export function barItems(slots: SlotsView | null, hasSelection: boolean, menuOpen: boolean): BarItem[] {
   const items: BarItem[] = [{ slot: 1 }];
   if (!hasSelection) return items;
   items.push({ slot: 2 });
   if (slots?.slot3) items.push({ slot: 3 });
   if (slots?.slot4) items.push({ slot: 4 });
-  if (moreOpen && slots) for (const m of slots.more) items.push({ action: m.action });
+  if (menuOpen && slots) for (const m of slots.more) items.push({ action: m.action });
   return items;
 }
 
@@ -58,13 +61,16 @@ export function barKey(k: KeyInput, c: BarKeyContext): BarCommand | null {
       return target ? { kind: 'run', target } : null;
     }
     case 'Tab':
-      return { kind: 'more', open: !c.moreOpen };
+      return { kind: 'menu', open: !c.menuOpen };
+    // Down and Up move the same way, for the menu's vertical list.
     case 'ArrowRight':
+    case 'ArrowDown':
       return { kind: 'highlight', index: (c.highlight + 1) % n };
     case 'ArrowLeft':
+    case 'ArrowUp':
       return { kind: 'highlight', index: (c.highlight - 1 + n) % n };
     case 'Escape':
-      return c.moreOpen ? { kind: 'more', open: false } : { kind: 'close' };
+      return c.menuOpen ? { kind: 'menu', open: false } : { kind: 'close' };
     default:
       return null;
   }
