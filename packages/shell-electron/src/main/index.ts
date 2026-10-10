@@ -54,9 +54,13 @@ async function main(): Promise<void> {
     });
   };
   services.on('settings', broadcastSettings);
+  const broadcastPeople = () => {
+    settingsWindow.send('people:changed', {});
+    if (!overlay.win.isDestroyed()) overlay.win.webContents.send('people:changed', {});
+  };
   services.embed.on('status', (s) => settingsWindow.send('embed:progress', s));
 
-  registerIpc({ services, overlay, capture, settingsWindow, hotkey, broadcastSettings });
+  registerIpc({ services, overlay, capture, settingsWindow, hotkey, broadcastSettings, broadcastPeople });
 
   if (noCapture) log.info('capture off (GLOSSLY_NO_CAPTURE)');
   else {

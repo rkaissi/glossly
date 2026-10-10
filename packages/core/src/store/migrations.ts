@@ -97,6 +97,13 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX events_kind_at ON events(kind, at);
   `,
+  /* 2: Phase 2, people layer. notified_at marks a commitment whose due-date notification was shown. */ `
+  ALTER TABLE commitments ADD COLUMN notified_at TEXT;
+  CREATE INDEX commitments_person ON commitments(person_id, status);
+  CREATE INDEX commitments_due ON commitments(status, due_at);
+  CREATE INDEX interactions_person ON interactions(person_id, occurred_at);
+  CREATE INDEX person_aliases_person ON person_aliases(person_id);
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */

@@ -14,9 +14,14 @@ import type { MetricsSummary } from './metrics';
 import type { ContextualAction, ContentType, DecisionProviderId } from './router/types';
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
+import type { WhoView } from './actions/who';
+import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary } from './people/types';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
 export type { MetricsSummary } from './metrics';
+export type { WhoEntry, WhoView } from './actions/who';
+export type { DetectedPerson } from './people/detect';
+export type * from './people/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 
 // ---- overlay state (main -> overlay renderer) ----
@@ -24,7 +29,7 @@ export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } fro
 export type ActionId = 'ask' | 'save' | ContextualAction;
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save';
+export type AvailableAction = 'ask' | 'save' | 'who';
 
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
 
@@ -222,7 +227,7 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
-export type SettingsTab = 'profile' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
+export type SettingsTab = 'profile' | 'people' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
 
 // ---- channel maps ----
 
@@ -249,6 +254,26 @@ export interface InvokeChannels {
 
   'clipboard:write': { args: { text: string }; result: void };
 
+  /** The people in the session's selection, each resolved against the people layer. Local only. */
+  'who:get': { args: { sessionId: number }; result: WhoView };
+
+  // ---- people (overlay and settings) ----
+  'people:list': { args: { query?: string }; result: PersonSummary[] };
+  /** The full record: more interactions and saved items than the overlay card. */
+  'people:card': { args: { personId: string }; result: PersonCard | null };
+  'people:create': { args: { name: string; email?: string; handle?: string; note?: string }; result: PersonCard };
+  /** "Is this the same Sam?" answered yes: the detected name, email, and handle become aliases. */
+  'people:confirm-same': { args: { personId: string; name?: string; email?: string; handle?: string }; result: PersonCard };
+  'people:update': { args: { personId: string; name?: string; note?: string | null }; result: PersonCard };
+  /** The kind is guessed from the value unless given ("a@b.c" email, "@x" handle, else name). */
+  'people:alias-add': { args: { personId: string; value: string; kind?: AliasKind }; result: PersonCard };
+  'people:alias-remove': { args: { personId: string; kind: AliasKind; value: string }; result: PersonCard };
+  /** Only after the user confirmed: folds dropId into keepId. */
+  'people:merge': { args: { keepId: string; dropId: string }; result: PersonCard };
+  'people:delete': { args: { personId: string }; result: void };
+  'commitments:list': { args: { status?: CommitmentStatus }; result: CommitmentView[] };
+  'commitments:set-status': { args: { id: string; status: CommitmentStatus }; result: void };
+
   'settings:get': { args: void; result: SettingsView };
   'settings:set': { args: { key: SettingsKey; value: unknown }; result: SetSettingResult };
   /** Saves the key (encrypted) only if the live test passes. */
@@ -266,7 +291,8 @@ export interface InvokeChannels {
   'metrics:summary': { args: { days: number }; result: MetricsSummary };
   'embed:status': { args: void; result: EmbedStatus };
   'embed:download': { args: void; result: void };
-  'settings:open': { args: { tab?: SettingsTab }; result: void };
+  /** `personId` (with tab "people") opens that person's full record. */
+  'settings:open': { args: { tab?: SettingsTab; personId?: string }; result: void };
   /**
    * The setup's "Try it" step is showing: the settings window may be a capture source (it is
    * otherwise ignored like every Glossly window). Cleared when the window closes.
@@ -282,6 +308,8 @@ export interface PushChannels {
   'ask:error': AskErrorEvent;
   'embed:progress': EmbedStatus;
   'settings:changed': SettingsView;
+  /** People, aliases, commitments, or interactions changed; views re-fetch. */
+  'people:changed': Record<string, never>;
 }
 
 export type InvokeChannel = keyof InvokeChannels;

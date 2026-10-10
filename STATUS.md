@@ -4,7 +4,7 @@ Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1) and P
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 174 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 194 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -53,11 +53,11 @@ The app lives in the tray. The default hotkey is `Ctrl+Alt+Space`. Data is in `%
 | Spec check | Status | Notes |
 | --- | --- | --- |
 | User identity setup at first run | Built (Step 15.1), not checked live | Setup has a new "You" step after Welcome (name required, emails and handles optional), and Settings has a Profile tab with the same form. Since you finished setup before this existed, the sidebar shows "Add your name" until you fill in Profile. Ask now tells the model who is asking and that a message in the selection was most likely written to them, which fixes Ask treating you as a message's author. |
-| Person resolution, Create person, alias management, confirm-merge prompt | Not started | |
-| Who is this card | Not started | |
+| Person resolution, Create person, alias management, confirm-merge prompt | Built (Step 15.2), not checked live | Resolution follows the spec: exact email or handle alias, exact name (or name alias), then a fuzzy name match (Jaro-Winkler above 0.92) only among people already seen in the same app. A fuzzy match is never merged on its own: "Who is this" asks "Is this the same Sam?" with both records side by side. No match offers Create person with the name and email filled in. Aliases are added and removed on the card and in the full record; two existing records can be merged from the record after a confirm. |
+| Who is this card | Built (Step 15.2), not checked live | A panel in the bar with a tab per person found in the selection (the message's author first, then people it names, emails, and handles; you are left out once your name is in Profile). The card has aliases, your note on how you know them, open commitments split into "You owe" and "They owe", the last 5 messages and replies, and saved items that mention them, plus "Open record", which opens Settings > People. Finding people is local (no model call). |
 | Commitment extraction, date resolution, review-then-save, due-date notifications | Not started | |
 | Reply with 3 intent-labeled drafts, person context, voice samples, insert into original field | Not started | |
-| Person badge on the bar | Not started | |
+| Person badge on the bar | Built (Step 15.2), not checked live | A known person in the selection who has open commitments or a note gets a badge after the bar's buttons ("Maya Lin · 1 open"); clicking it opens their Who card. Local, computed with the rules paint. |
 
 Built ahead of schedule because the privacy rules require them from day one or the work was cheap: JSON export and "Delete all data" (Data tab), and the local metrics view (Metrics tab; spec Phase 4).
 

@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
-import type { ActionId, InvokeArgs, InvokeChannel, InvokeResult, SetSettingResult, SettingsKey } from '@glossly/core';
+import { aliasKindOf, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type SetSettingResult, type SettingsKey } from '@glossly/core';
 import type { Capture } from './capture';
 import type { HotkeyManager } from './hotkey';
 import { logger } from './log';
@@ -11,7 +11,9 @@ import type { SettingsWindow } from './settings-window';
 const log = logger('ipc');
 
 const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize'];
-const TABS = ['profile', 'keys', 'models', 'general', 'data', 'metrics'] as const;
+const TABS = ['profile', 'people', 'keys', 'models', 'general', 'data', 'metrics'] as const;
+const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
+const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
 const MAX_CLIPBOARD = 1_000_000;
 
 export interface IpcDeps {
@@ -22,6 +24,8 @@ export interface IpcDeps {
   hotkey: HotkeyManager;
   /** Pushes the settings view to every window. */
   broadcastSettings: () => void;
+  /** Tells every window that people or commitments changed. */
+  broadcastPeople: () => void;
 }
 
 const num = (v: unknown): number => {
@@ -32,13 +36,15 @@ const str = (v: unknown, max = 10_000): string => {
   if (typeof v !== 'string' || v.length > max) throw new Error('Invalid argument');
   return v;
 };
+const optStr = (v: unknown, max = 10_000): string | undefined => (v === undefined || v === null || v === '' ? undefined : str(v, max));
 const obj = (v: unknown): Record<string, unknown> => {
   if (typeof v !== 'object' || v === null) throw new Error('Invalid argument');
   return v as Record<string, unknown>;
 };
 
 export function registerIpc(deps: IpcDeps): void {
-  const { services, overlay, capture, settingsWindow, hotkey, broadcastSettings } = deps;
+  const { services, overlay, capture, settingsWindow, hotkey, broadcastSettings, broadcastPeople } = deps;
+  const people = services.people;
 
   const trusted = (e: IpcMainInvokeEvent) => overlay.isOwnWindow(e.sender.id) || settingsWindow.isOwnWindow(e.sender.id);
 
@@ -90,6 +96,84 @@ export function registerIpc(deps: IpcDeps): void {
   handle('save:setWhy', (a) => services.save.setWhy(str(a.itemId, 100), str(a.why, 2000)));
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
+
+  // ---- people ----
+  handle('who:get', (a) => capture.who(num(a.sessionId)));
+  /** Runs a change, tells every window, and returns the person's overlay card. */
+  const changed = (personId: string): PersonCard => {
+    broadcastPeople();
+    const card = people.card(personId);
+    if (!card) throw new Error('That person no longer exists.');
+    return card;
+  };
+  handle('people:list', (a) => people.list(optStr(a?.query, 200) ?? ''));
+  handle('people:card', (a) => people.card(str(a.personId, 100), { interactions: 20, items: 20 }));
+  handle('people:create', (a) => {
+    const aliases = [
+      ...(optStr(a.email, 200) ? [{ kind: 'email' as const, value: str(a.email, 200) }] : []),
+      ...(optStr(a.handle, 100) ? [{ kind: 'handle' as const, value: str(a.handle, 100) }] : []),
+    ];
+    const p = people.create({ name: str(a.name, 200), note: optStr(a.note, 2000) ?? null, aliases });
+    log.info('person created', { aliases: aliases.length });
+    return changed(p.id);
+  });
+  handle('people:confirm-same', (a) => {
+    const id = str(a.personId, 100);
+    for (const [kind, v] of [['name', a.name], ['email', a.email], ['handle', a.handle]] as const) {
+      const value = optStr(v, 200);
+      // Quietly skips an alias someone else already has; the user can sort that out in the record.
+      if (value) {
+        try {
+          people.addAlias(id, kind, value);
+        } catch (e) {
+          if ((e as Error).name !== 'AliasTakenError') throw e;
+        }
+      }
+    }
+    return changed(id);
+  });
+  handle('people:update', (a) => {
+    const id = str(a.personId, 100);
+    people.update(id, { ...(a.name !== undefined && { name: str(a.name, 200) }), ...(a.note !== undefined && { note: a.note === null ? null : str(a.note, 2000) }) });
+    return changed(id);
+  });
+  handle('people:alias-add', (a) => {
+    const id = str(a.personId, 100);
+    const value = str(a.value, 200);
+    const kind = a.kind ? (str(a.kind, 10) as AliasKind) : aliasKindOf(value);
+    if (!ALIAS_KINDS.includes(kind)) throw new Error('Invalid alias kind');
+    people.addAlias(id, kind, value);
+    return changed(id);
+  });
+  handle('people:alias-remove', (a) => {
+    const id = str(a.personId, 100);
+    const kind = str(a.kind, 10) as AliasKind;
+    if (!ALIAS_KINDS.includes(kind)) throw new Error('Invalid alias kind');
+    people.removeAlias(id, kind, str(a.value, 200));
+    return changed(id);
+  });
+  handle('people:merge', (a) => {
+    const keep = str(a.keepId, 100);
+    people.merge(keep, str(a.dropId, 100));
+    log.info('people merged');
+    return changed(keep);
+  });
+  handle('people:delete', (a) => {
+    people.delete(str(a.personId, 100));
+    log.info('person deleted');
+    broadcastPeople();
+  });
+  handle('commitments:list', (a) => {
+    const status = optStr(a?.status, 10) as CommitmentStatus | undefined;
+    if (status && !STATUSES.includes(status)) throw new Error('Invalid status');
+    return people.commitments(status ? { status } : {});
+  });
+  handle('commitments:set-status', (a) => {
+    const status = str(a.status, 10) as CommitmentStatus;
+    if (!STATUSES.includes(status)) throw new Error('Invalid status');
+    people.setCommitmentStatus(str(a.id, 100), status);
+    broadcastPeople();
+  });
 
   // ---- settings ----
   handle('settings:get', () => services.view());
@@ -153,6 +237,7 @@ export function registerIpc(deps: IpcDeps): void {
     await services.deleteAll();
     log.info('all data deleted');
     broadcastSettings();
+    broadcastPeople();
   });
   handle('settings:reset', () => {
     capture.close('reset_settings');
@@ -168,8 +253,9 @@ export function registerIpc(deps: IpcDeps): void {
     // From the overlay (its menu, or "Add a key"): the bar's job is done; close it so it
     // doesn't sit on top of the settings window.
     if (overlay.isOwnWindow(e.sender.id)) capture.close('settings');
-    const tab = a?.tab;
-    settingsWindow.open(tab && (TABS as readonly string[]).includes(tab) ? tab : undefined);
+    const tab = a?.tab && (TABS as readonly string[]).includes(a.tab) ? a.tab : undefined;
+    const personId = tab === 'people' ? optStr(a?.personId, 100) : undefined;
+    settingsWindow.open(personId ? `people/${encodeURIComponent(personId)}` : tab);
   });
   handle('setup:try-it', (a, e) => {
     if (!settingsWindow.isOwnWindow(e.sender.id)) throw new Error('Settings window only');

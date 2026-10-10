@@ -24,6 +24,10 @@ export * from './store/migrations';
 export * from './store/store';
 
 export * from './people/names';
+export type * from './people/types';
+export * from './people/detect';
+export * from './people/resolve';
+export * from './store/people';
 
 export * from './llm/types';
 export * from './llm/catalog';
@@ -36,5 +40,6 @@ export * from './embed/types';
 export * from './actions/context';
 export * from './actions/ask';
 export * from './actions/save';
+export * from './actions/who';
 
 export type * from './api';

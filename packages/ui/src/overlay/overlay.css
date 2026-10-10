@@ -169,8 +169,13 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  background: transparent;
   font-size: 12px;
-  padding: 2px 9px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   color: var(--fg-2);
@@ -448,4 +453,76 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .debug mark {
   background: var(--select);
   color: var(--fg);
+}
+
+/* ---- Who is this ---- */
+
+.panel.who:focus {
+  outline: none;
+}
+.who-body {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+  user-select: text;
+}
+.inline-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+}
+.inline-note svg {
+  flex: none;
+}
+.inline-note button {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12.5px;
+  margin-left: auto;
+}
+.same {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.same-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.same-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-width: 0;
+}
+.same-card span {
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.same-label {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.create-person {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.form-grid .wide {
+  grid-column: 1 / -1;
+}
+.row-tight button svg {
+  margin-right: 2px;
 }

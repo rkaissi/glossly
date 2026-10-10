@@ -8,6 +8,10 @@ import {
   ask,
   classifyObstacles,
   countWords,
+  detectInputFor,
+  detectPeople,
+  personBadges,
+  whoFor,
   gateApp,
   gateAutoSelection,
   isoNow,
@@ -38,6 +42,7 @@ import {
   type SelectionPayload,
   type SelectionContext,
   type Trigger,
+  type WhoView,
 } from '@glossly/core';
 import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
@@ -531,6 +536,7 @@ export class Capture {
         siteKey: session.siteKey,
         debug: this.debugFor(session),
         slots: quick ? slotsView(quick, 'rules') : null,
+        badges: this.badgesFor(session),
         notice: notice ?? this.takeNotice(),
       },
       placement.rect,
@@ -592,6 +598,7 @@ export class Capture {
         mode: 'bar',
         placement: { mode: 'pill', side, rect },
         slots: slotsView(quick, 'rules'),
+        badges: this.badgesFor(s),
         debug: this.debugFor(s),
         notice: this.takeNotice(),
       },
@@ -735,6 +742,29 @@ export class Capture {
     this.close('dont_show_here');
     log.info('app set to hotkey-only');
     return { key, mode: 'hotkey' };
+  }
+
+  // ---- people ----
+
+  /** "Who is this": the people in the selection, resolved against the people layer. */
+  async who(sessionId: number): Promise<WhoView> {
+    const s = this.current(sessionId);
+    const identity = this.settings.identity;
+    if (!s?.selection) return { entries: [], identitySet: identity.name.trim().length > 0 };
+    const container = (await s.container) ?? null;
+    return whoFor(this.services.people, s.selection, container, identity, this.services.store.listKnownPeople());
+  }
+
+  /** Person badges from tier 1 (local, a few ms): a known person with open commitments or a note. */
+  private badgesFor(s: Session): OverlayState['badges'] {
+    if (!s.selection) return [];
+    try {
+      const detection = detectPeople(detectInputFor(s.selection, null), this.settings.identity, this.services.store.listKnownPeople());
+      return personBadges(this.services.people, detection, s.selection.source_app);
+    } catch (e) {
+      log.warn('person badges failed', errorInfo(e));
+      return [];
+    }
   }
 
   // ---- Ask and Save ----

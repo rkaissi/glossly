@@ -7,6 +7,7 @@ import {
   Metrics,
   PROVIDER_ORDER,
   PROVIDERS,
+  PeopleRepo,
   ProviderKeyError,
   SaveService,
   SettingsSchema,
@@ -47,6 +48,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
   readonly keys: KeyStore;
   readonly llm: AiSdkLlm;
   readonly save: SaveService;
+  readonly people: PeopleRepo;
   readonly embed: EmbedHost;
   private settingsCache: Settings;
   private readonly lastTests = new Map<string, KeyTestResult>();
@@ -61,6 +63,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
       store = new Store(userDataPath('glossly.db'));
     }
     this.store = store;
+    this.people = new PeopleRepo(store);
     this.metrics = new Metrics(store);
     this.keys = new KeyStore(userDataPath('keys'));
     this.settingsCache = store.getSettings();

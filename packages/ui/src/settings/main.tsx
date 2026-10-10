@@ -2,7 +2,7 @@
 // #models, #general, #data, #metrics). Main changes the hash on an open window to switch tabs.
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, UserRound, type LucideIcon } from 'lucide-react';
+import { Activity, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { GlosslyMark } from '../icons';
@@ -13,11 +13,13 @@ import { GeneralTab } from './General';
 import { KeysTab } from './Keys';
 import { MetricsTab } from './Metrics';
 import { ModelsTab } from './Models';
+import { PeopleTab } from './People';
 import { ProfileTab } from './Profile';
 import { Setup } from './Setup';
 
 const TABS = [
   { id: 'profile', label: 'Profile' },
+  { id: 'people', label: 'People' },
   { id: 'keys', label: 'Keys' },
   { id: 'models', label: 'Models' },
   { id: 'general', label: 'General' },
@@ -26,13 +28,18 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
-const TAB_ICONS: Record<Tab, LucideIcon> = { profile: UserRound, keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
+const TAB_ICONS: Record<Tab, LucideIcon> = { profile: UserRound, people: UsersRound, keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
 
 // Main loads the page with ?material=mica when the window is Windows 11 mica.
 document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
 
 const isTab = (h: string): h is Tab => TABS.some((t) => t.id === h);
 const readHash = () => location.hash.replace(/^#/, '');
+/** "#people/<id>" is the People tab showing one person's record. */
+const splitHash = (h: string): [string, string | null] => {
+  const [head, rest] = h.split(/\/(.*)/s);
+  return [head ?? '', rest ? decodeURIComponent(rest) : null];
+};
 
 function App() {
   const [view, setView] = useState<SettingsView | null>(null);
@@ -58,10 +65,11 @@ function App() {
   if (!view) return <div className="loading muted">Loading…</div>;
 
   // Until setup is finished, a window opened without a tab shows setup.
-  if (hash === 'setup' || (!isTab(hash) && !view.settings.firstRunComplete)) {
+  const [head, personId] = splitHash(hash);
+  if (head === 'setup' || (!isTab(head) && !view.settings.firstRunComplete)) {
     return <Setup view={view} onDone={() => (location.hash = 'general')} />;
   }
-  const tab: Tab = isTab(hash) ? hash : 'keys';
+  const tab: Tab = isTab(head) ? head : 'keys';
   return (
     <div className="settings">
       <nav>
@@ -94,6 +102,7 @@ function App() {
       </nav>
       <main>
         {tab === 'profile' && <ProfileTab view={view} />}
+        {tab === 'people' && <PeopleTab personId={personId} />}
         {tab === 'keys' && <KeysTab view={view} />}
         {tab === 'models' && <ModelsTab view={view} />}
         {tab === 'general' && <GeneralTab view={view} />}

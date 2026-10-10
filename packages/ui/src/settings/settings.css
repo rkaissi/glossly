@@ -590,3 +590,81 @@ th {
 .list-input .error {
   margin: 4px 0 0;
 }
+
+/* ---- people ---- */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  margin: 0 0 12px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+.search:focus-within {
+  border-color: var(--ring);
+}
+.search input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+.search input:focus-visible {
+  outline: none;
+}
+.people-list li {
+  padding: 0;
+}
+.person-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px 8px 14px;
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+.person-link:hover {
+  background: var(--hover);
+}
+.person-link svg {
+  color: var(--muted);
+  flex: none;
+}
+.clip1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 12px -4px;
+  color: var(--fg-2);
+  text-decoration: none;
+}
+.back-link:hover {
+  color: var(--fg);
+}
+.record-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+}
+.record-head h2 {
+  margin: 0;
+}
+.record-head input {
+  font: 600 18px/1.3 var(--font-display);
+  width: 320px;
+}

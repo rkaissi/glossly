@@ -90,6 +90,23 @@ function numericDensity(text: string): number {
   return numeric / tokens.length;
 }
 
+/** Labels that look like "Name: text" lines but aren't speakers. */
+const NOT_SPEAKERS = new Set(
+  'from to cc bcc subject re fwd fw date sent note notes ps update edit q a step warning error todo tip question answer summary reminder agenda action'.split(' '),
+);
+
+/** The speaker of a chat header line ("Sam Lee  10:42 AM", "[10:42] sam:", "Sam: hi"), or null. */
+export function chatSpeaker(line: string): string | null {
+  if (!CHAT_LINE.test(line)) return null;
+  const m =
+    /^\s*\[[^\]]*\]\s*([\w .'-]{1,40}):/.exec(line) ??
+    /^\s*([A-Z][\w.'-]*(?:\s[A-Z][\w.'-]*){0,3})\s*(?:[—–-]\s*)?(?:(?:Today|Yesterday)\s+at\s+)?\d{1,2}:\d{2}\s*(?:[AaPp][Mm])?\s*$/.exec(line) ??
+    /^\s*([A-Z][\w.'-]*(?:\s[A-Z][\w.'-]*){0,2}):\s+\S/.exec(line);
+  const name = m?.[1]?.trim();
+  if (!name || NOT_SPEAKERS.has(name.toLowerCase())) return null;
+  return name;
+}
+
 /** "[10:42] Sam: hi" and "Sam: hi" keep "hi"; a header-only line ("Sam Lee  10:42 AM") becomes empty. */
 function stripSpeaker(line: string): string {
   return line.match(/^\s*(?:\[[^\]]*\]\s*)?[\w .'-]{1,40}:\s+(.*)$/)?.[1] ?? '';

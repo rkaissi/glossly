@@ -2,7 +2,7 @@
 // pushes OverlayState; this side only renders it and sends clicks and keys back.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { EyeOff, Info, Settings, X } from 'lucide-react';
+import { EyeOff, Info, Settings, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { ActionIcon, GlosslyMark } from '../icons';
@@ -13,6 +13,7 @@ import { Debug } from './Debug';
 import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { SavePanel } from './SavePanel';
+import { WhoPanel } from './WhoPanel';
 
 // Main loads the page with ?material=acrylic when the window is Windows 11 acrylic glass.
 document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
@@ -207,11 +208,19 @@ function Expanded({ s }: { s: OverlayState }) {
         {slotButton({ slot: 2 }, save, { cls: 'save', disabled: !s.hasSelection })}
         {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
         {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
-        {s.badges.map((b) => (
-          <span key={b.kind === 'recall' ? 'recall' : b.personId} className="badge">
-            {badgeLabel(b)}
-          </span>
-        ))}
+        {s.badges.map((b) =>
+          b.kind === 'person' ? (
+            // A known person with open commitments or a note: opens their Who card.
+            <button key={b.personId} className="badge" title={`Who is ${b.label.split(' · ')[0]}`} onClick={() => run(id, { action: 'who' })}>
+              <UserRound size={13} strokeWidth={1.75} aria-hidden />
+              {badgeLabel(b)}
+            </button>
+          ) : (
+            <span key="recall" className="badge">
+              {badgeLabel(b)}
+            </span>
+          ),
+        )}
       </div>
 
       {menuOpen && (
@@ -285,6 +294,8 @@ function Expanded({ s }: { s: OverlayState }) {
           <AskPanel key="ask" s={s} />
         ) : s.panel === 'save' ? (
           <SavePanel key="save" s={s} />
+        ) : s.panel === 'who' ? (
+          <WhoPanel key="who" s={s} />
         ) : (
           <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
         ))}
