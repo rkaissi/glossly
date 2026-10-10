@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { EmbedLine } from './Data';
-import { formatAccelerator } from './format';
-import { hasWorkingKey, KeyCard } from './Keys';
+import { formatAccelerator, hasWorkingKey } from './format';
+import { KeyCard } from './Keys';
 import { RolePickers } from './Models';
 import { useAction } from './useAction';
 

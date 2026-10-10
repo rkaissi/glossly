@@ -15,7 +15,7 @@
     "helper:build": "dotnet build helpers/windows/GlosslyHelper.csproj -c Debug -v quiet -nologo",
     "helper:publish": "dotnet publish helpers/windows/GlosslyHelper.csproj -c Release -r win-x64 --self-contained true -o helpers/windows/publish -v quiet -nologo",
     "helper:record": "node scripts/record-helper.mjs",
-    "test": "vitest run",
+    "test": "vitest run --project unit",
     "eval": "vitest run --project evals && node evals/print-results.mjs",
     "typecheck": "pnpm -r typecheck"
   },

@@ -1,5 +1,8 @@
 // Pure helpers for the settings window, unit-tested in settings.test.ts.
-import type { CatalogModel } from '@glossly/core/api';
+import type { CatalogModel, SettingsView } from '@glossly/core/api';
+
+// Component files export only components, so React Fast Refresh can hot-swap them.
+export const hasWorkingKey = (view: SettingsView) => view.keys.some((k) => k.hasKey && k.lastTest?.ok);
 
 export interface ProviderGroup {
   provider: string;

@@ -4,8 +4,6 @@ import { glossly } from '../bridge';
 import { timeAgo } from './format';
 import { useAction } from './useAction';
 
-export const hasWorkingKey = (view: SettingsView) => view.keys.some((k) => k.hasKey && k.lastTest?.ok);
-
 /** One provider: "Get a key" link, paste field, and Test (which saves only a working key). */
 export function KeyCard({ k }: { k: KeyStatus }) {
   const [value, setValue] = useState('');

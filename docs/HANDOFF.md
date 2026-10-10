@@ -16,6 +16,7 @@ Spec sections that matter for this scope: Core user flow (incl. Coexisting with 
 - The agent shell often returns empty output; requesting `all` permissions fixes it. PowerShell shows stderr lines from pnpm as red "NativeCommandError" text even when the command succeeds, so check `$LASTEXITCODE`.
 - The display is at 125% scaling, so the helper's physical-pixel coordinates are 1.25 × DIP.
 - Cursor's agent shell can set `ELECTRON_RUN_AS_NODE`; clear it (`Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue`) before launching Electron from it.
+- Cursor's agent shell sets `NUGET_PACKAGES` to a sandbox cache that holds a broken `flaui.uia3` copy (`NU5037: missing nuspec`), which makes `pnpm helper:build` (and so `pnpm dev`) fail. Run `Remove-Item Env:NUGET_PACKAGES` first; the normal cache in `%USERPROFILE%\.nuget\packages` is fine.
 - `packages/*/node_modules/.bin` once held stale shims from an isolated-layout install (pointing into `node_modules/.pnpm`). They were deleted on Oct 10; if `electron-vite` ever fails with "Cannot find module ...\packages\shell-electron\node_modules\electron-vite", delete that `.bin` folder again.
 - `GROQ_API_KEY` is set as a Windows user environment variable (set by Rayan on Oct 9 with `setx`). It is only for command-line evals (`pnpm eval` runs the LLM router eval when it is present); the app itself gets keys through the settings UI and `safeStorage`. Shells started before it was set (including a long-lived agent shell) don't see it; load it with `$env:GROQ_API_KEY = [Environment]::GetEnvironmentVariable('GROQ_API_KEY','User')`. Never print or log its value.
 
@@ -149,6 +150,16 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - Seen during the live runs: the model router timed out on two of six calls (404 ms and 418 ms against the 400 ms budget) and fell back to rules, so `router.decisionTimeoutMs` is tight from this network. The rules classify the 39-word Notepad sample message (no speaker header) as `article`; slot 3 is still What did I promise. Ask's answer to that message treats the reader as the sender; the Phase 2 "You" identity screen is what fixes that.
 - Not verified live: changing the hotkey through the recorder, Export, Delete all (destructive; only reasoned through), and `models:refresh` errors.
 
+### Step 9: Verify (Oct 10, complete)
+
+`pnpm typecheck` is clean and `pnpm test` passes 143 unit tests.
+
+- **`pnpm dev` works.** The electron-vite dev server serves both pages; the overlay loaded with no error, and the settings window (opened by launching a second instance) showed real data. Hot reload reaches both windows: an edit to `settings/Keys.tsx` was hot-swapped in place by React Fast Refresh, and an edit to `overlay/LaterPanel.tsx` was pushed to the hidden overlay page. Main-process and preload edits are not hot-reloaded (electron-vite needs `--watch` for that); restart `pnpm dev`.
+- **Fixed: a second instance ran the whole app.** `index.ts` called `app.quit()` on a lost single-instance lock but still ran `main()`, so a second launch opened the shared database, failed to register the hotkey, and wrote a false "hotkey is taken" `pendingNotice` into the real settings (seen in Rayan's data from a 1:13 AM launch; that row was deleted). It now calls `app.exit(0)` and never runs `main()`; verified live (exit code 0, nothing logged, the running instance opened Settings).
+- **Fixed: `pnpm test` ran the evals project.** It ran the rules eval, and the LLM eval whenever `GROQ_API_KEY` was in the environment (Rayan's terminals have it). `test` is now `vitest run --project unit`; evals run only through `pnpm eval`.
+- **Fixed: Fast Refresh fell back to a full page reload** for the settings window because `Keys.tsx` exported `hasWorkingKey` next to components. It moved to `format.ts`. Keep component files exporting only components.
+- Machine state at the end of Step 9: the dev server is stopped, and a fresh `pnpm build` of this commit is running against Rayan's real data (2 saved items, Groq key, setup finished).
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -162,7 +173,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
    - Expand: tier-1 `context`, then `Router.quick` to paint, then `Router.route` to fill slots 3 and 4.
    - Keys: one `safeStorage`-encrypted file per provider in userData. Embeddings run in a `utilityProcess` using `@glossly/core/embed`. Store at `userData/glossly.db`. IPC uses `contextIsolation` with a preload `contextBridge`.
 4. ~~**UI**~~ (done: overlay in Step 7, settings window and first-run setup with the Try-it capture change in Step 8; Ask streaming verified live in Step 8).
-5. **Next: verify and write up.** Run `pnpm typecheck`, `pnpm test`, and `pnpm dev` (the dev server path has not been run since the CSP plugin was made build-only; check that both windows load and HMR works). Then write `STATUS.md` (spec: "Instructions for the coding agent", item 8): what Phases 0 and 1 deliver against the spec's milestone checklists, the decisions above, what's verified live and what isn't (see Steps 6 to 8), and the open questions below. Also write `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit. Don't run `pnpm eval` unless Rayan asks.
+5. **Next: write up.** ~~Run `pnpm typecheck`, `pnpm test`, and `pnpm dev`~~ (done, see Step 9). Write `STATUS.md` (spec: "Instructions for the coding agent", item 8): what Phases 0 and 1 deliver against the spec's milestone checklists, the decisions above, what's verified live and what isn't (see Steps 6 to 8), and the open questions below. Also write `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit. Don't run `pnpm eval` unless Rayan asks.
 
 ## Open questions for Rayan (note in STATUS.md)
 

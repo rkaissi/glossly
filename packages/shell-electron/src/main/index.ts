@@ -14,7 +14,7 @@ import { createTray } from './tray';
 const log = logger('main');
 
 app.setAppUserModelId('com.glossly.app');
-if (!app.requestSingleInstanceLock()) app.quit();
+const primary = app.requestSingleInstanceLock();
 
 let quitting = false;
 
@@ -84,7 +84,12 @@ async function main(): Promise<void> {
   if (process.env.GLOSSLY_SMOKE) void runSmoke({ helper, capture, services });
 }
 
-main().catch((e: unknown) => {
-  log.error('startup failed', { ...errorInfo(e), message: (e as Error)?.message?.slice(0, 300) });
-  app.exit(1);
-});
+// A second instance must not open the shared database or touch settings.
+if (!primary) {
+  app.exit(0);
+} else {
+  main().catch((e: unknown) => {
+    log.error('startup failed', { ...errorInfo(e), message: (e as Error)?.message?.slice(0, 300) });
+    app.exit(1);
+  });
+}
