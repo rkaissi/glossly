@@ -1,5 +1,6 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { uuidv7 } from 'uuidv7';
+import type { KnownPerson } from '../router/types';
 import { DEFAULT_COLLECTIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
 import { isoNow, type Collection, type Item } from '../types';
 import { DATA_TABLES, MIGRATIONS } from './migrations';
@@ -198,6 +199,34 @@ export class Store {
     return this.db
       .prepare('SELECT e.id, e.kind, e.display FROM entities e JOIN item_entities ie ON ie.entity_id = e.id WHERE ie.item_id = ? ORDER BY e.display')
       .all(itemId) as unknown as { id: string; kind: EntityKind; display: string }[];
+  }
+
+  // ---- people ----
+
+  /** People with their name, handle, and email aliases, for the router's feature matching. */
+  listKnownPeople(): KnownPerson[] {
+    const people = this.db.prepare('SELECT id, name FROM people ORDER BY name').all() as { id: string; name: string }[];
+    const aliases = this.db.prepare('SELECT person_id, value FROM person_aliases').all() as { person_id: string; value: string }[];
+    return people.map((p) => ({ id: p.id, name: p.name, aliases: aliases.filter((a) => a.person_id === p.id).map((a) => a.value) }));
+  }
+
+  /** The person whose name or name alias matches, compared in canonical form. */
+  findPersonByName(name: string): { id: string; entity_id: string | null } | null {
+    const c = canonicalize(name);
+    if (!c) return null;
+    const people = this.db.prepare('SELECT id, name, entity_id FROM people').all() as { id: string; name: string; entity_id: string | null }[];
+    const hit = people.find((p) => canonicalize(p.name) === c);
+    if (hit) return { id: hit.id, entity_id: hit.entity_id };
+    const aliases = this.db
+      .prepare("SELECT a.value, p.id, p.entity_id FROM person_aliases a JOIN people p ON p.id = a.person_id WHERE a.kind = 'name'")
+      .all() as { value: string; id: string; entity_id: string | null }[];
+    const alias = aliases.find((a) => canonicalize(a.value) === c);
+    return alias ? { id: alias.id, entity_id: alias.entity_id } : null;
+  }
+
+  /** Links a person to an entity unless they already have one. */
+  setPersonEntity(personId: string, entityId: string): void {
+    this.db.prepare('UPDATE people SET entity_id = ?, updated_at = ? WHERE id = ? AND entity_id IS NULL').run(entityId, isoNow(), personId);
   }
 
   // ---- vectors ----
