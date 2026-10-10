@@ -150,6 +150,8 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   focus(): void {
     this.focused = true;
     this.win.setFocusable(true);
+    // On Windows, setFocusable rebuilds the window styles and the taskbar button comes back.
+    this.win.setSkipTaskbar(true);
     if (!this.win.isVisible()) this.win.show();
     this.win.focus();
     this.win.webContents.focus();
@@ -160,6 +162,7 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
     if (this.focused) {
       this.focused = false;
       this.win.setFocusable(false);
+      this.win.setSkipTaskbar(true);
     }
   }
 

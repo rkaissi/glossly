@@ -1,6 +1,6 @@
 # Glossly build handoff
 
-Read this first, then `docs/Highlight-to-Action App Prototype Spec.md` (the spec) for general context. This file is the current source of truth: what exists, decisions that deviate from the spec, and what to build next.
+Read this first (and `AGENTS.md` for the standing working rules), then `docs/Highlight-to-Action App Prototype Spec.md` (the spec) for general context. This file is the current source of truth: what exists, decisions that deviate from the spec, and what to build next.
 
 ## Scope
 
@@ -160,6 +160,14 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **Fixed: Fast Refresh fell back to a full page reload** for the settings window because `Keys.tsx` exported `hasWorkingKey` next to components. It moved to `format.ts`. Keep component files exporting only components.
 - Machine state at the end of Step 9: the dev server is stopped, and a fresh `pnpm build` of this commit is running against Rayan's real data (2 saved items, Groq key, setup finished).
 
+### Step 10: Overlay taskbar button and agent rules (Oct 10, complete)
+
+- **Fixed (Rayan's feedback): an Electron taskbar button appeared whenever the overlay took focus** (hotkey path, or clicking Ask or Save). On Windows, `setFocusable()` rebuilds the window styles and the `skipTaskbar` flag is lost, so `Overlay.focus()` and `hideWindow()` now call `setSkipTaskbar(true)` after every `setFocusable` change. Only the settings window has a taskbar button. Verified live by a Composer subagent on the hotkey path: no taskbar button with the bar focused, with the Ask panel focused, or after closing. The auto path (pill, then clicking Ask) was not exercised (the scripted drag missed the text); it goes through the same `focus()`, so Rayan can confirm it in normal use.
+- `AGENTS.md` (repo root, read by Cursor agents every chat) now holds the standing rules: read this file first; do end-to-end and desktop testing (launching, `ui-drive.ps1`, screenshots) in a subagent on a Cursor model (Composer or Grok) to save Rayan's token budget; check the log, the DB, and running instances before driving the desktop; commit per chunk with this file updated, then stop and hand off; no `pnpm eval` unless asked.
+- Subagent tips: tell it to use `required_permissions: ["all"]`, to quote coordinates in PowerShell (`click "750,600"`; a bare `750,600` becomes an array), and to run a whole interaction in one shell command. Double-check its visual claims on the one screenshot that matters: it reported an "Electron icon" in a taskbar that had none (it mistook another app's icon).
+- `ERROR [overlay] overlay renderer gone {"reason":"crashed"}` and `WARN [embed] worker exited` in the log at 13:37 UTC come from `Stop-Process` killing the app's child processes during a restart, not from a real crash.
+- Machine state: a `pnpm build` of this commit is running against Rayan's real data; a sample-message tab was left open (unsaved) in his Notepad.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -173,7 +181,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
    - Expand: tier-1 `context`, then `Router.quick` to paint, then `Router.route` to fill slots 3 and 4.
    - Keys: one `safeStorage`-encrypted file per provider in userData. Embeddings run in a `utilityProcess` using `@glossly/core/embed`. Store at `userData/glossly.db`. IPC uses `contextIsolation` with a preload `contextBridge`.
 4. ~~**UI**~~ (done: overlay in Step 7, settings window and first-run setup with the Try-it capture change in Step 8; Ask streaming verified live in Step 8).
-5. **Next: write up.** ~~Run `pnpm typecheck`, `pnpm test`, and `pnpm dev`~~ (done, see Step 9). Write `STATUS.md` (spec: "Instructions for the coding agent", item 8): what Phases 0 and 1 deliver against the spec's milestone checklists, the decisions above, what's verified live and what isn't (see Steps 6 to 8), and the open questions below. Also write `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit. Don't run `pnpm eval` unless Rayan asks.
+5. **Next: write up.** ~~Run `pnpm typecheck`, `pnpm test`, and `pnpm dev`~~ (done, see Step 9; the taskbar fix is Step 10). Write `STATUS.md` at the repo root (spec: "Instructions for the coding agent", item 8): what Phases 0 and 1 deliver against the spec's milestone checklists, the decisions above, what's verified live and what isn't (see Steps 6 to 8), and the open questions below (include the Step 9 and 10 fixes in "verified"). Also write `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit. Don't run `pnpm eval` unless Rayan asks.
 
 ## Open questions for Rayan (note in STATUS.md)
 
