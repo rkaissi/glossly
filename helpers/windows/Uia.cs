@@ -19,6 +19,7 @@ internal sealed record Rect(int X, int Y, int W, int H)
 
 internal sealed record SelectionResult(string Text, string Method, Rect? Bounds, bool IsEditable, bool IsPassword, string ControlType, bool Truncated);
 internal sealed record ContextResult(string Before, string After);
+internal sealed record FieldResult(bool Found, Rect? Bounds, string ControlType);
 internal sealed record ContainerResult(string Text, int SelectionStart, int SelectionLength, string Source, string ContainerType);
 /// <summary>An obstacle near the selection. Id, class, and process are identifiers only, never window or element text.</summary>
 internal sealed record Popup(string Source, string Kind, Rect Bounds, string Id, string ClassName, string ProcessName)
@@ -362,6 +363,127 @@ internal sealed class Uia : IDisposable
         {
         }
         return null;
+    }
+
+    // ---- the text field a reply goes into ----
+
+    private const int UIA_IsEnabledPropertyId = 30010;
+    private const int UIA_IsKeyboardFocusablePropertyId = 30009;
+    private const int UIA_IsOffscreenPropertyId = 30022;
+    private const int UIA_IsPasswordPropertyId = 30019;
+    private const int UIA_IsValuePatternAvailablePropertyId = 30043;
+    private const int UIA_ValueIsReadOnlyPropertyId = 30046;
+    private const int UIA_EditControlTypeId = 50004;
+    private const int MaxFields = 300;
+
+    /// <summary>
+    /// Focuses the text field in the foreground window that a reply to the text at
+    /// <paramref name="near"/> most likely goes into: the nearest one that takes text and is not
+    /// above it (a chat composer or an email reply box sits below the message; a search box or
+    /// address bar sits above). In a browser or an Electron app the search stays inside the page,
+    /// so the address bar is never picked. Reads no text.
+    /// </summary>
+    public FieldResult FocusField(Rect near)
+    {
+        var fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero) throw new HelperException("no_foreground", "There is no foreground window");
+        NudgeChromium(fg);
+        var native = _automation.NativeAutomation;
+        var window = native.ElementFromHandle(fg);
+        var scope = PageAt(new Point(near.X + near.W / 2, near.Y + near.H / 2), window) ?? window;
+
+        var cache = native.CreateCacheRequest();
+        foreach (var id in new[] { UIA_BoundingRectanglePropertyId, UIA_ControlTypePropertyId, UIA_IsPasswordPropertyId, UIA_IsValuePatternAvailablePropertyId, UIA_ValueIsReadOnlyPropertyId })
+            cache.AddProperty(id);
+        var cond = native.CreateAndConditionFromArray(new[]
+        {
+            native.CreateOrCondition(
+                native.CreatePropertyCondition(UIA_ControlTypePropertyId, UIA_EditControlTypeId),
+                native.CreatePropertyCondition(UIA_ControlTypePropertyId, UIA_DocumentControlTypeId)),
+            native.CreatePropertyCondition(UIA_IsEnabledPropertyId, true),
+            native.CreatePropertyCondition(UIA_IsKeyboardFocusablePropertyId, true),
+            native.CreatePropertyCondition(UIA_IsOffscreenPropertyId, false),
+        });
+        var all = Safe(() => scope.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, cond, cache));
+        if (all == null) return new FieldResult(false, null, "none");
+
+        UIA.IUIAutomationElement? best = null;
+        Rect? bestRect = null;
+        double bestScore = double.MaxValue;
+        for (int i = 0; i < Math.Min(all.Length, MaxFields); i++)
+        {
+            var el = Safe(() => all.GetElement(i));
+            if (el == null || !TakesText(el)) continue;
+            var b = el.CachedBoundingRectangle;
+            var rect = new Rect(b.left, b.top, b.right - b.left, b.bottom - b.top);
+            if (rect.W < 40 || rect.H < 14) continue;
+            double? score = FieldScore(rect, near);
+            if (score is { } sc && sc < bestScore)
+            {
+                (best, bestRect, bestScore) = (el, rect, sc);
+            }
+        }
+        if (best == null) return new FieldResult(false, null, "none");
+        try
+        {
+            best.SetFocus();
+        }
+        catch (COMException)
+        {
+            return new FieldResult(false, null, "none");
+        }
+        return new FieldResult(true, bestRect, best.CachedControlType == UIA_EditControlTypeId ? "edit" : "document");
+    }
+
+    /// <summary>An enabled field that accepts typing: a writable value, or an edit control with no value pattern. Never a password.</summary>
+    private static bool TakesText(UIA.IUIAutomationElement el)
+    {
+        try
+        {
+            if (el.CachedIsPassword != 0) return false;
+            if (el.GetCachedPropertyValue(UIA_IsValuePatternAvailablePropertyId) is true)
+                return el.GetCachedPropertyValue(UIA_ValueIsReadOnlyPropertyId) is false;
+            return el.CachedControlType == UIA_EditControlTypeId;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Distance from the selection to the field; null when the field is wholly above it.</summary>
+    private static double? FieldScore(Rect field, Rect sel)
+    {
+        if (field.Y + field.H <= sel.Y) return null;
+        double dx = Math.Max(0, Math.Max(sel.X - (field.X + field.W), field.X - (sel.X + sel.W)));
+        double dy = Math.Max(0, field.Y - (sel.Y + sel.H));
+        return dx + dy;
+    }
+
+    /// <summary>
+    /// The outermost document under the window at <paramref name="p"/>: the web page in a browser
+    /// or the app's page in Electron. Null for a native app with no document there.
+    /// </summary>
+    private UIA.IUIAutomationElement? PageAt(Point p, UIA.IUIAutomationElement window)
+    {
+        try
+        {
+            var native = _automation.NativeAutomation;
+            var walker = native.ControlViewWalker;
+            UIA.IUIAutomationElement? page = null;
+            var el = native.ElementFromPoint(new UIA.tagPOINT { x = p.X, y = p.Y });
+            for (int i = 0; el != null && i < 40 && native.CompareElements(el, window) == 0; i++)
+            {
+                if (el.CurrentControlType == UIA_DocumentControlTypeId) page = el;
+                el = walker.GetParentElement(el);
+            }
+            // The point wasn't inside this window (the selection scrolled away): search the whole window.
+            return el == null ? null : page;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
     }
 
     private static bool Intersects(Rect a, Rect b) =>

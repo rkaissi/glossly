@@ -98,6 +98,10 @@ export const Commands = {
       method: z.enum(['already', 'direct', 'dummy_key', 'attach_thread_input']),
     }),
   },
+  focus_field: {
+    args: z.object({ near: RectSchema }),
+    result: z.object({ found: z.boolean(), bounds: RectSchema.nullable(), control_type: z.enum(['edit', 'document', 'none']) }),
+  },
   window_corners: {
     args: z.object({ handle: z.number().int(), corners: z.enum(['default', 'none', 'round', 'small']) }),
     result: z.object({ applied: z.boolean() }),

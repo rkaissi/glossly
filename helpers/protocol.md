@@ -155,6 +155,16 @@ Restores the window if minimized, then tries `SetForegroundWindow`, then a dummy
 
 Result: `{"restored": true, "method": "already" | "direct" | "dummy_key" | "attach_thread_input"}`. Errors: `window_gone`, `focus_failed`.
 
+### `focus_field`
+
+| Arg | Notes |
+| --- | --- |
+| `near` | Required: the selection's bounds (physical pixels) |
+
+Focuses the text field in the foreground window that a reply to the text at `near` most likely goes into, so `paste` can follow when the selection itself is read-only. Candidates are enabled, keyboard-focusable, on-screen Edit or Document elements that take text (a writable value pattern, or an Edit with none) and are not passwords. A field wholly above `near` is never picked (that is a search box or an address bar); of the rest, the nearest wins. In a browser or an Electron app the search stays inside the outermost document at `near`, so the address bar is out of reach. Reads no text. Call `restore_focus` first.
+
+Result: `{"found": bool, "bounds": Rect | null, "control_type": "edit" | "document" | "none"}`. Errors: `no_foreground`, `bad_request`.
+
 ### `window_corners`
 
 | Arg | Notes |

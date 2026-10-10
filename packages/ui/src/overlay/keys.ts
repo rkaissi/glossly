@@ -1,4 +1,5 @@
-// The bar's keyboard map (spec, Core user flow). Pure, so it is unit-tested. Panels handle
+// The bar's keyboard map (spec, Core user flow). The number keys follow the buttons'
+// order on screen (`slotKey`). Pure, so it is unit-tested. Panels handle
 // their own keys (Enter, Tab, Ctrl+C); Esc in a panel goes back to the bar. More lives in the
 // Glossly menu at the left of the bar: Tab opens the menu with More's first item highlighted,
 // and More's items then join what Enter and the arrow keys move through.
@@ -39,6 +40,14 @@ export function barItems(slots: SlotsView | null, hasSelection: boolean, menuOpe
   return items;
 }
 
+/**
+ * The number shown on a slot button and the key that runs it: its position on the bar, so
+ * the empty bar (no Save) reads 1 Ask, 2 Search, 3 Paste recent rather than skipping 2.
+ */
+export function slotKey(items: BarItem[], slot: 1 | 2 | 3 | 4): number {
+  return items.filter((i) => 'slot' in i).findIndex((i) => 'slot' in i && i.slot === slot) + 1;
+}
+
 export function sameItem(a: BarItem | undefined, b: BarItem): boolean {
   if (!a) return false;
   return 'slot' in a ? 'slot' in b && a.slot === b.slot : 'action' in b && a.action === b.action;
@@ -53,8 +62,8 @@ export function barKey(k: KeyInput, c: BarKeyContext): BarCommand | null {
     case '2':
     case '3':
     case '4': {
-      const target: BarItem = { slot: Number(k.key) as 1 | 2 | 3 | 4 };
-      return c.items.some((i) => sameItem(i, target)) ? { kind: 'run', target } : null;
+      const target = c.items.filter((i) => 'slot' in i)[Number(k.key) - 1];
+      return target ? { kind: 'run', target } : null;
     }
     case 'Enter': {
       const target = c.items[Math.min(Math.max(c.highlight, 0), n - 1)];

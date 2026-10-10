@@ -100,25 +100,26 @@ export function buildWhoPrompt(identity: Identity, input: DetectInput): string {
     .join('\n');
 }
 
+/** Who the text names, before matching to saved people. The shell caches it per input. */
+export interface WhoRead {
+  people: DetectedPerson[];
+  local: WhoLocal;
+}
+
 /**
  * Who opened. One Fast call (action "who") when a model is available; code then accepts the
- * rows. Local only, or no Fast model, reads the text only and leaves the note blank.
+ * rows. Local only, or no Fast model, reads the text only and leaves the note blank. Matching
+ * to saved people is `buildWho`, done fresh each time so a person added since shows up.
  */
-export async function identifyWho(
+export async function readWho(
   llm: LlmProvider,
-  repo: PeopleRepo,
   settings: Pick<Settings, 'identity' | 'localOnly'>,
-  selection: SelectionPayload,
-  container: ContainerContext | null | undefined,
+  input: DetectInput,
   signal?: AbortSignal,
   onModelError?: (e: unknown) => void,
-): Promise<WhoView> {
-  const input = detectInputFor(selection, container);
-  const identitySet = settings.identity.name.trim().length > 0;
+): Promise<WhoRead> {
   const local: WhoLocal = settings.localOnly ? 'local_only' : llm.hasModel('fast') ? null : 'no_model';
-  const view = (people: DetectedPerson[], why: WhoLocal) =>
-    buildWho(repo, { people, author: null, authorIsMe: false }, selection.source_app, identitySet, why);
-  if (local !== null) return view(localWho(input, settings.identity), local);
+  if (local !== null) return { people: localWho(input, settings.identity), local };
   let rows: z.infer<typeof WhoPeopleSchema>['people'];
   try {
     const out = await llm.structured(
@@ -138,9 +139,9 @@ export async function identifyWho(
     // A rate limit or a bad answer still leaves the people the text itself names.
     if (signal?.aborted) throw e;
     onModelError?.(e);
-    return view(localWho(input, settings.identity), 'model_failed');
+    return { people: localWho(input, settings.identity), local: 'model_failed' };
   }
-  return view(acceptWhoRows(rows, whoCorpus(input), settings.identity), null);
+  return { people: acceptWhoRows(rows, whoCorpus(input), settings.identity), local: null };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SlotsView, SlotView } from '@glossly/core/api';
-import { barItems, barKey, type BarKeyContext, type KeyInput } from './keys';
+import { barItems, barKey, slotKey, type BarKeyContext, type KeyInput } from './keys';
 import { parseInline, parseMarkdown } from './markdown';
 
 const slot = (action: SlotView['action'], available = false): SlotView => ({ action, label: action, available });
@@ -38,6 +38,15 @@ describe('barKey', () => {
     expect(barKey(key('3'), ctx())).toEqual({ kind: 'run', target: { slot: 3 } });
     expect(barKey(key('4'), ctx())).toBeNull();
     expect(barKey(key('2'), ctx({ items: barItems(null, false, false) }))).toBeNull();
+  });
+  it('numbers the buttons by position, so the empty bar has no gap where Save would be', () => {
+    const empty: SlotsView = { ...slots, slot3: slot('search', true), slot4: slot('paste_list', true), more: [] };
+    const items = barItems(empty, false, false);
+    expect([slotKey(items, 1), slotKey(items, 3), slotKey(items, 4)]).toEqual([1, 2, 3]);
+    expect(barKey(key('2'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 3 } });
+    expect(barKey(key('3'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 4 } });
+    expect(barKey(key('4'), ctx({ items }))).toBeNull();
+    expect(slotKey(barItems(slots, true, false), 3)).toBe(3);
   });
   it('runs the highlighted item on Enter', () => {
     expect(barKey(key('Enter'), ctx({ highlight: 1 }))).toEqual({ kind: 'run', target: { slot: 2 } });

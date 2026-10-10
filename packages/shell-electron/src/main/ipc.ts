@@ -122,6 +122,7 @@ export function registerIpc(deps: IpcDeps): void {
     if (!item) throw new Error('That item no longer exists.');
     clipboard.writeText(item.text);
   });
+  handle('items:insert', (a) => capture.insertItem(num(a.sessionId), str(a.itemId, 100)));
 
   // ---- Reply ----
   handle('reply:start', (a, e) => capture.startReply(num(a.sessionId), e.sender));
@@ -321,6 +322,7 @@ export function registerIpc(deps: IpcDeps): void {
   });
   handle('data:delete-all', async () => {
     capture.close('delete_all');
+    capture.clearCaches();
     await services.deleteAll();
     log.info('all data deleted');
     broadcastSettings();

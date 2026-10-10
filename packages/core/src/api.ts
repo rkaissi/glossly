@@ -142,6 +142,8 @@ export interface OverlayState {
   notice: string | null;
   /** This selection is already saved (save hotkey or autosave); Save becomes Undo. */
   saved: SavedNotice | null;
+  /** Nothing is selected and the focused control takes text, so a search result is inserted there instead of copied. */
+  canInsert: boolean;
 }
 
 // ---- Ask ----
@@ -354,6 +356,8 @@ export interface InvokeChannels {
   'search:query': { args: { sessionId: number; query: string }; result: SearchResults };
   /** Copies a saved item's full text. */
   'items:copy': { args: { itemId: string }; result: void };
+  /** Pastes a search result into the focused field (only offered when `canInsert`), else the clipboard. */
+  'items:insert': { args: { sessionId: number; itemId: string }; result: ReplyInsertResult };
 
   /** The people in the session's selection: one Fast call when a model is available, then code keeps the rows. */
   'who:get': { args: { sessionId: number }; result: WhoView };

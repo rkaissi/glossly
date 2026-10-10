@@ -105,8 +105,8 @@ export function actionForSlot(s: SlotsView | null, n: 1 | 2 | 3 | 4): ActionId |
   return (n === 3 ? s.slot3 : s.slot4)?.action ?? null;
 }
 
+/** Moves `r` inside `area`, shrinking it first when it is larger (else it would hang off the left or top). */
 export function clampRect(r: Rect, area: Rect): Rect {
-  // A window wider than the work area used to be pushed off the left edge. Shrink it first.
   const w = Math.min(Math.max(r.w, 0), Math.max(area.w, 0));
   const h = Math.min(Math.max(r.h, 0), Math.max(area.h, 0));
   const x = Math.min(Math.max(r.x, area.x), area.x + area.w - w);
@@ -122,22 +122,12 @@ export interface FitLimits {
 }
 
 /**
- * The size the renderer asked for, kept inside the work area. Wider than the screen used to
- * clamp the origin past the edge (the lower bound was above the upper bound). Shrink first,
- * then shift. `above` keeps the edge next to the selection fixed.
+ * The size the renderer asked for, within the limits and kept inside the work area: it grows
+ * from `cur` like `growFrom`, and a window wider than the screen shrinks instead of hanging off.
  */
 export function fitOnScreen(cur: Rect, w: number, h: number, area: Rect, above: boolean, limits: FitLimits): Rect {
-  const maxW = Math.max(1, Math.min(limits.maxW, Math.max(area.w, 1)));
-  const maxH = Math.max(1, Math.min(limits.maxH, Math.max(area.h, 1)));
-  const nw = Math.round(Math.min(Math.max(w, Math.min(limits.minW, maxW)), maxW));
-  const nh = Math.round(Math.min(Math.max(h, Math.min(limits.minH, maxH)), maxH));
-  let x = cur.x;
-  let y = above ? cur.y + cur.h - nh : cur.y;
-  if (x + nw > area.x + area.w) x = area.x + area.w - nw;
-  if (x < area.x) x = area.x;
-  if (y + nh > area.y + area.h) y = area.y + area.h - nh;
-  if (y < area.y) y = area.y;
-  return { x: Math.round(x), y: Math.round(y), w: nw, h: nh };
+  const size = { w: Math.min(Math.max(w, limits.minW), limits.maxW), h: Math.min(Math.max(h, limits.minH), limits.maxH) };
+  return growFrom(cur, above ? 'above' : 'below', size, area);
 }
 
 /**
@@ -194,4 +184,29 @@ export function shouldHideOverlay(input: {
 /** An HWND from BrowserWindow.getNativeWindowHandle(), as the number the helper uses. */
 export function hwndFromBuffer(buf: Buffer): number {
   return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
+}
+
+/** A small map that forgets the least recently used entry once it holds `max`. */
+export class Lru<K, V> {
+  private readonly map = new Map<K, V>();
+  constructor(private readonly max: number) {}
+
+  get(key: K): V | undefined {
+    const v = this.map.get(key);
+    if (v !== undefined) {
+      this.map.delete(key);
+      this.map.set(key, v);
+    }
+    return v;
+  }
+
+  set(key: K, value: V): void {
+    this.map.delete(key);
+    this.map.set(key, value);
+    if (this.map.size > this.max) this.map.delete(this.map.keys().next().value as K);
+  }
+
+  clear(): void {
+    this.map.clear();
+  }
 }

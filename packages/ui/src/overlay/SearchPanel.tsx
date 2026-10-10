@@ -9,13 +9,16 @@ const DEBOUNCE_MS = 120;
 
 /**
  * The search box (hotkey with nothing selected): saved items by their words and by meaning,
- * people, and open commitments. Local only; nothing is sent to a model.
+ * people, and open commitments. Local only; nothing is sent to a model. Picking an item types
+ * it into the field the hotkey was pressed in (`canInsert`), else copies it; the copy button
+ * always copies.
  */
 export function SearchPanel({ s }: { s: OverlayState }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults | null>(null);
   const [hl, setHl] = useState(0);
   const [copied, setCopied] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -46,6 +49,19 @@ export function SearchPanel({ s }: { s: OverlayState }) {
   const copy = (itemId: string) => {
     void glossly.invoke('items:copy', { itemId }).then(() => setCopied(itemId));
   };
+  // Inserting closes the bar. If the field turned out not to take text, it was copied instead.
+  const pick = (itemId: string) => {
+    if (!s.canInsert) return copy(itemId);
+    void glossly
+      .invoke('items:insert', { sessionId: s.sessionId, itemId })
+      .then((r) => {
+        if (r.result === 'copied') {
+          setCopied(itemId);
+          setNote('Copied. Click where it should go and press Ctrl+V.');
+        }
+      })
+      .catch(() => setNote('Could not insert. Use the copy button instead.'));
+  };
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'ArrowDown' && items.length) {
@@ -54,7 +70,10 @@ export function SearchPanel({ s }: { s: OverlayState }) {
     } else if (e.key === 'ArrowUp' && items.length) {
       e.preventDefault();
       setHl((i) => (i - 1 + items.length) % items.length);
-    } else if ((e.key === 'Enter' || (e.key === 'c' && e.ctrlKey && !window.getSelection()?.toString())) && items[hl]) {
+    } else if (e.key === 'Enter' && items[hl]) {
+      e.preventDefault();
+      pick(items[hl].itemId);
+    } else if (e.key === 'c' && e.ctrlKey && !window.getSelection()?.toString() && items[hl]) {
       e.preventDefault();
       copy(items[hl].itemId);
     }
@@ -76,6 +95,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
 
       <div className="search-body">
         {results && !results.semantic && results.query && <p className="muted small-text">Matching exact words only until the local model is ready.</p>}
+        {note && <p className="muted small-text">{note}</p>}
         {empty && <p className="muted">{results.query ? 'Nothing you saved matches.' : 'Nothing saved yet. Select text and press Save to keep it.'}</p>}
 
         {items.length > 0 && (
@@ -89,7 +109,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
                   highlight={i === hl}
                   onClick={() => {
                     setHl(i);
-                    copy(h.itemId);
+                    pick(h.itemId);
                   }}
                   actions={
                     copied === h.itemId ? (
@@ -97,7 +117,19 @@ export function SearchPanel({ s }: { s: OverlayState }) {
                         <Check size={13} strokeWidth={2} aria-hidden /> Copied
                       </span>
                     ) : (
-                      <Copy size={13} strokeWidth={1.75} aria-label="Copy" />
+                      <button
+                        className="ghost icon-only"
+                        title="Copy"
+                        aria-label="Copy"
+                        onClick={(e) => {
+                          // The row itself inserts; this button only copies.
+                          e.stopPropagation();
+                          setHl(i);
+                          copy(h.itemId);
+                        }}
+                      >
+                        <Copy size={13} strokeWidth={1.75} aria-hidden />
+                      </button>
                     )
                   }
                 />
@@ -151,7 +183,14 @@ export function SearchPanel({ s }: { s: OverlayState }) {
           <span className="spacer" />
           <span>
             <kbd>↑</kbd>
-            <kbd>↓</kbd> move · <kbd>Enter</kbd> copy · <kbd>Esc</kbd> back
+            <kbd>↓</kbd> move · <kbd>Enter</kbd> {s.canInsert ? 'insert' : 'copy'}
+            {s.canInsert && (
+              <>
+                {' '}
+                · <kbd>Ctrl+C</kbd> copy
+              </>
+            )}{' '}
+            · <kbd>Esc</kbd> back
           </span>
         </div>
       )}

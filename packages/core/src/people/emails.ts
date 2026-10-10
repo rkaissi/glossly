@@ -62,6 +62,7 @@ const EXACT_TLDS = new Set([
   'careers',
   'academy',
   'company',
+  'community',
   'network',
   'digital',
   'online',
@@ -91,17 +92,19 @@ const EXACT_TLDS = new Set([
 const COMMON_BY_LENGTH = [...COMMON_TLDS].sort((a, b) => b.length - a.length);
 
 /**
- * The domain ending of one label. "com" stays "com". "comjordan" is "com" plus a word the
- * page glued on. An unknown short ending ("xyz") is kept whole.
+ * The domain ending of one label. "com" stays "com". "comJordan" and "comjordan" are "com"
+ * plus a word the page glued on. A short ending we don't list (".cafe") is kept whole.
  */
 function tldOf(label: string): string | null {
+  // A capitalized word glued on ("caBlake") is the clearest split.
+  const glued = /^([a-z]{2,})[A-Z]/.exec(label);
+  if (glued) return tldOf(glued[1]!);
   const lower = label.toLowerCase();
   if (EXACT_TLDS.has(lower)) return lower;
-  for (const tld of COMMON_BY_LENGTH) {
-    if (lower.startsWith(tld) && lower.length >= tld.length + 2) return tld;
-  }
-  if (/^[a-z]{2,8}$/.test(lower)) return lower;
-  return null;
+  if (!/^[a-z]+$/.test(lower)) return null;
+  if (lower.length <= 6) return lower;
+  for (const tld of COMMON_BY_LENGTH) if (lower.startsWith(tld)) return tld;
+  return lower.length <= 24 ? lower : null;
 }
 
 function readLocal(text: string, at: number): { value: string; index: number } | null {
@@ -121,10 +124,11 @@ function readDomain(text: string, start: number): { host: string; end: number } 
     if (!m) return null;
     const label = m[0];
     const next = i + label.length;
-    if (text[next] === '.') {
+    // A dot followed by another label continues the domain. A dot before a space or the end
+    // of the text ends the sentence, not the address.
+    if (text[next] === '.' && /[A-Za-z0-9]/.test(text[next + 1] ?? '')) {
       labels.push(label);
       i = next + 1;
-      if (i >= text.length) return null;
       continue;
     }
     if (!/^[A-Za-z]+$/.test(label) || labels.length === 0) return null;

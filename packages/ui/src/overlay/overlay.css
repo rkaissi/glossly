@@ -91,12 +91,13 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .frame.has-panel {
   min-width: 520px;
 }
-/* Everything under the row takes the row's width instead of widening the bar. */
-/* width 0 keeps a long panel from widening the bar; min-width 100% then fills the row. */
+/* Everything under the row takes the row's width instead of widening the bar. A long word
+   (an address, a URL) wraps instead of overflowing; break-word, unlike anywhere, leaves
+   table columns their natural width. */
 .frame > :not(.row) {
   width: 0;
   min-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   border-top: 1px solid var(--border);
 }
 .frame.above > :not(.row) {

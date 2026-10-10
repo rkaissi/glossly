@@ -14,7 +14,9 @@ import {
   resolvePerson,
   savePromises,
   personBadges,
-  identifyWho,
+  buildWho,
+  buildWhoPrompt,
+  readWho,
   gateApp,
   gateAutoSelection,
   isoNow,
@@ -64,6 +66,7 @@ import {
   type SelectionPayload,
   type SelectionContext,
   type Trigger,
+  type WhoRead,
   type WhoView,
   type Item,
 } from '@glossly/core';
@@ -71,11 +74,13 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { actionForSlot, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { Lru, actionForSlot, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
 const WATCH_INTERVAL_MS = 80;
+/** Who and Visualize results kept per input (see `whoCache`). */
+const MODEL_CACHE_SIZE = 20;
 const MAX_SELECTION_CHARS = 20_000;
 /**
  * After the hotkey opens the bar, ignore the key that opened it, a cursor that is still far
@@ -161,6 +166,11 @@ function workArea(p: Point): Rect {
   return { x: a.x, y: a.y, w: a.width, h: a.height };
 }
 
+function toPhysRect(r: Rect): Rect {
+  const d = screen.dipToScreenRect(null, { x: r.x, y: r.y, width: r.w, height: r.h });
+  return { x: d.x, y: d.y, w: d.width, h: d.height };
+}
+
 function cursorRect(p: Point): Rect {
   return { x: Math.round(p.x) - 1, y: Math.round(p.y) - 10, w: 2, h: 20 };
 }
@@ -193,6 +203,12 @@ export class Capture {
   private lastAutosave: { handle: number; text: string; notice: SavedNotice } | null = null;
   /** Epoch ms until which a hotkey-opened bar stays up. 0 when not settling. */
   private settleUntil = 0;
+  /**
+   * Model results for the same input, so switching panels (or selecting the same text again)
+   * doesn't spend another call. Keyed by the exact model input; failures are never kept.
+   */
+  private readonly whoCache = new Lru<string, WhoRead>(MODEL_CACHE_SIZE);
+  private readonly visualCache = new Lru<string, Extract<VisualizeResult, { ok: true }>>(MODEL_CACHE_SIZE);
 
   /**
    * `captureSource` returns the HWND of the one Glossly window that may be read (the setup's
@@ -627,6 +643,8 @@ export class Capture {
       debug: this.debugFor(session),
       badges: this.badgesFor(session),
       notice: notice ?? this.takeNotice(),
+      // Nothing selected and the cursor is in a text field: a search result types into it.
+      canInsert: !selection && focusEditable === true,
     };
     if (selection) {
       this.overlay.update({ ...common, mode: 'bar', placement, slots: this.initialSlots(quick) }, placement.rect);
@@ -895,11 +913,20 @@ export class Capture {
     s.whoCtl = ctl;
     const t = performance.now();
     try {
-      const container = (await s.container) ?? null;
-      const view = await identifyWho(this.services.llm, this.services.people, this.settings, s.selection, container, ctl.signal, (e) =>
-        log.warn('who model failed, reading the text only', { code: e instanceof LlmError ? e.code : 'provider' }),
-      );
-      log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', ms: ms(t) });
+      const input = detectInputFor(s.selection, (await s.container) ?? null);
+      const key = buildWhoPrompt(identity, input);
+      let read = this.whoCache.get(key);
+      const cached = Boolean(read);
+      if (!read) {
+        read = await readWho(this.services.llm, this.settings, input, ctl.signal, (e) =>
+          log.warn('who model failed, reading the text only', { code: e instanceof LlmError ? e.code : 'provider' }),
+        );
+        // Only the model's answer is worth keeping; the text-only pass is cheap and a failure should retry.
+        if (read.local === null) this.whoCache.set(key, read);
+      }
+      // Matched against saved people every time, so someone added since shows as known.
+      const view = buildWho(this.services.people, { people: read.people, author: null, authorIsMe: false }, s.selection.source_app, empty.identitySet, read.local);
+      log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', cached, ms: ms(t) });
       return view;
     } catch (e) {
       const code = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
@@ -908,6 +935,12 @@ export class Capture {
     } finally {
       if (s.whoCtl === ctl) s.whoCtl = null;
     }
+  }
+
+  /** Delete all data: forget the cached model reads of captured text too. */
+  clearCaches(): void {
+    this.whoCache.clear();
+    this.visualCache.clear();
   }
 
   // ---- Reply ----
@@ -994,20 +1027,30 @@ export class Capture {
     const pid = personId && people.get(personId) ? personId : (s.reply?.personId ?? null);
     const sourceApp = s.selection.source_app;
     if (s.reply) s.reply.used = true;
-    return this.insertText(s, draft, 'reply', (how) => {
+    const record = (how: 'inserted' | 'copied') => {
       if (s.reply) s.reply.used = true;
       people.addVoice(draft, edited ? 'inserted_edited' : 'inserted');
       if (pid) people.addInteraction({ person_id: pid, direction: 'outbound', text: draft, source_app: sourceApp });
       this.services.metrics.record('reply_inserted', { how, edited, person: Boolean(pid), ms: ms(s.t0) });
-    });
+    };
+    // The selected message is usually read-only, so the reply goes into the page's reply box.
+    return this.insertText(s, draft, 'reply', record, { findField: true });
   }
 
   /**
    * The insert path (spec: Inserting text): focus back to the source window, then paste. When
-   * focus can't be restored, or the focused field doesn't take text, the text goes on the
-   * clipboard instead and the panel says so. `record` runs once the text is placed either way.
+   * focus can't be restored, or no field takes text, the text goes on the clipboard instead
+   * and the panel says so. `record` runs once the text is placed either way. With `findField`,
+   * a read-only focus (the selected message) hands over to the nearest text field below the
+   * selection, such as a chat composer or a reply box, even though it isn't focused.
    */
-  private async insertText(s: Session, text: string, what: 'reply' | 'paste', record: (how: 'inserted' | 'copied') => void): Promise<ReplyInsertResult> {
+  private async insertText(
+    s: Session,
+    text: string,
+    what: 'reply' | 'paste' | 'search',
+    record: (how: 'inserted' | 'copied') => void,
+    opts: { findField?: boolean } = {},
+  ): Promise<ReplyInsertResult> {
     if (!s.fg) throw new Error('The window this came from is gone.');
     const copy = (reason: 'focus' | 'not_editable' | 'paste'): ReplyInsertResult => {
       clipboard.writeText(text);
@@ -1035,6 +1078,16 @@ export class Capture {
       } catch {
         editable = null;
       }
+      let field: 'focused' | 'found' | 'unknown' = editable === null ? 'unknown' : 'focused';
+      if (editable === false && opts.findField && s.selection) {
+        const t = performance.now();
+        const found = await this.helper.request('focus_field', { near: toPhysRect(s.bounds) }).catch(() => null);
+        log.info('field search', { found: found?.found ?? false, type: found?.control_type ?? 'error', ms: ms(t) });
+        if (found?.found) {
+          editable = true;
+          field = 'found';
+        }
+      }
       if (editable === false) {
         await refocus();
         return copy('not_editable');
@@ -1046,7 +1099,7 @@ export class Capture {
         return copy('paste');
       }
       record('inserted');
-      log.info(`${what} inserted`, { editable: editable ?? 'unknown' });
+      log.info(`${what} inserted`, { field });
       return { result: 'inserted' };
     } finally {
       this.bouncing = false;
@@ -1062,9 +1115,19 @@ export class Capture {
     const ctl = new AbortController();
     s.visualCtl = ctl;
     const t = performance.now();
+    // Local only draws a plain chart without the model, so it is a different answer for the same text.
+    const key = `${this.settings.localOnly ? 'local' : 'model'}
+${s.selection.text}`;
+    const hit = this.visualCache.get(key);
+    if (hit) {
+      s.visual = hit;
+      log.info('visualized', { ok: true, cached: true, ms: ms(t) });
+      return hit;
+    }
     try {
       const r = await visualize({ llm: this.services.llm, settings: () => this.settings }, s.selection.text, ctl.signal);
       if (r.ok) {
+        this.visualCache.set(key, r);
         s.visual = r;
         this.services.metrics.record('visualize_done', { source: r.table.source, rows: r.table.rows.length, chart: r.chartBy ?? 'table', ms: ms(t) });
       } else if (r.code !== 'aborted') this.services.metrics.record('visualize_error', { code: r.code });
@@ -1112,6 +1175,18 @@ export class Capture {
     } finally {
       if (s.pasteCtl === ctl) s.pasteCtl = null;
     }
+  }
+
+  /**
+   * A search result picked with something to type into (the hotkey opened over a text field):
+   * the item's text is pasted there. Without one, the panel copies instead and never calls this.
+   */
+  async insertItem(sessionId: number, itemId: string): Promise<ReplyInsertResult> {
+    const s = this.current(sessionId);
+    if (!s) throw new Error('This bar is gone. Press the hotkey again.');
+    const item = this.services.store.getItem(itemId);
+    if (!item) throw new Error('That item no longer exists.');
+    return this.insertText(s, item.text, 'search', (how) => this.services.metrics.record('search_inserted', { how, ms: ms(s.t0) }));
   }
 
   async insertPaste(sessionId: number, text: string, kind: 'list' | 'summary', edited: boolean): Promise<ReplyInsertResult> {

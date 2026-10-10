@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
+import { Lru, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -191,5 +191,18 @@ describe('distanceToRect', () => {
     expect(distanceToRect({ x: 50, y: 20 }, r)).toBe(0);
     expect(distanceToRect({ x: 50, y: 230 }, r)).toBe(200);
     expect(distanceToRect({ x: 113, y: 34 }, r)).toBe(5);
+  });
+});
+
+describe('Lru', () => {
+  it('forgets the least recently used entry, and a read counts as a use', () => {
+    const c = new Lru<string, number>(2);
+    c.set('a', 1);
+    c.set('b', 2);
+    expect(c.get('a')).toBe(1);
+    c.set('c', 3);
+    expect([c.get('a'), c.get('b'), c.get('c')]).toEqual([1, undefined, 3]);
+    c.clear();
+    expect(c.get('a')).toBeUndefined();
   });
 });

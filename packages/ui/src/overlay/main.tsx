@@ -11,7 +11,7 @@ import './overlay.css';
 import { AskPanel } from './AskPanel';
 import { Debug } from './Debug';
 import { shownBadges } from './badges';
-import { barItems, barKey, sameItem, type BarItem } from './keys';
+import { barItems, barKey, sameItem, slotKey, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { PastePanel } from './PastePanel';
 import { PromisesPanel } from './PromisesPanel';
@@ -196,7 +196,7 @@ function Expanded({ s }: { s: OverlayState }) {
         onClick={() => !active && run(id, target)}
       >
         {/* The number takes the icon's 16 px, so turning the keyboard map on moves nothing. */}
-        {s.keyboard ? <kbd>{target.slot}</kbd> : <ActionIcon action={view.action} />}
+        {s.keyboard ? <kbd>{slotKey(items, target.slot)}</kbd> : <ActionIcon action={view.action} />}
         <span>{view.label}</span>
       </button>
     );
@@ -234,7 +234,7 @@ function Expanded({ s }: { s: OverlayState }) {
             disabled={undoLeft === 0}
             onClick={() => run(id, { slot: 2 })}
           >
-            {s.keyboard && undoLeft > 0 ? <kbd>2</kbd> : undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
+            {s.keyboard && undoLeft > 0 ? <kbd>{slotKey(items, 2)}</kbd> : undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
             <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : `Saved to ${s.saved.collection}`}</span>
           </button>
         )}

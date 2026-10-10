@@ -1,0 +1,69 @@
+{
+  "cmd": "focus_field",
+  "cases": [
+    {
+      "name": "reply box below the message",
+      "request": {
+        "id": 40,
+        "cmd": "focus_field",
+        "near": {
+          "x": 610,
+          "y": 420,
+          "w": 540,
+          "h": 66
+        }
+      },
+      "response": {
+        "id": 40,
+        "ok": true,
+        "result": {
+          "found": true,
+          "bounds": {
+            "x": 590,
+            "y": 1180,
+            "w": 880,
+            "h": 52
+          },
+          "control_type": "edit"
+        }
+      }
+    },
+    {
+      "name": "no field below",
+      "request": {
+        "id": 41,
+        "cmd": "focus_field",
+        "near": {
+          "x": 610,
+          "y": 420,
+          "w": 540,
+          "h": 66
+        }
+      },
+      "response": {
+        "id": 41,
+        "ok": true,
+        "result": {
+          "found": false,
+          "bounds": null,
+          "control_type": "none"
+        }
+      }
+    },
+    {
+      "name": "missing near",
+      "request": {
+        "id": 42,
+        "cmd": "focus_field"
+      },
+      "response": {
+        "id": 42,
+        "ok": false,
+        "error": {
+          "code": "bad_request",
+          "message": "Missing near"
+        }
+      }
+    }
+  ]
+}

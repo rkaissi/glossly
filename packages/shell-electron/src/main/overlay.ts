@@ -47,6 +47,7 @@ export const HIDDEN_STATE: OverlayState = {
   panel: null,
   notice: null,
   saved: null,
+  canInsert: false,
 };
 
 /**

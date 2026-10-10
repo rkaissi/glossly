@@ -15,6 +15,18 @@ describe('findEmails', () => {
     // A space after the glued word still leaves the next address intact.
     expect(findEmails('casey@waterloo.cablake and jordan@example.com').map((e) => e.email)).toEqual(['casey@waterloo.ca', 'jordan@example.com']);
   });
+
+  it('keeps an address that ends a sentence', () => {
+    expect(findEmails('Write to jordan@example.com.').map((e) => e.email)).toEqual(['jordan@example.com']);
+    expect(findEmails('Mail jordan@example.com. Thanks').map((e) => e.email)).toEqual(['jordan@example.com']);
+  });
+
+  it('splits a capitalized word off the domain, and keeps endings it does not list', () => {
+    expect(findEmails('casey@waterloo.caBlake').map((e) => e.email)).toEqual(['casey@waterloo.ca']);
+    expect(findEmails('desk@mail.northwind.comJordan').map((e) => e.email)).toEqual(['desk@mail.northwind.com']);
+    expect(findEmails('sam@bistro.cafe').map((e) => e.email)).toEqual(['sam@bistro.cafe']);
+    expect(findEmails('sam@town.community').map((e) => e.email)).toEqual(['sam@town.community']);
+  });
 });
 
 describe('isRoleAddress', () => {
