@@ -12,6 +12,7 @@ import { AskPanel } from './AskPanel';
 import { Debug } from './Debug';
 import { barItems, barKey, sameItem, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
+import { PastePanel } from './PastePanel';
 import { PromisesPanel } from './PromisesPanel';
 import { RecallPanel } from './RecallPanel';
 import { ReplyPanel } from './ReplyPanel';
@@ -311,6 +312,8 @@ function Expanded({ s }: { s: OverlayState }) {
           <SearchPanel key="search" s={s} />
         ) : s.panel === 'recall' ? (
           <RecallPanel key="recall" s={s} />
+        ) : s.panel === 'paste_list' || s.panel === 'paste_summary' ? (
+          <PastePanel key={s.panel} s={s} kind={s.panel === 'paste_list' ? 'list' : 'summary'} />
         ) : (
           <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
         ))}

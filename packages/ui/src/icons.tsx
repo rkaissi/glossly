@@ -1,5 +1,5 @@
 // Line icons (lucide-react) plus the Glossly mark. Components only, so Fast Refresh works.
-import { Bookmark, ChartColumn, History, ListChecks, MessageCircle, Reply, Search, UserRoundSearch, type LucideProps } from 'lucide-react';
+import { Bookmark, ChartColumn, History, List, ListChecks, MessageCircle, Reply, Search, Sparkles, UserRoundSearch, type LucideProps } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { ActionId } from '@glossly/core/api';
 
@@ -12,6 +12,8 @@ const ICONS: Record<ActionId, ComponentType<LucideProps>> = {
   visualize: ChartColumn,
   search: Search,
   recall: History,
+  paste_list: List,
+  paste_summary: Sparkles,
 };
 
 export function ActionIcon({ action, size = 16 }: { action: ActionId; size?: number }) {

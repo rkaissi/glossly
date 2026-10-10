@@ -148,10 +148,11 @@ describe('shouldHideOverlay', () => {
 });
 
 describe('empty selection', () => {
-  it('puts Search in slot 3, and reads tier 2 only for actions that send or store the text', () => {
-    const v = emptySlotsView();
+  it('puts Search and a paste action in slots 3 and 4, and reads tier 2 only for actions that send or store the text', () => {
+    const v = emptySlotsView({ slot3: { action: 'search', score: 0.9 }, slot4: { action: 'paste_list', score: 0.8 }, more: [{ action: 'paste_summary', score: 0.25 }], scores: {} });
     expect(actionForSlot(v, 3)).toBe('search');
-    expect(v.slot4).toBeNull();
+    expect(actionForSlot(v, 4)).toBe('paste_list');
+    expect(v.more.map((m) => m.label)).toEqual(['Paste a summary']);
     expect(needsTier2('ask')).toBe(true);
     expect(needsTier2('search')).toBe(false);
     expect(needsTier2('recall')).toBe(false);

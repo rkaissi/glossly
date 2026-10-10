@@ -1,5 +1,5 @@
 // Pure helpers for the overlay: slot labels and geometry. No Electron imports, so they are unit-tested.
-import type { ActionId, AvailableAction, Point, Rect, RouteResult, Size, SlotsView, SlotView } from '@glossly/core';
+import type { ActionId, AvailableAction, Point, Rect, RouteResult, Size, Slots, SlotsView, SlotView } from '@glossly/core';
 
 export const ACTION_LABELS: Record<ActionId, string> = {
   ask: 'Ask',
@@ -10,9 +10,11 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',
+  paste_list: 'Paste recent',
+  paste_summary: 'Paste a summary',
 };
 
-const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'search', 'recall'];
+const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'search', 'recall', 'paste_list', 'paste_summary'];
 /** Actions that read tier 2 when clicked: the ones that send or store the text around the selection. */
 const TIER2: readonly ActionId[] = ['ask', 'save', 'who', 'promises', 'reply'];
 export const needsTier2 = (a: ActionId) => TIER2.includes(a);
@@ -38,14 +40,14 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
   };
 }
 
-/** The bar with nothing selected: Ask, and Search in slot 3. Save is hidden (there is nothing to save). */
-export function emptySlotsView(): SlotsView {
+/** The bar with nothing selected: Ask, then Search and the paste actions under the slot rule. Save is hidden. */
+export function emptySlotsView(slots: Slots): SlotsView {
   return {
     slot1: slot('ask'),
     slot2: { ...slot('save'), collection: '' },
-    slot3: slot('search'),
-    slot4: null,
-    more: [],
+    slot3: slots.slot3 ? slot(slots.slot3.action, slots.slot3.score) : null,
+    slot4: slots.slot4 ? slot(slots.slot4.action, slots.slot4.score) : null,
+    more: slots.more.map((a) => slot(a.action, a.score)),
     stage: 'rules',
     content_type: null,
     provider: null,

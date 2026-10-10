@@ -11,7 +11,7 @@ import type { Placement } from './capture/placement';
 import type { EmbedProgress } from './embed/types';
 import type { CatalogModel } from './llm/catalog';
 import type { MetricsSummary } from './metrics';
-import type { ContextualAction, ContentType, DecisionProviderId } from './router/types';
+import type { BarAction, ContentType, DecisionProviderId } from './router/types';
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
@@ -28,11 +28,11 @@ export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } fro
 
 // ---- overlay state (main -> overlay renderer) ----
 
-/** `search` is the search box (hotkey with nothing selected); `recall` is the panel behind the Recall badge. */
-export type ActionId = 'ask' | 'save' | ContextualAction | 'search' | 'recall';
+/** Ask, Save, the slot-rule actions (see BarAction), and `recall`, the panel behind the Recall badge. */
+export type ActionId = 'ask' | 'save' | BarAction | 'recall';
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'search' | 'recall';
+export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'search' | 'recall' | 'paste_list' | 'paste_summary';
 
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel';
 
@@ -179,6 +179,11 @@ export interface ReplyInsertArgs {
 /** inserted: pasted into the source app. copied: on the clipboard instead (focus failed, or the focused field doesn't take text). */
 export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; reason: 'focus' | 'not_editable' | 'paste' };
 
+// ---- Paste (nothing selected) ----
+
+export type PasteKind = 'list' | 'summary';
+export type PasteCompose = { ok: true; text: string; /** Snippets used. */ count: number } | { ok: false; code: AskErrorEvent['code']; message: string };
+
 // ---- What did I promise ----
 
 export type PromisesResult =
@@ -297,6 +302,11 @@ export interface InvokeChannels {
   'reply:insert': { args: ReplyInsertArgs; result: ReplyInsertResult };
   /** Ctrl+C or the Copy button: counted for metrics only. */
   'reply:copied': { args: { sessionId: number }; result: void };
+
+  /** The recent snippets as a plain list, or a summary from the Chat role. Nothing is pasted yet. */
+  'paste:compose': { args: { sessionId: number; kind: PasteKind }; result: PasteCompose };
+  /** Pastes the (possibly edited) text through the insert path, like Reply. */
+  'paste:insert': { args: { sessionId: number; kind: PasteKind; text: string; edited: boolean }; result: ReplyInsertResult };
 
   /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
   'promises:extract': { args: { sessionId: number }; result: PromisesResult };

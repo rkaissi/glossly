@@ -58,8 +58,15 @@ export interface DecisionProvider {
 export const CONTEXTUAL_ACTIONS = ['reply', 'who', 'promises', 'visualize'] as const;
 export type ContextualAction = (typeof CONTEXTUAL_ACTIONS)[number];
 
+/** The actions for the bar with nothing selected (hotkey): search, and pasting recent snippets. */
+export const EMPTY_ACTIONS = ['search', 'paste_list', 'paste_summary'] as const;
+export type EmptyAction = (typeof EMPTY_ACTIONS)[number];
+
+/** Everything that competes for slots 3 and 4 under the slot rule. */
+export type BarAction = ContextualAction | EmptyAction;
+
 export interface ScoredAction {
-  action: ContextualAction;
+  action: BarAction;
   score: number;
 }
 
@@ -69,5 +76,5 @@ export interface Slots {
   slot4: ScoredAction | null;
   /** Under "More" (Tab). */
   more: ScoredAction[];
-  scores: Record<ContextualAction, number>;
+  scores: Partial<Record<BarAction, number>>;
 }

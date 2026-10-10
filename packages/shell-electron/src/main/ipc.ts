@@ -10,7 +10,7 @@ import type { SettingsWindow } from './settings-window';
 
 const log = logger('ipc');
 
-const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall'];
+const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
 const TABS = ['profile', 'people', 'keys', 'models', 'general', 'data', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
@@ -118,6 +118,17 @@ export function registerIpc(deps: IpcDeps): void {
     return r;
   });
   handle('reply:copied', (a) => capture.replyCopied(num(a.sessionId)));
+
+  // ---- Paste (nothing selected) ----
+  const pasteKind = (v: unknown) => {
+    if (v !== 'list' && v !== 'summary') throw new Error('Invalid kind');
+    return v;
+  };
+  handle('paste:compose', (a) => capture.composePaste(num(a.sessionId), pasteKind(a.kind)));
+  handle('paste:insert', (a) => {
+    if (typeof a.edited !== 'boolean') throw new Error('Invalid argument');
+    return capture.insertPaste(num(a.sessionId), str(a.text, 20_000), pasteKind(a.kind), a.edited);
+  });
 
   // ---- What did I promise ----
   handle('promises:extract', (a) => capture.extractPromises(num(a.sessionId)));

@@ -113,6 +113,14 @@ export const SettingsSchema = z.object({
     })
     .prefault({}),
 
+  paste: z
+    .object({
+      /** How many recent snippets the paste actions use, and how far back they look. */
+      recentCount: z.number().int().min(1).max(50).default(10),
+      recentDays: z.number().int().min(1).max(90).default(7),
+    })
+    .prefault({}),
+
   embeddings: z
     .object({
       model: z.string().default('Xenova/all-MiniLM-L6-v2'),

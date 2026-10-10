@@ -418,6 +418,15 @@ A review of the 15.5 commits, with fixes. 345 unit tests pass; `pnpm typecheck` 
 - **The search box.** The hotkey with nothing selected now opens straight into a Search panel under Ask and Search (Save is hidden, there is nothing to save). It searches saved items by their words (text, why, window title), then by meaning (`recall.searchSimilarity`, 0.45, lower because the user asked), plus people (name or alias) and open commitments (text or person). An empty query lists the newest saved items and the open commitments. Arrows move, Enter or a click copies the item's full text (`items:copy`), people and commitments open the People tab. While the embedding model isn't ready it says it is matching exact words only. Nothing here calls a provider.
 - New settings: `recall {minSimilarity, searchSimilarity, maxResults}`. New channels: `recall:get`, `recall:dismiss`, `recall:ask`, `search:query`, `items:copy`. New action ids `search` and `recall` (they don't read tier 2).
 
+### Step 16.2: paste recent snippets with nothing selected (Oct 10)
+
+354 unit tests pass (new: `core/src/actions/paste.test.ts`); `pnpm typecheck` is clean. Not run live yet.
+
+- **Two actions on the empty bar**, under the same slot rule as the contextual ones (`rankSlots` in `router/slots.ts`; `assignEmptySlots` scores them): **Search** 0.9; **Paste recent** 0.8 when something was saved in the last `paste.recentDays` (7) days, 0.3 when the focused control doesn't take text (it would only copy), 0 with nothing recent; **Paste a summary** just under Paste recent with a model, 0.25 without one (Local only or no key), so it waits under More and explains itself. So the usual empty bar is Ask, Search, Paste recent, with the summary under More.
+- **Paste recent** is `- ` lines of up to `paste.recentCount` (10) snippets, oldest first, no model. **Paste a summary** is one Chat call (`prompts/paste-summary.md`: 3 to 6 plain bullets, only what the snippets say). Both open a panel with the text in an editable box first; Enter (or Paste) inserts it through the same path as Reply (`insertText`: focus back, check the field takes text, paste; otherwise the clipboard and a note). Shift+Enter adds a line. Metrics: `paste_composed`, `paste_inserted` (kind, how, edited), `paste_error`.
+- **Reading of the plan.** "Show paste only when nothing is selected or the focused control is editable, so a highlight isn't replaced": paste is offered only when nothing is selected, so a highlight is never replaced; editability then only decides whether it is a top slot or waits under More.
+- `insertReply` now goes through the shared `insertText`; Reply behaves as before. New channels `paste:compose` and `paste:insert`; new settings `paste {recentCount, recentDays}`; new action ids `paste_list` and `paste_summary`.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

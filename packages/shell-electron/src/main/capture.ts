@@ -25,6 +25,10 @@ import {
   pillWait,
   reply,
   recall as recallFor,
+  assignEmptySlots,
+  pasteList,
+  pasteSummary,
+  recentSnippets,
   search as searchSaved,
   placeBar,
   placePill,
@@ -42,6 +46,7 @@ import {
   type PillTiming,
   type PromiseSaveRow,
   type PromisesResult,
+  type PasteCompose,
   type ReplyInsertResult,
   type ReplyStart,
   type ReplyTo,
@@ -115,6 +120,8 @@ interface Session {
   askRelated: string[] | null;
   /** Hotkey with nothing selected: whether the focused control takes text (null when unknown). */
   focusEditable: boolean | null;
+  /** The running paste summary. */
+  pasteCtl: AbortController | null;
 }
 
 /** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
@@ -122,6 +129,9 @@ const BASELINE_WAIT_MS = 100;
 
 /** Synthetic obstacles above and below the selection, for checking the dot by hand (dev builds only). */
 const FORCE_DOT = !app.isPackaged && process.env.GLOSSLY_FORCE_DOT === '1';
+
+/** Actions that work with nothing selected. */
+const WITHOUT_SELECTION: readonly ActionId[] = ['ask', 'search', 'paste_list', 'paste_summary'];
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const ms = (t: number) => Math.round(performance.now() - t);
@@ -374,6 +384,7 @@ export class Capture {
         recallDismissed: new Set(),
         askRelated: null,
         focusEditable: null,
+        pasteCtl: null,
       };
       this.session = session;
       this.overlay.update(
@@ -570,6 +581,7 @@ export class Capture {
       recallDismissed: new Set(),
       askRelated: null,
       focusEditable,
+      pasteCtl: null,
     };
     this.session = session;
 
@@ -599,7 +611,7 @@ export class Capture {
       // Nothing selected: the search box opens at once, under Ask and Search.
       const rect = growFrom(placement.rect, placement.side, SIZES.panel, workArea(session.anchor));
       this.overlay.update(
-        { ...common, mode: 'panel', panel: 'search', placement: { mode: 'pill', side: placement.side, rect }, slots: emptySlotsView() },
+        { ...common, mode: 'panel', panel: 'search', placement: { mode: 'pill', side: placement.side, rect }, slots: emptySlotsView(this.emptySlots(session)) },
         rect,
       );
     }
@@ -694,6 +706,19 @@ export class Capture {
     s.timings.context = ms(t);
   }
 
+  /** Slots for the bar with nothing selected, under the same rule as the contextual actions. */
+  private emptySlots(s: Session) {
+    const settings = this.settings;
+    return assignEmptySlots(
+      {
+        editable: s.focusEditable,
+        recent: recentSnippets(this.services.store, settings).length,
+        summaryModel: !settings.localOnly && this.services.llm.hasModel('chat'),
+      },
+      settings.router,
+    );
+  }
+
   /** True when Router.route will spend a model call. Rules then wait instead of flashing. */
   private routeWillCallModel(): boolean {
     return !this.settings.localOnly && this.services.llm.hasModel('decision');
@@ -751,7 +776,7 @@ export class Capture {
     if (!s) return;
     const action = 'slot' in target ? actionForSlot(this.state.slots, target.slot) : target.action;
     if (!action) return;
-    if (!s.selection && action !== 'ask' && action !== 'search') return;
+    if (!s.selection && !WITHOUT_SELECTION.includes(action)) return;
     this.stopWatch();
     this.services.metrics.record('action_clicked', { action, ms: ms(s.t0), trigger: s.trigger });
     if (action === 'recall') this.services.metrics.record('recall_opened', { count: this.visibleRecall(s).length });
@@ -929,9 +954,7 @@ export class Capture {
   }
 
   /**
-   * Inserts a draft (spec: Inserting text): focus back to the source window, then paste. Reply
-   * never sends. When focus can't be restored, or the focused field doesn't take text, the
-   * draft goes on the clipboard instead and the panel says so. An inserted reply is stored as a
+   * Inserts a draft (spec: Inserting text). Reply never sends. An inserted reply is stored as a
    * voice sample and, when the author is a known person, as an interaction with them.
    */
   async insertReply(sessionId: number, text: string, edited: boolean, personId?: string): Promise<ReplyInsertResult> {
@@ -942,16 +965,26 @@ export class Capture {
     const people = this.services.people;
     const pid = personId && people.get(personId) ? personId : (s.reply?.personId ?? null);
     const sourceApp = s.selection.source_app;
-    const record = (how: 'inserted' | 'copied') => {
+    if (s.reply) s.reply.used = true;
+    return this.insertText(s, draft, 'reply', (how) => {
       if (s.reply) s.reply.used = true;
       people.addVoice(draft, edited ? 'inserted_edited' : 'inserted');
       if (pid) people.addInteraction({ person_id: pid, direction: 'outbound', text: draft, source_app: sourceApp });
       this.services.metrics.record('reply_inserted', { how, edited, person: Boolean(pid), ms: ms(s.t0) });
-    };
+    });
+  }
+
+  /**
+   * The insert path (spec: Inserting text): focus back to the source window, then paste. When
+   * focus can't be restored, or the focused field doesn't take text, the text goes on the
+   * clipboard instead and the panel says so. `record` runs once the text is placed either way.
+   */
+  private async insertText(s: Session, text: string, what: 'reply' | 'paste', record: (how: 'inserted' | 'copied') => void): Promise<ReplyInsertResult> {
+    if (!s.fg) throw new Error('The window this came from is gone.');
     const copy = (reason: 'focus' | 'not_editable' | 'paste'): ReplyInsertResult => {
-      clipboard.writeText(draft);
+      clipboard.writeText(text);
       record('copied');
-      log.info('reply copied', { reason });
+      log.info(`${what} copied`, { reason });
       return { result: 'copied', reason };
     };
     const refocus = async () => {
@@ -978,19 +1011,55 @@ export class Capture {
         await refocus();
         return copy('not_editable');
       }
-      if (s.reply) s.reply.used = true;
-      this.close('reply_inserted');
+      this.close(`${what}_inserted`);
       try {
-        await this.helper.request('paste', { text: draft });
+        await this.helper.request('paste', { text });
       } catch {
         return copy('paste');
       }
       record('inserted');
-      log.info('reply inserted', { edited, editable: editable ?? 'unknown' });
+      log.info(`${what} inserted`, { editable: editable ?? 'unknown' });
       return { result: 'inserted' };
     } finally {
       this.bouncing = false;
     }
+  }
+
+  // ---- Paste (nothing selected) ----
+
+  /** The recent snippets as a list, or summarized by the Chat model. Shown before anything is pasted. */
+  async composePaste(sessionId: number, kind: 'list' | 'summary'): Promise<PasteCompose> {
+    const s = this.current(sessionId);
+    if (!s) return { ok: false, code: 'no_selection', message: 'This bar is gone. Press the hotkey again.' };
+    const items = recentSnippets(this.services.store, this.settings);
+    if (items.length === 0) return { ok: false, code: 'no_selection', message: `Nothing saved in the last ${this.settings.paste.recentDays} days.` };
+    if (kind === 'list') {
+      this.services.metrics.record('paste_composed', { kind, count: items.length, ms: 0 });
+      return { ok: true, text: pasteList(items), count: items.length };
+    }
+    s.pasteCtl?.abort();
+    const ctl = new AbortController();
+    s.pasteCtl = ctl;
+    const t = performance.now();
+    try {
+      const text = await pasteSummary(this.services.llm, items, ctl.signal);
+      this.services.metrics.record('paste_composed', { kind, count: items.length, ms: ms(t) });
+      return { ok: true, text, count: items.length };
+    } catch (e) {
+      const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
+      if (code !== 'aborted') this.services.metrics.record('paste_error', { code, ...(e instanceof LlmError && e.statusCode && { status: e.statusCode }) });
+      return { ok: false, code, message: e instanceof LlmError ? e.message : 'The model call failed.' };
+    } finally {
+      if (s.pasteCtl === ctl) s.pasteCtl = null;
+    }
+  }
+
+  async insertPaste(sessionId: number, text: string, kind: 'list' | 'summary', edited: boolean): Promise<ReplyInsertResult> {
+    const s = this.current(sessionId);
+    if (!s) throw new Error('This bar is gone. Press the hotkey again.');
+    const body = text.trim();
+    if (!body) throw new Error('There is nothing to paste.');
+    return this.insertText(s, body, 'paste', (how) => this.services.metrics.record('paste_inserted', { kind, how, edited, ms: ms(s.t0) }));
   }
 
   /** What did I promise: one structured call for the commitments in the selected message. */
@@ -1213,7 +1282,7 @@ export class Capture {
     log.info('overlay closed', { reason, mode, focused, trigger });
     // Focus goes back to the source app, unless it already left (blur), the settings window is
     // taking it, or Reply already handed it back to paste.
-    if (focused && s.fg && reason !== 'blur' && reason !== 'settings' && reason !== 'reply_inserted') {
+    if (focused && s.fg && reason !== 'blur' && reason !== 'settings' && !reason.endsWith('_inserted')) {
       void this.helper.request('restore_focus', { handle: s.fg.handle }).catch(() => {});
     }
   }
@@ -1263,6 +1332,7 @@ export class Capture {
     s.routeCtl?.abort();
     s.promisesCtl?.abort();
     s.whoCtl?.abort();
+    s.pasteCtl?.abort();
     s.reply?.ctl.abort();
     if (s.reply?.done && !s.reply.used) this.services.metrics.record('reply_discarded');
     this.cancelAsks(s);
