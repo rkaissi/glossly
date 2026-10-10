@@ -155,6 +155,29 @@ export class SaveService {
     return { item, undoUntil, enriched: this.startEnrich(item) };
   }
 
+  /**
+   * Visualize's Save: the table and its chart as an item of kind "chart". The text is the
+   * table as CSV, so search and Recall can find it; the rows and spec go in data_json.
+   */
+  saveChart(input: { csv: string; data: Record<string, unknown>; collection: string; selection: SelectionPayload }): SaveResult {
+    const { store } = this.deps;
+    const settings = this.deps.settings();
+    const collection = store.collectionByName(input.collection) ?? store.createCollection(input.collection);
+    const item = store.insertItem({
+      collection_id: collection.id,
+      kind: 'chart',
+      text: input.csv,
+      why: null,
+      source_app: input.selection.source_app || null,
+      window_title: input.selection.window_title || null,
+      data_json: JSON.stringify(input.data),
+    });
+    const undoUntil = this.now() + settings.save.undoSeconds * 1000;
+    this.undoDeadlines.set(item.id, undoUntil);
+    this.deps.metrics?.record('save_done', { via: 'visualize', has_why: false });
+    return { item, undoUntil, enriched: this.startEnrich(item) };
+  }
+
   /** Moves a saved item to another collection (created if needed). Returns the collection's name, or null if the item is gone. */
   move(itemId: string, collection: string): string | null {
     const { store } = this.deps;

@@ -14,7 +14,7 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   paste_summary: 'Paste a summary',
 };
 
-const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'search', 'recall', 'paste_list', 'paste_summary'];
+const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
 /** Actions that read tier 2 when clicked: the ones that send or store the text around the selection. */
 const TIER2: readonly ActionId[] = ['ask', 'save', 'who', 'promises', 'reply'];
 export const needsTier2 = (a: ActionId) => TIER2.includes(a);

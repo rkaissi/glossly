@@ -25,6 +25,7 @@ import {
   pillWait,
   reply,
   recall as recallFor,
+  visualize,
   assignEmptySlots,
   pasteList,
   pasteSummary,
@@ -53,6 +54,7 @@ import {
   type ReplyTo,
   type RecallHit,
   type SearchResults,
+  type VisualizeResult,
   type Placement,
   type Point,
   type Rect,
@@ -128,6 +130,9 @@ interface Session {
   saved: SavedNotice | null;
   /** Autosave moves its item to the route's collection once; set after that. */
   savedSettled: boolean;
+  /** The running Visualize, and its last result (for Save). */
+  visualCtl: AbortController | null;
+  visual: Extract<VisualizeResult, { ok: true }> | null;
 }
 
 /** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
@@ -395,6 +400,8 @@ export class Capture {
         pasteCtl: null,
         saved: null,
         savedSettled: false,
+        visualCtl: null,
+        visual: null,
       };
       this.session = session;
       if (settings.saveMode === 'autosave' && session.siteKey !== null) this.autosave(session);
@@ -596,6 +603,8 @@ export class Capture {
       pasteCtl: null,
       saved: null,
       savedSettled: false,
+      visualCtl: null,
+      visual: null,
     };
     this.session = session;
 
@@ -1044,6 +1053,38 @@ export class Capture {
     }
   }
 
+  // ---- Visualize ----
+
+  async runVisualize(sessionId: number): Promise<VisualizeResult> {
+    const s = this.current(sessionId);
+    if (!s?.selection) return { ok: false, code: 'no_selection', message: 'Nothing is selected.' };
+    s.visualCtl?.abort();
+    const ctl = new AbortController();
+    s.visualCtl = ctl;
+    const t = performance.now();
+    try {
+      const r = await visualize({ llm: this.services.llm, settings: () => this.settings }, s.selection.text, ctl.signal);
+      if (r.ok) {
+        s.visual = r;
+        this.services.metrics.record('visualize_done', { source: r.table.source, rows: r.table.rows.length, chart: r.chartBy ?? 'table', ms: ms(t) });
+      } else if (r.code !== 'aborted') this.services.metrics.record('visualize_error', { code: r.code });
+      log.info('visualized', { ok: r.ok, ...(r.ok ? { source: r.table.source, chart: r.chartBy ?? 'table' } : { code: r.code }), ms: ms(t) });
+      return r;
+    } finally {
+      if (s.visualCtl === ctl) s.visualCtl = null;
+    }
+  }
+
+  saveVisualize(sessionId: number): SaveDone {
+    const s = this.current(sessionId);
+    if (!s?.selection || !s.visual) throw new Error('Nothing to save yet.');
+    const collection = s.route?.decisions.best_collection ?? 'Notes';
+    const v = s.visual;
+    const r = this.services.save.saveChart({ csv: v.csv, data: { columns: v.table.columns, rows: v.table.rows, types: v.types, spec: v.spec }, collection, selection: s.selection });
+    void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
+    return { itemId: r.item.id, collection, undoUntil: r.undoUntil };
+  }
+
   // ---- Paste (nothing selected) ----
 
   /** The recent snippets as a list, or summarized by the Chat model. Shown before anything is pasted. */
@@ -1290,6 +1331,8 @@ export class Capture {
       pasteCtl: null,
       saved,
       savedSettled: true,
+      visualCtl: null,
+      visual: null,
     };
     this.session = session;
     const placement = placeBar({ selection: bounds, anchor, obstacles: [], size: SIZES.toast, growW: SIZES.toast.w + 80, workArea: workArea(anchor) });
@@ -1522,6 +1565,7 @@ export class Capture {
     s.promisesCtl?.abort();
     s.whoCtl?.abort();
     s.pasteCtl?.abort();
+    s.visualCtl?.abort();
     s.reply?.ctl.abort();
     if (s.reply?.done && !s.reply.used) this.services.metrics.record('reply_discarded');
     this.cancelAsks(s);

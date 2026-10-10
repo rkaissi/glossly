@@ -28,13 +28,13 @@ function route(partial: Partial<RouteResult['slots']> = {}, collection = 'Notes'
 }
 
 describe('slotsView', () => {
-  it('labels slots and marks later-phase actions unavailable', () => {
+  it('labels slots, with every action available now that Visualize is built', () => {
     const v = slotsView(route(), 'rules');
     expect(v.slot1).toMatchObject({ action: 'ask', label: 'Ask', available: true });
     expect(v.slot2).toMatchObject({ action: 'save', label: 'Save to Notes', collection: 'Notes', available: true });
     expect(v.slot3).toMatchObject({ action: 'reply', available: true, score: 0.9 });
     expect(v.slot4).toMatchObject({ action: 'promises', label: 'What did I promise', available: true });
-    expect(slotsView(route({ slot3: { action: 'visualize', score: 1 } }), 'rules').slot3).toMatchObject({ action: 'visualize', available: false });
+    expect(slotsView(route({ slot3: { action: 'visualize', score: 1 } }), 'rules').slot3).toMatchObject({ action: 'visualize', label: 'Visualize', available: true });
     expect(v.route_ms).toBe(3);
   });
 

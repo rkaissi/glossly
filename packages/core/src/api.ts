@@ -16,6 +16,7 @@ import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './setti
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
 import type { RecallHit, SearchResults } from './recall/types';
+import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, VoiceSample } from './people/types';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
@@ -24,6 +25,7 @@ export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
 export type { RecallHit, RecallReason, SearchResults } from './recall/types';
+export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 
 // ---- overlay state (main -> overlay renderer) ----
@@ -32,7 +34,7 @@ export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } fro
 export type ActionId = 'ask' | 'save' | BarAction | 'recall';
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'search' | 'recall' | 'paste_list' | 'paste_summary';
+export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'visualize' | 'search' | 'recall' | 'paste_list' | 'paste_summary';
 
 /** `toast`: the small "Saved to Notes · Undo" strip after the save hotkey; it never takes focus. */
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel' | 'toast';
@@ -316,6 +318,13 @@ export interface InvokeChannels {
   'saved:undo': { args: { sessionId: number }; result: { undone: boolean } };
 
   'clipboard:write': { args: { text: string }; result: void };
+  /** "Copy as image": a PNG data URL rendered by the chart. */
+  'clipboard:image': { args: { dataUrl: string }; result: void };
+
+  /** Visualize: the table (parsed in code, else by the model) and a validated Vega-Lite spec. */
+  'visualize:run': { args: { sessionId: number }; result: VisualizeResult };
+  /** Saves the last Visualize result as a chart item in the route's collection. */
+  'visualize:save': { args: { sessionId: number }; result: SaveDone };
 
   /** Streams three drafts (Chat role) to the sender's reply:* channels. */
   'reply:start': { args: { sessionId: number }; result: ReplyStart };

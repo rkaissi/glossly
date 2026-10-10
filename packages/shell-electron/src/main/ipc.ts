@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { aliasKindOf, type ActionId, type AliasKind, type CommitmentStatus, type InvokeArgs, type InvokeChannel, type InvokeResult, type PersonCard, type PromiseSaveRow, type SetSettingResult, type SettingsKey } from '@glossly/core';
 import type { Capture } from './capture';
 import type { HotkeyManager, SaveHotkey } from './hotkey';
@@ -100,6 +100,17 @@ export function registerIpc(deps: IpcDeps): void {
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
   handle('saved:undo', (a) => capture.undoSaved(num(a.sessionId)));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
+  handle('clipboard:image', async (a) => {
+    const prefix = 'data:image/png;base64,';
+    const url = str(a.dataUrl, 20_000_000);
+    if (!url.startsWith(prefix)) throw new Error('Invalid image');
+    const png = Buffer.from(url.slice(prefix.length), 'base64');
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+  });
+
+  // ---- Visualize ----
+  handle('visualize:run', (a) => capture.runVisualize(num(a.sessionId)));
+  handle('visualize:save', (a) => capture.saveVisualize(num(a.sessionId)));
 
   // ---- Recall and search ----
   handle('recall:get', (a) => capture.recallHits(num(a.sessionId)));

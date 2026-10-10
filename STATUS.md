@@ -1,6 +1,6 @@
-# Glossly status: Phases 0 to 2
+# Glossly status: Phases 0 to 3
 
-Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1) and Phase 2 (people layer and Reply), which is being built in Step 15. `docs/HANDOFF.md` has the detailed build notes.
+Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, not run live yet). `docs/HANDOFF.md` has the detailed build notes.
 
 ## Summary
 
@@ -60,6 +60,16 @@ The app lives in the tray. The default hotkey is `Ctrl+Alt+Space`. Data is in `%
 | Person badge on the bar | Built (Step 15.2), checked live Oct 10 | A known person in the selection who has open commitments or a note gets a badge after the bar's buttons ("Maya Lin · 1 open"); clicking it opens their Who card. Local, computed with the rules paint. |
 
 Built ahead of schedule because the privacy rules require them from day one or the work was cheap: JSON export and "Delete all data" (Data tab), and the local metrics view (Metrics tab; spec Phase 4).
+
+## Phase 3: Recall and Visualize (Step 16, built Oct 10; not run live yet)
+
+| Spec check | Status | Notes |
+| --- | --- | --- |
+| Recall ranking, badge, expandable cards, dismiss logging | Built (Step 16.1) | Runs when the bar opens, on the selection, on this computer only: saved items sharing a person, company, product, or place come first, then items similar in meaning (0.78 or more). The bar shows "N related"; the cards show the snippet with the shared name marked, why it matched, and when and where it was saved, with Copy, "Not related" (logged without text), and "Ask about these". Ask also gets the top 3 as saved notes. There is no "open source" button, since saved items keep the app and window title but no link. |
+| Visualize: table parsing, LLM fallback, validated Vega-Lite, copy and save | Built (Step 16.6) | Markdown, TSV, CSV, semicolons, pipes, and aligned columns are read in code; other text goes to the model for rows. The model then writes a Vega-Lite spec, which must pass the Vega-Lite JSON schema, use only the table's columns, and load nothing from outside; otherwise the table is shown. Local only or no key: code picks a plain bar or line chart. Copy as image, Copy CSV, Save (a chart item with Undo), and a table view. |
+| Search box over saved items when nothing is selected | Built (Step 16.1) | The hotkey with nothing selected opens search: saved items by words and by meaning, people, and open promises. Also new on that bar (Step 16.2): paste your recent snippets as a list, or as a short summary written by the model. |
+
+Also in Step 16: Save mode (Manual, a save hotkey, or autosave on highlight; 16.3), Ask saving a note when asked to remember something (16.4), and one slot rule for every action (16.5).
 
 ## Eval numbers
 

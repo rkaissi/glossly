@@ -881,3 +881,43 @@ html:not([data-material='acrylic']) .toast {
   padding: 0 10px;
   font-size: 12.5px;
 }
+
+/* ---- Visualize ---- */
+
+.viz-chart {
+  min-height: 220px;
+  user-select: none;
+}
+.viz-table {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  user-select: text;
+}
+.viz-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+}
+.viz-table th,
+.viz-table td {
+  padding: 5px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.viz-table th {
+  position: sticky;
+  top: 0;
+  background: var(--glass-solid);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.viz-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.viz-table tr:last-child td {
+  border-bottom: none;
+}

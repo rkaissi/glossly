@@ -19,6 +19,7 @@ import { ReplyPanel } from './ReplyPanel';
 import { SavePanel } from './SavePanel';
 import { SavedToast, useSecondsLeft } from './SavedToast';
 import { SearchPanel } from './SearchPanel';
+import { VisualizePanel } from './VisualizePanel';
 import { WhoPanel } from './WhoPanel';
 
 // Main loads the page with ?material=acrylic when the window is Windows 11 acrylic glass.
@@ -336,6 +337,8 @@ function Expanded({ s }: { s: OverlayState }) {
           <SearchPanel key="search" s={s} />
         ) : s.panel === 'recall' ? (
           <RecallPanel key="recall" s={s} />
+        ) : s.panel === 'visualize' ? (
+          <VisualizePanel key="visualize" s={s} />
         ) : s.panel === 'paste_list' || s.panel === 'paste_summary' ? (
           <PastePanel key={s.panel} s={s} kind={s.panel === 'paste_list' ? 'list' : 'summary'} />
         ) : (
