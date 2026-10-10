@@ -7,7 +7,7 @@ import { useAction } from './useAction';
 const ROLES: { role: RoleName; label: string; desc: string }[] = [
   { role: 'fast', label: 'Fast', desc: 'Routing when no decision model is set, and finding people and dates when you save. Needs structured output.' },
   { role: 'chat', label: 'Chat', desc: 'Writes Ask answers. Pick the strongest writer you have.' },
-  { role: 'decision', label: 'Decision', desc: 'Picks the extra actions in slots 3 and 4. Rules take over if it is slower than 400 ms.' },
+  { role: 'decision', label: 'Decision', desc: 'Picks the extra actions in slots 3 and 4. Rules take over if it is slower than {timeout} ms.' },
 ];
 
 const ACTION_OVERRIDES: { action: string; label: string; role: RoleName }[] = [
@@ -86,7 +86,7 @@ function RoleRow({ view, role, label, desc }: { view: SettingsView; role: RoleNa
         <strong>{label}</strong>
         {cur.manual && <span className="tag">Picked by you</span>}
       </div>
-      <p className="muted small">{desc}</p>
+      <p className="muted small">{desc.replace('{timeout}', String(view.settings.router.decisionTimeoutMs))}</p>
       <div className="role-pickers">
         <label>
           <span className="small muted">Model</span>

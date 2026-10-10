@@ -1,7 +1,7 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { uuidv7 } from 'uuidv7';
 import type { KnownPerson } from '../router/types';
-import { DEFAULT_COLLECTIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
+import { DEFAULT_COLLECTIONS, SETTINGS_MIGRATIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
 import { isoNow, type Collection, type Item } from '../types';
 import { DATA_TABLES, MIGRATIONS } from './migrations';
 
@@ -43,6 +43,7 @@ export class Store {
     if (opts.vecExtensionPath) this.db.loadExtension(opts.vecExtensionPath);
     this.hasVectors = Boolean(opts.vecExtensionPath);
     this.migrate();
+    this.migrateSettings();
     this.ensureDefaultCollections();
   }
 
@@ -58,6 +59,27 @@ export class Store {
         this.db.exec(`PRAGMA user_version = ${v + 1}`);
       });
     }
+  }
+
+  /** Applies each SETTINGS_MIGRATIONS entry once, to stored values only. */
+  private migrateSettings(): void {
+    const done = Number(this.getMeta('settings_migrations') ?? 0);
+    if (done >= SETTINGS_MIGRATIONS.length) return;
+    this.tx(() => {
+      for (const m of SETTINGS_MIGRATIONS.slice(done)) {
+        const row = this.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(m.key) as { value_json: string } | undefined;
+        if (!row) continue;
+        let stored: unknown;
+        try {
+          stored = JSON.parse(row.value_json);
+        } catch {
+          continue;
+        }
+        const next = m.migrate(stored);
+        if (next !== undefined) this.db.prepare('UPDATE settings SET value_json = ? WHERE key = ?').run(JSON.stringify(next), m.key);
+      }
+      this.setMeta('settings_migrations', String(SETTINGS_MIGRATIONS.length));
+    });
   }
 
   tx<T>(fn: () => T): T {

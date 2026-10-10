@@ -197,6 +197,13 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - **Shell.** `autoTrigger`: foreground, selection, `baseline` (waits up to 100 ms), then `pollForToolbar` with `popups_near` checks, then place and show once. No baseline request on mouse-down any more. After showing in a non-`known` app, if a check found a new obstacle owned by the foreground app's process it learns at once; otherwise one extra check runs at 250 ms after mouse-up (the pill is up and doesn't move) and learns if the app's own toolbar appeared late. Timings: `foreground`, `selection`, `baseline`, `wait` (time slept), `polls`, `popups_near` (last check), `popups_total`, `total`. `SelectionDebug.pill` (`PillTiming`: wait, reason, polls, found, baseline) shows in the debug view as "pill wait: shown at N ms · wait 100 ms (short) · 1 check, last N ms". `pill_shown` gained `wait_ms`, `wait_reason`, `polls`, `popups_ms`; `main.log` gets INFO "pill shown" per pill and "toolbar wait learned" (ms, and whether the key is a site; the key itself is not logged).
 - Expected in Notepad: one check at about 100 ms, so about 100 ms plus one `popups_near` (target about 130 to 150 ms). To be measured in the live check.
 
+### Step 12.3: router timeout (Oct 10, done)
+
+158 unit tests pass; `pnpm typecheck` is clean.
+
+- `router.decisionTimeoutMs` defaults to 600. `SETTINGS_MIGRATIONS` in `core/src/settings.ts` is a list of one-time changes to stored values, applied in order by `Store.migrateSettings()` in the constructor and tracked in meta `settings_migrations` (the count applied). Entry 1 moves a stored `router.decisionTimeoutMs` of exactly 400 to 600; a fresh database just records the count, so a 400 picked later is kept (store test). Add later default changes as new entries; never edit a shipped one.
+- The Models tab's Decision description reads the budget from settings; `evals/print-results.mjs` says "over budget (600 ms)".
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -214,7 +221,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 
 Rayan's review answers (Oct 10) set the order below. Each numbered step is one or more commits; stop and hand off after each.
 
-### Step 12 (in progress; 12.1 and 12.2 done, 12.3 next): fixes from Rayan's review
+### Step 12 (in progress; 12.1 to 12.3 done, 12.4 next): fixes from Rayan's review
 
 **How to run 12.2 to 12.5 (Rayan, Oct 10):** do all four in one chat, in order. Commit to `main` after each one (with this file and `STATUS.md` updated) but don't stop between them. Do no end-to-end or desktop testing until all four are implemented, then run one combined live check through a Composer or Grok subagent, fix what it finds, commit, and stop to hand off.
 
@@ -226,7 +233,7 @@ Rayan's review answers (Oct 10) set the order below. Each numbered step is one o
    - Poll instead of waiting the full 250 ms: from about 100 ms after mouse-up, check for new obstacles every 30 to 40 ms. Show as soon as a new toolbar is found (placed on the other side), or once the app's wait has passed with none found.
    - Per-app wait: the full wait only for apps and sites known to show selection toolbars (Notion, Google Docs, Word, Slack, Medium, Outlook), learned per app key when a toolbar appears there, and a short wait (around 80 to 120 ms) everywhere else. Store what was learned locally (process name or site key plus a delay; no text).
    - Report the new numbers in the debug view and `STATUS.md`. The spec's 150 ms is the goal where no toolbar is expected.
-3. **Router timeout:** raise the `router.decisionTimeoutMs` default from 400 to 600 ms. Users who saved the old default keep 400 because settings are stored per key, so migrate a stored value of exactly 400 to 600 once. Update `STATUS.md`.
+3. ~~**Router timeout:**~~ Done, see Step 12.3 above. Original notes: raise the `router.decisionTimeoutMs` default from 400 to 600 ms. Users who saved the old default keep 400 because settings are stored per key, so migrate a stored value of exactly 400 to 600 once. Update `STATUS.md`.
 4. **Delete all data versus Reset settings** (decision 10). "Delete all data" removes items, entities, people, vectors, events, and collections (re-seeded), and keeps keys, settings, the model catalog, and the embedding model. A new "Reset settings" button (Data tab, own inline confirm) removes saved keys and their test results, resets settings to defaults, re-registers the default hotkey, and returns to setup. Change `Store.deleteAll()` so it no longer clears `settings` and `models`, and add a store method for the reset. Update the Data tab copy and the store tests.
 5. **Strict Local only** (decision 12). Skip Save's entity extraction (the item is saved and embedded; mark it so entities can be backfilled if Local only is turned off later, or leave it, whichever is simpler and stated in `STATUS.md`). Ask with Local only on shows "Local only is on" plus a button that turns it off (or opens General). The General tab copy says plainly that nothing is sent to a model provider while it is on. Put the check in one place (for example `AiSdkLlm` refusing with an `LlmError` code `local_only` when the setting is on), so later actions can't forget it, plus a unit test.
 

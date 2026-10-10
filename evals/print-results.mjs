@@ -21,7 +21,7 @@ for (const f of files) {
     'slot 3/4 match': pct(r.slot_accuracy),
     cases: r.cases,
     'median ms': Math.round(r.median_ms * 10) / 10,
-    ...(r.errors !== undefined ? { errors: r.errors, 'over 400 ms': r.over_budget } : {}),
+    ...(r.errors !== undefined ? { errors: r.errors, 'over budget (600 ms)': r.over_budget } : {}),
   });
   const errorKinds = [...new Set(r.results.map((c) => c.error).filter(Boolean))];
   if (errorKinds.length) console.log(`errors (scored on the rules fallback):\n  ${errorKinds.join('\n  ')}`);

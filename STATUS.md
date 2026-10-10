@@ -4,7 +4,7 @@ Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1). `doc
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 157 unit tests.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 158 unit tests.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -57,7 +57,7 @@ Router eval on the 60 hand-written fixtures in `fixtures/`. The spec's target is
 | Run | Type accuracy | Slot 3 and 4 match | Median time |
 | --- | --- | --- | --- |
 | Rules only (Oct 10) | 98.3% | 90.0% | under 1 ms |
-| LLM, `groq:qwen/qwen3.8-27b` (Oct 9) | 100% | 61.7% | 247 ms, 3 of 60 calls over 400 ms |
+| LLM, `groq:qwen/qwen3.8-27b` (Oct 9) | 100% | 61.7% | 247 ms, 3 of 60 calls over 400 ms (the budget then; now 600 ms) |
 
 The rules were tuned on these same fixtures, so expect lower numbers on real selections. The LLM's slot misses mostly came from counting chat speaker headers as "mentions people" (adding Who to 17 cases). The prompt was tightened afterwards but **not re-run** (Groq free-tier limits). Rules still miss automated mail (it gets Reply because the spec scores Reply as "written by someone else"), a message with first names only, one "please ... today" sentence read as a commitment, and one prose sentence with numbers just under the table threshold.
 
@@ -117,7 +117,7 @@ Known rough edges:
 **Answered Oct 10** (the plan is in `docs/HANDOFF.md`, Steps 12 to 20):
 
 - Pill speed: keep checking for toolbars but make it faster; a visible pill never moves.
-- Router timeout: raise it to 600 ms.
+- Router timeout: raise it to 600 ms. **Done in Step 12.3** (Oct 10): the default `router.decisionTimeoutMs` is 600, and a stored value of exactly 400 (the old default) is moved to 600 once, the first time the new version opens the database (tracked in meta `settings_migrations`, so a 400 you set later is kept). The Models tab's Decision description shows the current budget.
 - Delete all data: keep API keys and settings. A separate "Reset settings" button clears settings and keys.
 - Local only: strict. Nothing goes to a cloud model, including entity extraction and Ask. Local model support comes later (Step 20).
 - Packaging: after every Windows-buildable spec phase is done.
@@ -129,7 +129,7 @@ Known rough edges:
 The original questions:
 
 1. **Pill speed.** The pill took about 360 ms (250 ms toolbar wait plus `popups_near`) against the 150 ms target. Should it be faster and less careful about toolbars? One option is to show the pill at once and move it if a toolbar appears. (Answered; built in Step 12.2.)
-2. **Router timeout.** The model router missed its 400 ms budget on 2 of 6 live calls (404 and 418 ms) and fell back to rules. Raise `router.decisionTimeoutMs` to about 600 ms, or accept rules as the frequent fallback?
+2. **Router timeout.** The model router missed its 400 ms budget on 2 of 6 live calls (404 and 418 ms) and fell back to rules. Raise `router.decisionTimeoutMs` to about 600 ms, or accept rules as the frequent fallback? (Answered; done in Step 12.3.)
 3. **"Delete all data".** It currently also removes saved API keys and resets settings. Is that what you want, or should keys and preferences survive it?
 4. **Local only.** It currently turns off only the router's model call, as the spec says. Save's entity extraction still calls the Fast model because you clicked an action. Should Local only also skip that?
 5. **Packaging.** The `electron-builder` config (helper output into `resources/helper`, `asarUnpack` for sqlite-vec and onnxruntime) isn't written. Do it before Phase 2, or when testers are lined up?

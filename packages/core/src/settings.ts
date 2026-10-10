@@ -62,7 +62,7 @@ export const SettingsSchema = z.object({
     .object({
       slotThreshold: z.number().min(0).max(1).default(0.5),
       moreThreshold: z.number().min(0).max(1).default(0.2),
-      decisionTimeoutMs: z.number().int().min(50).default(400),
+      decisionTimeoutMs: z.number().int().min(50).default(600),
     })
     .prefault({}),
 
@@ -107,6 +107,21 @@ export type SettingsKey = keyof Settings;
 export const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
 
 export const DEFAULT_COLLECTIONS = ['Notes', 'Reading', 'Ideas', 'People notes'] as const;
+
+/**
+ * One-time changes to stored values, applied in order and tracked in meta
+ * `settings_migrations`. Settings are stored per key, so a changed default only reaches users
+ * who still have the old default through one of these. Each returns the new value for its key,
+ * or undefined to leave it.
+ */
+export const SETTINGS_MIGRATIONS: { key: SettingsKey; migrate: (stored: unknown) => unknown }[] = [
+  // Oct 10: the router's decision budget went from 400 to 600 ms (400 timed out too often).
+  {
+    key: 'router',
+    migrate: (r) =>
+      r && typeof r === 'object' && (r as { decisionTimeoutMs?: unknown }).decisionTimeoutMs === 400 ? { ...r, decisionTimeoutMs: 600 } : undefined,
+  },
+];
 
 /** Parses a partial or stale stored object, keeping valid keys and defaulting the rest. */
 export function parseSettings(raw: Record<string, unknown>): Settings {

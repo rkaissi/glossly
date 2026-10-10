@@ -1,4 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
 import { canonicalize, Store } from './store';
@@ -33,6 +36,35 @@ describe('Store', () => {
     expect(s.localOnly).toBe(true);
     expect(s.appModes).toEqual({ 'slack.exe': 'hotkey' });
     expect(s.hotkey).toBe(DEFAULT_SETTINGS.hotkey);
+  });
+
+  it('moves a stored router timeout of exactly 400 ms to 600 ms, once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glossly-store-'));
+    const path = join(dir, 'g.db');
+    try {
+      const router = (ms: number) => ({ ...DEFAULT_SETTINGS.router, decisionTimeoutMs: ms });
+      // A database from before the migration existed.
+      store = new Store(path);
+      store.setSetting('router', router(400));
+      store.db.prepare("DELETE FROM meta WHERE key = 'settings_migrations'").run();
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().router.decisionTimeoutMs).toBe(600);
+      // A 400 the user picks afterwards is kept.
+      store.setSetting('router', router(400));
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().router.decisionTimeoutMs).toBe(400);
+      // Any other stored value is left alone.
+      store.setSetting('router', router(450));
+      store.db.prepare("DELETE FROM meta WHERE key = 'settings_migrations'").run();
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().router.decisionTimeoutMs).toBe(450);
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('stores items with entities and deletes orphans with the item', () => {
