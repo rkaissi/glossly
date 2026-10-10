@@ -453,7 +453,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
    - `NAME_PAIR` is any two capitalized words, and `\s` matches newlines, so Discord's stacked button labels become "Edit Edit" and "Forward Forward". "Add Reaction" is a pair. Outlook's "Reactions" and "Reply" become "Reactions Reply". "Cc" after a hyphenated surname becomes "Morgan Cc".
    - Hyphens aren't part of a name token, so "Alex Hale-Morgan" also yields "Alex Hale".
    - `NAME_EMAIL` requires the address immediately after the name, so `Maya Chen (mc)<maya.chen@example.com>` does not link. The address survives only as a bare email, and the cap of 6 (`MAX_PEOPLE`) fills with junk before Maya, Lena Ortiz, and Sam Okonkwo.
-   - The last `From:` line is the author. That line is Alex, and `isMe` only accepts the exact Profile name or a one-word first name, so "Alex Hale-Morgan" is a new person. "Alex H" and `@alexmorgan` don't match "Alex Morgan" either.
+   - The last `From:` line is the author. That line is Alex, and `isMe` only accepts the exact Profile name or a one-word first name, so "Alex Hale-Morgan" is a new person. "Alex M" and `@alexmorgan` don't match "Alex Morgan" either.
    - A Discord speaker on their own line ("quinn") with the time on the next line is not a chat header. The `@quinn` in the window title is never read. `HANDLE` only sees `@name` in the selection text.
 
    **Model or regex.** Use the model as the reader when one is available, and code as the judge. A tighter regex can refuse "Add Reaction" and still cannot prefill "recruiter at Northwind, colleague who follows up" or keep Lena and Sam while dropping the button row. A model with no judge will invent people and is unavailable under Local only. Save's `save_entities` call is not this call: it runs only after a save, and its schema is `kind` plus `name`.
@@ -463,7 +463,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
    Code after the model, before anything is shown:
    - Drop confidence under 0.7.
    - Drop a row whose name, email, and handle are all absent from the captured text. `evidence` has to be a substring. This is what stops invented people.
-   - Drop the user. Widen `isMe`: exact name; a single token equal to the first name; first name plus the last name or its initial, extra middle tokens allowed ("Alex", "Alex H", "Alex Hale-Morgan" all match Profile "Alex Morgan"); any Profile email; any Profile handle (`@alexmorgan`).
+   - Drop the user. Widen `isMe`: exact name; a single token equal to the first name; first name plus the last name or its initial, extra middle tokens allowed ("Alex", "Alex M", "Alex Hale-Morgan" all match Profile "Alex Morgan"); any Profile email; any Profile handle (`@alexmorgan`).
    - Merge fragments in one result to the longest form. "Sam", "Sam Smith", and "Smith" from one "Sam Smith" are one chip.
    - If the text contains an email or an `@handle`, the result must include it, attached to the neighboring name when there is one (`(cw)` and similar between the name and the address don't break the link).
    - Cap at 8 after filtering, not before.
