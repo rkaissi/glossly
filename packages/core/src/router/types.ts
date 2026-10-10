@@ -62,7 +62,13 @@ export type ContextualAction = (typeof CONTEXTUAL_ACTIONS)[number];
 export const EMPTY_ACTIONS = ['search', 'paste_list', 'paste_summary'] as const;
 export type EmptyAction = (typeof EMPTY_ACTIONS)[number];
 
-/** Everything that competes for slots 3 and 4 under the slot rule. */
+/**
+ * Everything that competes for slots 3 and 4 under the slot rule (`rankSlots`): the top two
+ * above `router.slotThreshold` get the slots, the rest above `router.moreThreshold` go under
+ * More, and there is never a third visible slot. To add an action (todo, calendar, ...), add
+ * it to one of the lists above and give it a 0 to 1 score in `scoreActions` or
+ * `scoreEmptyActions`; nothing else decides where it shows.
+ */
 export type BarAction = ContextualAction | EmptyAction;
 
 export interface ScoredAction {

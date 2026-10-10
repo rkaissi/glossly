@@ -447,6 +447,14 @@ A review of the 15.5 commits, with fixes. 345 unit tests pass; `pnpm typecheck` 
 - **Recall hits in the Ask prompt** landed in 16.1 (the top 3, or the cards picked with "Ask about these").
 - The preload's push-channel list is now a `Record<PushChannel, true>`, so a new push channel that isn't listed fails typecheck instead of throwing in the renderer.
 
+### Step 16.5: one slot rule for every action (Oct 10)
+
+357 unit tests pass; `pnpm typecheck` is clean.
+
+- `rankSlots` (`router/slots.ts`, added in 16.2) is the one rule: the top two scores above `router.slotThreshold` (0.5) take slots 3 and 4, the rest above `router.moreThreshold` (0.2) go under More, ties keep the listed order, and there is never a third visible slot. The contextual actions (`scoreActions`) and the empty-bar actions (`scoreEmptyActions`: Search, Paste recent, Paste a summary) both go through it. A new test pins it with seven actions scoring high.
+- To add an action later (Step 21's todo and calendar): add its id to `CONTEXTUAL_ACTIONS` or `EMPTY_ACTIONS` in `router/types.ts` and give it a 0 to 1 score; the bar, More, the keyboard map, and the Step 15.5.2 "a shown button stays" merge all follow. The comment on `BarAction` says so.
+- Recall stays a badge, not a slot (spec).
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

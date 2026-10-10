@@ -6,7 +6,7 @@ import { extractFeatures } from './features';
 import { formatDecisionPrompt, LlmStructuredDecision } from './llm-decision';
 import { Router } from './router';
 import { decideByRules, ruleCollection } from './rules';
-import { assignSlots, scoreActions } from './slots';
+import { assignSlots, rankSlots, scoreActions } from './slots';
 import type { DecisionProvider, Decisions, SelectionContext } from './types';
 
 const collections = [...DEFAULT_COLLECTIONS];
@@ -127,6 +127,14 @@ describe('slots', () => {
     expect(s.more.map((m) => m.action)).toEqual(['promises']);
     const none = assignSlots({ ...base, authored_by_other: 0.1, mentions_people: 0.1, contains_commitment: 0.1 }, f, DEFAULT_SETTINGS.router);
     expect([none.slot3, none.slot4, none.more]).toEqual([null, null, []]);
+  });
+
+  it('never shows a third slot, however many actions score high, and drops the ones under the More bar', () => {
+    const scores = { reply: 0.95, who: 0.9, promises: 0.85, visualize: 0.7, search: 0.6, paste_list: 0.15, paste_summary: 0.55 };
+    const order = ['reply', 'who', 'promises', 'visualize', 'search', 'paste_list', 'paste_summary'] as const;
+    const s = rankSlots(scores, order, DEFAULT_SETTINGS.router);
+    expect([s.slot3?.action, s.slot4?.action]).toEqual(['reply', 'who']);
+    expect(s.more.map((m) => m.action)).toEqual(['promises', 'visualize', 'search', 'paste_summary']);
   });
 
   it('breaks ties in a stable order', () => {
