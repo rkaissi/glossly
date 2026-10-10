@@ -4,7 +4,7 @@ Read this first (and `AGENTS.md` for the standing working rules), then `docs/Hig
 
 ## Scope
 
-Build Phases 0 and 1 of the spec, then stop for review. Commit to `main` as each milestone chunk lands. At the end, write `STATUS.md` (spec: "Instructions for the coding agent", item 8).
+Build Phases 0 and 1 of the spec, then stop for review. Commit to `main` as each milestone chunk lands. At the end, write `STATUS.md` (spec: "Instructions for the coding agent", item 8). **Status: Phases 0 and 1 are built and written up in `STATUS.md`; waiting on Rayan's review and hand tests.**
 
 Spec sections that matter for this scope: Core user flow (incl. Coexisting with app selection toolbars), Architecture and stack, Capture layer, Router and action bar, Actions (Ask and Save only for Phase 1), Data model, Model providers, Privacy and safety rules, Milestones (Phase 0 and 1). People layer, Reply, Recall, and Visualize are later phases; keep the design compatible with them but don't build them.
 
@@ -168,6 +168,13 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - `ERROR [overlay] overlay renderer gone {"reason":"crashed"}` and `WARN [embed] worker exited` in the log at 13:37 UTC come from `Stop-Process` killing the app's child processes during a restart, not from a real crash.
 - Machine state: a `pnpm build` of this commit is running against Rayan's real data; a sample-message tab was left open (unsaved) in his Notepad.
 
+### Step 11: Write-up (Oct 10, complete)
+
+- `STATUS.md` (repo root): a summary, how to run, the Phase 0 and Phase 1 checklists with a status per item, the eval numbers, capture results so far, the decisions above in plain terms, what's verified live and what isn't, known rough edges, and the open questions below. Keep it updated at the end of each phase (spec: "Instructions for the coding agent", item 8).
+- `evals/capture.md`: instructions plus two tables for Rayan to fill in by hand. The capture table covers Chrome, Edge, Slack, Discord, Outlook web, VS Code, and Notepad, with columns for drag, double-click, hotkey, method, clipboard restore, tier 2, pill hiding, and pill ms. The toolbar table covers Notion, Google Docs, Word, and Slack's composer. Notepad is pre-filled from the agent's Oct 10 runs. Everything it tells Rayan to read comes from the debug view (`method`, and `total` and `tier2 1/0` in the timings line).
+- Checked for the write-up, read-only: Rayan's DB has 2 items with 4 linked entities, so Save's entity extraction has run live (counts only were read). Ask passes `related: []` in `capture.ts`; saved-note citations wait for Recall (Phase 3).
+- No code changed; nothing was run against the desktop.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
@@ -181,7 +188,8 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
    - Expand: tier-1 `context`, then `Router.quick` to paint, then `Router.route` to fill slots 3 and 4.
    - Keys: one `safeStorage`-encrypted file per provider in userData. Embeddings run in a `utilityProcess` using `@glossly/core/embed`. Store at `userData/glossly.db`. IPC uses `contextIsolation` with a preload `contextBridge`.
 4. ~~**UI**~~ (done: overlay in Step 7, settings window and first-run setup with the Try-it capture change in Step 8; Ask streaming verified live in Step 8).
-5. **Next: write up.** ~~Run `pnpm typecheck`, `pnpm test`, and `pnpm dev`~~ (done, see Step 9; the taskbar fix is Step 10). Write `STATUS.md` at the repo root (spec: "Instructions for the coding agent", item 8): what Phases 0 and 1 deliver against the spec's milestone checklists, the decisions above, what's verified live and what isn't (see Steps 6 to 8), and the open questions below (include the Step 9 and 10 fixes in "verified"). Also write `evals/capture.md`, a per-app pass/fail table for Rayan to fill in by hand (Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, with columns for whether selection and tier-2 context work, plus toolbar overlap in Notion, Google Docs, Word, and Slack's composer). Commit. Don't run `pnpm eval` unless Rayan asks.
+5. ~~Write up~~ (done, see Step 11: `STATUS.md` and `evals/capture.md`).
+6. **Next: Rayan's review.** Phases 0 and 1 stop here. Waiting on Rayan to fill in `evals/capture.md` and answer the open questions below. Then fix what the hand tests turn up (likely candidates: apps where UIA reads nothing, `popups_near` misplacing the pill next to a real toolbar, additions to `DEFAULT_HOTKEY_ONLY`), apply his answers (pill speed, router timeout, delete-all scope, local-only scope), record the results in `STATUS.md`, and only then start Phase 2. Don't run `pnpm eval` unless Rayan asks.
 
 ## Open questions for Rayan (note in STATUS.md)
 
@@ -190,6 +198,7 @@ All under `packages/core/`. Imports are extensionless (bundler resolution). Prom
 - "Delete all data" now also removes the saved API keys and resets settings (decision 10). Is that the intended meaning, or should keys and preferences survive it?
 - Packaging (`electron-builder` config: helper publish output into `resources/helper`, `asarUnpack` for sqlite-vec and onnxruntime) is not written yet.
 - "Local only" currently means only the router's model call is disabled, as the spec says. Save's entity extraction (Fast model) still runs because the user clicked an action. Should local-only also skip it?
+- May the agent run `pnpm eval` once to score the tuned router prompt (Step 5)? If slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection`.
 
 ## Things Rayan has to do himself
 
