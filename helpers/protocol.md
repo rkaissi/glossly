@@ -104,25 +104,36 @@ Result: `{"handle": int, "pid": int, "process_name": "slack.exe", "title": strin
 
 ### `popups_near`
 
-Lists popup windows and toolbar or menu elements near a selection, so the pill can avoid them. Budget: about 80 ms.
+Lists popup windows and toolbar or menu elements near a selection, so the pill can avoid them. The app calls it repeatedly (every 30 to 40 ms) while it waits for a selection toolbar, so it is kept cheap: the window scan and the UIA probes run in parallel, the probes use a UIA cache request (one cross-process call per element), and anything not done after 80 ms is dropped.
 
 | Arg | Notes |
 | --- | --- |
 | `bounds` | Required rect: the selection bounds |
 | `exclude_pids` | Optional int array: the app's own processes |
-| `all_windows` | Optional bool, default false. Lists popup-like windows screen-wide and regardless of z-order (the UIA probes still run around `bounds`). The app takes this snapshot at `mouse_down` as a baseline, so obstacles that were already on screen before the selection are not counted |
+| `all_windows` | Optional bool, default false. Lists popup-like windows screen-wide and regardless of z-order (the UIA probes still run around `bounds`). This is what the `baseline` snapshot uses |
 
 Result: `{"popups": [{"source", "kind", "bounds", "id", "class_name", "process_name"}]}`.
 
 | Field | Notes |
 | --- | --- |
-| `source` | `window` (a top-level window) or `uia` (an element found by probing 18 and 42 px above and below the selection) |
+| `source` | `window` (a top-level window) or `uia` (an element found by probing 18 px above and below the selection, at its center and at its start and end) |
 | `kind` | `popup_window`, `tool_window`, `toolbar`, `menu`, or `tooltip` |
 | `id` | Stable identity for diffing against the baseline: `w:<hwnd>` for windows, `u:<runtime id>` for UIA elements, `""` if the provider has none |
 | `class_name` | Window class or UIA class name, at most 60 characters. An identifier, never window or element text |
 | `process_name` | Owner process, as in `foreground` |
 
 Windows are counted when they are visible, not cloaked, popup-like (`WS_POPUP`, tool window, or topmost), not click-through (`WS_EX_TRANSPARENT`), 8 to 1400 by 8 to 700 px, and within 200 px sideways and 160 px vertically of `bounds`. Without `all_windows`, only windows above the foreground window in z-order count, since anything behind it cannot cover the selection. The app decides which side of the selection each popup is on.
+
+### `baseline`
+
+The obstacles that were on screen at the latest left `mouse_down`, so the app can ignore app chrome and unrelated windows and count only toolbars that appeared for this selection. While `mouse_hook` is on, the helper takes this snapshot by itself on every left press, on a background thread (it never delays other requests): `popups_near` with `all_windows` around a 2x20 px rect at the press point. The second press of a double-click (within the system double-click time and 4 px) keeps the first press's snapshot.
+
+| Arg | Default | Notes |
+| --- | --- | --- |
+| `exclude_pids` | | Optional int array: the app's own processes, left out of the result |
+| `wait_ms` | 150 | 0 to 1000. How long to wait if the snapshot for the latest press is still being taken |
+
+Result: `{"available": bool, "popups": [...], "age_ms": int, "ms": int}`. `popups` has the same shape as in `popups_near`. `available` is false before the first press, or if the snapshot was not ready within `wait_ms`. `age_ms` is how long ago it was taken and `ms` how long it took.
 
 ### `copy_fallback`
 

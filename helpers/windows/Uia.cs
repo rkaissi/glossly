@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text.Json.Serialization;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
@@ -7,6 +7,7 @@ using FlaUI.Core.Definitions;
 using FlaUI.Core.Patterns;
 using FlaUI.UIA3;
 using static Glossly.Helper.Win32;
+using UIA = Interop.UIAutomationClient;
 
 namespace Glossly.Helper;
 
@@ -20,7 +21,11 @@ internal sealed record SelectionResult(string Text, string Method, Rect? Bounds,
 internal sealed record ContextResult(string Before, string After);
 internal sealed record ContainerResult(string Text, int SelectionStart, int SelectionLength, string Source, string ContainerType);
 /// <summary>An obstacle near the selection. Id, class, and process are identifiers only, never window or element text.</summary>
-internal sealed record Popup(string Source, string Kind, Rect Bounds, string Id, string ClassName, string ProcessName);
+internal sealed record Popup(string Source, string Kind, Rect Bounds, string Id, string ClassName, string ProcessName)
+{
+    /// <summary>Owner process, for filtering the baseline; not sent.</summary>
+    [JsonIgnore] public int Pid { get; init; }
+}
 
 /// <summary>
 /// UI Automation reads. Must be used from one MTA thread (the main thread, which processes
@@ -241,7 +246,27 @@ internal sealed class Uia : IDisposable
     /// </summary>
     public List<Popup> PopupsNear(Rect sel, HashSet<int> excludePids, bool allWindows)
     {
-        var sw = Stopwatch.StartNew();
+        // In-page toolbars (Google Docs, Notion, web apps) are not separate windows, so they are
+        // probed through UIA, in parallel with the window scan. Each probe is about 8 to 18 px
+        // outside the selection, where a toolbar about 40 px tall that sits next to it overlaps.
+        int cx = sel.X + sel.W / 2;
+        var points = new[]
+        {
+            new Point(cx, sel.Y - 18), new Point(cx, sel.Y + sel.H + 18),
+            new Point(sel.X + 10, sel.Y - 18), new Point(sel.X + sel.W - 10, sel.Y + sel.H + 18),
+        };
+        var probes = points.Select(p => Task.Run(() => Probe(p, excludePids))).ToArray();
+
+        var found = ListWindows(sel, excludePids, allWindows);
+        Task.WaitAll(probes, PopupBudgetMs);
+        var seen = new HashSet<Rect>(found.Select(f => f.Bounds));
+        foreach (var t in probes)
+            if (t.IsCompletedSuccessfully && t.Result is { } hit && seen.Add(hit.Bounds)) found.Add(hit);
+        return found;
+    }
+
+    private List<Popup> ListWindows(Rect sel, HashSet<int> excludePids, bool allWindows)
+    {
         var found = new List<Popup>();
         var fg = GetForegroundWindow();
         var region = new Rect(sel.X - 200, sel.Y - 160, sel.W + 400, sel.H + 320);
@@ -275,55 +300,68 @@ internal sealed class Uia : IDisposable
             GetWindowThreadProcessId(h, out uint pid);
             if (excludePids.Contains((int)pid)) return true;
             var kind = (ex & WS_EX_TOOLWINDOW) != 0 ? "tool_window" : "popup_window";
-            found.Add(new Popup("window", kind, rect, $"w:{h.ToInt64()}", Clip(cls), Proc((int)pid)));
+            found.Add(new Popup("window", kind, rect, $"w:{h.ToInt64()}", Clip(cls), Proc((int)pid)) { Pid = (int)pid });
             return true;
         }, IntPtr.Zero);
+        return found;
+    }
 
-        // In-page toolbars (Google Docs, Notion, web apps) are not separate windows.
-        int cx = sel.X + sel.W / 2;
-        var probes = new[]
+    private const int UIA_RuntimeIdPropertyId = 30000;
+    private const int UIA_BoundingRectanglePropertyId = 30001;
+    private const int UIA_ProcessIdPropertyId = 30002;
+    private const int UIA_ControlTypePropertyId = 30003;
+    private const int UIA_ClassNamePropertyId = 30012;
+    private const int UIA_MenuControlTypeId = 50009;
+    private const int UIA_MenuBarControlTypeId = 50010;
+    private const int UIA_ToolBarControlTypeId = 50021;
+    private const int UIA_ToolTipControlTypeId = 50022;
+    private const int UIA_DocumentControlTypeId = 50030;
+    private const int UIA_WindowControlTypeId = 50032;
+
+    /// <summary>
+    /// The toolbar, menu, or tooltip at <paramref name="p"/> or up to 5 parents above it. Uses
+    /// the raw UIA interface with a cache request, so each element costs one cross-process call
+    /// instead of one per property. Safe to call from several MTA threads at once.
+    /// </summary>
+    private Popup? Probe(Point p, HashSet<int> excludePids)
+    {
+        try
         {
-            new Point(cx, sel.Y - 18), new Point(cx, sel.Y + sel.H + 18),
-            new Point(cx, sel.Y - 42), new Point(cx, sel.Y + sel.H + 42),
-            new Point(sel.X + 10, sel.Y - 18), new Point(sel.X + sel.W - 10, sel.Y + sel.H + 18),
-        };
-        var seen = new HashSet<Rect>(found.Select(f => f.Bounds));
-        foreach (var p in probes)
-        {
-            if (sw.ElapsedMilliseconds > PopupBudgetMs) break;
-            var hit = Safe(() => _automation.FromPoint(p));
-            var el = hit;
+            var native = _automation.NativeAutomation;
+            var cache = native.CreateCacheRequest();
+            foreach (var id in new[] { UIA_RuntimeIdPropertyId, UIA_BoundingRectanglePropertyId, UIA_ProcessIdPropertyId, UIA_ControlTypePropertyId, UIA_ClassNamePropertyId })
+                cache.AddProperty(id);
+            var walker = native.ControlViewWalker;
+            var el = native.ElementFromPointBuildCache(new UIA.tagPOINT { x = p.X, y = p.Y }, cache);
             for (int i = 0; el != null && i < 6; i++)
             {
-                var ct = Safe(() => el.ControlType);
+                int ct = el.CachedControlType;
                 string? kind = ct switch
                 {
-                    ControlType.ToolBar => "toolbar",
-                    ControlType.Menu => "menu",
-                    ControlType.MenuBar => "menu",
-                    ControlType.ToolTip => "tooltip",
+                    UIA_ToolBarControlTypeId => "toolbar",
+                    UIA_MenuControlTypeId or UIA_MenuBarControlTypeId => "menu",
+                    UIA_ToolTipControlTypeId => "tooltip",
                     _ => null,
                 };
                 if (kind != null)
                 {
-                    var b = Safe(() => el.BoundingRectangle);
-                    var rect = Rect.From(b);
-                    int pid = Safe(() => el.Properties.ProcessId.ValueOrDefault);
-                    if (!rect.IsEmpty && rect.H < 300 && !excludePids.Contains(pid) && seen.Add(rect))
-                    {
-                        var rid = Safe(() => el.Properties.RuntimeId.ValueOrDefault);
-                        var id = rid is { Length: > 0 } ? "u:" + string.Join(".", rid) : "";
-                        var cls = Safe(() => el.Properties.ClassName.ValueOrDefault) ?? "";
-                        found.Add(new Popup("uia", kind, rect, id, Clip(cls), pid > 0 ? Proc(pid) : "unknown"));
-                    }
-                    break;
+                    var b = el.CachedBoundingRectangle;
+                    var rect = new Rect(b.left, b.top, b.right - b.left, b.bottom - b.top);
+                    int pid = el.CachedProcessId;
+                    if (rect.IsEmpty || rect.H >= 300 || excludePids.Contains(pid)) return null;
+                    var rid = el.GetCachedPropertyValue(UIA_RuntimeIdPropertyId) as int[];
+                    var id = rid is { Length: > 0 } ? "u:" + string.Join(".", rid) : "";
+                    var cls = el.CachedClassName ?? "";
+                    return new Popup("uia", kind, rect, id, Clip(cls), pid > 0 ? Focus.ProcessName(pid) : "unknown") { Pid = pid };
                 }
-                if (ct is ControlType.Window or ControlType.Document) break;
-                var cur = el;
-                el = Safe(() => _walker.GetParent(cur));
+                if (ct is UIA_WindowControlTypeId or UIA_DocumentControlTypeId) return null;
+                el = walker.GetParentElementBuildCache(el, cache);
             }
         }
-        return found;
+        catch (Exception e) when (e is COMException or InvalidCastException or ArgumentException)
+        {
+        }
+        return null;
     }
 
     private static bool Intersects(Rect a, Rect b) =>

@@ -1,0 +1,41 @@
+{
+  "cmd": "baseline",
+  "cases": [
+    {
+      "name": "before any press",
+      "request": { "id": 1, "cmd": "baseline", "wait_ms": 0 },
+      "response": { "id": 1, "ok": true, "result": { "available": false, "popups": [], "age_ms": 0, "ms": 0 } }
+    },
+    {
+      "name": "snapshot from the last left press",
+      "request": { "id": 12, "cmd": "baseline", "exclude_pids": [4410, 4412], "wait_ms": 150 },
+      "response": {
+        "id": 12,
+        "ok": true,
+        "result": {
+          "available": true,
+          "popups": [
+            {
+              "source": "window",
+              "kind": "popup_window",
+              "bounds": { "x": 1500, "y": 40, "w": 360, "h": 220 },
+              "id": "w:722110",
+              "class_name": "Chrome_WidgetWin_1",
+              "process_name": "spotify.exe"
+            },
+            {
+              "source": "uia",
+              "kind": "menu",
+              "bounds": { "x": 12, "y": 60, "w": 200, "h": 41 },
+              "id": "u:42.330120.4.1",
+              "class_name": "",
+              "process_name": "notepad.exe"
+            }
+          ],
+          "age_ms": 412,
+          "ms": 31
+        }
+      }
+    }
+  ]
+}

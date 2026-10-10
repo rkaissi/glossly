@@ -18,6 +18,7 @@ internal static class Program
     {
         Output.Start();
         using var uia = new Uia();
+        Baseline.Start(uia);
         using var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
 
         Output.Event("ready", new { Version, Protocol = ProtocolVersion, Pid = Environment.ProcessId });
@@ -68,6 +69,7 @@ internal static class Program
         "context_container" => uia.ContextContainer(Int(req, "max_chars", 8_000, 100, 50_000)),
         "foreground" => Focus.Foreground(),
         "popups_near" => new { Popups = uia.PopupsNear(RectArg(req, "bounds"), PidsArg(req, "exclude_pids"), OptBool(req, "all_windows")) },
+        "baseline" => Baseline.Get(PidsArg(req, "exclude_pids"), Int(req, "wait_ms", 150, 0, 1_000)),
         "copy_fallback" => CopyFallback(uia, Int(req, "timeout_ms", 120, 10, 2_000)),
         "restore_focus" => Focus.Restore(Long(req, "handle")),
         "paste" => Paste(Str(req, "text"), Int(req, "settle_ms", 250, 0, 2_000)),

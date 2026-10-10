@@ -11,18 +11,24 @@ import {
   gateApp,
   gateAutoSelection,
   isoNow,
+  learnKeyFor,
+  learnToolbarWait,
   mayCopyFallback,
+  pillWait,
   placeBar,
   placePill,
+  pollForToolbar,
   siteKeyFor,
   type ActionId,
   type AppMode,
   type AskErrorEvent,
+  type ClassifiedObstacle,
   type CommandResult,
   type ContainerContext,
   type HelperEvent,
   type ObstacleDebug,
   type OverlayState,
+  type PillTiming,
   type Placement,
   type Point,
   type Rect,
@@ -66,14 +72,16 @@ interface Session {
   timings: Record<string, number>;
   placement: Placement['side'] | null;
   obstacles: ObstacleDebug[];
+  pill: PillTiming | null;
 }
 
-type Popups = CommandResult<'popups_near'>['popups'];
+/** How long the auto path waits for the helper's mouse-down snapshot if it is still being taken. */
+const BASELINE_WAIT_MS = 100;
 
 /** Synthetic obstacles above and below the selection, for checking the dot by hand (dev builds only). */
 const FORCE_DOT = !app.isPackaged && process.env.GLOSSLY_FORCE_DOT === '1';
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const ms = (t: number) => Math.round(performance.now() - t);
 
 function toDipRect(r: Rect): Rect {
@@ -116,8 +124,6 @@ export class Capture {
   private inputWatch = false;
   /** Set while focus is handed to the source app to read tier 2 on the hotkey path. */
   private bouncing = false;
-  /** Obstacles on screen at the last left mouse-down, so the pill ignores what was already there. */
-  private baseline: Promise<Popups | null> | null = null;
   /** The session whose pill or dot is expanding (tier 1 is being read). */
   private expanding: Session | null = null;
 
@@ -174,7 +180,6 @@ export class Capture {
       case 'mouse_down': {
         this.autoGen++;
         const inside = this.overlay.isVisible && contains(this.overlay.hitBounds(), toDipPoint(ev));
-        if (ev.button === 'left' && !inside) this.takeBaseline(ev);
         if (!this.overlay.isVisible || this.overlay.hasFocus) return;
         if (!inside) this.close('click_outside');
         return;
@@ -198,28 +203,17 @@ export class Capture {
   // ---- auto pill path ----
 
   /**
-   * Snapshots the obstacles on screen when a selection may be starting: every popup-like
-   * window, plus the toolbar probes around the press point. A selection toolbar appears only
-   * after this, so popups_near results that match the snapshot are app chrome, not toolbars.
+   * The auto pill: read the selection, then check for the app's own selection toolbar from
+   * about 100 ms after mouse-up until the app's wait is over (full where toolbars are known or
+   * learned, short elsewhere), and show at once on the side away from any toolbar found. The
+   * pill is placed once and never moves.
    */
-  private takeBaseline(press: Point): void {
-    if (!this.helper.isReady) {
-      this.baseline = null;
-      return;
-    }
-    this.baseline = this.helper
-      .request('popups_near', { bounds: cursorRect(press), exclude_pids: [...this.ownPids()], all_windows: true })
-      .then((r) => r.popups)
-      .catch(() => null);
-  }
-
   private async autoTrigger(physical: Point, p: Point): Promise<void> {
     const gen = ++this.autoGen;
     const t0 = performance.now();
     const timings: Record<string, number> = {};
     const stale = () => gen !== this.autoGen;
     const settings = this.settings;
-    const baseline = this.baseline;
     try {
       let t = performance.now();
       const fg = await this.helper.request('foreground');
@@ -234,22 +228,45 @@ export class Capture {
       if (stale()) return;
       if (!gateAutoSelection(sel, appId, settings).ok) return;
 
-      const wait = settings.capture.pillDelayMs - (performance.now() - t0);
-      if (wait > 0) await sleep(wait);
-      timings.wait = Math.max(0, Math.round(wait));
+      // What was on screen at this selection's mouse-down, taken by the helper on its own.
+      t = performance.now();
+      const exclude = [...this.ownPids()];
+      const base = await this.helper.request('baseline', { exclude_pids: exclude, wait_ms: BASELINE_WAIT_MS }).catch(() => null);
+      const before = base?.available ? base.popups : null;
+      timings.baseline = ms(t);
       if (stale()) return;
 
       const physBounds = sel.bounds ?? cursorRect(physical);
-      t = performance.now();
-      const popups = await this.helper
-        .request('popups_near', { bounds: physBounds, exclude_pids: [...this.ownPids()] })
-        .catch(() => ({ popups: [] }));
-      const before = baseline ? await baseline : null;
-      timings.popups_near = ms(t);
-      if (stale()) return;
+      const wait = pillWait(appId, settings);
+      const find = async () => {
+        const r = await this.helper.request('popups_near', { bounds: physBounds, exclude_pids: exclude }).catch(() => ({ popups: [] }));
+        return classifyObstacles(r.popups, before, physBounds);
+      };
+      let classified: ClassifiedObstacle[] = [];
+      let checksMs = 0;
+      const check = async () => {
+        const tc = performance.now();
+        classified = await find();
+        timings.popups_near = ms(tc);
+        checksMs += timings.popups_near;
+        return FORCE_DOT || classified.some((o) => o.status === 'new');
+      };
+      const poll = await pollForToolbar({
+        t0,
+        waitMs: wait.ms,
+        firstMs: settings.capture.pollStartMs,
+        intervalMs: settings.capture.pollIntervalMs,
+        check,
+        stale,
+        now: () => performance.now(),
+        sleep,
+      });
+      if (!poll) return;
+      timings.wait = poll.slept;
+      timings.polls = poll.polls;
+      timings.popups_total = checksMs;
 
       const bounds = toDipRect(physBounds);
-      const classified = classifyObstacles(popups.popups, before, physBounds);
       const obstacles = classified.filter((o) => o.status === 'new').map((o) => toDipRect(o.popup.bounds));
       if (FORCE_DOT) obstacles.push({ ...bounds, y: bounds.y - 80, h: 80 }, { ...bounds, y: bounds.y + bounds.h, h: 80 });
       const placement = placePill({
@@ -296,6 +313,7 @@ export class Capture {
         timings,
         placement: placement.side,
         obstacles: obstacleInfo,
+        pill: { wait_ms: wait.ms, reason: wait.reason, polls: poll.polls, found: poll.found, baseline: before !== null },
       };
       this.session = session;
       this.overlay.update(
@@ -315,6 +333,10 @@ export class Capture {
         method: sel.method,
         ms: timings.total,
         side: placement.side,
+        wait_ms: wait.ms,
+        wait_reason: wait.reason,
+        polls: poll.polls,
+        popups_ms: timings.popups_near ?? 0,
         baseline: before !== null,
         obstacles: obstacleInfo.filter((o) => o.status === 'new').length,
         ignored: obstacleInfo.filter((o) => o.status !== 'new').length,
@@ -328,7 +350,38 @@ export class Capture {
           obstacles: obstacleInfo.map((o) => `${o.source} ${o.kind} ${o.w}x${o.h} ${o.side} ${o.status} ${o.process_name} ${o.class_name}`),
         });
       }
+      log.info('pill shown', {
+        ms: timings.total,
+        side: placement.side,
+        wait_ms: wait.ms,
+        reason: wait.reason,
+        polls: poll.polls,
+        found: poll.found,
+        selection_ms: timings.selection,
+        baseline_ms: timings.baseline,
+        popups_ms: timings.popups_near,
+        baseline: before !== null,
+      });
       this.startWatch();
+
+      // Only the app's own new obstacles teach its wait (not, say, another app's notification).
+      const learnKey = wait.reason !== 'known' && session.siteKey !== null ? learnKeyFor(appId) : null;
+      const fromApp = (found: ClassifiedObstacle[]) => found.some((o) => o.status === 'new' && o.popup.process_name === fg.process_name);
+      if (learnKey && poll.found && fromApp(classified)) this.learnToolbar(learnKey, poll.at);
+      else if (learnKey && wait.ms < settings.capture.pillDelayMs) {
+        // The pill is up and never moves, but one check at the full wait teaches the next
+        // selection here to wait for a toolbar that shows up later than the short wait.
+        setTimeout(
+          () => {
+            if (!this.current(session.id)) return;
+            const started = ms(t0);
+            void find().then((late) => {
+              if (fromApp(late)) this.learnToolbar(learnKey, started);
+            });
+          },
+          Math.max(0, t0 + settings.capture.pillDelayMs - performance.now()),
+        );
+      }
     } catch (e) {
       if (!(e instanceof HelperError)) log.error('auto capture failed', errorInfo(e));
     }
@@ -443,6 +496,7 @@ export class Capture {
       timings,
       placement: null,
       obstacles: [],
+      pill: null,
     };
     this.session = session;
 
@@ -819,7 +873,16 @@ export class Capture {
       timings: { ...s.timings },
       placement: s.placement,
       obstacles: s.obstacles,
+      pill: s.pill,
     };
+  }
+
+  /** Stores, per app or site, how soon after mouse-up its selection toolbar showed. */
+  private learnToolbar(key: string, seenMs: number): void {
+    const next = learnToolbarWait(this.settings.toolbarWaits, key, seenMs);
+    if (!next) return;
+    this.services.setSetting('toolbarWaits', next);
+    log.info('toolbar wait learned', { ms: next[key], site: /^[-|]/.test(key) });
   }
 
   /** The one-time notice (e.g. a role's model went away), cleared once shown. */

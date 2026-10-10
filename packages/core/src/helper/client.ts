@@ -30,6 +30,7 @@ export const DEFAULT_TIMEOUTS: Record<CommandName, number> = {
   context_container: 3000,
   foreground: 1000,
   popups_near: 1500,
+  baseline: 1500,
   copy_fallback: 2500,
   restore_focus: 2000,
   paste: 4000,

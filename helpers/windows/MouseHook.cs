@@ -121,6 +121,7 @@ internal static class MouseHook
         {
             case WM_LBUTTONDOWN:
                 _downPt = pt;
+                Baseline.OnPress(pt, info.time);
                 Output.Event("mouse_down", new { X = pt.X, Y = pt.Y, Button = "left" });
                 break;
             case WM_RBUTTONDOWN:

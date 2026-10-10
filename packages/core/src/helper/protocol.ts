@@ -20,6 +20,15 @@ export type HelperErrorCode = z.infer<typeof ErrorCodeSchema>;
 
 const Enabled = z.object({ enabled: z.boolean() });
 
+const PopupSchema = z.object({
+  source: z.enum(['window', 'uia']),
+  kind: z.enum(['popup_window', 'tool_window', 'toolbar', 'menu', 'tooltip']),
+  bounds: RectSchema,
+  id: z.string(),
+  class_name: z.string(),
+  process_name: z.string(),
+});
+
 export const Commands = {
   ping: {
     args: z.object({}),
@@ -67,17 +76,15 @@ export const Commands = {
       exclude_pids: z.array(z.number().int()).optional(),
       all_windows: z.boolean().optional(),
     }),
+    result: z.object({ popups: z.array(PopupSchema) }),
+  },
+  baseline: {
+    args: z.object({ exclude_pids: z.array(z.number().int()).optional(), wait_ms: z.number().int().optional() }),
     result: z.object({
-      popups: z.array(
-        z.object({
-          source: z.enum(['window', 'uia']),
-          kind: z.enum(['popup_window', 'tool_window', 'toolbar', 'menu', 'tooltip']),
-          bounds: RectSchema,
-          id: z.string(),
-          class_name: z.string(),
-          process_name: z.string(),
-        }),
-      ),
+      available: z.boolean(),
+      popups: z.array(PopupSchema),
+      age_ms: z.number().int(),
+      ms: z.number().int(),
     }),
   },
   copy_fallback: {

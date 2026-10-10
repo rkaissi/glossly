@@ -1,8 +1,21 @@
 import { useState } from 'react';
-import type { SelectionDebug, SlotsView } from '@glossly/core/api';
+import type { PillTiming, SelectionDebug, SlotsView } from '@glossly/core/api';
 
 const OPEN_KEY = 'glossly.debugOpen';
 const clip = (s: string, n: number, fromEnd = false) => (s.length <= n ? s : fromEnd ? `…${s.slice(-n)}` : `${s.slice(0, n)}…`);
+
+/** e.g. "shown at 131 ms · wait 100 ms (short) · 1 check, last 22 ms · toolbar found". */
+function pillLine(p: PillTiming, t: Record<string, number>): string {
+  return [
+    t.total !== undefined && `shown at ${t.total} ms`,
+    `wait ${p.wait_ms} ms (${p.reason})`,
+    `${p.polls} ${p.polls === 1 ? 'check' : 'checks'}${t.popups_near !== undefined ? `, last ${t.popups_near} ms` : ''}`,
+    p.found && 'toolbar found',
+    !p.baseline && 'no baseline',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 /** Captured text, method, timings, routing, and tier-1 context. Shown when settings.debugView is on. */
 export function Debug({ d, slots }: { d: SelectionDebug; slots: SlotsView | null }) {
@@ -32,6 +45,11 @@ export function Debug({ d, slots }: { d: SelectionDebug; slots: SlotsView | null
       </summary>
       <div>route: {route}</div>
       <div>timings: {timings || 'none'}</div>
+      {d.pill && (
+        <div>
+          pill wait: {pillLine(d.pill, d.timings)}
+        </div>
+      )}
       {d.placement && (
         <div>
           pill: {d.placement === 'end' ? 'dot' : d.placement} · obstacles: {d.obstacles.length === 0 && 'none'}

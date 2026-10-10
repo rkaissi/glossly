@@ -110,6 +110,11 @@ internal static class Win32
     [DllImport("kernel32.dll")] public static extern UIntPtr GlobalSize(IntPtr h);
     [DllImport("kernel32.dll")] public static extern IntPtr GlobalFree(IntPtr h);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr GetModuleHandle(string? name);
+    public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    [DllImport("kernel32.dll", SetLastError = true)] public static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder name, ref uint size);
 
     public static string WindowTitle(IntPtr hwnd)
     {

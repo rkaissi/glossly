@@ -16,8 +16,23 @@ internal static class Focus
         return new ForegroundResult(h.ToInt64(), (int)pid, ProcessName((int)pid), WindowTitle(h), ClassName(h));
     }
 
+    /// <summary>
+    /// Lower-case image name with ".exe". Uses the image path, which is cheap; Process.GetProcessById
+    /// snapshots every process on the system and is only the fallback.
+    /// </summary>
     public static string ProcessName(int pid)
     {
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, (uint)pid);
+        if (h != IntPtr.Zero)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder(1024);
+                uint size = (uint)sb.Capacity;
+                if (QueryFullProcessImageName(h, 0, sb, ref size)) return Path.GetFileName(sb.ToString()).ToLowerInvariant();
+            }
+            finally { CloseHandle(h); }
+        }
         try
         {
             using var p = Process.GetProcessById(pid);

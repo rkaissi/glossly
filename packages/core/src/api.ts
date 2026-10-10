@@ -6,6 +6,7 @@
  * refer to the current session by `sessionId`.
  */
 import type { ClassifiedObstacle, ObstacleStatus } from './capture/obstacles';
+import type { PillWaitReason } from './capture/pill-wait';
 import type { Placement } from './capture/placement';
 import type { EmbedProgress } from './embed/types';
 import type { CatalogModel } from './llm/catalog';
@@ -45,6 +46,19 @@ export interface SelectionDebug {
   placement: Placement['side'] | null;
   /** What popups_near found (auto path). Identifiers and sizes only, never text. */
   obstacles: ObstacleDebug[];
+  /** How the auto pill waited for a selection toolbar, or null on the hotkey path. */
+  pill: PillTiming | null;
+}
+
+export interface PillTiming {
+  /** The app's wait: the last toolbar check starts this long after mouse-up. */
+  wait_ms: number;
+  reason: PillWaitReason;
+  polls: number;
+  /** A new toolbar was found, so the pill went to the other side before the wait was over. */
+  found: boolean;
+  /** The helper's mouse-down snapshot was there to diff against. */
+  baseline: boolean;
 }
 
 export interface ObstacleDebug {

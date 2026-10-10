@@ -115,6 +115,8 @@ async function record() {
 
 // Cases whose response does not depend on screen state.
 const DETERMINISTIC = new Set([
+  // baseline.json is replayed first, before mouse_hook turns the hook on.
+  'baseline/before any press',
   'ping/pong',
   'errors/unknown command',
   'errors/invalid JSON',

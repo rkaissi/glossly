@@ -68,27 +68,35 @@ export interface AppIdentity {
   title: string;
 }
 
+/** Title-suffix keys start with a dash ("- Google Docs") or a bar ("| Medium"). */
+const isTitleKey = (k: string) => /^[-—–|]/.test(k);
+
 /**
  * True if a key matches the app: process names match case-insensitively; keys starting with
- * "-" or "—" are title suffixes, matched after stripping the browser's own suffix.
+ * "-", "—", or "|" are title suffixes, matched after stripping the browser's own suffix.
  */
 export function keyMatches(key: string, app: AppIdentity): boolean {
   const k = key.trim();
   if (!k) return false;
-  if (/^[-—–]/.test(k)) {
+  if (isTitleKey(k)) {
     const title = stripBrowserSuffix(app.title).toLowerCase();
     return title.endsWith(k.toLowerCase());
   }
   return app.process_name.toLowerCase() === k.toLowerCase();
 }
 
+const BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe', 'arc.exe'];
+
+export const isBrowser = (app: Pick<AppIdentity, 'process_name'>) => BROWSERS.includes(app.process_name.toLowerCase());
+
 /** The key "Don't show here" would store for this app: the site suffix for browsers, else the process name. */
 export function siteKeyFor(app: AppIdentity): string {
-  const browsers = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe', 'arc.exe'];
-  if (browsers.includes(app.process_name.toLowerCase())) {
+  if (isBrowser(app)) {
     const title = stripBrowserSuffix(app.title);
     const parts = title.split(/\s+[-—–]\s+/);
     if (parts.length > 1) return `- ${parts[parts.length - 1]}`;
+    const barParts = title.split(/\s+\|\s+/);
+    if (barParts.length > 1) return `| ${barParts[barParts.length - 1]}`;
   }
   return app.process_name.toLowerCase();
 }
@@ -105,7 +113,7 @@ export function resolveAppMode(app: AppIdentity, settings: Pick<Settings, 'appMo
     if (keyMatches(key, app)) return { mode: 'off', blocked: true, matched: key };
   }
   // Title-suffix keys are more specific than process names (a site inside a browser).
-  const userKeys = Object.keys(settings.appModes).sort((a, b) => Number(/^[-—–]/.test(b)) - Number(/^[-—–]/.test(a)));
+  const userKeys = Object.keys(settings.appModes).sort((a, b) => Number(isTitleKey(b)) - Number(isTitleKey(a)));
   for (const key of userKeys) {
     if (keyMatches(key, app)) return { mode: settings.appModes[key]!, blocked: false, matched: key };
   }

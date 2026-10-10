@@ -35,11 +35,22 @@ export const SettingsSchema = z.object({
   appModes: z.record(z.string(), AppModeSchema).default({}),
   /** Extra entries on top of the built-in block list. Same key format as appModes. */
   blockList: z.array(z.string()).default([]),
+  /**
+   * Learned on this machine: apps and sites (same key format as appModes) where a selection
+   * toolbar appeared, with the latest ms after mouse-up it was first seen. No text.
+   */
+  toolbarWaits: z.record(z.string(), z.number().int().min(0)).default({}),
 
   capture: z
     .object({
       minWords: z.number().int().min(1).default(3),
+      /** The full wait for a selection toolbar, in apps known or learned to show one. From mouse-up. */
       pillDelayMs: z.number().int().min(0).default(250),
+      /** The wait everywhere else. */
+      shortWaitMs: z.number().int().min(0).default(100),
+      /** When the first toolbar check runs, and how often after that until the wait is over. */
+      pollStartMs: z.number().int().min(0).default(100),
+      pollIntervalMs: z.number().int().min(10).default(35),
       hideDistancePx: z.number().int().min(20).default(200),
       contextChars: z.number().int().min(0).default(500),
       containerChars: z.number().int().min(500).default(8000),

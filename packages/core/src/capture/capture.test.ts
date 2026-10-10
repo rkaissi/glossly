@@ -3,12 +3,14 @@ import { DEFAULT_SETTINGS } from '../settings';
 import { keyMatches, resolveAppMode, siteKeyFor, stripBrowserSuffix } from './apps';
 import { countWords, gateAutoSelection, mayCopyFallback } from './gating';
 import { classifyObstacles, type Popup } from './obstacles';
+import { learnKeyFor, learnToolbarWait, pillWait, pollForToolbar, type PollOptions } from './pill-wait';
 import { placeBar, placePill } from './placement';
 
 const s = DEFAULT_SETTINGS;
 const slack = { process_name: 'slack.exe', title: '#design - Acme - Slack' };
 const docs = { process_name: 'chrome.exe', title: 'Q4 plan - Google Docs - Google Chrome' };
 const edgeDocs = { process_name: 'msedge.exe', title: 'Q4 plan - Google Docs - Personal - Microsoft\u200b Edge' };
+const medium = { process_name: 'chrome.exe', title: 'On waiting | by Ann Lee | Medium - Google Chrome' };
 
 describe('app matching', () => {
   it('strips browser suffixes', () => {
@@ -26,6 +28,8 @@ describe('app matching', () => {
   it('builds a site key for browsers and a process key otherwise', () => {
     expect(siteKeyFor(docs)).toBe('- Google Docs');
     expect(siteKeyFor(slack)).toBe('slack.exe');
+    expect(siteKeyFor(medium)).toBe('| Medium');
+    expect(keyMatches('| Medium', medium)).toBe(true);
   });
 
   it('blocks password managers and lets user modes win over defaults', () => {
@@ -175,5 +179,81 @@ describe('obstacles', () => {
     const before = popup({ id: '' });
     expect(classifyObstacles([popup({ id: '' })], [before], selection)[0]!.status).toBe('preexisting');
     expect(classifyObstacles([popup({ id: '', class_name: 'other' })], [before], selection)[0]!.status).toBe('new');
+  });
+});
+
+describe('pill wait', () => {
+  const notepad = { process_name: 'notepad.exe', title: 'notes.txt - Notepad' };
+
+  it('waits in full only where a toolbar is known or was learned', () => {
+    expect(pillWait(slack, s)).toEqual({ ms: 250, reason: 'known' });
+    expect(pillWait(docs, s)).toEqual({ ms: 250, reason: 'known' });
+    expect(pillWait(medium, s)).toEqual({ ms: 250, reason: 'known' });
+    expect(pillWait(notepad, s)).toEqual({ ms: 100, reason: 'short' });
+    // Learned time plus the margin, between the short and the full wait.
+    expect(pillWait(notepad, { ...s, toolbarWaits: { 'notepad.exe': 120 } })).toEqual({ ms: 160, reason: 'learned' });
+    expect(pillWait(notepad, { ...s, toolbarWaits: { 'notepad.exe': 400 } })).toEqual({ ms: 250, reason: 'learned' });
+    expect(pillWait(notepad, { ...s, toolbarWaits: { 'notepad.exe': 0 } })).toEqual({ ms: 100, reason: 'learned' });
+  });
+
+  it('learns per app or site, never for a whole browser, and only grows', () => {
+    expect(learnKeyFor(notepad)).toBe('notepad.exe');
+    expect(learnKeyFor({ process_name: 'chrome.exe', title: 'Board - Trello - Google Chrome' })).toBe('- Trello');
+    expect(learnKeyFor({ process_name: 'chrome.exe', title: 'Untitled - Google Chrome' })).toBeNull();
+    const a = learnToolbarWait({}, 'notepad.exe', 131.6);
+    expect(a).toEqual({ 'notepad.exe': 132 });
+    expect(learnToolbarWait(a!, 'notepad.exe', 90)).toBeNull();
+    expect(learnToolbarWait(a!, 'notepad.exe', 250)).toEqual({ 'notepad.exe': 250 });
+  });
+
+  // A fake clock: sleep and each check advance it.
+  function clock(checkMs: number, foundAt: number | null) {
+    let t = 1000;
+    const starts: number[] = [];
+    const o: PollOptions = {
+      t0: 1000,
+      waitMs: 250,
+      firstMs: 100,
+      intervalMs: 35,
+      now: () => t,
+      sleep: async (ms) => {
+        t += ms;
+      },
+      check: async () => {
+        starts.push(t - 1000);
+        t += checkMs;
+        return foundAt !== null && t - 1000 - checkMs >= foundAt;
+      },
+      stale: () => false,
+    };
+    return { o, starts, setT: (v: number) => (t = v) };
+  }
+
+  it('polls from 100 ms until a check starts after the wait', async () => {
+    const { o, starts } = clock(10, null);
+    const r = await pollForToolbar(o);
+    expect(starts).toEqual([100, 135, 170, 205, 240, 250]);
+    expect(r).toMatchObject({ found: false, polls: 6, at: 250 });
+  });
+
+  it('stops at the first check that finds a toolbar', async () => {
+    const { o, starts } = clock(10, 130);
+    const r = await pollForToolbar(o);
+    expect(starts).toEqual([100, 135]);
+    expect(r).toMatchObject({ found: true, polls: 2, at: 135 });
+  });
+
+  it('a short wait is one check, right away if the selection read was slow', async () => {
+    const fast = clock(20, null);
+    expect(await pollForToolbar({ ...fast.o, waitMs: 100 })).toMatchObject({ found: false, polls: 1, at: 100 });
+    const slow = clock(20, null);
+    slow.setT(1130);
+    expect(await pollForToolbar({ ...slow.o, waitMs: 100 })).toMatchObject({ polls: 1, at: 130, slept: 0 });
+  });
+
+  it('gives up when the capture goes stale', async () => {
+    const { o } = clock(10, null);
+    let n = 0;
+    expect(await pollForToolbar({ ...o, stale: () => ++n > 2 })).toBeNull();
   });
 });

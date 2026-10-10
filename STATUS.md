@@ -4,12 +4,12 @@ Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1). `doc
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 149 unit tests.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 157 unit tests.
 
 Phase 0 is not signed off yet, for two reasons:
 
 - **The per-app capture checks and the toolbar-overlap checks haven't been run.** Only Notepad and Glossly's own settings window (Chromium) have been tested. These are hand tests for you, recorded in `evals/capture.md`.
-- **The pill shows in about 315 to 360 ms, not the spec's 150 ms.** The spec's own 250 ms wait for app toolbars makes 150 ms impossible as written. See the open questions below.
+- **Pill speed (reworked in Step 12.2, Oct 10).** It used to show in about 315 to 360 ms (a fixed 250 ms toolbar wait, then about 100 ms for `popups_near`). Now it checks for a selection toolbar from 100 ms after mouse-up and waits the full 250 ms only in apps known or learned to show one; elsewhere it shows after one check at about 100 ms. Live numbers: see "Selection to pill" below.
 
 ## How to run
 
@@ -30,12 +30,12 @@ The app lives in the tray. The default hotkey is `Ctrl+Alt+Space`. Data is in `%
 | --- | --- | --- |
 | Tray app, settings window, configurable hotkey, pnpm monorepo (`core`, `shell-electron`, `ui`) | Done | The hotkey recorder is built, but changing the hotkey hasn't been tried live. |
 | C# helper with every protocol command and recorded fixtures | Done | Every command is in `helpers/protocol.md`, with fixtures in `helpers/fixtures/`. `pnpm helper:record --check` replays 10 cases against the live binary and all pass. |
-| Auto pill: mouse hook, selection read, 3-word minimum, password-field skip, 250 ms delay, toolbar-aware placement, non-focusable window | Done, except real toolbars | Verified in Notepad and in the settings window. The placement logic is unit tested, but `popups_near` hasn't been tried against a real app toolbar. |
+| Auto pill: mouse hook, selection read, 3-word minimum, password-field skip, toolbar wait, toolbar-aware placement, non-focusable window | Done, except real toolbars | Verified in Notepad and in the settings window. The placement logic is unit tested, but `popups_near` hasn't been tried against a real app toolbar. The 250 ms wait now applies only where toolbars are expected (Step 12.2). |
 | Hotkey path with copy fallback and clipboard restore | Done, partly verified | The helper's copy fallback restores the clipboard in hand tests (WPF and WinForms windows). In the app, the hotkey path has only run on apps that UIA can read, so the copy-fallback branch hasn't run live. |
 | Debug view showing captured text, method, and tier-1 context | Done | Verified live. Also shows routing stage, fallback reason, and every timing. |
 | Works in Chrome, Edge, Slack, Discord, Outlook web, VS Code, Notepad, recorded in `evals/capture.md` | Not done | Notepad passes, including tier 2. The table for the rest is ready for you to fill in. |
 | No overlap with selection toolbars in Notion, Google Docs, Word, Slack's composer | Not done | Hand test, also in `evals/capture.md`. |
-| Selection to pill under 150 ms | Not met | Measured 314 and 358 ms in Notepad: 250 ms wait, then about 100 ms for `popups_near`. |
+| Selection to pill under 150 ms | Reworked, not measured yet | Before Step 12.2: 314 and 358 ms in Notepad (250 ms wait, then about 100 ms for `popups_near`). Step 12.2 aims for about 150 ms where no toolbar is expected; the live numbers come with the Step 12 live check. |
 
 ## Phase 1: bar, Ask, Save
 
@@ -124,10 +124,11 @@ Known rough edges:
 - Router eval: one run at the end, once everything looks good.
 - New: the purple oval is the "dot" placement. Windows won't shrink the window below 29×38, which stretches the dot, and it shows too often because static toolbars count as obstacles. **Fixed in Step 12** (Oct 10): the dot is a fixed 18 px circle inside a 40×40 click-through window, and only obstacles that appeared after the selection's mouse-down count. Already-present ones (menu bars, app chrome, unrelated always-on-top windows), tooltips, windows behind the app, click-through overlays, and anything covering the selection are ignored. Every pill now records what it found (source, kind, size, side, why it was or wasn't counted) in the debug view, the `pill_shown` event, and `main.log` ("pill obstacles"). Before the fix, 8 of 120 pills were dots and 9 went above.
 - New: a redesign with Windows 11 glass, monochrome, and a bar that fits its buttons (Step 13).
+- Pill speed, **built in Step 12.2** (Oct 10). The pill checks for the app's own selection toolbar every 35 ms from 100 ms after mouse-up, and shows as soon as one is found (on the other side) or once the app's wait is over with none found. The wait is the full 250 ms in apps and sites known to show selection toolbars (Word, PowerPoint, Outlook, OneNote, Notion, Slack, Google Docs and Slides, Word and Outlook on the web, Medium) and 100 ms everywhere else. When a toolbar from the app itself shows up somewhere with the short wait (one extra check runs at 250 ms, after the pill is up), Glossly remembers that app or site and how soon the toolbar showed (setting `toolbarWaits`: a process name or site suffix plus a number of ms, no text) and waits that long there next time. A shown pill never moves. The check got cheaper too: the helper takes the mouse-down snapshot itself on a background thread, the window scan and the UIA probes run in parallel, the probes use a UIA cache request, there are 4 probes instead of 6, and process names no longer come from a full process list. The debug view has a "pill wait" line (when it was shown, the wait and why, the checks, and whether a toolbar was found), `pill_shown` records `wait_ms`, `wait_reason`, `polls`, and `popups_ms`, and `main.log` has a "pill shown" line per pill.
 
 The original questions:
 
-1. **Pill speed.** The pill takes about 360 ms (250 ms toolbar wait plus `popups_near`) against the 150 ms target. Should it be faster and less careful about toolbars? One option is to show the pill at once and move it if a toolbar appears.
+1. **Pill speed.** The pill took about 360 ms (250 ms toolbar wait plus `popups_near`) against the 150 ms target. Should it be faster and less careful about toolbars? One option is to show the pill at once and move it if a toolbar appears. (Answered; built in Step 12.2.)
 2. **Router timeout.** The model router missed its 400 ms budget on 2 of 6 live calls (404 and 418 ms) and fell back to rules. Raise `router.decisionTimeoutMs` to about 600 ms, or accept rules as the frequent fallback?
 3. **"Delete all data".** It currently also removes saved API keys and resets settings. Is that what you want, or should keys and preferences survive it?
 4. **Local only.** It currently turns off only the router's model call, as the spec says. Save's entity extraction still calls the Fast model because you clicked an action. Should Local only also skip that?
