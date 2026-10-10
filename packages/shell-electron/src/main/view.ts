@@ -75,6 +75,37 @@ export function distanceToRect(p: Point, r: Rect): number {
 
 export const contains = (r: Rect, p: Point) => p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
 
+/** Activity that can dismiss the overlay. Blur closes a focused bar; the others close a pill. */
+export type HideSignal = 'keyboard_activity' | 'wheel' | 'mouse_away' | 'foreground' | 'blur';
+
+/**
+ * Whether this signal should hide the overlay.
+ * `settling` is the short window after the hotkey opens the bar: the keys that opened it
+ * still count as keyboard activity, focus may not have landed, and a blur or a foreground
+ * bounce in that window would hide a bar the user just opened. Wheel still hides an
+ * unfocused pill (a scroll is not the hotkey).
+ */
+export function shouldHideOverlay(input: {
+  signal: HideSignal;
+  visible: boolean;
+  /** The overlay has asked for focus. A focused bar closes on blur, not on the other signals. */
+  focused: boolean;
+  settling: boolean;
+  /** Windows has actually given the overlay the foreground. */
+  osFocused?: boolean;
+  /** Foreground moved to the source window or to Glossly itself. */
+  ownForeground?: boolean;
+}): boolean {
+  const { signal, visible, focused, settling, osFocused, ownForeground } = input;
+  // A blur before the hotkey's focus lands is the window settling, not the user leaving.
+  // Once the OS focus is there, a blur closes, so a click away is not swallowed.
+  if (signal === 'blur') return !(settling && !osFocused);
+  if (!visible || focused) return false;
+  if (signal === 'wheel') return true;
+  if (signal === 'foreground') return !ownForeground && !settling;
+  return !settling;
+}
+
 /** An HWND from BrowserWindow.getNativeWindowHandle(), as the number the helper uses. */
 export function hwndFromBuffer(buf: Buffer): number {
   return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);

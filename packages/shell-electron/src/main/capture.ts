@@ -57,12 +57,18 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { actionForSlot, contains, distanceToRect, growFrom, isAvailable, mergeRoute, slotsView } from './view';
+import { actionForSlot, contains, distanceToRect, growFrom, isAvailable, mergeRoute, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
 const WATCH_INTERVAL_MS = 80;
 const MAX_SELECTION_CHARS = 20_000;
+/**
+ * After the hotkey opens the bar, ignore the key that opened it, a cursor that is still far
+ * from the selection, and a focus or foreground bounce. The helper reports that key as
+ * keyboard_activity about 50 to 100 ms later, often while the bar is visible and not focused yet.
+ */
+const HOTKEY_SETTLE_MS = 500;
 
 type Foreground = CommandResult<'foreground'>;
 
@@ -147,6 +153,8 @@ export class Capture {
   private bouncing = false;
   /** The session whose pill or dot is expanding (tier 1 is being read). */
   private expanding: Session | null = null;
+  /** Epoch ms until which a hotkey-opened bar stays up. 0 when not settling. */
+  private settleUntil = 0;
 
   /**
    * `captureSource` returns the HWND of the one Glossly window that may be read (the setup's
@@ -163,7 +171,7 @@ export class Capture {
       this.inputWatch = false;
     });
     overlay.on('blur', () => {
-      if (!this.bouncing && this.session) this.close('blur');
+      if (!this.bouncing && this.session) this.activityHide('blur');
     });
   }
 
@@ -214,14 +222,13 @@ export class Capture {
       }
       case 'wheel':
       case 'keyboard_activity':
-        if (this.overlay.isVisible && !this.overlay.hasFocus) this.close(ev.event);
+        this.activityHide(ev.event);
         return;
       case 'foreground': {
         // The overlay belongs to the window the text was selected in: close it when another
         // app's window comes to the front. (A focused overlay already closes on blur.)
-        if (!this.overlay.isVisible || this.overlay.hasFocus) return;
-        if (ev.handle === this.session?.fg?.handle || this.ownPids().has(ev.pid)) return;
-        this.close('foreground');
+        const own = ev.handle === this.session?.fg?.handle || this.ownPids().has(ev.pid);
+        this.activityHide('foreground', own);
         return;
       }
       default:
@@ -427,10 +434,12 @@ export class Capture {
     const s = this.session;
     // A visible pill or unfocused bar: expand it and take focus.
     if (s && this.overlay.isVisible && !this.overlay.hasFocus && s.selection) {
+      // Before the await: the hotkey's own keys are about to arrive as keyboard_activity.
+      this.armHotkeySettle();
       this.stopWatch();
       if (this.state.mode !== 'bar' && this.state.mode !== 'panel') await this.expand(s.id, true);
       if (this.current(s.id)) {
-        this.focusOverlay();
+        this.focusOverlay(true);
         this.overlay.patch({ keyboard: true });
       }
       return;
@@ -440,6 +449,7 @@ export class Capture {
       this.close('hotkey_toggle');
       return;
     }
+    this.armHotkeySettle();
 
     const t0 = performance.now();
     const timings: Record<string, number> = {};
@@ -544,7 +554,7 @@ export class Capture {
     const quick = selection ? this.router().quick(toContext(selection)) : null;
     session.route = quick;
     timings.total = ms(t0);
-    this.focusOverlay();
+    this.focusOverlay(true);
     this.overlay.update(
       {
         ...HIDDEN_STATE,
@@ -569,8 +579,10 @@ export class Capture {
   /**
    * Focuses the overlay. Windows may refuse the foreground change (for example while the
    * source app is in its Alt menu mode); then the helper forces it with restore_focus.
+   * `settle` restarts the hotkey grace so a blur before that focus lands does not hide the bar.
    */
-  private focusOverlay(): void {
+  private focusOverlay(settle = false): void {
+    if (settle) this.armHotkeySettle();
     this.overlay.focus();
     setTimeout(() => {
       if (!this.overlay.hasFocus || this.overlay.osFocused || this.bouncing) return;
@@ -614,6 +626,7 @@ export class Capture {
         : placeBar({ selection: s.bounds, anchor: s.anchor, obstacles: [], size: SIZES.bar, growW: MAX_W, workArea: area }).rect;
     const side = from?.mode === 'pill' ? from.side : rect.y >= s.bounds.y + s.bounds.h ? 'below' : 'above';
     s.timings.expand = ms(t);
+    if (viaHotkey) this.armHotkeySettle();
     this.overlay.patch(
       {
         mode: 'bar',
@@ -1051,19 +1064,53 @@ export class Capture {
 
   close(reason: string): void {
     const s = this.session;
+    const visible = this.overlay.isVisible;
+    if (!s && !visible) return;
+    const mode = this.state.mode;
+    const focused = this.overlay.hasFocus;
+    const trigger = s?.trigger ?? null;
+    this.settleUntil = 0;
     if (!s) {
-      if (this.overlay.isVisible) this.overlay.update(HIDDEN_STATE);
+      this.overlay.update(HIDDEN_STATE);
+      log.info('overlay closed', { reason, mode, focused });
       return;
     }
-    const hadFocus = this.overlay.hasFocus;
     this.endSession();
     this.overlay.update({ ...HIDDEN_STATE, sessionId: s.id });
-    if (reason === 'foreground' || reason === 'settings') log.info('overlay closed', { reason });
+    log.info('overlay closed', { reason, mode, focused, trigger });
     // Focus goes back to the source app, unless it already left (blur), the settings window is
     // taking it, or Reply already handed it back to paste.
-    if (hadFocus && s.fg && reason !== 'blur' && reason !== 'settings' && reason !== 'reply_inserted') {
+    if (focused && s.fg && reason !== 'blur' && reason !== 'settings' && reason !== 'reply_inserted') {
       void this.helper.request('restore_focus', { handle: s.fg.handle }).catch(() => {});
     }
+  }
+
+  /** Ignores hide signals for a short time after the hotkey opens the bar. */
+  private armHotkeySettle(): void {
+    this.settleUntil = Date.now() + HOTKEY_SETTLE_MS;
+  }
+
+  private get hotkeySettling(): boolean {
+    return Date.now() < this.settleUntil;
+  }
+
+  /**
+   * Hides on an activity signal, except during the hotkey grace. A suppressed hide is logged
+   * so the next vanish can be told apart from a real dismiss.
+   */
+  private activityHide(signal: HideSignal, ownForeground = false): void {
+    const input = {
+      signal,
+      visible: this.overlay.isVisible,
+      focused: this.overlay.hasFocus,
+      osFocused: this.overlay.osFocused,
+      ownForeground,
+    };
+    if (shouldHideOverlay({ ...input, settling: this.hotkeySettling })) {
+      this.close(signal);
+      return;
+    }
+    if (shouldHideOverlay({ ...input, settling: false })) log.info('overlay hide suppressed', { reason: signal });
   }
 
   private endSession(): void {
@@ -1093,7 +1140,7 @@ export class Capture {
         void this.expand(this.session.id);
         return;
       }
-      if (distanceToRect(cursor, hit) > this.settings.capture.hideDistancePx) this.close('mouse_away');
+      if (distanceToRect(cursor, hit) > this.settings.capture.hideDistancePx) this.activityHide('mouse_away');
     }, WATCH_INTERVAL_MS);
   }
 

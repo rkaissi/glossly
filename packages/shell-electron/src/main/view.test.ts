@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { actionForSlot, distanceToRect, growFrom, mergeRoute, slotsView } from './view';
+import { actionForSlot, distanceToRect, growFrom, mergeRoute, shouldHideOverlay, slotsView } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -79,6 +79,45 @@ describe('growFrom', () => {
 
   it('stays inside the work area', () => {
     expect(growFrom({ x: 900, y: 780, w: 168, h: 40 }, 'below', { w: 460, h: 56 }, area)).toEqual({ x: 540, y: 744, w: 460, h: 56 });
+  });
+});
+
+describe('shouldHideOverlay', () => {
+  const pill = { visible: true, focused: false, settling: false };
+
+  it('hides an unfocused pill on typing, scrolling, or the cursor leaving', () => {
+    expect(shouldHideOverlay({ ...pill, signal: 'keyboard_activity' })).toBe(true);
+    expect(shouldHideOverlay({ ...pill, signal: 'wheel' })).toBe(true);
+    expect(shouldHideOverlay({ ...pill, signal: 'mouse_away' })).toBe(true);
+    expect(shouldHideOverlay({ ...pill, signal: 'foreground' })).toBe(true);
+  });
+
+  it('keeps a focused bar up except when it blurs', () => {
+    const bar = { visible: true, focused: true, settling: false };
+    expect(shouldHideOverlay({ ...bar, signal: 'keyboard_activity' })).toBe(false);
+    expect(shouldHideOverlay({ ...bar, signal: 'mouse_away' })).toBe(false);
+    expect(shouldHideOverlay({ ...bar, signal: 'foreground' })).toBe(false);
+    expect(shouldHideOverlay({ ...bar, signal: 'blur' })).toBe(true);
+  });
+
+  it('does not let the hotkey that opened the bar close it while focus is landing', () => {
+    const opening = { visible: true, focused: false, settling: true };
+    expect(shouldHideOverlay({ ...opening, signal: 'keyboard_activity' })).toBe(false);
+    expect(shouldHideOverlay({ ...opening, signal: 'mouse_away' })).toBe(false);
+    expect(shouldHideOverlay({ ...opening, signal: 'foreground' })).toBe(false);
+    expect(shouldHideOverlay({ ...opening, signal: 'blur' })).toBe(false);
+    // Focus has landed: a blur is the user leaving, even inside the grace.
+    expect(shouldHideOverlay({ ...opening, signal: 'blur', osFocused: true })).toBe(true);
+    // A scroll during the grace is still the user leaving the pill.
+    expect(shouldHideOverlay({ ...opening, signal: 'wheel' })).toBe(true);
+  });
+
+  it('ignores a foreground change to the source window or to Glossly', () => {
+    expect(shouldHideOverlay({ ...pill, signal: 'foreground', ownForeground: true })).toBe(false);
+  });
+
+  it('does nothing when the overlay is hidden', () => {
+    expect(shouldHideOverlay({ signal: 'keyboard_activity', visible: false, focused: false, settling: false })).toBe(false);
   });
 });
 
