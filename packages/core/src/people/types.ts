@@ -152,6 +152,17 @@ export interface PromiseRow {
   person_name: string | null;
   /** The person record the name resolved to; a fuzzy match is only a suggestion. */
   match: { personId: string; name: string; kind: 'exact' | 'fuzzy' } | null;
+  /** What the people reader (Who's) found about `person_name`, for creating them; null when it found nothing or they are saved. */
+  details: NewPersonDetails | null;
+}
+
+/** What Who's reader knows about someone not saved yet: the same fields Create person prefills. */
+export interface NewPersonDetails {
+  email: string | null;
+  handle: string | null;
+  /** The role and the about line, joined, as Who's Create person writes the note. */
+  note: string | null;
+  relationship: Relationship | null;
 }
 
 /** A reviewed row to save. `person` is an existing record, a new one to create, or nobody. */
@@ -159,5 +170,5 @@ export interface PromiseSaveRow {
   owner: CommitmentOwner;
   text: string;
   due_at: string | null;
-  person: { kind: 'existing'; id: string } | { kind: 'new'; name: string } | null;
+  person: { kind: 'existing'; id: string } | ({ kind: 'new'; name: string } & Partial<NewPersonDetails>) | null;
 }

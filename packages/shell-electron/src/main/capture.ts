@@ -84,6 +84,7 @@ import {
   type SelectionContext,
   type Trigger,
   type WhoRead,
+  type DetectInput,
   type WhoView,
   type Item,
   type Surroundings,
@@ -233,6 +234,8 @@ export class Capture {
    * doesn't spend another call. Keyed by the exact model input; failures are never kept.
    */
   private readonly whoCache = new Lru<string, WhoRead>(MODEL_CACHE_SIZE);
+  /** A people read still running, so Who and Promises opened together share the one call. */
+  private readonly whoPending = new Map<string, Promise<WhoRead>>();
   private readonly visualCache = new Lru<string, Extract<VisualizeResult, { ok: true }>>(MODEL_CACHE_SIZE);
 
   /**
@@ -985,16 +988,7 @@ export class Capture {
     const t = performance.now();
     try {
       const input = detectInputFor(s.selection, (await s.container) ?? null);
-      const key = buildWhoPrompt(identity, input);
-      let read = this.whoCache.get(key);
-      const cached = Boolean(read);
-      if (!read) {
-        read = await readWho(this.services.llm, this.settings, input, ctl.signal, (e) =>
-          log.warn('who model failed, reading the text only', { code: e instanceof LlmError ? e.code : 'provider' }),
-        );
-        // Only the model's answer is worth keeping; the text-only pass is cheap and a failure should retry.
-        if (read.local === null) this.whoCache.set(key, read);
-      }
+      const { read, cached } = await this.readPeople(input, ctl.signal);
       // Matched against saved people every time, so someone added since shows as known.
       const view = buildWho(this.services.people, { people: read.people, author: null, authorIsMe: false }, s.selection.source_app, empty.identitySet, read.local);
       log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', cached, ms: ms(t) });
@@ -1005,6 +999,29 @@ export class Capture {
       throw e;
     } finally {
       if (s.whoCtl === ctl) s.whoCtl = null;
+    }
+  }
+
+  /**
+   * The people a captured text names: Who's model read, cached per text, so Who is this and What
+   * did I promise share one call. A text-only pass (Local only, no key, a failed call) isn't kept.
+   */
+  private async readPeople(input: DetectInput, signal: AbortSignal): Promise<{ read: WhoRead; cached: boolean }> {
+    const key = buildWhoPrompt(this.settings.identity, input);
+    const hit = this.whoCache.get(key);
+    if (hit) return { read: hit, cached: true };
+    const pending = this.whoPending.get(key);
+    if (pending) return { read: await pending, cached: true };
+    const run = readWho(this.services.llm, this.settings, input, signal, (e) =>
+      log.warn('who model failed, reading the text only', { code: e instanceof LlmError ? e.code : 'provider' }),
+    );
+    this.whoPending.set(key, run);
+    try {
+      const read = await run;
+      if (read.local === null) this.whoCache.set(key, read);
+      return { read, cached: false };
+    } finally {
+      this.whoPending.delete(key);
     }
   }
 
@@ -1375,11 +1392,26 @@ ${s.selection.text}`;
     try {
       const container = (await s.container) ?? null;
       const people = this.services.people;
-      const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
+      const input = detectInputFor(s.selection, container);
+      const det = detectPeople(input, identity, this.services.store.listKnownPeople());
       const authorMatch = det.author ? resolvePerson(people, det.author, s.selection.source_app) : null;
       s.author = { personId: authorMatch?.kind === 'exact' ? authorMatch.personId : null, isMe: det.authorIsMe };
-      const rows = await extractPromises(this.services.llm, people, this.settings, { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe }, ctl.signal);
-      this.services.metrics.record('promises_extracted', { count: rows.length, ms: ms(t) });
+      // Who's people reader runs alongside (or comes from its cache), so a new person gets the
+      // same email, note, and relationship that Who is this would give them.
+      const found = this.readPeople(input, ctl.signal).then(
+        (r) => r.read.people,
+        () => [],
+      );
+      const rows = await extractPromises(
+        this.services.llm,
+        people,
+        this.settings,
+        { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe },
+        ctl.signal,
+        new Date(),
+        found,
+      );
+      this.services.metrics.record('promises_extracted', { count: rows.length, with_details: rows.filter((r) => r.details).length, ms: ms(t) });
       return {
         ok: true,
         rows,

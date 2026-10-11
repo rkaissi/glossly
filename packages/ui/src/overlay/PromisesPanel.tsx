@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ExternalLink, Info, RotateCcw } from 'lucide-react';
-import type { OverlayState, PromiseRow, PromiseSaveRow, PromisesResult } from '@glossly/core/api';
+import type { OverlayState, PromiseRow, PromiseSaveRow, PromisesResult, Relationship } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { formatDue } from '../dates';
+import { RELATIONSHIP_OPTIONS } from '../people/relationship';
 
 /** Which person a row is saved with: the matched record, a new one from the name, or nobody. */
 type PersonChoice = 'match' | 'new' | 'none';
@@ -13,10 +14,61 @@ interface Draft extends PromiseRow {
 
 const initialChoice = (r: PromiseRow): PersonChoice => (r.match ? 'match' : r.person_name ? 'new' : 'none');
 
-function toSave(d: Draft): PromiseSaveRow {
+/** A new person is created with what Who's reader found (email, handle, note) and the relationship picked here. */
+function toSave(d: Draft, relationships: Record<string, Relationship>): PromiseSaveRow {
   const person: PromiseSaveRow['person'] =
-    d.person === 'match' && d.match ? { kind: 'existing', id: d.match.personId } : d.person === 'new' && d.person_name ? { kind: 'new', name: d.person_name } : null;
+    d.person === 'match' && d.match
+      ? { kind: 'existing', id: d.match.personId }
+      : d.person === 'new' && d.person_name
+        ? {
+            kind: 'new',
+            name: d.person_name,
+            email: d.details?.email ?? null,
+            handle: d.details?.handle ?? null,
+            note: d.details?.note ?? null,
+            relationship: relationships[d.person_name] ?? d.details?.relationship ?? 'other',
+          }
+        : null;
   return { owner: d.owner, text: d.text.trim(), due_at: d.due_at, person };
+}
+
+/**
+ * The people the selected rows will create, once each, with the relationship to give them
+ * (prefilled from Who's reader, else Other) and what else was found.
+ */
+function NewPeople({ rows, relationships, onPick }: { rows: Draft[]; relationships: Record<string, Relationship>; onPick: (name: string, r: Relationship) => void }) {
+  const seen = new Map<string, Draft>();
+  for (const r of rows) if (r.selected && r.person === 'new' && r.person_name && !seen.has(r.person_name)) seen.set(r.person_name, r);
+  if (seen.size === 0) return null;
+  return (
+    <div className="new-people">
+      <h4>New people</h4>
+      <ul>
+        {[...seen.values()].map((r) => {
+          const name = r.person_name!;
+          const extra = [r.details?.email, r.details?.handle && `@${r.details.handle}`, r.details?.note].filter(Boolean).join(' · ');
+          return (
+            <li key={name}>
+              <strong>{name}</strong>
+              <select
+                value={relationships[name] ?? r.details?.relationship ?? 'other'}
+                aria-label={`How you know ${name}`}
+                tabIndex={-1}
+                onChange={(e) => onPick(name, e.target.value as Relationship)}
+              >
+                {RELATIONSHIP_OPTIONS.map(([value, text]) => (
+                  <option key={value} value={value}>
+                    {text}
+                  </option>
+                ))}
+              </select>
+              {extra && <span className="muted clip1">{extra}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 type Phase =
@@ -97,6 +149,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
   const [rows, setRows] = useState<Draft[]>([]);
   const [meta, setMeta] = useState<{ author: string | null; authorIsMe: boolean; identitySet: boolean } | null>(null);
   const [hl, setHl] = useState(0);
+  const [relationships, setRelationships] = useState<Record<string, Relationship>>({});
   const panel = useRef<HTMLDivElement>(null);
 
   const extract = async () => {
@@ -130,7 +183,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
     if (phase.kind !== 'review' || selected.length === 0) return;
     setPhase({ kind: 'saving' });
     try {
-      const r = await glossly.invoke('promises:save', { sessionId: s.sessionId, rows: selected.map(toSave) });
+      const r = await glossly.invoke('promises:save', { sessionId: s.sessionId, rows: selected.map((d) => toSave(d, relationships)) });
       setPhase({ kind: 'saved', ...r });
       panel.current?.focus();
     } catch {
@@ -204,6 +257,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
                   <Row key={d.key} d={d} highlight={s.keyboard && i === hl} onChange={(p) => patch(i, p)} onFocusRow={() => setHl(i)} />
                 ))}
               </ul>
+              <NewPeople rows={rows} relationships={relationships} onPick={(name, r) => setRelationships((m) => ({ ...m, [name]: r }))} />
             </>
           )}
         </>

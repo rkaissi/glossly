@@ -115,6 +115,40 @@ describe('What did I promise', () => {
     expect(people.commitments({ status: 'open' }).find((c) => c.text === 'book a room')?.person_id).toBeNull();
   });
 
+  it("takes the full name and details from Who's reader for someone not saved yet", async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const llm = new FakeLlm(() => ({
+      commitments: [
+        { owner: 'me', person_name: 'Daniel', text: 'intro Daniel to legal', due_phrase: '', confidence: 0.8 },
+        { owner: 'them', person_name: 'Priya', text: 'send the budget', due_phrase: '', confidence: 0.8 },
+      ],
+    }));
+    const detected = [
+      { name: 'Daniel Park', email: 'daniel.park@example.com', handle: null, role: 'mentioned' as const, knownId: null, detail: 'legal lead at Acme', about: 'joins the call', relationship: 'colleague' as const },
+      { name: 'Priya Shah', email: null, handle: null, role: 'mentioned' as const, knownId: null, relationship: 'professional' as const },
+      { name: 'Priya Rao', email: null, handle: null, role: 'mentioned' as const, knownId: null },
+    ];
+    const rows = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now, Promise.resolve(detected));
+    expect(rows[0]).toMatchObject({
+      person_name: 'Daniel Park',
+      match: null,
+      details: { email: 'daniel.park@example.com', note: 'legal lead at Acme. joins the call', relationship: 'colleague' },
+    });
+    // Two Priyas: which one is unclear, so the name stays as written and nothing is attached.
+    expect(rows[1]).toMatchObject({ person_name: 'Priya', details: null });
+
+    savePromises(people, [{ owner: 'me', text: 'intro Daniel to legal', due_at: null, person: { kind: 'new', name: 'Daniel Park', ...rows[0]!.details } }], {
+      message: selection.text,
+      sourceApp: 'slack.exe',
+      authorPersonId: null,
+      authorIsMe: false,
+    });
+    const daniel = people.card(people.list('daniel')[0]!.id)!;
+    expect(daniel).toMatchObject({ relationship: 'colleague', note: 'legal lead at Acme. joins the call' });
+    expect(daniel.aliases).toContainEqual({ kind: 'email', value: 'daniel.park@example.com' });
+  });
+
   it('stores the message as outbound when the user wrote it', () => {
     store = new Store(':memory:');
     const people = new PeopleRepo(store);

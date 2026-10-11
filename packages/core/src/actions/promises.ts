@@ -7,7 +7,7 @@ import { resolveDue } from '../people/dates';
 import type { DetectedPerson } from '../people/detect';
 import { canonicalize, describeIdentity } from '../people/names';
 import { resolvePerson } from '../people/resolve';
-import type { CommitmentView, PromiseRow, PromiseSaveRow } from '../people/types';
+import type { CommitmentView, NewPersonDetails, PromiseRow, PromiseSaveRow } from '../people/types';
 
 export type { PromiseRow, PromiseSaveRow } from '../people/types';
 import type { Settings } from '../settings';
@@ -69,8 +69,34 @@ export function buildPromisesPrompt(settings: Pick<Settings, 'identity'>, input:
   return parts.join('\n');
 }
 
-/** Turns the model's answer into review rows: due phrases resolved in code, names resolved against people. */
-export function toPromiseRows(out: ExtractedCommitments, people: PeopleRepo, sourceApp: string, now: Date): PromiseRow[] {
+const tokens = (s: string) => canonicalize(s).split(' ').filter(Boolean);
+
+/**
+ * The person the people reader found for a name in a commitment: the same name, or a lone first
+ * name ("Maya") that only one of them has ("Maya Chen"), or their email. Null when it's unclear.
+ */
+export function findDetected(name: string, detected: DetectedPerson[]): DetectedPerson | null {
+  const key = canonicalize(name);
+  if (!key) return null;
+  const same = detected.find((d) => (d.name && canonicalize(d.name) === key) || (d.email && d.email.toLowerCase() === name.trim().toLowerCase()));
+  if (same) return same;
+  const parts = tokens(name);
+  if (parts.length !== 1) return null;
+  const firsts = detected.filter((d) => d.name && tokens(d.name).length > 1 && tokens(d.name)[0] === parts[0]);
+  return firsts.length === 1 ? firsts[0]! : null;
+}
+
+export function detailsOf(d: DetectedPerson): NewPersonDetails {
+  const note = [d.detail, d.about].filter((s): s is string => Boolean(s?.trim())).join('. ');
+  return { email: d.email, handle: d.handle, note: note || null, relationship: d.relationship ?? null };
+}
+
+/**
+ * Turns the model's answer into review rows: due phrases resolved in code, names resolved
+ * against people. `detected` is what the people reader (Who's) found in the same text: a short
+ * name grows to the full one it found, and someone not saved yet gets their details.
+ */
+export function toPromiseRows(out: ExtractedCommitments, people: PeopleRepo, sourceApp: string, now: Date, detected: DetectedPerson[] = []): PromiseRow[] {
   const seen = new Set<string>();
   const rows: PromiseRow[] = [];
   for (const [i, c] of out.commitments.entries()) {
@@ -79,7 +105,9 @@ export function toPromiseRows(out: ExtractedCommitments, people: PeopleRepo, sou
     const dupe = `${c.owner}:${canonicalize(text)}`;
     if (seen.has(dupe)) continue;
     seen.add(dupe);
-    const name = c.person_name.trim() || null;
+    const written = c.person_name.trim() || null;
+    const found = written ? findDetected(written, detected) : null;
+    const name = found?.name && tokens(found.name).length > tokens(written!).length ? found.name : written;
     const due_phrase = c.due_phrase.trim() || null;
     let match: PromiseRow['match'] = null;
     if (name) {
@@ -101,12 +129,16 @@ export function toPromiseRows(out: ExtractedCommitments, people: PeopleRepo, sou
       selected: confidence >= SELECT_CONFIDENCE,
       person_name: name,
       match,
+      details: found && match?.kind !== 'exact' ? detailsOf(found) : null,
     });
   }
   return rows;
 }
 
-/** One structured call on the Fast role (action "promises"). Local only refuses inside the LLM layer. */
+/**
+ * One structured call on the Fast role (action "promises"). Local only refuses inside the LLM
+ * layer. `detected` is the people reader's answer for the same text, which runs alongside.
+ */
 export async function extractPromises(
   llm: LlmProvider,
   people: PeopleRepo,
@@ -114,8 +146,9 @@ export async function extractPromises(
   input: PromisesInput,
   signal?: AbortSignal,
   now: Date = new Date(),
+  detected: Promise<DetectedPerson[]> | DetectedPerson[] = [],
 ): Promise<PromiseRow[]> {
-  const out = await llm.structured(
+  const call = llm.structured(
     {
       role: 'fast',
       action: 'promises',
@@ -127,7 +160,8 @@ export async function extractPromises(
     },
     ExtractedCommitmentsSchema,
   );
-  return toPromiseRows(out, people, input.selection.source_app, now);
+  const [out, found] = await Promise.all([call, detected]);
+  return toPromiseRows(out, people, input.selection.source_app, now, found);
 }
 
 export interface PromiseSaveContext {
@@ -154,7 +188,9 @@ export function savePromises(people: PeopleRepo, rows: PromiseSaveRow[], ctx: Pr
     if (!key) return null;
     const known = newIds.get(key) ?? people.byName(row.person.name);
     if (known) return known;
-    const p = people.create({ name: row.person.name });
+    const { email, handle, note, relationship } = row.person;
+    const aliases = [...(email ? [{ kind: 'email' as const, value: email }] : []), ...(handle ? [{ kind: 'handle' as const, value: handle }] : [])];
+    const p = people.create({ name: row.person.name, note: note ?? null, relationship: relationship ?? null, aliases });
     created++;
     newIds.set(key, p.id);
     return p.id;

@@ -230,7 +230,20 @@ export function registerIpc(deps: IpcDeps): void {
       if (due !== null && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/.test(due)) throw new Error('Invalid date');
       const p = r.person === null ? null : obj(r.person);
       const person: PromiseSaveRow['person'] =
-        p === null ? null : p.kind === 'existing' ? { kind: 'existing', id: str(p.id, 100) } : p.kind === 'new' ? { kind: 'new', name: str(p.name, 100) } : null;
+        p === null
+          ? null
+          : p.kind === 'existing'
+            ? { kind: 'existing', id: str(p.id, 100) }
+            : p.kind === 'new'
+              ? {
+                  kind: 'new',
+                  name: str(p.name, 100),
+                  email: optStr(p.email, 200) ?? null,
+                  handle: optStr(p.handle, 100) ?? null,
+                  note: optStr(p.note, 2000) ?? null,
+                  relationship: p.relationship == null ? null : asRelationship(p.relationship),
+                }
+              : null;
       return { owner, text: str(r.text, 500), due_at: due, person };
     });
     const r = capture.savePromises(num(a.sessionId), rows);
