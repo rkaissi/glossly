@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 11, 2026: roadmap reordered (features, then polish, then all testing and evals, then packaging); plain-name per-app rules with a "Show here" toggle and one add-person form landed (decisions 32 and 33; not checked live). 434 unit tests pass; `pnpm typecheck` is clean; `main` is pushed.
+Last updated Oct 11, 2026: roadmap reordered (features, then polish, then all testing and evals, then packaging, then the README; decision providers parked); plain-name per-app rules with a "Show here" toggle and one add-person form landed (decisions 32 and 33; not checked live). 434 unit tests pass; `pnpm typecheck` is clean; `main` is pushed.
 
 ## Start here
 
@@ -28,14 +28,12 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Built:** spec Phases 0 to 3 (capture, the bar, Ask, Save, settings and setup, people and Who, What did I promise, Reply, Recall, Search, Visualize) plus everything Rayan added along the way: the glass redesign, Save modes, paste with nothing selected, Ask's remember tool, Reply that learns your style, the Saved tab, relationships. Of Phase 4, the metrics view is done (Step 17.1).
 - **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, and the fixes since, including Oct 11's) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
-- **Not started:** Steps 17 to 22 below.
+- **Not started:** Steps 18 to 23 below. (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
-
-**Step 17 (rest): optional decision providers.** The spec names Jev and OpenAI Decisions as `DecisionProvider`s behind a setting (`router/types.ts`, Models tab). Check their current docs first; they may have changed or not exist, in which case say so and skip. (Step 17.1, the metrics view, is done; the eval runners moved to Step 21.)
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
 **Step 18: local models, and privacy as a choice.**
 - Replace the Local only checkbox with a choice (a segmented control or radio pair in General and in setup): **All models** (any configured provider) or **Local only** (nothing leaves this computer; today's decision 12 behavior). Either keep the `localOnly` setting underneath or migrate it to a `privacy` enum with a settings migration; every "Local only is on" message and button in the panels must follow the new wording.
@@ -61,7 +59,7 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
   - Items saved under Local only never get entities (decision 12); offer a backfill when switching to All models if it's cheap.
 
 **Step 21: testing and evals, all in one step.** Run when Rayan is away from the machine, through a subagent (AGENTS.md).
-- The whole live-check backlog in `docs/testing.md`, including everything Steps 17 to 20 added. Fix what it finds.
+- The whole live-check backlog in `docs/testing.md`, including everything Steps 18 to 20 added. Fix what it finds.
 - Export and Delete all data checked live (Delete all only on a throwaway profile).
 - Rayan's per-app hand tests in `evals/capture.md` (the Phase 0 sign-off, formerly Step 14). Fix what they turn up (apps where UIA reads nothing, pill placement next to real toolbars, additions to `DEFAULT_HOTKEY_ONLY`) and record results in `STATUS.md`.
 - Eval runners for every eval in the spec's table: commitments extraction, the date resolver (`resolveDue` has 60 unit cases; an eval adds model-in-the-loop phrases), Recall ranking, Visualize, the router (exists), and people extraction from the Who fixtures in `core/src/people/who-judge.test.ts`. Follow `evals/router.eval.ts`: skip without `GROQ_API_KEY`, retry on 429, fail on a high error rate, write to `evals/results/`, print with `print-results.mjs`.
@@ -69,7 +67,11 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 
 **Step 22: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon, and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
 
-**Parked (Rayan: "way later"):** a monthly subscription with a cap on Ask, as a third privacy choice beside All models and Local only, enforced in the model layer next to the Local only refusal. Not before packaging.
+**Step 23: the public README.** Rewrite `README.md` as the repo's front page for when it goes public: what Glossly is in one or two lines, a short demo (GIF or video) and screenshots of the pill, the bar, a few panels, and settings in light and dark, the features (from `docs/features.md`, in plain words), privacy (what stays local, Local only, keys in `safeStorage`), install from GitHub Releases (with the SmartScreen note), requirements (Windows 11; a Groq, OpenAI, or Anthropic key, or a local model), building from source, the tech stack, project layout with links to `docs/`, the roadmap (macOS later), and the license (ask Rayan which). Capture screenshots and the demo with a subagent on fictional sample data only (AGENTS.md first section), never Rayan's real data. Keep `STATUS.md` and `docs/` as the contributor docs and link them.
+
+**Parked (Rayan: "way later" or not now):**
+- A monthly subscription with a cap on Ask, as a third privacy choice beside All models and Local only, enforced in the model layer next to the Local only refusal. Not before packaging.
+- Optional decision providers for the router (the spec's Jev via OpenRouter and OpenAI Decisions, Phase 4): a `DecisionProvider` (`router/types.ts`) per API behind a setting in the Models tab. Scrapped from the plan on Oct 11; check their current docs first if it comes back, since both may have changed or no longer exist.
 
 ## Open questions for Rayan
 

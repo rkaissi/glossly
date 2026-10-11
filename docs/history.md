@@ -42,4 +42,4 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | — | Oct 11 | `0e7061f` | "Don't show here" stores plain names and toggles to "Show here"; one add-person form in Who, Reply, and What did I promise; Reply's unreadable Add button fixed. |
 | — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
-Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 17 (rest) to 22 are planned in `HANDOFF.md` (reordered Oct 11).
+Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 18 to 23 are planned in `HANDOFF.md` (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
