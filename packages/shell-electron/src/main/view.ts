@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // Pure helpers for the overlay: slot labels and geometry. No Electron imports, so they are unit-tested.
 import type { ActionId, AvailableAction, Point, Rect, RouteResult, Size, Slots, SlotsView, SlotView } from '@glossly/core';
 
@@ -208,5 +209,48 @@ export class Lru<K, V> {
 
   clear(): void {
     this.map.clear();
+  }
+}
+
+/** How much of the text before a selection identifies its conversation for Reply's cache. */
+const REPLY_KEY_BEFORE = 200;
+
+/**
+ * Reply's cache key for one highlight: the site or app, the text just before the selection
+ * (the speaker header and the messages above, which tell two conversations apart when the same
+ * short message appears in both), and the selected text, hashed. The window title is left out,
+ * since it changes with unread counts ("(3) #design | Acme - Slack"). Digits are dropped from
+ * the text before, so timestamps that move ("2m ago", "9:41 AM") don't change the key.
+ */
+export function replyCacheKey(input: { place: string; before: string; text: string }): string {
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const before = norm(input.before.slice(-REPLY_KEY_BEFORE).replace(/\d+/g, ''));
+  return createHash('sha256').update([input.place.toLowerCase(), before, norm(input.text)].join('\u0000')).digest('hex');
+}
+
+/** An Lru whose entries also expire, for model answers that go stale (Reply's drafts). */
+export class ExpiringLru<K, V> {
+  private readonly lru: Lru<K, { value: V; at: number }>;
+  constructor(
+    max: number,
+    private readonly ttlMs: number,
+    private readonly now: () => number = Date.now,
+  ) {
+    this.lru = new Lru(max);
+  }
+
+  get(key: K): V | undefined {
+    const e = this.lru.get(key);
+    if (!e) return undefined;
+    if (this.now() - e.at > this.ttlMs) return undefined;
+    return e.value;
+  }
+
+  set(key: K, value: V): void {
+    this.lru.set(key, { value, at: this.now() });
+  }
+
+  clear(): void {
+    this.lru.clear();
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { Lru, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
+import { ExpiringLru, Lru, replyCacheKey, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -204,5 +204,32 @@ describe('Lru', () => {
     expect([c.get('a'), c.get('b'), c.get('c')]).toEqual([1, undefined, 3]);
     c.clear();
     expect(c.get('a')).toBeUndefined();
+  });
+});
+
+describe("Reply's cache key", () => {
+  const base = { place: '- slack', before: 'Maya Lin  9:41 AM\n', text: 'sounds good?' };
+
+  it('ignores the window title, timestamps, and whitespace, and is a hash', () => {
+    const k = replyCacheKey(base);
+    expect(k).toMatch(/^[0-9a-f]{64}$/);
+    expect(replyCacheKey({ ...base, before: 'Maya Lin  10:02 AM\n' })).toBe(k);
+    expect(replyCacheKey({ ...base, text: '  sounds\n good? ' })).toBe(k);
+    expect(replyCacheKey({ ...base, place: '- Slack' })).toBe(k);
+  });
+
+  it('tells the same short message in two conversations apart', () => {
+    expect(replyCacheKey({ ...base, before: 'Jordan Hale  9:41 AM\n' })).not.toBe(replyCacheKey(base));
+    expect(replyCacheKey({ ...base, place: 'discord.exe' })).not.toBe(replyCacheKey(base));
+  });
+
+  it('expires entries', () => {
+    let now = 0;
+    const cache = new ExpiringLru<string, number>(2, 1000, () => now);
+    cache.set('a', 1);
+    now = 999;
+    expect(cache.get('a')).toBe(1);
+    now = 1001;
+    expect(cache.get('a')).toBeUndefined();
   });
 });

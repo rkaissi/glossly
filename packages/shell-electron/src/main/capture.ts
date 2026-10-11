@@ -94,7 +94,7 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { Lru, actionForSlot, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { ExpiringLru, Lru, actionForSlot, replyCacheKey, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
@@ -104,8 +104,8 @@ const CLICK_SETTLE_MS = 120;
 /** Who and Visualize results kept per input (see `whoCache`). */
 const MODEL_CACHE_SIZE = 20;
 const MAX_SELECTION_CHARS = 20_000;
-/** One highlight for Reply's cache: the same text in the same window and app. */
-const replyCacheKey = (sel: SelectionPayload) => [sel.source_app, sel.window_title, sel.text].join('\n');
+/** Reply's drafts for a highlight are reused for this long; after that the conversation has likely moved on. */
+const REPLY_CACHE_MS = 30 * 60_000;
 /** Hotkey with nothing selected: how much text around the caret (or on screen) is read. */
 const CARET_CHARS = 4000;
 /**
@@ -251,7 +251,7 @@ export class Capture {
   /** A people read still running, so Who and Promises opened together share the one call. */
   private readonly whoPending = new Map<string, Promise<WhoRead>>();
   /** Finished Reply drafts per highlight (`replyCacheKey`), so switching panels doesn't write them again. */
-  private readonly replyCache = new Lru<string, { raw: string; model: ModelRef }>(MODEL_CACHE_SIZE);
+  private readonly replyCache = new ExpiringLru<string, { raw: string; model: ModelRef }>(MODEL_CACHE_SIZE, REPLY_CACHE_MS);
   private readonly visualCache = new Lru<string, Extract<VisualizeResult, { ok: true }>>(MODEL_CACHE_SIZE);
 
   /**
@@ -1064,7 +1064,7 @@ export class Capture {
       setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
       return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
     }
-    const key = replyCacheKey(s.selection);
+    const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, before: s.selection.context_before, text: s.selection.text });
     // The panel was closed and opened again while the drafts were still being written: carry on
     // with that run. The text so far comes back with this answer; the rest streams under the same id.
     const running = s.reply;
