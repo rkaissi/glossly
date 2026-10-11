@@ -4,7 +4,7 @@ import askPrompt from '../../prompts/ask.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import { describeIdentity } from '../people/names';
 import type { Settings } from '../settings';
-import type { ContainerContext, Item, SelectionPayload } from '../types';
+import type { ContainerContext, Item, SelectionPayload, Surroundings } from '../types';
 import { contextWindow } from './context';
 
 export interface AskInput {
@@ -17,6 +17,8 @@ export interface AskInput {
   related?: Item[];
   /** Lets Ask save a note when the question asks it to remember something. */
   remember?: RememberDeps;
+  /** Nothing selected: the text around the caret, or what is on screen. */
+  surroundings?: Surroundings | null;
 }
 
 export interface RememberDeps {
@@ -56,6 +58,12 @@ const MAX_SELECTION = 12_000;
 const MAX_NOTES = 3;
 const MAX_NOTE_CHARS = 800;
 const SELECTION_MARK = '[SELECTION]';
+const CURSOR_MARK = '[CURSOR]';
+
+/** The surroundings with a cursor mark where the caret is (none for visible text). */
+export function markCursor(s: Surroundings): string {
+  return s.caret >= 0 ? s.text.slice(0, s.caret) + CURSOR_MARK + s.text.slice(s.caret) : s.text;
+}
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
@@ -95,12 +103,25 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
     '## The person asking',
     me ? `${me}. They are reading the selection; they did not write it unless it is signed by or attributed to them.` : 'Unknown. They are reading the selection and most likely did not write it.',
     '',
-    `## Selection (from ${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''})`,
-    '<selection>',
-    clip(selection.text, MAX_SELECTION),
-    '</selection>',
   ];
-  if (surrounding.trim() !== SELECTION_MARK) {
+  const where = `${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''}`;
+  const around = input.surroundings;
+  if (!selection.text.trim()) {
+    // Nothing selected: the question is about what is on screen, or a general one.
+    parts.push(`## Nothing is selected (the person is in ${where || 'an unknown app'})`);
+    if (around?.text.trim()) {
+      parts.push(
+        '',
+        around.source === 'caret' ? `## Around their cursor (${CURSOR_MARK} marks where they are typing)` : '## What is on their screen',
+        '<context>',
+        markCursor(around),
+        '</context>',
+      );
+    }
+  } else {
+    parts.push(`## Selection (from ${where})`, '<selection>', clip(selection.text, MAX_SELECTION), '</selection>');
+  }
+  if (selection.text.trim() && surrounding.trim() !== SELECTION_MARK) {
     parts.push(
       '',
       `## Surrounding context (${SELECTION_MARK} marks where the selection is)`,

@@ -138,6 +138,16 @@ describe('Ask', () => {
     expect(prompt).toContain('Why it was saved: pricing');
   });
 
+  it('uses the text around the cursor, or on screen, when nothing is selected', () => {
+    const empty = selection({ text: '', context_before: '', context_after: '' });
+    const typing = buildAskPrompt(DEFAULT_SETTINGS, { selection: empty, question: 'Is this polite?', surroundings: { text: 'Hi Sam, send it now.', caret: 8, source: 'caret' } }).prompt;
+    expect(typing).toContain('## Nothing is selected');
+    expect(typing).toContain('## Around their cursor ([CURSOR] marks where they are typing)\n<context>\nHi Sam, [CURSOR]send it now.\n</context>');
+    expect(typing).not.toContain('<selection>');
+    const reading = buildAskPrompt(DEFAULT_SETTINGS, { selection: empty, question: 'Summarize', surroundings: { text: 'Quarterly plan', caret: -1, source: 'visible' } }).prompt;
+    expect(reading).toContain('## What is on their screen\n<context>\nQuarterly plan\n</context>');
+  });
+
   it('says who is asking, so a message is not read as their own', () => {
     const anon = buildAskPrompt(DEFAULT_SETTINGS, { selection: selection() }).prompt;
     expect(anon).toContain('## The person asking\nUnknown. They are reading the selection');

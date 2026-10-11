@@ -102,6 +102,7 @@ async function record() {
   const sel = await run('selection');
   await run('context', { before: 500, after: 500 });
   await run('context_container', { max_chars: 8000 });
+  await run('context_caret', { max_chars: 4000 });
   if (sel.ok && sel.result.bounds) await run('popups_near', { bounds: sel.result.bounds, exclude_pids: [process.pid] });
   if (args.has('--copy')) await run('copy_fallback');
   helper.close();

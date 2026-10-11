@@ -44,6 +44,17 @@ export interface Collection {
   created_at: string;
 }
 
+/**
+ * What is around the user when the hotkey finds nothing selected: the text around the caret in
+ * a field (`caret` is its offset), or the text visible on screen (`caret` -1). Read once, locally,
+ * when the bar opens; sent to a model only by an action that uses it (Ask, Paste).
+ */
+export interface Surroundings {
+  text: string;
+  caret: number;
+  source: 'caret' | 'visible';
+}
+
 export interface Item {
   id: string;
   collection_id: string | null;

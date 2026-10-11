@@ -566,6 +566,16 @@ Rayan's requests after the 16.8 commit. 420 unit tests pass; `pnpm typecheck` is
 - Core: `library(deps, {query, collection, limit})` in `recall/recall.ts` (tested), `Store.itemIdsPage`, `Store.collectionCounts`, and `searchItemText` takes an optional collection. `SaveService.remove` stops enrichment before deleting (metric `item_deleted`). Channels `library:query`, `items:delete`, `items:move`; `SettingsTab` has `saved`.
 - The settings window's title is now "Glossly" (it was "Glossly Settings").
 
+### Step 16.11: the surroundings when nothing is selected (Oct 10, night)
+
+425 unit tests pass; `pnpm typecheck` is clean; the helper builds. Not run live (`pnpm helper:record --check` was not re-run; the new command reads screen state, so it has no deterministic case).
+
+- **Helper `context_caret {max_chars}`** (protocol, fixture, `protocol.md`, `record-helper.mjs`). With the caret in a field (`Locate` without requiring selected text, and the field editable): the text around the caret inside its container, centered like `context_container` (a reply box inside its email thread). Anywhere else: the text visible in the focused document, or under the cursor (`GetVisibleRanges`). Result `{text, caret (-1 for visible text), source: caret|visible|none, container_type, is_editable}`. Password fields are refused, as everywhere.
+- **The hotkey with nothing selected reads it** before the bar takes focus (`CARET_CHARS` 4000, cleaned with `cleanText`), into `Session.surroundings` (`Surroundings` in `core/src/types.ts`), with `timings.context_caret`. It stays local. It also fills `focusEditable` when the selection read couldn't tell. The debug view shows it as the context, split at the caret.
+- **Ask uses it** when nothing is selected: "Around their cursor" with a `[CURSOR]` mark, or "What is on their screen" (`markCursor`, tested). `prompts/ask.md` was rewritten for both cases (with and without a selection). Paste uses it from Step 16.12.
+- **Cost to know about**: one more helper call (UIA, no model) on every hotkey press with nothing selected, before the bar shows. Watch `context_caret` in the timings; on a large Chromium page `GetVisibleRanges` may take 100 ms or more.
+- **Live check**: hotkey in an empty Gmail reply under a thread, then Ask "what should I say?": the answer uses the thread; hotkey over a page with nothing selected and Ask "summarize this"; a password field gives no surroundings.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

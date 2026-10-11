@@ -98,6 +98,26 @@ Result:
 
 Errors: `no_selection`, `password_field`.
 
+### `context_caret`
+
+The surroundings when nothing is selected (the hotkey with no selection). In a field with a caret, the text around the caret inside its container, the way `context_container` centers a selection (a reply box inside its email thread, a paragraph in a document). Anywhere else, the text visible in the focused document or the one under the cursor (`GetVisibleRanges`).
+
+| Arg | Default | Range |
+| --- | --- | --- |
+| `max_chars` | 4000 | 100 to 20000 |
+
+Result:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `text` | string | At most `max_chars` |
+| `caret` | int | Offset of the caret in `text`; -1 for visible text |
+| `source` | `"caret"`, `"visible"`, or `"none"` | `none` means nothing readable (empty `text`) |
+| `container_type` | string | `document`, `list`, `pane`, or `none` |
+| `is_editable` | bool | The focused element takes text |
+
+Errors: `password_field`.
+
 ### `foreground`
 
 Result: `{"handle": int, "pid": int, "process_name": "slack.exe", "title": string, "class_name": string}`. `process_name` is lower-case with `.exe` (on macOS: the bundle executable name). `handle` is an opaque integer to pass back to `restore_focus`.

@@ -21,6 +21,7 @@ internal sealed record SelectionResult(string Text, string Method, Rect? Bounds,
 internal sealed record ContextResult(string Before, string After);
 internal sealed record FieldResult(bool Found, Rect? Bounds, string ControlType);
 internal sealed record ContainerResult(string Text, int SelectionStart, int SelectionLength, string Source, string ContainerType);
+internal sealed record CaretResult(string Text, int Caret, string Source, string ContainerType, bool IsEditable);
 /// <summary>An obstacle near the selection. Id, class, and process are identifiers only, never window or element text.</summary>
 internal sealed record Popup(string Source, string Kind, Rect Bounds, string Id, string ClassName, string ProcessName)
 {
@@ -211,6 +212,81 @@ internal sealed class Uia : IDisposable
 
         var t1 = ContextAround(loc.Range, 500, 500, null);
         return new ContainerResult(t1.Before + selText + t1.After, t1.Before.Length, selText.Length, "tier1", "none");
+    }
+
+    // ---- surroundings with nothing selected ----
+
+    /// <summary>
+    /// What is around the user when nothing is selected. In a field with a caret: the text
+    /// around the caret inside its container (a reply box inside its email thread). Anywhere
+    /// else: the text visible in the focused document, or the one under the cursor. Never
+    /// reads a password field.
+    /// </summary>
+    public CaretResult ContextCaret(int maxChars)
+    {
+        var focused = Safe(() => _automation.FocusedElement());
+        if (focused != null && IsPassword(focused)) throw new HelperException("password_field", "Focused element is a password field");
+        var loc = Locate(focused, requireText: false);
+        if (loc != null && (IsPassword(loc.Element) || IsPassword(loc.Origin)))
+            throw new HelperException("password_field", "Caret is in a password field");
+        bool editable = loc != null ? IsEditable(loc.Origin) || IsEditable(loc.Element) : focused != null && IsEditable(focused);
+
+        if (loc != null && editable)
+        {
+            var (clip, type) = FindContainerRange(loc);
+            int half = maxChars / 2;
+            var first = ContextAround(loc.Range, half, half, clip);
+            var ctx = first;
+            if (half - first.Before.Length > 0 && first.After.Length == half)
+                ctx = ContextAround(loc.Range, first.Before.Length, maxChars - first.Before.Length, clip);
+            else if (half - first.After.Length > 0 && first.Before.Length == half)
+                ctx = ContextAround(loc.Range, maxChars - first.After.Length, first.After.Length, clip);
+            if (ctx.Before.Length + ctx.After.Length > 0)
+                return new CaretResult(ctx.Before + ctx.After, ctx.Before.Length, "caret", clip != null ? type : "none", true);
+        }
+
+        // A page or document being read has no useful caret: take what is on screen.
+        var pattern = loc?.Pattern ?? PatternFrom(focused) ?? PatternAtCursor();
+        if (pattern != null && !(focused != null && IsPassword(focused)))
+        {
+            var ranges = Safe(() => pattern.GetVisibleRanges());
+            if (ranges is { Length: > 0 })
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var r in ranges)
+                {
+                    if (sb.Length >= maxChars) break;
+                    var t = Safe(() => r.GetText(maxChars - sb.Length)) ?? "";
+                    if (t.Length == 0) continue;
+                    if (sb.Length > 0) sb.Append('\n');
+                    sb.Append(t);
+                }
+                var text = sb.Length > maxChars ? sb.ToString(0, maxChars) : sb.ToString();
+                if (text.Trim().Length > 0) return new CaretResult(text, -1, "visible", "document", editable);
+            }
+        }
+        return new CaretResult("", -1, "none", "none", editable);
+    }
+
+    /// <summary>The nearest TextPattern walking up from <paramref name="start"/>, selection or not.</summary>
+    private ITextPattern? PatternFrom(AutomationElement? start)
+    {
+        var el = start;
+        for (int i = 0; el != null && i < MaxWalk; i++)
+        {
+            if (IsPassword(el)) return null;
+            var pattern = Safe(() => el.Patterns.Text.PatternOrDefault);
+            if (pattern != null) return pattern;
+            var current = el;
+            el = Safe(() => _walker.GetParent(current));
+        }
+        return null;
+    }
+
+    private ITextPattern? PatternAtCursor()
+    {
+        GetCursorPos(out var p);
+        return PatternFrom(Safe(() => _automation.FromPoint(new Point(p.X, p.Y))));
     }
 
     private (ITextRange? Range, string Type) FindContainerRange(Located loc)

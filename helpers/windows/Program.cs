@@ -67,6 +67,7 @@ internal static class Program
         "selection" => uia.Selection(Int(req, "max_chars", 20_000, 1, 200_000)),
         "context" => uia.Context(Int(req, "before", 500, 0, 5_000), Int(req, "after", 500, 0, 5_000)),
         "context_container" => uia.ContextContainer(Int(req, "max_chars", 8_000, 100, 50_000)),
+        "context_caret" => uia.ContextCaret(Int(req, "max_chars", 4_000, 100, 20_000)),
         "foreground" => Focus.Foreground(),
         "popups_near" => new { Popups = uia.PopupsNear(RectArg(req, "bounds"), PidsArg(req, "exclude_pids"), OptBool(req, "all_windows")) },
         "baseline" => Baseline.Get(PidsArg(req, "exclude_pids"), Int(req, "wait_ms", 150, 0, 1_000)),

@@ -1,0 +1,40 @@
+{
+  "cmd": "context_caret",
+  "cases": [
+    {
+      "name": "caret in a reply box",
+      "request": { "id": 31, "cmd": "context_caret", "max_chars": 4000 },
+      "response": {
+        "id": 31,
+        "ok": true,
+        "result": {
+          "text": "Maya Lin\nCan you send me the slides before Friday?\nReply\nThanks Maya, ",
+          "caret": 70,
+          "source": "caret",
+          "container_type": "document",
+          "is_editable": true
+        }
+      }
+    },
+    {
+      "name": "visible text of a page",
+      "request": { "id": 32, "cmd": "context_caret" },
+      "response": {
+        "id": 32,
+        "ok": true,
+        "result": {
+          "text": "Quarterly planning\nThe launch moved to Thursday.",
+          "caret": -1,
+          "source": "visible",
+          "container_type": "document",
+          "is_editable": false
+        }
+      }
+    },
+    {
+      "name": "nothing readable",
+      "request": { "id": 33, "cmd": "context_caret" },
+      "response": { "id": 33, "ok": true, "result": { "text": "", "caret": -1, "source": "none", "container_type": "none", "is_editable": false } }
+    }
+  ]
+}

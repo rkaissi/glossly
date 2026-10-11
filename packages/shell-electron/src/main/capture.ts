@@ -84,6 +84,7 @@ import {
   type WhoRead,
   type WhoView,
   type Item,
+  type Surroundings,
 } from '@glossly/core';
 import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
@@ -99,6 +100,8 @@ const CLICK_SETTLE_MS = 120;
 /** Who and Visualize results kept per input (see `whoCache`). */
 const MODEL_CACHE_SIZE = 20;
 const MAX_SELECTION_CHARS = 20_000;
+/** Hotkey with nothing selected: how much text around the caret (or on screen) is read. */
+const CARET_CHARS = 4000;
 /**
  * After the hotkey opens the bar, ignore the key that opened it, a cursor that is still far
  * from the selection, and a focus or foreground bounce. The helper reports that key as
@@ -147,6 +150,8 @@ interface Session {
   askRelated: string[] | null;
   /** Hotkey with nothing selected: whether the focused control takes text (null when unknown). */
   focusEditable: boolean | null;
+  /** Hotkey with nothing selected: the text around the caret, or what is visible (helper context_caret). */
+  surroundings: Surroundings | null;
   /** The running paste summary. */
   pasteCtl: AbortController | null;
   /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
@@ -456,6 +461,7 @@ export class Capture {
         recallDismissed: new Set(),
         askRelated: null,
         focusEditable: null,
+        surroundings: null,
         pasteCtl: null,
         saved: null,
         savedSettled: false,
@@ -569,6 +575,7 @@ export class Capture {
     let selection: SelectionPayload | null = null;
     let physBounds: Rect | null = null;
     let focusEditable: boolean | null = null;
+    let surroundings: Surroundings | null = null;
 
     try {
       let t = performance.now();
@@ -609,6 +616,21 @@ export class Capture {
             timings.copy_fallback = ms(t);
             text = cleanText(cf.text);
             method = 'copy';
+          }
+
+          if (!text.trim() && !password) {
+            // Nothing selected: read what is around the caret, or on screen, before the bar takes focus.
+            t = performance.now();
+            try {
+              const c = await this.helper.request('context_caret', { max_chars: CARET_CHARS });
+              timings.context_caret = ms(t);
+              focusEditable ??= c.is_editable;
+              const around = cleanText(c.text, { trimEdges: false });
+              if (c.source !== 'none' && around.trim()) surroundings = { text: around, caret: c.caret >= 0 ? Math.min(c.caret, around.length) : -1, source: c.source };
+            } catch (e) {
+              if (e instanceof HelperError && (e.code === 'closed' || e.code === 'timeout')) throw e;
+              /* a password field or nothing readable: no surroundings */
+            }
           }
 
           if (text.trim() && !password) {
@@ -659,6 +681,7 @@ export class Capture {
       recallDismissed: new Set(),
       askRelated: null,
       focusEditable,
+      surroundings,
       pasteCtl: null,
       saved: null,
       savedSettled: false,
@@ -1530,6 +1553,7 @@ ${s.selection.text}`;
       recallDismissed: new Set(),
       askRelated: null,
       focusEditable: null,
+      surroundings: null,
       pasteCtl: null,
       saved,
       savedSettled: true,
@@ -1660,7 +1684,7 @@ ${s.selection.text}`;
             return { collection };
           },
         };
-        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: this.askNotes(s), remember }, ctl.signal);
+        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: this.askNotes(s), remember, surroundings: s.selection ? null : s.surroundings }, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
           send('ask:chunk', { requestId, text });
@@ -1828,10 +1852,13 @@ ${s.selection.text}`;
   private debugFor(s: Session): OverlayState['debug'] {
     if (!this.settings.debugView) return null;
     const sel = s.selection;
+    // Nothing selected: the surroundings show as the context, split at the caret.
+    const around = !sel && s.surroundings ? s.surroundings : null;
+    const at = around ? (around.caret >= 0 ? around.caret : around.text.length) : 0;
     return {
       text: sel?.text ?? '',
-      context_before: sel?.context_before ?? '',
-      context_after: sel?.context_after ?? '',
+      context_before: sel?.context_before ?? around?.text.slice(0, at) ?? '',
+      context_after: sel?.context_after ?? around?.text.slice(at) ?? '',
       method: sel?.method ?? 'uia',
       trigger: s.trigger,
       source_app: s.fg?.process_name ?? '',

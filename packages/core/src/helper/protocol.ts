@@ -60,6 +60,17 @@ export const Commands = {
       container_type: z.string(),
     }),
   },
+  context_caret: {
+    args: z.object({ max_chars: z.number().int().optional() }),
+    result: z.object({
+      text: z.string(),
+      /** Offset of the caret in `text`, or -1 when the text is what is visible rather than around a caret. */
+      caret: z.number().int().min(-1),
+      source: z.enum(['caret', 'visible', 'none']),
+      container_type: z.string(),
+      is_editable: z.boolean(),
+    }),
+  },
   foreground: {
     args: z.object({}),
     result: z.object({
