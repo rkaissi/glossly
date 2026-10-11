@@ -78,10 +78,9 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
       glossly.on('reply:done', (p) => route(p.requestId, { kind: 'done', model: p.model })),
       glossly.on('reply:error', (p) => route(p.requestId, { kind: 'error', code: p.code, message: p.message })),
     ];
-    return () => {
-      offs.forEach((off) => off());
-      if (current.current) void glossly.invoke('reply:cancel', { requestId: current.current });
-    };
+    // Closing the panel doesn't cancel the drafts: main finishes and keeps them for this highlight,
+    // so switching to another action and back shows them without another call.
+    return () => offs.forEach((off) => off());
   }, []);
 
   const run = async (redo?: ReplyRedo) => {
@@ -103,7 +102,9 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
     setStart(r);
     const queued = early.current.get(r.requestId) ?? [];
     early.current.clear();
-    if (queued.length) setStream((st) => queued.reduce(apply, st));
+    // Picking up a run still going: start from the text so far (it already holds anything queued).
+    if (r.resumed !== undefined) setStream({ status: 'streaming', raw: r.resumed });
+    else if (queued.length) setStream((st) => queued.reduce(apply, st));
   };
 
   useEffect(() => {

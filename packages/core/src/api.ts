@@ -199,6 +199,8 @@ export interface ReplyStart {
   identitySet: boolean;
   /** The kind of platform, so "Add to people" can suggest a relationship (work chat: colleague). */
   channel: ReplyChannel;
+  /** Set when this picks up drafts still being written for the same highlight: the text so far. */
+  resumed?: string;
 }
 export interface ReplyInsertArgs {
   sessionId: number;

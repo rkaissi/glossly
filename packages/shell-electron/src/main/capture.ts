@@ -67,6 +67,7 @@ import {
   type ReplyInsertResult,
   type ReplyPick,
   type ReplyRedo,
+  type ModelRef,
   type ReplyStart,
   type ReplyTo,
   type RecallHit,
@@ -103,6 +104,8 @@ const CLICK_SETTLE_MS = 120;
 /** Who and Visualize results kept per input (see `whoCache`). */
 const MODEL_CACHE_SIZE = 20;
 const MAX_SELECTION_CHARS = 20_000;
+/** One highlight for Reply's cache: the same text in the same window and app. */
+const replyCacheKey = (sel: SelectionPayload) => [sel.source_app, sel.window_title, sel.text].join('\n');
 /** Hotkey with nothing selected: how much text around the caret (or on screen) is read. */
 const CARET_CHARS = 4000;
 /**
@@ -144,7 +147,18 @@ interface Session {
   author: { personId: string | null; isMe: boolean } | null;
   /** The latest Reply request: drafts done, and whether one was inserted or copied (else it counts as discarded). */
   /** `learned`: this session's pick has been recorded (Copy then Insert counts once). */
-  reply: { requestId: string; ctl: AbortController; personId: string | null; done: boolean; used: boolean; learned: boolean } | null;
+  reply: {
+    requestId: string;
+    ctl: AbortController;
+    personId: string | null;
+    done: boolean;
+    used: boolean;
+    learned: boolean;
+    /** The highlight (`replyCacheKey`) and the text streamed so far, so a reopened panel picks up a run still going. */
+    key: string;
+    raw: string;
+    start: ReplyStart | null;
+  } | null;
   /** Recall cards for the selection, once found (null until then). */
   recall: RecallHit[] | null;
   /** Cards dismissed as "not related" in this session. */
@@ -236,6 +250,8 @@ export class Capture {
   private readonly whoCache = new Lru<string, WhoRead>(MODEL_CACHE_SIZE);
   /** A people read still running, so Who and Promises opened together share the one call. */
   private readonly whoPending = new Map<string, Promise<WhoRead>>();
+  /** Finished Reply drafts per highlight (`replyCacheKey`), so switching panels doesn't write them again. */
+  private readonly replyCache = new Lru<string, { raw: string; model: ModelRef }>(MODEL_CACHE_SIZE);
   private readonly visualCache = new Lru<string, Extract<VisualizeResult, { ok: true }>>(MODEL_CACHE_SIZE);
 
   /**
@@ -1028,6 +1044,7 @@ export class Capture {
   /** Delete all data: forget the cached model reads of captured text too. */
   clearCaches(): void {
     this.whoCache.clear();
+    this.replyCache.clear();
     this.visualCache.clear();
   }
 
@@ -1047,9 +1064,17 @@ export class Capture {
       setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
       return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
     }
+    const key = replyCacheKey(s.selection);
+    // The panel was closed and opened again while the drafts were still being written: carry on
+    // with that run. The text so far comes back with this answer; the rest streams under the same id.
+    const running = s.reply;
+    if (!redo && running && !running.done && running.start && running.key === key && !running.ctl.signal.aborted) {
+      log.info('reply drafts', { resumed: true });
+      return { ...running.start, resumed: running.raw };
+    }
     s.reply?.ctl.abort();
     const ctl = new AbortController();
-    const state = { requestId, ctl, personId: null as string | null, done: false, used: false, learned: false };
+    const state: NonNullable<Session['reply']> = { requestId, ctl, personId: null, done: false, used: false, learned: false, key, raw: '', start: null };
     s.reply = state;
 
     const container = (await s.container) ?? null;
@@ -1090,17 +1115,38 @@ export class Capture {
       this.services.metrics.record('reply_redo', { asks: redo.asks.join(','), typed: Boolean(redo.note?.trim()) });
     }
 
+    // The same highlight gets the drafts it already has: switching panels and back, or selecting
+    // it again, shows them without another call. "None of these" always writes new ones, and
+    // those become the cached drafts.
+    const start: ReplyStart = { requestId, to, identitySet, channel };
+    state.start = start;
+    const hit = redo ? undefined : this.replyCache.get(key);
+    if (hit) {
+      setTimeout(() => {
+        if (s.reply !== state) return;
+        state.done = true;
+        send('reply:chunk', { requestId, text: hit.raw });
+        send('reply:done', { requestId, model: hit.model });
+        log.info('reply drafts', { cached: true });
+      }, 0);
+      return start;
+    }
+
     void (async () => {
       const t = performance.now();
       let firstMs: number | null = null;
+      let raw = '';
       try {
         const r = reply(this.services.llm, this.settings, input, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
+          raw += text;
+          state.raw = raw;
           send('reply:chunk', { requestId, text });
         }
         const model = await r.model;
         state.done = true;
+        if (raw.trim()) this.replyCache.set(key, { raw, model });
         send('reply:done', { requestId, model });
         this.services.metrics.record('reply_drafts', { first_token_ms: firstMs ?? -1, total_ms: ms(t), person: Boolean(person) });
       } catch (e) {
@@ -1110,7 +1156,7 @@ export class Capture {
         fail(code, message);
       }
     })();
-    return { requestId, to, identitySet, channel };
+    return start;
   }
 
   cancelReply(requestId: string): void {

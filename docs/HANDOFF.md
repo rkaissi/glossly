@@ -620,6 +620,14 @@ Rayan asked for a prompt-engineering pass, structured output where it helps, and
 - **Comparison evals** (run only with `GROQ_API_KEY` and `GLOSSLY_COMPARE=1`; helpers in `evals/lib.ts`, old code and prompts in `evals/legacy/`): `evals/visualize-compare.eval.ts` (the model writing the Vega-Lite spec against the structured pick, 20 cases in `fixtures/visualize/charts.json` with what a relevant chart is; renders both with vega, flags mixed scales, crowded labels, reordering, design overrides; writes JSON and a side-by-side HTML page to `evals/results/`) and `evals/router-collection-compare.eval.ts` (string collection with the code fix-up against the enum, 60 fixtures, Qwen 3.8 and gpt-oss-20b; counts outright failures, retries, and how often the old version needed the fix-up).
 - **What ran**: one partial Visualize run on Qwen 3.8 (15 of 20 cases before the 10-minute test timeout; two of those lost to rate limits). On the 13 cases where both answered: the old way was relevant on 7, the new one on 12. The old way wrote one spec that wasn't valid JSON (no chart), charted a table with no numbers and a prose list of mixed metrics, reordered two ordered axes (most likely alphabetical), and crowded long labels on vertical bars; the new one's only miss was plotting visitors and signups on one axis (mixed scale), which both did. No HTML or JSON was written, so looks were not compared. The router comparison never ran. Timeouts are now an hour and calls are paced (`GLOSSLY_COMPARE_GAP_MS`, 2.5 s); a full run of both is about 300 calls.
 
+### Reply drafts are kept per highlight (Oct 10, late night)
+
+429 unit tests pass; `pnpm typecheck` is clean. Not run live.
+
+- Finished drafts are cached per highlight (`replyCacheKey`: app, window title, and selected text; a 20-entry `Lru` like Who's and Visualize's, cleared by Delete all data). Opening Reply again, after switching to another action or selecting the same text again, shows them at once with no call (`reply drafts {cached:true}`; no `reply_drafts` metric). "None of these" always writes new drafts, and those replace the cached ones.
+- The panel no longer cancels the stream when it closes. Switching away mid-stream lets it finish (and be cached); opening Reply again while it is still going picks up that run (`ReplyStart.resumed` holds the text so far, then the rest streams under the same id; `reply drafts {resumed:true}`).
+- Not kept: edits, the picked draft, and the "Write my own" text are panel state and reset when the panel reopens.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).
