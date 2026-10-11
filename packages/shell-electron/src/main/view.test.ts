@@ -178,7 +178,7 @@ describe('empty selection', () => {
     const v = emptySlotsView({ slot3: { action: 'search', score: 0.9 }, slot4: { action: 'paste_list', score: 0.8 }, more: [{ action: 'paste_summary', score: 0.25 }], scores: {} });
     expect(actionForSlot(v, 3)).toBe('search');
     expect(actionForSlot(v, 4)).toBe('paste_list');
-    expect(v.more.map((m) => m.label)).toEqual(['Paste a summary']);
+    expect(v.more.map((m) => m.label)).toEqual(['Write it for here']);
     expect(needsTier2('ask')).toBe(true);
     expect(needsTier2('search')).toBe(false);
     expect(needsTier2('recall')).toBe(false);

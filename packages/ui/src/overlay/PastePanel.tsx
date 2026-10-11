@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ClipboardCheck, Copy, CornerDownLeft, RotateCcw } from 'lucide-react';
-import type { OverlayState, PasteCompose, PasteKind } from '@glossly/core/api';
+import type { OverlayState, PasteCompose, PasteKind, PasteTarget } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { ActionIcon } from '../icons';
 
+const PLACE: Record<PasteTarget, string> = { email: 'this email', chat: 'this chat', document: 'this document', code: 'this file', other: 'here' };
+
+/** The panel's heading: what was picked, and for where. */
+function heading(kind: PasteKind, c: PasteCompose | null): string {
+  if (!c?.ok) return kind === 'list' ? 'Your snippets' : 'Written from your snippets';
+  if (kind === 'summary') return `Written for ${PLACE[c.target]}`;
+  return c.reason === 'related' ? `Snippets that fit ${PLACE[c.target]}` : 'Your recent snippets';
+}
+
 /**
- * Paste for the bar with nothing selected: the recent snippets as a list, or a short summary.
- * The list can switch to the snippets as saved (full text, original line breaks). The text is
- * shown and editable first; Enter pastes it into the app (or copies it when the focused
- * control doesn't take text).
+ * Paste for the bar with nothing selected. Main picks the snippets that fit what is around the
+ * cursor (else the newest) and shapes them for the spot: as a list (which can switch to the
+ * snippets as saved), or written for it by the model. The text is shown and editable first;
+ * Enter pastes it into the app (or copies it when the focused control doesn't take text).
  */
 export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
   const [composed, setComposed] = useState<PasteCompose | null>(null);
@@ -79,14 +88,15 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
     }
   };
 
-  const title = kind === 'list' ? 'Your recent snippets' : 'A summary of your recent snippets';
+  const title = heading(kind, composed);
+  const count = composed?.ok ? (kind === 'summary' && composed.count < composed.total ? `${composed.count} of ${composed.total}` : String(composed.count)) : null;
   return (
     <div className="panel paste" onKeyDown={onKeyDown}>
       <h2 className="saved-line">
         <ActionIcon action={kind === 'list' ? 'paste_list' : 'paste_summary'} size={17} />
         <span>
           {title}
-          {composed?.ok && <span className="muted"> · {composed.count}</span>}
+          {count && <span className="muted"> · {count}</span>}
         </span>
       </h2>
 
@@ -111,7 +121,7 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
           ))}
         </div>
       )}
-      {!composed && <p className="muted">{kind === 'list' ? 'Gathering…' : 'Summarizing…'}</p>}
+      {!composed && <p className="muted">{kind === 'list' ? 'Finding snippets…' : 'Writing…'}</p>}
       {composed?.ok && (
         <textarea
           ref={editor}
@@ -126,7 +136,7 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
         <div className="answer-error">
           <span className={composed.code === 'no_selection' ? 'muted' : 'error'}>{composed.message}</span>
           {composed.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
-          {composed.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and summarize</button>}
+          {composed.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and write it</button>}
           {(composed.code === 'provider' || composed.code === 'timeout' || composed.code === 'invalid_output') && (
             <button onClick={() => void compose()}>
               <RotateCcw size={14} strokeWidth={1.75} aria-hidden />

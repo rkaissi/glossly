@@ -40,7 +40,9 @@ import {
   assignEmptySlots,
   pasteAsSaved,
   pasteList,
-  pasteSummary,
+  composePaste as composeForHere,
+  pasteSnippets,
+  pasteTarget,
   recentSnippets,
   search as searchSaved,
   library as librarySaved,
@@ -823,6 +825,7 @@ export class Capture {
         editable: s.focusEditable,
         recent: recentSnippets(this.services.store, settings).length,
         summaryModel: !settings.localOnly && this.services.llm.hasModel('chat'),
+        writing: s.surroundings?.source === 'caret' && s.surroundings.text.trim().length > 0 && this.services.store.collectionCounts().total > 0,
       },
       settings.router,
     );
@@ -1300,24 +1303,37 @@ ${s.selection.text}`;
 
   // ---- Paste (nothing selected) ----
 
-  /** The recent snippets as a list, or summarized by the Chat model. Shown before anything is pasted. */
+  /**
+   * The snippets that fit where the cursor is (by meaning against the surroundings, else the
+   * newest), as a list shaped for the spot, or written for it by the Chat model. Shown before
+   * anything is pasted.
+   */
   async composePaste(sessionId: number, kind: 'list' | 'summary'): Promise<PasteCompose> {
     const s = this.current(sessionId);
     if (!s) return { ok: false, code: 'no_selection', message: 'This bar is gone. Press the hotkey again.' };
-    const items = recentSnippets(this.services.store, this.settings);
+    const target = pasteTarget(s.fg?.process_name ?? '', s.fg?.title ?? '');
+    const t = performance.now();
+    const sv = this.services;
+    const picked = await pasteSnippets({ store: sv.store, embedder: () => sv.embed.embedder(), settings: () => sv.settings }, { surroundings: s.surroundings, target });
+    const items = picked.items;
     if (items.length === 0) return { ok: false, code: 'no_selection', message: `Nothing saved in the last ${this.settings.paste.recentDays} days.` };
+    const base = { count: items.length, total: items.length, target, reason: picked.reason };
     if (kind === 'list') {
-      this.services.metrics.record('paste_composed', { kind, count: items.length, ms: 0 });
-      return { ok: true, text: pasteList(items), asSaved: pasteAsSaved(items), count: items.length };
+      this.services.metrics.record('paste_composed', { kind, count: items.length, target, reason: picked.reason, ms: ms(t) });
+      return { ok: true, ...base, text: pasteList(items, target), asSaved: pasteAsSaved(items) };
     }
     s.pasteCtl?.abort();
     const ctl = new AbortController();
     s.pasteCtl = ctl;
-    const t = performance.now();
     try {
-      const text = await pasteSummary(this.services.llm, items, ctl.signal);
-      this.services.metrics.record('paste_composed', { kind, count: items.length, ms: ms(t) });
-      return { ok: true, text, count: items.length };
+      const draft = await composeForHere(
+        this.services.llm,
+        { items, target, app: s.fg?.process_name ?? '', title: s.fg?.title ?? '', surroundings: s.surroundings },
+        ctl.signal,
+      );
+      this.services.metrics.record('paste_composed', { kind, count: draft.used.length, offered: items.length, target, reason: picked.reason, format: draft.format, ms: ms(t) });
+      if (!draft.text) return { ok: false, code: 'no_selection', message: 'None of your saved snippets fit what you are writing. Paste snippets lists them anyway.' };
+      return { ok: true, ...base, count: draft.used.length || items.length, text: draft.text, format: draft.format };
     } catch (e) {
       const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
       if (code !== 'aborted') this.services.metrics.record('paste_error', { code, ...(e instanceof LlmError && e.statusCode && { status: e.statusCode }) });

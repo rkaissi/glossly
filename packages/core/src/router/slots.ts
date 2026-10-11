@@ -27,19 +27,23 @@ export interface EmptyContext {
   recent: number;
   /** A model is available for the summary (a key, and Local only off). */
   summaryModel: boolean;
+  /** The caret is in a field with text around it and something is saved, so older snippets may fit too. */
+  writing?: boolean;
 }
 
 /**
- * Nothing selected: Search always; pasting recent snippets when there are some, ranked lower
- * when the focused control doesn't take text (it then lands on the clipboard). The summary
- * needs a model; without one it stays under More, where it explains why.
+ * Nothing selected: Search always; pasting snippets when there are some, ranked lower when the
+ * focused control doesn't take text (it then lands on the clipboard). While the user is writing
+ * (text around the caret), "Write it for here" goes ahead of the plain list, since it picks the
+ * snippets that fit and shapes them for the spot. It needs a model; without one it stays under
+ * More, where it explains why.
  */
 export function scoreEmptyActions(c: EmptyContext): Record<EmptyAction, number> {
-  const paste = c.recent === 0 ? 0 : c.editable === false ? 0.3 : 0.8;
+  const paste = c.recent === 0 && !c.writing ? 0 : c.editable === false ? 0.3 : 0.8;
   return {
     search: 0.9,
     paste_list: paste,
-    paste_summary: paste === 0 ? 0 : c.summaryModel ? paste - 0.05 : 0.25,
+    paste_summary: paste === 0 ? 0 : !c.summaryModel ? 0.25 : c.writing ? paste + 0.05 : paste - 0.05,
   };
 }
 

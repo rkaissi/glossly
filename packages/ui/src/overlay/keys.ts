@@ -42,7 +42,7 @@ export function barItems(slots: SlotsView | null, hasSelection: boolean, menuOpe
 
 /**
  * The number shown on a slot button and the key that runs it: its position on the bar, so
- * the empty bar (no Save) reads 1 Ask, 2 Search, 3 Paste recent rather than skipping 2.
+ * the empty bar (no Save) reads 1 Ask, 2 Search, 3 Paste snippets rather than skipping 2.
  */
 export function slotKey(items: BarItem[], slot: 1 | 2 | 3 | 4): number {
   return items.filter((i) => 'slot' in i).findIndex((i) => 'slot' in i && i.slot === slot) + 1;

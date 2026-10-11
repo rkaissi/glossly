@@ -10,8 +10,8 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',
-  paste_list: 'Paste recent',
-  paste_summary: 'Paste a summary',
+  paste_list: 'Paste snippets',
+  paste_summary: 'Write it for here',
 };
 
 const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];

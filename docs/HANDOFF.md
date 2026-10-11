@@ -576,6 +576,16 @@ Rayan's requests after the 16.8 commit. 420 unit tests pass; `pnpm typecheck` is
 - **Cost to know about**: one more helper call (UIA, no model) on every hotkey press with nothing selected, before the bar shows. Watch `context_caret` in the timings; on a large Chromium page `GetVisibleRanges` may take 100 ms or more.
 - **Live check**: hotkey in an empty Gmail reply under a thread, then Ask "what should I say?": the answer uses the thread; hotkey over a page with nothing selected and Ask "summarize this"; a password field gives no surroundings.
 
+### Step 16.12: paste picks what fits and shapes it for the spot (Oct 10, night)
+
+428 unit tests pass; `pnpm typecheck` is clean. Not run live.
+
+- **Where the cursor is** (`pasteTarget`, tested): email (the `replyChannel` email apps and sites), chat (messaging and work chat), document (Word, Notepad, OneNote, Notion, Obsidian, Google Docs, Confluence, ...), code (VS Code, Cursor, JetBrains, Visual Studio, ...), or other. It sets how many snippets go in (`PASTE_COUNT`: chat 3, email and code and other 5, document 8, capped by `paste.recentCount`) and the list's shape (plain lines in a chat, `- ` bullets elsewhere).
+- **Which snippets** (`pasteSnippets`, tested): with the surroundings from Step 16.11 and the embedding model, saved items close in meaning to the text just before the caret (or what is on screen), at or above the new setting `paste.relatedSimilarity` (0.4), of any age, a newer one winning a near tie. Otherwise, or when nothing is close, the newest from the last `paste.recentDays` days, oldest first. A snippet already in the text around the caret is left out. Still local; no model call.
+- **Write it for here** (was "Paste a summary"; `composePaste`, `prompts/paste-compose.md`, which replaces `paste-summary.md`). One structured call on the Chat role: `{use: number[], format: z.enum(PASTE_FORMATS), text}`. The prompt gets the target, the app and title, the text around the cursor with `[CURSOR]`, and the numbered snippets; it uses only the ones that fit, and shapes the text for the spot (sentences that slot into an email reply without a second greeting, one chat message, bullets or a summary paragraph matching a document, a list elsewhere), continuing from the cursor. Code keeps only real snippet numbers. An empty text means nothing fits, and the panel says so.
+- **The empty bar**: "Paste recent" is now "Paste snippets". While the user is writing (caret surroundings, something saved, a model), "Write it for here" takes slot 4 ahead of the list (`EmptyContext.writing`), even when nothing was saved in the last week. The panel says "Snippets that fit this email · 3", "Your recent snippets · 5", or "Written for this document · 2 of 5". Metrics: `paste_composed` gains `target`, `reason`, `offered`, `format`.
+- **Live check**: in a Gmail reply about a topic you saved a snippet on weeks ago, hotkey with nothing selected: slot 4 is Write it for here, and it writes sentences from only that snippet; in Google Docs under a bulleted list it writes bullets; in Slack, Paste snippets gives plain lines.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

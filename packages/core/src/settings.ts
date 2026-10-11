@@ -128,6 +128,8 @@ export const SettingsSchema = z.object({
       /** How many recent snippets the paste actions use, and how far back they look. */
       recentCount: z.number().int().min(1).max(50).default(10),
       recentDays: z.number().int().min(1).max(90).default(7),
+      /** With text around the caret, saved items at least this close in meaning are pasted, whatever their age. */
+      relatedSimilarity: z.number().min(0).max(1).default(0.4),
     })
     .prefault({}),
 

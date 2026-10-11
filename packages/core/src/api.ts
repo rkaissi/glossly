@@ -15,6 +15,7 @@ import type { BarAction, ContentType, DecisionProviderId } from './router/types'
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
+import type { PasteFormat, PasteTarget } from './actions/paste-types';
 import type { LibraryQuery, LibraryResult, RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
@@ -28,6 +29,7 @@ export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
 export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePreference } from './people/reply-style';
 export type { Relationship } from './people/relationship';
+export type { PasteFormat, PasteTarget } from './actions/paste-types';
 export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
@@ -238,6 +240,14 @@ export type PasteCompose =
       asSaved?: string;
       /** Snippets used. */
       count: number;
+      /** Snippets that were offered (the summary may use fewer). */
+      total: number;
+      /** Where the cursor is: email, chat, document, code, or other. */
+      target: PasteTarget;
+      /** `related`: picked by meaning against the text around the cursor; `recent`: the newest ones. */
+      reason: 'related' | 'recent';
+      /** Summary only: the shape the model wrote. */
+      format?: PasteFormat;
     }
   | { ok: false; code: AskErrorEvent['code']; message: string };
 
