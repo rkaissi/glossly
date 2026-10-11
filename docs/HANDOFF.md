@@ -6,7 +6,7 @@ Last updated Oct 11, 2026: **Step 20.3, first chunk, landed** (decision 41): a s
 
 ## Start here
 
-Glossly is a Windows tray app: highlight text anywhere and a small pill offers actions on it (Ask, Save, Reply, Who is this, What did I promise, Visualize), or press `Ctrl+Alt+Space` for the full bar. A C# helper reads selections through UI Automation; Electron hosts the overlay and settings; `packages/core` holds everything OS-neutral.
+Glossly is a Windows tray app: highlight text anywhere and a small pill offers actions on it (Ask, Save, Reply, Who is this, Tasks and events, Visualize), or press `Ctrl+Alt+Space` for the full bar. Settings has Tasks and Calendar tabs for what it finds. A C# helper reads selections through UI Automation; Electron hosts the overlay and settings; `packages/core` holds everything OS-neutral.
 
 | Doc | Read it for |
 | --- | --- |
@@ -21,16 +21,17 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 | `docs/Highlight-to-Action App Prototype Spec.md` | The original spec. Its Phase 4+ sections, Data model, Evals and local metrics, Milestones, and Distribution to testers still guide the remaining steps; `docs/decisions.md` overrides it where they differ. |
 | `helpers/protocol.md` | Every helper command, error, and event. Read before touching the helper or `capture.ts`. |
 | `evals/capture.md` | Rayan's hand-test sheet for Phase 0. |
-| `docs/brand/` | The Glossly mark and the alternatives Rayan liked. |
+| `docs/brand/` | The Glossly mark, the app icon (Glass) and its backups (Aurora first, then Rim), and the alternatives Rayan liked. |
+| `docs/design/` | The HTML mockups Rayan approved for Step 20 (20.1 controls, 20.2 Tasks and Calendar, 20.3 hints, setup, icon, motion). The setup build follows `mockups/20-3-design-pass.html`. |
 
 ## Where things stand
 
 - **Built:** spec Phases 0 to 3 (capture, the bar, Ask, Save, settings and setup, people and Who, What did I promise, Reply, Recall, Search, Visualize) plus everything Rayan added along the way: the glass redesign, Save modes, paste with nothing selected, Ask's remember tool, Reply that learns your style, the Saved tab, relationships. Of Phase 4, the metrics view is done (Step 17.1).
-- **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, 18, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
+- **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 20.3's first chunk, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
-- **Steps 18 to 20.2 (Oct 11):** built with unit tests only (20.1 and 20.2 also previewed in the browser); their live checks are in the backlog under "Local models and privacy", "Tasks and events", "Design system and controls", and "Tasks and Calendar".
-- **Not started:** Steps 20.3 to 23 below. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
-- **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
+- **Steps 18 to 20.3's first chunk (Oct 11):** built with unit tests only (the settings side of 20.1 to 20.3 also previewed in the browser with fictional data); their live checks are in the backlog under "Local models and privacy", "Tasks and events", "Design system and controls", "Tasks and Calendar", and "Motion, key hints, app icon". The overlay side of Step 20 (the panel's pickers and its window growing for them, key chips, the overlay's motion) has never been seen running.
+- **Not started:** the rest of 20.3 (the setup redesign, the spacing check, the small fixes) and Steps 21 to 23 below. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
+- **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data, from `packages/shell-electron/out`; his Notepad has a few unsaved sample tabs from earlier checks. When it next starts from a fresh build, migration 6 (`commitments.completed_at`) runs on his database and the new settings (`weekStart`, `calendarView`, `keyHints`) take their defaults. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
@@ -47,12 +48,12 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 - Router: the `promises` score also counts todo-like text ("remember to", "need to", a verb with a date) and a message from someone with open tasks. Label "Tasks" in the bar and More.
 - Reminders keep using the commitment notifier.
 
-*19.2 Calendar events (done, Oct 11; decision 37).* Events come from the same call and panel as tasks: the action is **Tasks and events**, and Settings > **Agenda** lists both by day. Stored apart (`calendar_events`, migration 5) with their own reminders. **Fallback if one action works poorly:** two actions, Tasks and Add to calendar (a new `event` id), each with its own call and panel; the Agenda and storage stay (decision 37 has the details).
+*19.2 Calendar events (done, Oct 11; decision 37).* Events come from the same call and panel as tasks: the action is **Tasks and events**, and Settings > **Agenda** listed both by day (replaced by the Tasks and Calendar tabs in 20.2). Stored apart (`calendar_events`, migration 5) with their own reminders. **Fallback if one action works poorly:** two actions, Tasks and Add to calendar (a new `event` id), each with its own call and panel; the Agenda and storage stay (decision 37 has the details).
 
 *19.3 Google Calendar sync: parked (Rayan, Oct 11; see Parked below).*
 
 
-**Step 20: design pass and UI upgrade** (Rayan, Oct 11: "be a designer"). Modern, sleek, minimal, and glossy, native to Windows 11; no illustration pass, no second theme. **Design first, then implement:** each sub-step starts with a mockup (an HTML page in the scratchpad built from `theme.css`, opened in the built-in browser), then the code. Check the real windows with a Sonnet subagent and screenshots, but sparingly (AGENTS.md); screenshots only on fictional sample data (a throwaway profile), never Rayan's.
+**Step 20: design pass and UI upgrade** (Rayan, Oct 11: "be a designer"). Modern, sleek, minimal, and glossy, native to Windows 11; no illustration pass, no second theme. **Design first, then implement:** each sub-step starts with a mockup (an HTML page built from `theme.css` and `controls.css`, shown in the built-in browser and kept in `docs/design/mockups/` once approved), then the code. Check the real windows with a Sonnet subagent and screenshots, but sparingly (AGENTS.md); screenshots only on fictional sample data (a throwaway profile), never Rayan's.
 
 *20.1 Design system and our own controls (done, Oct 11; decision 39).* Controls in `packages/ui/src/controls/` (Popover, Menu and ActionMenu, Select, Calendar, DatePicker with a field and a row-chip look, DateRangePicker, TimePicker, Segmented, Checkbox, TaskCheck, Switch, ChoiceCards); tokens and buttons in `theme.css`; every native control in both windows replaced; tabs regrouped.
 
@@ -79,7 +80,7 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 - Eval runners for every eval in the spec's table: commitments extraction, the date resolver (`resolveDue` has 60 unit cases; an eval adds model-in-the-loop phrases), Recall ranking, Visualize, the router (exists), and people extraction from the Who fixtures in `core/src/people/who-judge.test.ts`. Follow `evals/router.eval.ts`: skip without `GROQ_API_KEY`, retry on 429, fail on a high error rate, write to `evals/results/`, print with `print-results.mjs`.
 - Then **one** `pnpm eval` run (Rayan approved one; Groq free tier; no comparison evals, decision 35). Record every number in `STATUS.md` and `docs/testing.md`, including the re-tuned router prompt's slot match. Pre-agreed rule: if the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection` and compute the people and commitment scores from rules. Who's own model call stays.
 
-**Step 22: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon, and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
+**Step 22: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon (`packages/shell-electron/resources/icon.png`, Glass; electron-builder makes the `.ico`; ship `icon.png` in resources too, which `appIconPath()` reads when packaged), and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
 
 **Step 23: the public README.** Rewrite `README.md` as the repo's front page for when it goes public: what Glossly is in one or two lines, a short demo (GIF or video) and screenshots of the pill, the bar, a few panels, and settings in light and dark, the features (from `docs/features.md`, in plain words), privacy (what stays local, Local only, keys in `safeStorage`), install from GitHub Releases (with the SmartScreen note), requirements (Windows 11; a Groq, OpenAI, or Anthropic key, or a local model), building from source, the tech stack, project layout with links to `docs/`, the roadmap (macOS later), and the license (ask Rayan which). Capture screenshots and the demo with a subagent on fictional sample data only (AGENTS.md first section), never Rayan's real data. Keep `STATUS.md` and `docs/` as the contributor docs and link them.
 
@@ -120,6 +121,13 @@ None right now. Everything he was asked has been answered and is recorded in `do
 - A popover closes when its anchor scrolls out of view, so open one only on a visible trigger. Popovers stack: Esc and clicks outside close only the top one, so a picker can open over the event editor. In the overlay, `RoomContext` grows the window for a popover that doesn't fit; the settings window has no provider.
 - Rayan's instance runs from `packages/shell-electron/out`: build elsewhere while it runs (`pnpm exec electron-vite build --outDir <scratchpad>`). To preview the settings page without the app, serve the built `renderer/` with a stub `window.glossly` that returns fictional data (how 20.1 was checked).
 
+**Motion and key hints (Step 20.3, decision 41)**
+- Animate with the spring tokens in `theme.css` (`--spring-soft`, `--spring-pop`, `--spring-gentle` and their `-ms` durations) and the shared keyframes (`rise-in`, `pop-in-small`, `squash-pop`); exits use `--ease-in`, short, no bounce. The generator for new springs is in `docs/design/mockups/20-3-design-pass.html` (`spring()`); keep overshoot under 10%.
+- Every button squishes on `:active` through `transform`; a button that needs its own transform should opt out (toggles with a role already do).
+- In the overlay the glass is the window, so never scale or move a container there; animate what's inside.
+- Key chips: the bar reads `s.keyHints` once, in `Expanded`'s `hints` state, when it opens; `s.keyboard` still decides whether the keys work.
+- Previewing: the built-in browser shows files outside the project as static snapshots, and the mockups and the built settings page need a server. A tiny Node server in the scratchpad that serves the mockups, `/theme.css`, `/controls.css`, and a built `renderer/` copy (with JavaScript sent as `text/javascript`) works; for the settings page, inject a `stub.js` that defines `window.glossly` with fictional data before the bundle loads.
+
 **Local models (Step 18)**
 - `@ai-sdk/openai-compatible` 3.0.67 with `supportsStructuredOutputs: true`: Ollama and LM Studio both take `response_format: json_schema` (LM Studio rejects `json_object`). Local models get `tools: false`, so Ask's remember tool is not offered on them.
 - Neither Ollama nor LM Studio is known to be installed here; the Step 21 pass needs one with a small model pulled (for example `ollama pull qwen3:4b`).
@@ -159,6 +167,8 @@ pnpm eval                # only when Rayan asks
 - Empty output from the shell: request `all` permissions. PowerShell shows pnpm's stderr as red `NativeCommandError` even on success; check `$LASTEXITCODE`.
 - If `electron-vite` fails with "Cannot find module ...\packages\shell-electron\node_modules\electron-vite", delete that package's `node_modules\.bin` (stale shims from an old install).
 - The helper exe is locked while Glossly runs; stop the app before `pnpm helper:build`.
+- Python on Windows writes CRLF in text mode; when a script rewrites repo files, pass `newline='\n'` (the repo is LF, `.gitattributes`).
+- In Claude Code's Bash tool, long quoted heredocs with backticks sometimes fail to parse ("unexpected EOF"); write the script to a scratchpad file and run it instead.
 
 **API keys**
 - The app gets keys only through Settings > Models (formerly Keys; `safeStorage`, `%APPDATA%\Glossly\keys\`). Rayan's Groq key is saved there.
