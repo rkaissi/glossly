@@ -186,9 +186,9 @@ describe("acceptWhoRows", () => {
         const corpus = [
             "Hello team",
             "",
-            "casey@waterloo.cablake",
-            "communications@alumo.ca",
-            "nyc-swe-intern-interview-scheduling@northwind.comjordan",
+            "casey@lakeview.cariley",
+            "communications@fabrikam.ca",
+            "team-intern-interview-scheduling@northwind.comjordan",
             "",
             "Jordan Hale <jordan.hale@example.com> will follow up."
         ].join("\n");
@@ -196,14 +196,14 @@ describe("acceptWhoRows", () => {
             [
                 row({ name: "Jordan Hale", evidence: "Jordan Hale" }),
                 row({
-                    name: "casey@waterloo.cablake",
-                    email: "casey@waterloo.cablake",
-                    evidence: "casey@waterloo.cablake"
+                    name: "casey@lakeview.cariley",
+                    email: "casey@lakeview.cariley",
+                    evidence: "casey@lakeview.cariley"
                 }),
                 row({
-                    name: "communications@alumo.ca",
-                    email: "communications@alumo.ca",
-                    evidence: "communications@alumo.ca"
+                    name: "communications@fabrikam.ca",
+                    email: "communications@fabrikam.ca",
+                    evidence: "communications@fabrikam.ca"
                 })
             ],
             corpus,

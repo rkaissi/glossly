@@ -96,7 +96,7 @@ const COMMON_BY_LENGTH = [...COMMON_TLDS].sort((a, b) => b.length - a.length);
  * plus a word the page glued on. A short ending we don't list (".cafe") is kept whole.
  */
 function tldOf(label: string): string | null {
-  // A capitalized word glued on ("caBlake") is the clearest split.
+  // A capitalized word glued on ("caRiley") is the clearest split.
   const glued = /^([a-z]{2,})[A-Z]/.exec(label);
   if (glued) return tldOf(glued[1]!);
   const lower = label.toLowerCase();
