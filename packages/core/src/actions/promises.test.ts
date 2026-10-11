@@ -3,9 +3,10 @@ import type { z } from 'zod';
 import { LlmError, type ChatRequest, type LlmProvider } from '../llm/types';
 import { detectPeople, type DetectedPerson } from '../people/detect';
 import { DEFAULT_SETTINGS } from '../settings';
+import { CalendarRepo } from '../store/calendar';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
-import type { SelectionPayload } from '../types';
+import { isoNow, type SelectionPayload } from '../types';
 import { buildPromisesPrompt, extractPromises, reminderCutoff, reminderText, savePromises, type ExtractedCommitments } from './promises';
 import { detectInputFor } from './who';
 
@@ -51,6 +52,7 @@ const answer: ExtractedCommitments = {
     { owner: 'them', person_name: 'Maya', text: 'share the slides with Daniel', due_phrase: '', confidence: 0.4, change: 'new', open_task: 'none' },
     { owner: 'me', person_name: 'Maya Lin', text: "Send the slides from  Tuesday's review", due_phrase: 'Friday', confidence: 0.9, change: 'new', open_task: 'none' },
   ],
+  events: [],
 };
 
 let store: Store;
@@ -141,6 +143,7 @@ describe('What did I promise', () => {
         { owner: 'me', person_name: 'Daniel', text: 'intro Daniel to legal', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
         { owner: 'them', person_name: 'Priya', text: 'send the budget', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
       ],
+      events: [],
     }));
     const detected = [
       { name: 'Daniel Park', email: 'daniel.park@example.com', handle: null, role: 'mentioned' as const, knownId: null, detail: 'legal lead at Acme', about: 'joins the call', relationship: 'colleague' as const },
@@ -205,6 +208,7 @@ describe('Tasks and open tasks (decision 36)', () => {
         // A second row about the same task is dropped.
         { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck again', due_phrase: '', confidence: 0.9, change: 'same', open_task: 't2' },
       ],
+      events: [],
     }));
     const r = await extractPromises(llm, people, settings, { selection: fromJordan, author, authorIsMe: false, people: [author] }, undefined, now);
     const prompt = llm.calls[0]!.prompt;
@@ -234,6 +238,7 @@ describe('Tasks and open tasks (decision 36)', () => {
         { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'later', confidence: 0.9, change: 'moved', open_task: 't2' },
         { owner: 'me', person_name: 'Jordan Hale', text: 'book the venue', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't9' },
       ],
+      events: [],
     }));
     // The schema's enum would refuse t9 from a real model; the fake skips validation of that, so code must cope.
     llm.loose = true;
@@ -253,6 +258,41 @@ describe('Tasks and open tasks (decision 36)', () => {
     expect(r.rows[0]).toMatchObject({ change: 'moved', existing: { id: deck.id }, due_at: '2026-10-16', due_phrase: 'by Friday' });
     expect(r.rows[1]).toMatchObject({ change: 'new', text: 'book the venue' });
     expect(r.open.map((t) => t.text).sort()).toEqual(['intro Jordan to Casey', 'send the budget']);
+  });
+});
+
+describe('events from the same call (decision 37)', () => {
+  it('returns events beside tasks, with the saved events on those days', async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const calendar = new CalendarRepo(store);
+    calendar.add({ title: 'Dentist', starts_at: '2026-10-15T09:00:00' + isoNow(now).slice(19), ends_at: null, all_day: false, location: null, attendees: [], personIds: [] }, null);
+    calendar.add({ title: 'Other day', starts_at: '2026-10-16', ends_at: null, all_day: true, location: null, attendees: [], personIds: [] }, null);
+    const llm = new FakeLlm(() => ({
+      commitments: [{ owner: 'me', person_name: 'Jordan Hale', text: 'bring the deck', due_phrase: 'Thursday', confidence: 0.8, change: 'new', open_task: 'none' }],
+      events: [{ title: 'Lunch with Jordan', when: 'Thursday 1pm', end: '', duration_minutes: 90, location: 'Northwind Cafe', people: ['Jordan Hale'], confidence: 0.9 }],
+    }));
+    const r = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now, [], calendar);
+    expect(r.rows).toHaveLength(1);
+    expect(r.events).toEqual([
+      expect.objectContaining({ title: 'Lunch with Jordan', all_day: false, location: 'Northwind Cafe', attendees: ['Jordan Hale'], people: [], selected: true }),
+    ]);
+    expect(r.events[0]!.starts_at!.slice(0, 16)).toBe('2026-10-15T13:00');
+    expect(r.events[0]!.ends_at!.slice(0, 16)).toBe('2026-10-15T14:30');
+    expect(r.sameDay.map((e) => e.title)).toEqual(['Dentist']);
+  });
+
+  it('without a model, an invitation is an event and its request is a task', async () => {
+    store = new Store(':memory:');
+    const llm = new FakeLlm(() => {
+      throw new Error('no model call expected');
+    });
+    llm.usable = false;
+    const sel: SelectionPayload = { ...selection, text: 'Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?' };
+    const author = { name: 'Jordan Hale', email: null, handle: null, role: 'author' as const, knownId: null };
+    const r = await extractPromises(llm, new PeopleRepo(store), settings, { selection: sel, author, authorIsMe: false }, undefined, now);
+    expect(r.events.map((e) => [e.title, e.location])).toEqual([['Lunch with Jordan', 'Northwind Cafe']]);
+    expect(r.rows.map((x) => [x.owner, x.text])).toEqual([['me', 'bring the deck']]);
   });
 });
 

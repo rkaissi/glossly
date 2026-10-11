@@ -192,3 +192,13 @@ export function resolveDue(phrase: string | null | undefined, now: Date = new Da
   if (!t) return dateString(resolved.day);
   return isoNow(new Date(resolved.day.y, resolved.day.m, resolved.day.d, t[0], t[1]));
 }
+
+/**
+ * A clock time in a phrase ("2pm", "14:30", "noon", "at 3"), or null. A bare hour ("2") reads
+ * like "at 2": 1 to 7 is the afternoon.
+ */
+export function parseClock(phrase: string): [number, number] | null {
+  const s = phrase.trim().toLowerCase();
+  if (!s) return null;
+  return takeTime(/^\d{1,2}$/.test(s) ? `at ${s}` : s).time;
+}

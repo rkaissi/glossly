@@ -14,8 +14,8 @@ function PeopleList() {
     <section>
       <h2>People</h2>
       <p className="muted">
-        Everyone here was added by you, from "Who is this", a task you saved, or a reply you inserted. Nothing is looked up online. Open tasks are
-        in the <a href="#tasks">Tasks</a> tab.
+        Everyone here was added by you, from "Who is this", a task you saved, or a reply you inserted. Nothing is looked up online. Open tasks and
+        events are in the <a href="#agenda">Agenda</a> tab.
       </p>
 
       <h3>Everyone</h3>

@@ -17,6 +17,7 @@ import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
 import type { PasteFormat, PasteTarget } from './actions/paste-types';
 import type { PromisesByRules } from './actions/promises';
+import type { CalendarEvent, EventPatch, EventCandidate, EventSaveRow } from './calendar/types';
 import type { LibraryQuery, LibraryResult, RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
@@ -32,6 +33,7 @@ export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, 
 export type { Relationship } from './people/relationship';
 export type { PasteFormat, PasteTarget } from './actions/paste-types';
 export type { PromisesByRules } from './actions/promises';
+export type * from './calendar/types';
 export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, Privacy, RoleName, Settings, SettingsKey } from './settings';
@@ -276,6 +278,9 @@ export type PromisesResult =
       byRules: PromisesByRules;
       /** Open tasks with the people involved that no row is about (decision 36). */
       open: CommitmentView[];
+      /** Events the message describes, and saved events on those days (decision 37). */
+      events: EventCandidate[];
+      sameDay: CalendarEvent[];
     }
   | { ok: false; code: AskErrorEvent['code']; message: string };
 
@@ -369,7 +374,7 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
-export type SettingsTab = 'profile' | 'people' | 'tasks' | 'saved' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
+export type SettingsTab = 'profile' | 'people' | 'agenda' | 'saved' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
 
 // ---- channel maps ----
 
@@ -422,7 +427,10 @@ export interface InvokeChannels {
   /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
   'promises:extract': { args: { sessionId: number }; result: PromisesResult };
   /** Saves the rows the user kept. New people are created; the message is stored with its author. */
-  'promises:save': { args: { sessionId: number; rows: PromiseSaveRow[] }; result: { saved: number; created: number; updated: number } };
+  'promises:save': {
+    args: { sessionId: number; rows: PromiseSaveRow[]; events?: EventSaveRow[] };
+    result: { saved: number; created: number; updated: number; events: number };
+  };
 
   /** The Recall cards for the session's selection (spec: Recall), without the ones dismissed. Local. */
   'recall:get': { args: { sessionId: number }; result: { hits: RecallHit[] } };
@@ -464,7 +472,11 @@ export interface InvokeChannels {
   /** Edits a task's text or due date (a new date gets a new reminder). */
   'commitments:update': { args: { id: string; text?: string; due_at?: string | null }; result: void };
   'commitments:delete': { args: { id: string }; result: void };
-  /** A personal todo typed in the Tasks tab: owner "me", no person. */
+  /** Calendar events for the Agenda tab, by day range ("YYYY-MM-DD", inclusive) and person. */
+  'calendar:list': { args: { from?: string; to?: string; personId?: string }; result: CalendarEvent[] };
+  'calendar:update': { args: { id: string; patch: EventPatch }; result: void };
+  'calendar:delete': { args: { id: string }; result: void };
+  /** A personal todo typed in the Agenda tab: owner "me", no person. */
   'commitments:add': { args: { text: string; due_at: string | null }; result: void };
   /** Voice samples for Reply: pasted ones (at most 5) and the replies the user inserted. */
   'voice:list': { args: void; result: VoiceSample[] };

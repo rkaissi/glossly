@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, Copy, Search as SearchIcon, UserRound } from 'lucide-react';
 import type { OverlayState, SearchResults } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { formatDue } from '../dates';
+import { formatDue, formatEventTime } from '../dates';
 import { SavedRow } from './saved';
 
 const DEBOUNCE_MS = 120;
@@ -36,7 +36,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
             setResults(r);
             setHl(0);
           })
-          .catch(() => live && setResults({ query, items: [], people: [], commitments: [], semantic: false })),
+          .catch(() => live && setResults({ query, items: [], people: [], commitments: [], events: [], semantic: false })),
       query ? DEBOUNCE_MS : 0,
     );
     return () => {
@@ -156,9 +156,26 @@ export function SearchPanel({ s }: { s: OverlayState }) {
           </section>
         )}
 
+        {(results?.events.length ?? 0) > 0 && (
+          <section>
+            <h3 className="section-label">Upcoming events</h3>
+            <ul className="saved-list">
+              {results!.events.map((e) => (
+                <li key={e.id} className="saved-row clickable" onClick={() => void glossly.invoke('settings:open', { tab: 'agenda' })}>
+                  <div className="saved-text">{e.title}</div>
+                  <div className="saved-meta">
+                    <span className="muted">{formatEventTime(e)}</span>
+                    {e.location && <span className="muted">{e.location}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {(results?.commitments.length ?? 0) > 0 && (
           <section>
-            <h3 className="section-label">Open promises</h3>
+            <h3 className="section-label">Open tasks</h3>
             <ul className="saved-list">
               {results!.commitments.map((c) => {
                 const due = formatDue(c.due_at);

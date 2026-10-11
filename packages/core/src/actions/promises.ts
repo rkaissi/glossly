@@ -15,6 +15,9 @@ export type { PromiseRow, PromiseSaveRow } from '../people/types';
 import type { Settings } from '../settings';
 import type { PeopleRepo } from '../store/people';
 import { isoNow, type ContainerContext, type SelectionPayload } from '../types';
+import { ExtractedEventSchema, rulesEvents, toEventRows, type ExtractedEvent } from '../calendar/events';
+import type { CalendarEvent, EventCandidate } from '../calendar/types';
+import type { CalendarRepo } from '../store/calendar';
 import { contextWindow } from './context';
 import { matchOpenTasks, rulesCommitments } from './promise-rules';
 
@@ -39,6 +42,8 @@ export function commitmentsSchema(openKeys: string[]) {
         open_task: z.enum(['none', ...openKeys] as [string, ...string[]]).describe('The key of the open task this row is about, or "none".'),
       }),
     ),
+    // Step 19.2 (decision 37): events come from the same call.
+    events: z.array(ExtractedEventSchema),
   });
 }
 export const ExtractedCommitmentsSchema = commitmentsSchema([]);
@@ -55,6 +60,8 @@ export interface ExtractedCommitment {
 }
 export interface ExtractedCommitments {
   commitments: ExtractedCommitment[];
+  /** Missing in pattern output and older test answers. */
+  events?: ExtractedEvent[];
 }
 
 /** At most this many open tasks go into the prompt. */
@@ -216,6 +223,10 @@ export type PromisesByRules = null | 'local_only' | 'no_model';
 
 export interface PromisesExtract {
   rows: PromiseRow[];
+  /** Events the message describes (decision 37). */
+  events: EventCandidate[];
+  /** Saved events on the days of those events, to spot a clash or a duplicate. */
+  sameDay: CalendarEvent[];
   /** Open tasks with the people involved that no row is about (decision 36). */
   open: CommitmentView[];
   byRules: PromisesByRules;
@@ -247,6 +258,7 @@ export async function extractPromises(
   signal?: AbortSignal,
   now: Date = new Date(),
   detected: Promise<DetectedPerson[]> | DetectedPerson[] = [],
+  calendar?: CalendarRepo,
 ): Promise<PromisesExtract> {
   const sourceApp = input.selection.source_app;
   const ids = exactIds(people, [input.author, ...(input.people ?? [])], sourceApp);
@@ -260,7 +272,8 @@ export async function extractPromises(
   let byRules: PromisesByRules = null;
   if (!llm.hasModel('fast')) {
     const author = { name: input.authorIsMe ? null : (input.author?.name ?? null), isMe: input.authorIsMe };
-    out = matchOpenTasks(rulesCommitments(input.selection.text.slice(0, MAX_SELECTION), author, now), open);
+    const text = input.selection.text.slice(0, MAX_SELECTION);
+    out = { ...matchOpenTasks(rulesCommitments(text, author, now), open), events: rulesEvents(text, author) };
     found = await detected;
     byRules = settings.privacy === 'local' ? 'local_only' : 'no_model';
   } else {
@@ -272,7 +285,7 @@ export async function extractPromises(
         prompt: buildPromisesPrompt(settings, input, now, open),
         signal,
         temperature: 0,
-        maxOutputTokens: 900,
+        maxOutputTokens: 1200,
       },
       commitmentsSchema(open.map((o) => o.key)),
     );
@@ -282,7 +295,10 @@ export async function extractPromises(
   const everyone = new Set([...ids, ...exactIds(people, found, sourceApp), ...rows.flatMap((r) => (r.match?.kind === 'exact' ? [r.match.personId] : []))]);
   const about = new Set(rows.flatMap((r) => (r.existing ? [r.existing.id] : [])));
   const rest = people.commitments({ personIds: [...everyone], status: 'open' }).filter((t) => !about.has(t.id));
-  return { rows, open: rest, byRules };
+  const events = toEventRows(out.events ?? [], people, sourceApp, now);
+  const days = [...new Set(events.flatMap((e) => (e.starts_at ? [e.starts_at.slice(0, 10)] : [])))];
+  const sameDay = calendar ? days.flatMap((d) => calendar.list({ from: d, to: d })) : [];
+  return { rows, events, sameDay, open: rest, byRules };
 }
 
 export interface PromiseSaveContext {
@@ -369,6 +385,14 @@ export function reminderCutoff(now: Date, hour: number): string {
 }
 
 /** The notification's title and body. Shown only on this computer. */
+/** "Lunch with Jordan" / "Starts at 1:00 PM at Northwind" for an event's reminder. */
+export function eventReminderText(e: CalendarEvent): { title: string; body: string } {
+  const when = e.all_day
+    ? 'Today'
+    : `Starts at ${new Date(e.starts_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  return { title: e.title, body: `${when}${e.location ? ` at ${e.location}` : ''}` };
+}
+
 export function reminderText(c: CommitmentView, now: Date): { title: string; body: string } {
   const today = isoNow(now).slice(0, 10);
   const day = c.due_at?.slice(0, 10) ?? today;

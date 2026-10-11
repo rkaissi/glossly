@@ -129,10 +129,35 @@ export const MIGRATIONS: string[] = [
   UPDATE style_signals SET channel = 'messaging' WHERE channel = 'chat';
   UPDATE voice_samples SET channel = 'messaging' WHERE channel = 'chat';
   `,
+  /* 5: Calendar events (Step 19.2, decision 37), on this computer only. starts_at is a day for an
+     all-day event, else a timestamp; attendees is a JSON list of names as written; the saved
+     people among them are linked. notified_at marks the reminder before it starts. */ `
+  CREATE TABLE calendar_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT,
+    all_day INTEGER NOT NULL DEFAULT 0,
+    location TEXT,
+    attendees TEXT NOT NULL DEFAULT '[]',
+    source_app TEXT,
+    created_at TEXT NOT NULL,
+    notified_at TEXT
+  );
+  CREATE INDEX calendar_events_start ON calendar_events(starts_at);
+  CREATE TABLE calendar_event_people (
+    event_id TEXT NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,
+    person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    PRIMARY KEY (event_id, person_id)
+  );
+  CREATE INDEX calendar_event_people_person ON calendar_event_people(person_id);
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */
 export const DATA_TABLES = [
+  'calendar_event_people',
+  'calendar_events',
   'item_entities',
   'commitments',
   'interactions',

@@ -31,6 +31,7 @@ const maya: PersonCard = {
   theyOwe: [{ id: 'c2', owner: 'them', text: 'share the budget sheet', due_at: null, status: 'open', person_id: 'p1', person_name: 'Maya Lin' }],
   interactions: [{ id: 'i1', direction: 'outbound', text: 'Thanks, talk Friday', source_app: 'slack.exe', occurred_at: '2026-10-09T15:00:00-04:00' }],
   items: [],
+  events: [],
   created_at: '2026-10-01T10:00:00-04:00',
 };
 

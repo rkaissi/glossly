@@ -120,6 +120,15 @@ describe('slots', () => {
     expect(scoreActions(base, { ...f, knownPeople: ['p1'] }).who).toBe(1);
   });
 
+  it('offers Tasks and events on an invitation, but not on code (decision 37)', () => {
+    const quiet = { ...base, content_type: 'single_message' as const, contains_commitment: 0.05 };
+    const invite = extractFeatures(ctx('Lunch Thursday at 1pm?'));
+    expect(invite.eventSentences).toBe(1);
+    expect(scoreActions(quiet, invite).promises).toBe(0.7);
+    expect(scoreActions({ ...quiet, content_type: 'code' }, invite).promises).toBe(0.05);
+    expect(extractFeatures(ctx('Please send the deck by Friday 5pm.')).eventSentences).toBe(0);
+  });
+
   it('offers Tasks on a message from someone you have open tasks with (decision 36)', () => {
     const quiet = { ...base, content_type: 'single_message' as const, contains_commitment: 0.05 };
     expect(scoreActions(quiet, f).promises).toBe(0.05);

@@ -20,6 +20,8 @@ import {
   type AliasKind,
   type CommitmentStatus,
   type TaskChange,
+  type EventPatch,
+  type EventSaveRow,
   type InvokeArgs,
   type InvokeChannel,
   type InvokeResult,
@@ -258,7 +260,18 @@ export function registerIpc(deps: IpcDeps): void {
               : null;
       return { change: change as TaskChange, existingId, owner, text: str(r.text, 500), due_at: due, person };
     });
-    const r = capture.savePromises(num(a.sessionId), rows);
+    if (a.events !== undefined && (!Array.isArray(a.events) || a.events.length > 5)) throw new Error('Invalid events');
+    const events = (a.events ?? []).map((raw): EventSaveRow => {
+      const e = obj(raw);
+      const starts_at = str(e.starts_at, 40);
+      if (!DUE.test(starts_at)) throw new Error('Invalid date');
+      const ends_at = e.ends_at === null || e.ends_at === undefined ? null : str(e.ends_at, 40);
+      if (ends_at && !DUE.test(ends_at)) throw new Error('Invalid date');
+      const attendees = Array.isArray(e.attendees) ? e.attendees.slice(0, 20).map((x) => str(x, 100)) : [];
+      const personIds = Array.isArray(e.personIds) ? e.personIds.slice(0, 20).map((x) => str(x, 100)) : [];
+      return { title: str(e.title, 200), starts_at, ends_at, all_day: e.all_day === true, location: optStr(e.location, 300) ?? null, attendees, personIds };
+    });
+    const r = capture.savePromises(num(a.sessionId), rows, events);
     broadcastPeople();
     return r;
   });
@@ -343,6 +356,38 @@ export function registerIpc(deps: IpcDeps): void {
     const due = a.due_at === undefined ? undefined : a.due_at === null ? null : str(a.due_at, 40);
     if (due && !DUE.test(due)) throw new Error('Invalid date');
     people.updateCommitment(str(a.id, 100), { ...(a.text !== undefined && { text: str(a.text, 300) }), ...(due !== undefined && { due_at: due }) });
+    broadcastPeople();
+  });
+  handle('calendar:list', (a) => {
+    const day = (v: unknown) => {
+      const s = optStr(v, 10);
+      if (s && !/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error('Invalid date');
+      return s;
+    };
+    const from = day(a?.from);
+    const to = day(a?.to);
+    const personId = optStr(a?.personId, 100);
+    return services.calendar.list({ ...(from && { from }), ...(to && { to }), ...(personId && { personId }) });
+  });
+  handle('calendar:update', (a) => {
+    const p = obj(a.patch);
+    const patch: EventPatch = {};
+    if (p.title !== undefined) patch.title = str(p.title, 200);
+    if (p.starts_at !== undefined) {
+      patch.starts_at = str(p.starts_at, 40);
+      if (!DUE.test(patch.starts_at)) throw new Error('Invalid date');
+    }
+    if (p.ends_at !== undefined) {
+      patch.ends_at = p.ends_at === null ? null : str(p.ends_at, 40);
+      if (patch.ends_at && !DUE.test(patch.ends_at)) throw new Error('Invalid date');
+    }
+    if (p.all_day !== undefined) patch.all_day = p.all_day === true;
+    if (p.location !== undefined) patch.location = p.location === null ? null : str(p.location, 300);
+    services.calendar.update(str(a.id, 100), patch);
+    broadcastPeople();
+  });
+  handle('calendar:delete', (a) => {
+    services.calendar.delete(str(a.id, 100));
     broadcastPeople();
   });
   handle('commitments:add', (a) => {

@@ -21,6 +21,7 @@ import type {
   VoiceSample,
 } from '../people/types';
 import { isoNow } from '../types';
+import { CalendarRepo } from './calendar';
 import type { Store } from './store';
 
 const MAX_NAME = 100;
@@ -228,6 +229,7 @@ export class PeopleRepo {
     this.store.tx(() => {
       this.db.prepare('UPDATE interactions SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       this.db.prepare('UPDATE commitments SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
+      this.db.prepare('UPDATE OR IGNORE calendar_event_people SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       this.db.prepare('UPDATE voice_samples SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       this.db.prepare('UPDATE style_signals SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       const moved = drop.aliases;
@@ -457,6 +459,7 @@ export class PeopleRepo {
       theyOwe: open.filter((c) => c.owner === 'them'),
       interactions,
       items: this.items(personId, opts.items ?? 5),
+      events: new CalendarRepo(this.store).list({ from: this.now().slice(0, 10), personId, limit: 5 }),
       created_at: p.created_at,
     };
   }

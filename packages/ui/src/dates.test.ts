@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appName, firstName, formatDay, formatDue } from './dates';
+import { appName, firstName, formatDay, formatDue, formatEventTime, joinStamp, splitStamp } from './dates';
 
 // Saturday, Oct 10 2026, 2 PM local.
 const now = new Date(2026, 9, 10, 14, 0);
@@ -27,5 +27,22 @@ describe('dates', () => {
     expect(appName('slack.exe')).toBe('Slack');
     expect(appName(null)).toBe('');
     expect(firstName('  Sam Lee ')).toBe('Sam');
+  });
+});
+
+describe('event times', () => {
+  const now = new Date(2026, 9, 14, 10, 0);
+  it('formats timed and all-day events', () => {
+    expect(formatEventTime({ starts_at: '2026-10-15T13:00:00-04:00', ends_at: '2026-10-15T14:30:00-04:00', all_day: false }, now)).toBe('Tomorrow 1 PM – 2:30 PM');
+    expect(formatEventTime({ starts_at: '2026-10-14T09:00:00-04:00', ends_at: null, all_day: false }, now)).toBe('Today 9 AM');
+    expect(formatEventTime({ starts_at: '2026-11-20', ends_at: null, all_day: true }, now)).toBe('Nov 20 · All day');
+  });
+
+  it('splits and joins stamps for date and time inputs', () => {
+    expect(splitStamp('2026-10-15T13:05:00-04:00')).toEqual({ day: '2026-10-15', time: '13:05' });
+    expect(splitStamp('2026-10-15')).toEqual({ day: '2026-10-15', time: '' });
+    expect(splitStamp(null)).toEqual({ day: '', time: '' });
+    expect(joinStamp('2026-10-15', '')).toBe('2026-10-15');
+    expect(joinStamp('2026-10-15', '13:05')).toMatch(/^2026-10-15T13:05:00[+-]\d{2}:\d{2}$/);
   });
 });

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ExternalLink, Info, RotateCcw } from 'lucide-react';
-import type { CommitmentView, OverlayState, PromiseRow, PromiseSaveRow, PromisesByRules, PromisesResult } from '@glossly/core/api';
+import type { CalendarEvent, CommitmentView, EventCandidate, EventSaveRow, OverlayState, PromiseRow, PromiseSaveRow, PromisesByRules, PromisesResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { formatDue } from '../dates';
+import { formatDue, formatEventTime, joinStamp, splitStamp } from '../dates';
 import { PersonFields } from '../people/PersonForm';
 import { draftToCreate, type PersonDraft } from '../people/draft';
 
@@ -68,7 +68,90 @@ type Phase =
   | { kind: 'error'; result: Extract<PromisesResult, { ok: false }> }
   | { kind: 'review' }
   | { kind: 'saving' }
-  | { kind: 'saved'; saved: number; created: number; updated: number };
+  | { kind: 'saved'; saved: number; created: number; updated: number; events: number };
+
+/** An event as the panel edits it: day and times as input values. */
+interface EventDraft {
+  key: string;
+  title: string;
+  day: string;
+  start: string;
+  end: string;
+  location: string;
+  attendees: string[];
+  personIds: string[];
+  when_phrase: string | null;
+  selected: boolean;
+}
+
+function toEventDraft(e: EventCandidate): EventDraft {
+  const s = splitStamp(e.starts_at);
+  return {
+    key: e.key,
+    title: e.title,
+    day: s.day,
+    start: e.all_day ? '' : s.time,
+    end: e.all_day ? '' : splitStamp(e.ends_at).time,
+    location: e.location ?? '',
+    attendees: e.attendees,
+    personIds: e.people.map((p) => p.personId),
+    when_phrase: e.when_phrase,
+    selected: e.selected,
+  };
+}
+
+function toEventSave(d: EventDraft): EventSaveRow {
+  const allDay = !d.start;
+  return {
+    title: d.title.trim(),
+    starts_at: joinStamp(d.day, d.start),
+    // An end at or before the start is dropped; the Agenda shows the start alone.
+    ends_at: allDay || !d.end || d.end <= d.start ? null : joinStamp(d.day, d.end),
+    all_day: allDay,
+    location: d.location.trim() || null,
+    attendees: d.attendees,
+    personIds: d.personIds,
+  };
+}
+
+const canSaveEvent = (d: EventDraft) => d.selected && d.title.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day);
+
+/** A candidate event: what, when (day, start, end; no start is all day), where, and who. */
+function EventRowView({ d, onChange }: { d: EventDraft; onChange: (patch: Partial<EventDraft>) => void }) {
+  return (
+    <li className={`promise event${d.selected ? '' : ' off'}`}>
+      <button
+        className={`check${d.selected ? ' on' : ''}`}
+        role="checkbox"
+        aria-checked={d.selected}
+        aria-label={d.selected ? 'Skip this event' : 'Add this event'}
+        tabIndex={-1}
+        onClick={() => onChange({ selected: !d.selected })}
+      >
+        {d.selected && <Check size={12} strokeWidth={2.5} aria-hidden />}
+      </button>
+      <div className="promise-body">
+        <input className="promise-text" value={d.title} maxLength={200} aria-label="Event" spellCheck={false} onChange={(e) => onChange({ title: e.target.value })} />
+        <div className="promise-meta event-when" title={d.when_phrase ? `"${d.when_phrase}"` : undefined}>
+          <input type="date" aria-label="Day" tabIndex={-1} value={d.day} onChange={(e) => onChange({ day: e.target.value })} />
+          <input type="time" aria-label="Starts" tabIndex={-1} value={d.start} onChange={(e) => onChange({ start: e.target.value })} />
+          {d.start ? (
+            <>
+              <span className="muted">to</span>
+              <input type="time" aria-label="Ends" tabIndex={-1} value={d.end} onChange={(e) => onChange({ end: e.target.value })} />
+            </>
+          ) : (
+            <span className="muted">All day</span>
+          )}
+        </div>
+        <div className="promise-meta">
+          <input className="event-place" placeholder="Where" aria-label="Where" tabIndex={-1} value={d.location} maxLength={300} onChange={(e) => onChange({ location: e.target.value })} />
+          {d.attendees.length > 0 && <span className="muted small clip1">With {d.attendees.join(', ')}</span>}
+        </div>
+      </div>
+    </li>
+  );
+}
 
 const CHANGE_LABEL: Record<Exclude<PromiseRow['change'], 'new'>, string> = { same: 'Already open', done: 'Mark done', moved: 'New date' };
 
@@ -228,6 +311,8 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
   const [hl, setHl] = useState(0);
   const [people, setPeople] = useState<Record<string, PersonDraft>>({});
   const [open, setOpen] = useState<CommitmentView[]>([]);
+  const [events, setEvents] = useState<EventDraft[]>([]);
+  const [sameDay, setSameDay] = useState<CalendarEvent[]>([]);
   const [openError, setOpenError] = useState<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
 
@@ -243,6 +328,8 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
     setRows(r.rows.map((row) => ({ ...row, person: initialChoice(row) })));
     setMeta({ author: r.author, authorIsMe: r.authorIsMe, identitySet: r.identitySet, byRules: r.byRules });
     setOpen(r.open);
+    setEvents(r.events.map(toEventDraft));
+    setSameDay(r.sameDay);
     setHl(0);
     setPhase({ kind: 'review' });
   };
@@ -257,13 +344,16 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
   }, [s.keyboard, phase.kind]);
 
   const selected = rows.filter((r) => r.selected && r.text.trim());
+  const eventsToSave = events.filter(canSaveEvent);
+  const toSaveCount = selected.length + eventsToSave.length;
+  const patchEvent = (key: string, p: Partial<EventDraft>) => setEvents((es) => es.map((e) => (e.key === key ? { ...e, ...p } : e)));
   const patch = (i: number, p: Partial<Draft>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
 
   const save = async () => {
-    if (phase.kind !== 'review' || selected.length === 0) return;
+    if (phase.kind !== 'review' || toSaveCount === 0) return;
     setPhase({ kind: 'saving' });
     try {
-      const r = await glossly.invoke('promises:save', { sessionId: s.sessionId, rows: selected.map((d) => toSave(d, people)) });
+      const r = await glossly.invoke('promises:save', { sessionId: s.sessionId, rows: selected.map((d) => toSave(d, people)), events: eventsToSave.map(toEventSave) });
       setPhase({ kind: 'saved', ...r });
       panel.current?.focus();
     } catch {
@@ -313,7 +403,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
   return (
     <div className="panel promises" tabIndex={-1} ref={panel} onKeyDown={onKeyDown}>
-      {phase.kind === 'loading' && <p className="thinking">Finding tasks…</p>}
+      {phase.kind === 'loading' && <p className="thinking">Finding tasks and events…</p>}
 
       {phase.kind === 'error' && (
         <div className="answer-error">
@@ -358,7 +448,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
             </div>
           )}
           {rows.length === 0 ? (
-            <p className="muted">{open.length ? 'Nothing new in this message.' : 'No tasks in this selection.'}</p>
+            events.length === 0 && <p className="muted">{open.length ? 'Nothing new in this message.' : 'No tasks or events in this selection.'}</p>
           ) : (
             <>
               <h2>
@@ -376,6 +466,21 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
               <NewPeople rows={rows} people={people} onChange={(key, d) => setPeople((m) => ({ ...m, [key]: d }))} />
             </>
           )}
+          {events.length > 0 && (
+            <div className="events">
+              <h4>Events</h4>
+              <ul className="promise-list">
+                {events.map((d) => (
+                  <EventRowView key={d.key} d={d} onChange={(p) => patchEvent(d.key, p)} />
+                ))}
+              </ul>
+              {sameDay.length > 0 && (
+                <p className="muted small">
+                  Already that day: {sameDay.map((e) => `${e.title} (${formatEventTime(e)})`).join(', ')}
+                </p>
+              )}
+            </div>
+          )}
           <OpenTasks tasks={open} onDone={markDone} onDue={changeDue} />
           {openError && <p className="error small">{openError}</p>}
         </>
@@ -385,8 +490,14 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
         <h2 className="saved-line">
           <Check size={17} strokeWidth={2} aria-hidden />
           <span>
-            {phase.saved > 0 ? `Saved ${phase.saved} ${phase.saved === 1 ? 'task' : 'tasks'}` : `Updated ${phase.updated} ${phase.updated === 1 ? 'task' : 'tasks'}`}
-            {phase.saved > 0 && phase.updated > 0 && <span className="muted"> · updated {phase.updated}</span>}
+            {[
+              phase.saved > 0 && `Saved ${phase.saved} ${phase.saved === 1 ? 'task' : 'tasks'}`,
+              phase.updated > 0 && `updated ${phase.updated}`,
+              phase.events > 0 && `added ${phase.events} ${phase.events === 1 ? 'event' : 'events'}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+              .replace(/^./, (c) => c.toUpperCase())}
             {phase.created > 0 && <span className="muted"> · added {phase.created === 1 ? '1 person' : `${phase.created} people`}</span>}
           </span>
         </h2>
@@ -394,15 +505,15 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
       <div className="panel-foot">
         {phase.kind === 'saved' && (
-          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'tasks' })}>
+          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'agenda' })}>
             <ExternalLink size={14} strokeWidth={1.75} aria-hidden />
-            Open Tasks
+            Open Agenda
           </button>
         )}
         <span className="spacer" />
-        {(phase.kind === 'review' || phase.kind === 'saving') && rows.length > 0 && (
-          <button className="primary" disabled={selected.length === 0 || phase.kind === 'saving'} onClick={() => void save()}>
-            {phase.kind === 'saving' ? 'Saving…' : `Save ${selected.length}`}
+        {(phase.kind === 'review' || phase.kind === 'saving') && rows.length + events.length > 0 && (
+          <button className="primary" disabled={toSaveCount === 0 || phase.kind === 'saving'} onClick={() => void save()}>
+            {phase.kind === 'saving' ? 'Saving…' : `Save ${toSaveCount}`}
           </button>
         )}
         {s.keyboard && (

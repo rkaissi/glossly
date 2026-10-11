@@ -64,6 +64,7 @@ import {
   type OverlayState,
   type PillTiming,
   type PromiseSaveRow,
+  type EventSaveRow,
   type PromisesResult,
   type PasteCompose,
   type ReplyInsertResult,
@@ -1480,7 +1481,7 @@ ${s.selection.text}`;
         (r) => r.read.people,
         () => [],
       );
-      const { rows, open, byRules } = await extractPromises(
+      const { rows, open, events, sameDay, byRules } = await extractPromises(
         this.services.llm,
         people,
         this.settings,
@@ -1488,8 +1489,9 @@ ${s.selection.text}`;
         ctl.signal,
         new Date(),
         found,
+        this.services.calendar,
       );
-      this.services.metrics.record('promises_extracted', { count: rows.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), open: open.length, changes: rows.filter((r) => r.change !== 'new').length, ...(byRules && { by_rules: byRules }) });
+      this.services.metrics.record('promises_extracted', { count: rows.length, events: events.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), open: open.length, changes: rows.filter((r) => r.change !== 'new').length, ...(byRules && { by_rules: byRules }) });
       return {
         ok: true,
         rows,
@@ -1498,6 +1500,8 @@ ${s.selection.text}`;
         identitySet: identity.name.trim().length > 0,
         byRules,
         open,
+        events,
+        sameDay,
       };
     } catch (e) {
       const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
@@ -1509,18 +1513,19 @@ ${s.selection.text}`;
     }
   }
 
-  savePromises(sessionId: number, rows: PromiseSaveRow[]): { saved: number; created: number; updated: number } {
+  savePromises(sessionId: number, rows: PromiseSaveRow[], events: EventSaveRow[] = []): { saved: number; created: number; updated: number; events: number } {
     const s = this.current(sessionId);
     if (!s?.selection) throw new Error('This selection is gone. Select the message again.');
+    for (const e of events) this.services.calendar.add(e, s.selection.source_app);
     const r = savePromises(this.services.people, rows, {
       message: s.selection.text,
       sourceApp: s.selection.source_app,
       authorPersonId: s.author?.personId ?? null,
       authorIsMe: s.author?.isMe ?? false,
     });
-    this.services.metrics.record('promises_saved', { count: r.saved, created: r.created, updated: r.updated, offered: rows.length });
-    log.info('promises saved', r);
-    return r;
+    this.services.metrics.record('promises_saved', { count: r.saved, created: r.created, updated: r.updated, events: events.length, offered: rows.length });
+    log.info('promises saved', { ...r, events: events.length });
+    return { ...r, events: events.length };
   }
 
   /** Person badges from tier 1 (local, a few ms): a known person with open commitments or a note. */
@@ -1752,7 +1757,7 @@ ${s.selection.text}`;
   }
 
   async search(query: string): Promise<SearchResults> {
-    return searchSaved({ ...this.recallDeps(), people: this.services.people }, query);
+    return searchSaved({ ...this.recallDeps(), people: this.services.people, calendar: this.services.calendar }, query);
   }
 
   /** The Saved tab in Settings. Local, like the search box. */

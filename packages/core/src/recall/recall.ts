@@ -3,9 +3,10 @@
 import type { Embedder } from '../embed/types';
 import { canonicalize } from '../people/names';
 import type { Settings } from '../settings';
+import type { CalendarRepo } from '../store/calendar';
 import type { PeopleRepo } from '../store/people';
 import type { EntityKind, Store } from '../store/store';
-import type { Item } from '../types';
+import { isoNow, type Item } from '../types';
 import type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './types';
 
 export interface RecallDeps {
@@ -116,18 +117,20 @@ export async function recall(deps: RecallDeps, input: { text: string; personIds?
 
 /**
  * The search box (hotkey with nothing selected): saved items by their words, then by meaning,
- * plus people and open commitments. An empty query lists the newest saved items and the open
- * commitments.
+ * plus people, open commitments, and upcoming events. An empty query lists the newest saved
+ * items, the open commitments, and the next events.
  */
-export async function search(deps: RecallDeps & { people: PeopleRepo }, query: string): Promise<SearchResults> {
+export async function search(deps: RecallDeps & { people: PeopleRepo; calendar?: CalendarRepo }, query: string): Promise<SearchResults> {
   const { store, people } = deps;
   const q = query.replace(/\s+/g, ' ').trim().slice(0, 200);
   const embedderReady = Boolean(deps.embedder()) && store.hasVectors;
   const open = people.commitments({ status: 'open' });
+  const today = isoNow().slice(0, 10);
+  const events = deps.calendar?.list({ from: today, ...(q && { query: q }), limit: SIDE_LIMIT }) ?? [];
 
   if (!q) {
     const items = store.itemsWithCollection(store.recentItemIds(SEARCH_LIMIT)).map((it) => toHit(it, 'text_match', null, null));
-    return { query: q, items, people: [], commitments: open.slice(0, SIDE_LIMIT), semantic: embedderReady };
+    return { query: q, items, people: [], commitments: open.slice(0, SIDE_LIMIT), events, semantic: embedderReady };
   }
 
   const exact = store.searchItemText(q, SEARCH_LIMIT);
@@ -140,7 +143,7 @@ export async function search(deps: RecallDeps & { people: PeopleRepo }, query: s
 
   const lower = q.toLowerCase();
   const commitments = open.filter((c) => c.text.toLowerCase().includes(lower) || (c.person_name ?? '').toLowerCase().includes(lower));
-  return { query: q, items, people: people.list(q).slice(0, SIDE_LIMIT), commitments: commitments.slice(0, SIDE_LIMIT), semantic: embedderReady };
+  return { query: q, items, people: people.list(q).slice(0, SIDE_LIMIT), commitments: commitments.slice(0, SIDE_LIMIT), events, semantic: embedderReady };
 }
 
 const LIBRARY_HIT_CHARS = 1500;

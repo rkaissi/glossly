@@ -1,6 +1,7 @@
 // People layer records (spec: People layer, Data model) and the views the UI renders.
 // Types only, so the UI can import them through `@glossly/core/api`.
 
+import type { CalendarEvent } from '../calendar/types';
 import type { Relationship } from './relationship';
 import type { ReplyChannel } from './reply-style';
 
@@ -123,6 +124,8 @@ export interface PersonCard {
   interactions: InteractionView[];
   /** Saved items that mention them, newest first. */
   items: PersonItemView[];
+  /** Their next calendar events (decision 37), soonest first. */
+  events: CalendarEvent[];
   created_at: string;
 }
 

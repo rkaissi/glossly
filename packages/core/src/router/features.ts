@@ -1,3 +1,4 @@
+import { isEventSentence } from '../calendar/events';
 import { countWords } from '../capture/gating';
 import { findEmails } from '../people/emails';
 import { isMe } from '../people/names';
@@ -17,6 +18,8 @@ export interface Features {
   knownPeople: string[];
   /** Known people in the text who have open tasks with the user. */
   peopleWithTasks: number;
+  /** Sentences that read like an event: a day with a time or a meeting word (decision 37). */
+  eventSentences: number;
   tableShape: boolean;
   numericDensity: number;
   chatLines: number;
@@ -168,6 +171,7 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     namePairs,
     knownPeople,
     peopleWithTasks: known.filter((p) => (p.open ?? 0) > 0).length,
+    eventSentences: text.split(/(?<=[.!?])\s+|\n+/).filter(isEventSentence).length,
     tableShape: detectTable(lines),
     numericDensity: numericDensity(text),
     chatLines: lines.filter((l) => CHAT_LINE.test(l)).length,

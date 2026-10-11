@@ -2,7 +2,7 @@
 
 What each feature does today, where it lives, and how far it has been checked. "Live" means seen working in the real app on Rayan's machine; "unit" means only unit tests cover it. The live-check backlog in `docs/testing.md` lists everything still waiting for a live pass. Architecture is in `docs/architecture.md`; reasons are in `docs/decisions.md`.
 
-Spec phase mapping: Phase 0 is Capture; Phase 1 is the bar, Ask, Save, and Settings; Phase 2 is People, Who, Tasks (formerly What did I promise), and Reply; Phase 3 is Recall, Search, and Visualize; Phase 4 (Windows parts) is Metrics and the evals.
+Spec phase mapping: Phase 0 is Capture; Phase 1 is the bar, Ask, Save, and Settings; Phase 2 is People, Who, Tasks and events (formerly What did I promise), and Reply; Phase 3 is Recall, Search, and Visualize; Phase 4 (Windows parts) is Metrics and the evals.
 
 ## Capture (the pill, the dot, the hotkey)
 
@@ -64,19 +64,22 @@ Status: the earlier "Paste recent" list was live; the 16.12 rework, As saved, an
 
 Status: live (setup You step, Profile, Who with the model on the email fixture text, badge, People tab). Not live: the Discord fixture on a real page, real Outlook web, first-name matching, contact cards, shared-inbox and glued-domain fixes, caching, the badge collapse, relationship editing.
 
-## Tasks (formerly What did I promise)
+## Tasks and events (formerly What did I promise)
 
-One action and one list for promises, requests, and personal todos (decision 36). Internally the action id is still `promises` and the table `commitments`.
+One bar action, **Tasks and events**, for promises, requests, personal todos (decision 36), and calendar events (decision 37), and one Settings tab, **Agenda**. Internally the action id is still `promises`; tasks live in `commitments`, events in `calendar_events`.
 
-- **From this message:** one Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) alongside Who's people read (shared and cached). Before the call, the author and the people the message names are matched to saved people (exact matches only), and their open tasks (up to 12) go into the prompt under keys (`t1`…). Each row comes back as `new`, or `same`, `done`, or `moved` with the key of an open task (`open_task` is an enum of the keys sent). Code keeps a row about an open task as that task (owner, person, text), drops a second row about the same task, and turns a `moved` without a readable new date into `same`. `same` rows start unchecked (nothing to save); `done` marks the task done and `moved` sets its new date on save. The model returns due phrases as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates.
-- **Already open with these people:** every other open task with the author, anyone named, Who's read, and the rows' people, whatever the message says; Done and the date apply at once (`commitments:set-status`, `commitments:update`).
-- New rows: keep or skip, editable task, You owe / They owe, the person, the due date with a date picker, and for each new person the same fields as Who's Create person (decision 33), prefilled from Who's read; they are created on save. Enter saves; the message is stored as an interaction with the people involved.
-- Without a usable model (Local only without a local model, or no key; decision 34): sentence patterns (`actions/promise-rules.ts`: promises, requests, "remember to", todo lines, deadlines) and `matchOpenTasks` (same owner and most of the words: `same`, or `moved` with a deadline). Patterns never mark a task done; the open list's Done covers that. A note says the rows came from patterns.
-- **Settings > Tasks** (`settings/Tasks.tsx`): Open and Done, filter by person, edit the text (on blur) and date, mark done or reopen, delete with a confirm, and "Add a todo" (owner me, no person; `commitments:add`). People links to it instead of listing open commitments.
-- Bar: label "Tasks"; the score is the text's commitment score, or 0.55 for a message naming someone with open tasks (`peopleWithTasks`); "remember to", "don't forget", "todo", and "reminder" count as commitment phrases.
-- Reminders (`reminders.ts`): at `reminderHour` (9) on the due date, or at launch if missed, up to 3 per check; clicking opens Settings > Tasks. A moved date gets a new reminder.
+- **One call:** one Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) returns `commitments` and `events`, alongside Who's people read (shared and cached). Before it, the author and the people the message names are matched to saved people (exact matches only), and their open tasks (up to 12) go into the prompt under keys (`t1`…).
+- **Tasks from this message:** each row is `new`, or `same`, `done`, or `moved` with the key of an open task (`open_task` is an enum of the keys sent). Code keeps a row about an open task as that task (owner, person, text), drops a second row about the same task, and turns a `moved` without a readable new date into `same`. `same` rows start unchecked; `done` marks the task done and `moved` sets its new date on save. Due phrases come back as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates.
+- **Events from this message** (`calendar/events.ts`, `calendar/when.ts`): title, when and end as written, a length, place, and who attends. `resolveEventTime` reads ranges ("1-2pm", "11-1pm"), end times, and lengths; a day without a time is all day; a timed event without an end lasts an hour. Attendees who resolve exactly to saved people are linked. In the panel: title, day, start and end (no start is all day), place; "Already that day" lists saved events on the same day. A row with no readable day starts unchecked.
+- **Already open with these people:** every other open task with the author, anyone named, Who's read, and the rows' people; Done and the date apply at once (`commitments:set-status`, `commitments:update`).
+- New task rows: keep or skip, editable task, You owe / They owe, the person, the due date, and for each new person the same fields as Who's Create person (decision 33). Enter saves tasks and events together; the message is stored as an interaction with the people involved.
+- **Without a usable model** (Local only without a local model, or no key; decision 34): `rulesEvents` (a day plus a meeting word, or a day and a time without deadline words; title from the meeting word and the author, place after "at" or "in") and the task patterns (`actions/promise-rules.ts`), which skip sentences that read as events, plus `matchOpenTasks`. A note says the rows came from patterns.
+- **Settings > Agenda** (`settings/Agenda.tsx`, grouping in `agenda-groups.ts`): Upcoming (open tasks and events from today, by Overdue, Today, Tomorrow, This week, Later, No date) or Done and past; All / Tasks / Events; filter by person. Tasks: edit text and date, done or reopen, delete with a confirm, and "Add a todo" (owner me, no person). Events: edit the title, move to another day (keeps the time), delete with a confirm. People links to it.
+- **Search** lists upcoming events (by title, place, or attendee) and open tasks; **person cards** show "Coming up" (their next 5 events).
+- Bar: label "Tasks and events"; the score is the highest of the text's commitment score, 0.55 for a message naming someone with open tasks (`peopleWithTasks`), and 0.7 when a sentence reads as an event (`eventSentences`; not on code or tables).
+- Reminders (`reminders.ts`): tasks at `reminderHour` (9) on the due date, or at launch if missed; timed events `eventReminderMinutes` (15) before they start, until they end; all-day events from the reminder hour on their day. Up to 3 per check, events first; clicking opens Settings > Agenda. A moved date or day gets a new reminder.
 
-Status: live (the Step 15.3 extraction, save, card). Not live: everything from Step 19.1 (open tasks, done and moved rows, the Tasks tab, todos), the shared reader, and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 22 (packaging).
+Status: live (the Step 15.3 extraction, save, card). Not live: everything from Steps 19.1 and 19.2 (open tasks, done and moved rows, events, the Agenda tab, todos, event reminders), the shared reader, and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 22 (packaging).
 
 ## Reply
 
@@ -99,7 +102,7 @@ Status: the earlier version (model-written specs) was live after two fixes; the 
 
 ## Settings window and setup
 
-Tabs: Profile, People, Tasks, Saved, Keys, Models, General, Data, Metrics (`settings/`). Setup (`#setup`) has five steps: Welcome, You, Keys, Models, Try it (decision 11). The Keys step ("Choose your models") opens with the privacy choice and the local model card; Next needs a working key or local server, or Local only (which works without either).
+Tabs: Profile, People, Agenda, Saved, Keys, Models, General, Data, Metrics (`settings/`). Setup (`#setup`) has five steps: Welcome, You, Keys, Models, Try it (decision 11). The Keys step ("Choose your models") opens with the privacy choice and the local model card; Next needs a working key or local server, or Local only (which works without either).
 
 - **Keys**: per provider (Groq, OpenAI, Anthropic), test and save (`listModels` doubles as the test and fills the catalog), Test again, Replace, Remove (confirm). **Local model** card: Connect to Ollama or LM Studio (presets) or any address; saved only when it lists chat models; Test again, Change, Remove; warns when the address isn't this computer (decision 34).
 - **Models**: model and fallback per role, the Local only model (when a local server is set up), capability tags and warnings, per-action overrides, the catalog with Refresh (local server included).

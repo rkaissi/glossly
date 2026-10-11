@@ -9,7 +9,7 @@ const ACTION_NAMES: Record<string, string> = {
   save: 'Save',
   reply: 'Reply',
   who: 'Who is this',
-  promises: 'Tasks',
+  promises: 'Tasks and events',
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',

@@ -14,8 +14,13 @@ export function scoreActions(d: Decisions, f: Features): Record<ContextualAction
   return {
     reply: answerable ? d.authored_by_other : 0,
     who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact),
-    // Tasks (decision 36): what the text says, or a message involving someone you have open tasks with.
-    promises: Math.max(d.contains_commitment, isMessage && f.peopleWithTasks > 0 ? 0.55 : 0),
+    // Tasks and events (decisions 36 and 37): what the text says, an event in it, or a message
+    // involving someone you have open tasks with. Not on code or tables.
+    promises: Math.max(
+      d.contains_commitment,
+      isMessage && f.peopleWithTasks > 0 ? 0.55 : 0,
+      f.eventSentences > 0 && d.content_type !== 'code' && d.content_type !== 'table_or_numbers' ? 0.7 : 0,
+    ),
     visualize: d.content_type === 'table_or_numbers' ? 1 : 0,
   };
 }

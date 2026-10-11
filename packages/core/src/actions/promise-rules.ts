@@ -3,6 +3,7 @@
 // slides?"), and `resolveDue` finds the deadline. Rougher than the model, so rows start
 // selected only when they name a deadline; the user still reviews every one.
 import { resolveDue } from '../people/dates';
+import { isEventSentence } from '../calendar/events';
 import { canonicalize } from '../people/names';
 import type { ExtractedCommitments, OpenTaskRef } from './promises';
 
@@ -59,6 +60,8 @@ export function rulesCommitments(text: string, author: { name: string | null; is
     .map((s) => s.trim())
     .filter(Boolean);
   for (const sentence of sentences) {
+    // "Can you make lunch Thursday at 1?" is an event, found by `rulesEvents`, not a task.
+    if (isEventSentence(sentence)) continue;
     const todo = TODO.exec(sentence);
     const req = todo ? null : REQUEST.exec(sentence);
     const prom = todo || req ? null : PROMISE.exec(sentence);

@@ -48,6 +48,32 @@ export function formatDue(due: string | null, now = new Date()): { label: string
   return { label: `Due ${when.replace(/^(Today|Tomorrow)/, (w) => w.toLowerCase())}`, overdue };
 }
 
+/** An event's time for display: "Thu 1 PM – 2 PM", "Today 9:30 AM", or "Oct 20 · All day" (decision 37). */
+export function formatEventTime(e: { starts_at: string; ends_at: string | null; all_day: boolean }, now = new Date()): string {
+  const day = formatDay(e.starts_at, now);
+  if (e.all_day || !hasTime(e.starts_at)) return `${day} · All day`;
+  const end = e.ends_at && hasTime(e.ends_at) && e.ends_at.slice(0, 10) === e.starts_at.slice(0, 10) ? ` – ${timeOf(e.ends_at)}` : '';
+  return `${day} ${timeOf(e.starts_at)}${end}`;
+}
+
+/** The "YYYY-MM-DD" day and "HH:MM" time of a stored start or end, for date and time inputs. */
+export function splitStamp(s: string | null): { day: string; time: string } {
+  if (!s) return { day: '', time: '' };
+  const m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/.exec(s);
+  return { day: m?.[1] ?? '', time: m?.[2] ?? '' };
+}
+
+/** A local timestamp with the offset, from date and time inputs; the day alone when there is no time. */
+export function joinStamp(day: string, time: string): string {
+  if (!time) return day;
+  const [y, mo, d] = day.split('-').map(Number);
+  const [h, mi] = time.split(':').map(Number);
+  const dt = new Date(y!, mo! - 1, d!, h!, mi!);
+  const off = -dt.getTimezoneOffset();
+  const pad = (n: number) => String(Math.trunc(Math.abs(n))).padStart(2, '0');
+  return `${day}T${time}:00${off >= 0 ? '+' : '-'}${pad(off / 60)}:${pad(off % 60)}`;
+}
+
 /** "slack.exe" as "Slack", "ms-teams.exe" as "Ms-teams". */
 export function appName(processName: string | null): string {
   if (!processName) return '';

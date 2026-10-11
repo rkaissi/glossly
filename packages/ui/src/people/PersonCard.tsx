@@ -2,11 +2,11 @@
 // split into "You owe" and "They owe", recent interactions, and saved items that mention
 // them. Shared by the overlay's Who panel and the settings window's full record.
 import { useState, type KeyboardEvent } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Bookmark, Check, ExternalLink, Pencil, Plus, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Bookmark, CalendarDays, Check, ExternalLink, Pencil, Plus, X } from 'lucide-react';
 import type { CommitmentView, PersonCard, Relationship } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
-import { appName, firstName, formatDay, formatDue } from '../dates';
+import { appName, firstName, formatDay, formatDue, formatEventTime } from '../dates';
 import { useAction } from '../settings/useAction';
 import { RELATIONSHIP_OPTIONS } from './relationship';
 import './people.css';
@@ -211,7 +211,7 @@ export function PersonCardView({
   compact?: boolean;
   removableAliases?: boolean;
 }) {
-  const empty = !card.youOwe.length && !card.theyOwe.length && !card.interactions.length && !card.items.length;
+  const empty = !card.youOwe.length && !card.theyOwe.length && !card.events.length && !card.interactions.length && !card.items.length;
   return (
     <div className={`person${compact ? ' compact' : ''}`}>
       {compact && (
@@ -238,6 +238,20 @@ export function PersonCardView({
         <div className="person-section">
           <h4>{firstName(card.name)} owes you</h4>
           <CommitmentList items={card.theyOwe} />
+        </div>
+      )}
+      {card.events.length > 0 && (
+        <div className="person-section">
+          <h4>Coming up</h4>
+          <ul className="commitments">
+            {card.events.map((e) => (
+              <li key={e.id} className="commitment">
+                <CalendarDays size={14} strokeWidth={1.75} aria-hidden />
+                <span className="grow">{e.title}</span>
+                <span className="due">{formatEventTime(e)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {card.interactions.length > 0 && (

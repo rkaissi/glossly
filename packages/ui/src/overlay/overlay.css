@@ -987,6 +987,28 @@ html:not([data-material='acrylic']) .toast {
   font-size: 13px;
 }
 
+/* Events in the Tasks and events panel (decision 37). */
+.events h4 {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.event-when input[type='date'],
+.event-when input[type='time'] {
+  height: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.event-place {
+  height: 26px;
+  flex: 1;
+  min-width: 0;
+  max-width: 220px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
 /* Tasks: rows about a task you already have, and the open tasks with the same people. */
 .promise-text.static {
   display: flex;

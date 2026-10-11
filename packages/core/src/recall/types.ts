@@ -1,4 +1,5 @@
 // Types shared with the UI (through api.ts). No runtime code.
+import type { CalendarEvent } from '../calendar/types';
 import type { CommitmentView, PersonSummary } from '../people/types';
 
 /** Why a saved item came back: an entity it shares with the selection, a similar meaning, or the typed words. */
@@ -27,6 +28,8 @@ export interface SearchResults {
   people: PersonSummary[];
   /** Open commitments only. */
   commitments: CommitmentView[];
+  /** Upcoming calendar events (decision 37). */
+  events: CalendarEvent[];
   /** False when the embedding model isn't ready, so only exact words were searched. */
   semantic: boolean;
 }

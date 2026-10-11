@@ -32,6 +32,10 @@ export * from './people/dates';
 export * from './people/reply-style';
 export * from './people/relationship';
 export * from './store/people';
+export * from './store/calendar';
+export type * from './calendar/types';
+export * from './calendar/when';
+export * from './calendar/events';
 
 export * from './llm/types';
 export * from './llm/catalog';

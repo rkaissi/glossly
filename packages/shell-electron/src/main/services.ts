@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { getLoadablePath } from 'sqlite-vec';
 import {
   AiSdkLlm,
+  CalendarRepo,
   DEFAULT_BLOCK_LIST,
   DEFAULT_HOTKEY_ONLY,
   LOCAL_PRESETS,
@@ -57,6 +58,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
   readonly llm: AiSdkLlm;
   readonly save: SaveService;
   readonly people: PeopleRepo;
+  readonly calendar: CalendarRepo;
   readonly embed: EmbedHost;
   private settingsCache: Settings;
   private readonly lastTests = new Map<string, KeyTestResult>();
@@ -72,6 +74,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     }
     this.store = store;
     this.people = new PeopleRepo(store);
+    this.calendar = new CalendarRepo(store);
     this.metrics = new Metrics(store);
     this.keys = new KeyStore(userDataPath('keys'));
     this.settingsCache = store.getSettings();

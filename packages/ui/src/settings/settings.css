@@ -780,7 +780,16 @@ button.link {
   text-decoration: underline;
 }
 
-/* Tasks tab (decision 36). */
+/* Agenda tab (decisions 36 and 37). */
+.agenda-group h3 {
+  margin: 18px 0 6px;
+  font-size: 13px;
+}
+.task .event-icon {
+  display: inline-flex;
+  margin-top: 7px;
+  color: var(--fg-2);
+}
 .segmented {
   display: inline-flex;
   padding: 2px;

@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (458 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (477 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -138,11 +138,16 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] A local server at a LAN address: Keys warns, General's Local only line says it isn't used, and Ask refuses under Local only.
 - [ ] Setup on a throwaway profile: choosing Local only enables Next with no key; All models needs a key or a local server.
 
-**Tasks (Step 19.1)**
-- [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Tasks.
+**Tasks and events (Steps 19.1 and 19.2)**
+- [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Agenda.
 - [ ] A reply that finishes one ("Here is the budget") and moves another ("can we push the review to Monday?"): rows tagged Mark done and New date with the old → new date; Save updates both (`promises_saved {updated: 2}`), no duplicates.
 - [ ] Restating an open task shows it as Already open, unchecked, and Space doesn't check it.
-- [ ] Settings > Tasks: Add a todo with a date, edit text and date, mark done, reopen, filter by person, delete with the confirm. A reminder click opens Tasks.
+- [ ] Settings > Agenda: Add a todo with a date, edit text and date, mark done, reopen, filter by person and by Tasks / Events, Done and past, delete with the confirm. A reminder click opens Agenda.
+- [ ] An invitation ("Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?" from a fictional sender): the bar offers Tasks and events; the panel has the event (day, 1 PM to 2 PM, place) and the task (bring the deck); Save adds both; the event shows in the Agenda under its day, in Search, and on the sender's card if saved. A second event on that day shows under "Already that day".
+- [ ] "Send the report by Friday 5pm" gives a task, not an event. An all-day event ("offsite Oct 20") saves without times.
+- [ ] Event reminders: a timed event 15 minutes ahead shows a toast once; an all-day one at 9:00 on its day (same toast caveat as tasks, Step 22).
+- [ ] Local only with no local model: the invitation gives the event and the task by patterns.
+- [ ] If one action feels too busy or the model mixes events and tasks up, note it: decision 37's fallback is two actions.
 - [ ] Local only with no local model: pattern rows matched to an open task by words show Already open or New date.
 
 **Later steps**

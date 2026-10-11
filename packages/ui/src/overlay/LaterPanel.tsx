@@ -5,7 +5,7 @@ import { ActionIcon } from '../icons';
 const ABOUT: Partial<Record<ActionId, { title: string; text: string }>> = {
   reply: { title: 'Reply', text: 'Drafts three replies with what you know about the person, and inserts the one you pick.' },
   who: { title: 'Who is this', text: 'Shows what you have saved about the people in the selection.' },
-  promises: { title: 'Tasks', text: 'Finds promises, requests, and todos, and tracks their due dates.' },
+  promises: { title: 'Tasks and events', text: 'Finds promises, requests, todos, and events, and keeps them in your agenda.' },
   visualize: { title: 'Visualize', text: 'Turns tables and numbers into a chart you can copy or save.' },
 };
 
