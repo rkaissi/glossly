@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 11, 2026: plain-name per-app rules with a "Show here" toggle, and one add-person form (decisions 32 and 33; not checked live). 434 unit tests pass; `pnpm typecheck` is clean.
+Last updated Oct 11, 2026: roadmap reordered (features, then polish, then all testing and evals, then packaging); plain-name per-app rules with a "Show here" toggle and one add-person form landed (decisions 32 and 33; not checked live). 434 unit tests pass; `pnpm typecheck` is clean; `main` is pushed.
 
 ## Start here
 
@@ -28,49 +28,53 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Built:** spec Phases 0 to 3 (capture, the bar, Ask, Save, settings and setup, people and Who, What did I promise, Reply, Recall, Search, Visualize) plus everything Rayan added along the way: the glass redesign, Save modes, paste with nothing selected, Ask's remember tool, Reply that learns your style, the Saved tab, relationships. Of Phase 4, the metrics view is done (Step 17.1).
 - **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, and the fixes since, including Oct 11's) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
-- **Not started:** the rest of Step 17, the eval run, packaging, local models, todos and calendar, polish.
+- **Not started:** Steps 17 to 22 below.
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan set this order on Oct 10 (decision 30). Each step is one or more commits; stop and hand off after each.
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
-**0. The live-check backlog (recommended first, when Rayan is away from the machine).** A lot landed without a live pass. Run the checklist in `docs/testing.md` through a subagent, fix what it finds, and tick items off. Rayan hasn't asked for this explicitly; confirm the timing with him.
+**Step 17 (rest): optional decision providers.** The spec names Jev and OpenAI Decisions as `DecisionProvider`s behind a setting (`router/types.ts`, Models tab). Check their current docs first; they may have changed or not exist, in which case say so and skip. (Step 17.1, the metrics view, is done; the eval runners moved to Step 21.)
 
-**Step 14 (any time, Rayan):** the per-app hand tests in `evals/capture.md`. Fix what they turn up (apps where UIA reads nothing, pill placement next to real toolbars, additions to `DEFAULT_HOTKEY_ONLY`) and record results in `STATUS.md`. This is Phase 0's sign-off and can run alongside everything else.
+**Step 18: local models, and privacy as a choice.**
+- Replace the Local only checkbox with a choice (a segmented control or radio pair in General and in setup): **All models** (any configured provider) or **Local only** (nothing leaves this computer; today's decision 12 behavior). Either keep the `localOnly` setting underneath or migrate it to a `privacy` enum with a settings migration; every "Local only is on" message and button in the panels must follow the new wording.
+- Add a local provider (an OpenAI-compatible endpoint such as Ollama or LM Studio) to the catalog and roles. Under Local only, calls go to the local model when one is configured, else they're refused as today.
+- Leave room for a third choice later (the parked subscription).
 
-**Step 17 (rest): Phase 4, Windows parts.** Skip the Swift helper and macOS onboarding.
-- Eval runners for every eval in the spec's table: commitments extraction, the date resolver (`resolveDue` already has 60 unit cases; an eval adds model-in-the-loop phrases), Recall ranking, Visualize, the router (exists), and people extraction built from the Who fixtures in `core/src/people/who-judge.test.ts`. Follow `evals/router.eval.ts`: skip without `GROQ_API_KEY`, retry on 429, fail on a high error rate, write to `evals/results/`, print with `print-results.mjs`. Don't run them (Step 18 does).
-- Optional decision providers behind settings (the spec names Jev and OpenAI Decisions): implement `DecisionProvider` (`router/types.ts`), add them to the Models tab. Check their current docs first; they may have changed or not exist.
-- Export and Delete all data checked live (Delete all was checked on a throwaway profile; Export never).
+**Step 19: todos and calendar, in the app first.** A selection can become a todo or a calendar event, detected like commitments (one structured call, the user confirms, due phrases through `resolveDue`), stored locally, shown in Search and on a person's card, with reminders through the commitment notifier. Add the action ids to `CONTEXTUAL_ACTIONS` with a score (see "Routing and slots" in `docs/architecture.md`); `LaterPanel` covers an action whose panel isn't built yet. **Google Calendar and reminders sync is the second half**, only after the local list works.
 
-**Step 18: one eval run.** Rayan approved exactly one `pnpm eval` run once Step 17 is done. Record every number in `STATUS.md` and `docs/testing.md`, including the re-tuned router prompt's slot match. Pre-agreed rule: if the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection` and compute the people and commitment scores from rules. Who's own model call is separate and stays. Optionally run the comparison evals (`GLOSSLY_COMPARE=1`) if Rayan agrees to the extra calls.
+**Step 20: polish and UI upgrade.** Keep it quiet and native to Windows 11; no illustration pass, no second theme.
+- **Destructive buttons are filled red** (solid red background, white text), not red outlines, in both windows: Delete person, Delete all data, Reset settings, Merge, Remove key, alias, or sample, Delete saved item. The inline confirm stays.
+- **Keyboard hints setting.** General gets "Show keyboard shortcuts": **Always**, **On hotkey** (today's behavior, the default), **Never**. Today the hint replaces the button's icon; instead keep the icon on the left of the label and put the key chip on the right (`overlay/main.tsx`, `overlay.css`, `keys.ts`). The keyboard map itself stays live whenever the bar has focus, whatever the setting. Mind the bar width (`MAX_W`, the 172 px slot cap) and the Step 13 rule that nothing moves when hints appear.
+- **Setup redesign.** Take cues from the onboarding in Raycast, Arc, and the ChatGPT and Claude desktop apps: one focused screen per step with a large heading and one short line, a clear primary button, progress dots, a live "try it" moment, and nothing on screen that the step doesn't need. Keep the steps' content (Welcome, You, Keys, Models, Try it), the privacy choice from Step 18, and the embedding download notice. Look at the current versions of those onboardings before designing.
+- **App icon** for the window, tray, taskbar, and installer, built from the C1 mark (`docs/brand/`); replaces the code-drawn tray icon (`tray.ts`) and Electron's default window icon.
+- Motion on the bar and panels (the current fades are the floor) and one accent color on the glass (lifts the "no accent" part of decision 13).
+- **The small fixes:**
+  - The dot sits 4 DIP right of the mouse-up point and can cover the next letter (`placement.ts`, `anchorX + 4`); a real fix needs the last line's rect from the helper.
+  - Long Save labels truncate at the 172 px slot cap ("Save to People not…").
+  - The "Nothing selected…" strip stays above the paste panel and is truncated there.
+  - Ask's Markdown rendering once joined "at 10 a.m." into "at10a.m.." (`markdown.ts`).
+  - Visualize's x labels sometimes rotate 90°.
+  - Panels can extend past the source window onto whatever is below.
+  - Notepad's taskbar button flashes after the tier-2 hand-off (a Windows refusal in `Focus.cs`; harmless, fix if cheap).
+  - Items saved under Local only never get entities (decision 12); offer a backfill when switching to All models if it's cheap.
 
-**Step 19: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer, unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Use the Step 22 icon if it exists, else the tray mark.
+**Step 21: testing and evals, all in one step.** Run when Rayan is away from the machine, through a subagent (AGENTS.md).
+- The whole live-check backlog in `docs/testing.md`, including everything Steps 17 to 20 added. Fix what it finds.
+- Export and Delete all data checked live (Delete all only on a throwaway profile).
+- Rayan's per-app hand tests in `evals/capture.md` (the Phase 0 sign-off, formerly Step 14). Fix what they turn up (apps where UIA reads nothing, pill placement next to real toolbars, additions to `DEFAULT_HOTKEY_ONLY`) and record results in `STATUS.md`.
+- Eval runners for every eval in the spec's table: commitments extraction, the date resolver (`resolveDue` has 60 unit cases; an eval adds model-in-the-loop phrases), Recall ranking, Visualize, the router (exists), and people extraction from the Who fixtures in `core/src/people/who-judge.test.ts`. Follow `evals/router.eval.ts`: skip without `GROQ_API_KEY`, retry on 429, fail on a high error rate, write to `evals/results/`, print with `print-results.mjs`.
+- Then **one** `pnpm eval` run (Rayan approved one; Groq free tier). Record every number in `STATUS.md` and `docs/testing.md`, including the re-tuned router prompt's slot match. Pre-agreed rule: if the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection` and compute the people and commitment scores from rules. Who's own model call stays.
 
-**Step 20: local models, and privacy as a choice.** Add a local provider (an OpenAI-compatible endpoint such as Ollama or LM Studio) to the catalog and roles. Replace the Local only checkbox with a choice: **On this computer** or **Use my API key**. On this computer, calls go to the local model when one is configured, else they're refused as today (decision 12). The General tab says which is active in one sentence. Leave room for a third choice (the parked subscription).
+**Step 22: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon, and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
 
-**Step 21: todos and calendar, in the app first.** A selection can become a todo or a calendar event, detected like commitments (one structured call, the user confirms, due phrases through `resolveDue`), stored locally, shown in Search and on a person's card, with reminders through the commitment notifier. Add the action ids to `CONTEXTUAL_ACTIONS` with a score (see "Routing and slots" in `docs/architecture.md`); `LaterPanel` covers an action whose panel isn't built yet. **Google Calendar and reminders sync is the second half**, only after the local list works.
-
-**Step 22: polish.** Motion on the bar and panels (the current fades are the floor), one accent color on the glass (lifts the "no accent" part of decision 13), and a real app icon for window, tray, and installer. Keep it quiet: no illustration pass, no second theme.
-
-**Parked (Rayan: "way later"):** a monthly subscription with a cap on Ask, as a third choice beside "Use my API key", enforced in the model layer next to the Local only refusal. Not before packaging, not in the same step as local models.
-
-**Small things to pick up when nearby:**
-- The dot sits 4 DIP right of the mouse-up point and can cover the next letter (`placement.ts`, `anchorX + 4`); a real fix needs the last line's rect from the helper.
-- Long Save labels truncate at the 172 px slot cap ("Save to People not…").
-- The "Nothing selected…" strip stays above the paste panel and is truncated there.
-- Ask's Markdown rendering once joined "at 10 a.m." into "at10a.m.." (`markdown.ts`).
-- Visualize's x labels sometimes rotate 90°.
-- Panels can extend past the source window onto whatever is below.
-- Notepad's taskbar button flashes after the tier-2 hand-off (a Windows refusal in `Focus.cs`; harmless).
-- Items saved under Local only never get entities (decision 12); a backfill when it's turned off would be easy if Rayan wants it.
+**Parked (Rayan: "way later"):** a monthly subscription with a cap on Ask, as a third privacy choice beside All models and Local only, enforced in the model layer next to the Local only refusal. Not before packaging.
 
 ## Open questions for Rayan
 
 1. **Who is this and What did I promise:** keep them as two actions (they now share one people read), or merge them? Left separate pending his call.
-2. **The live-check backlog:** run it before Step 17, or keep building and check later?
-3. **Comparison evals in Step 18:** run them alongside the router eval (about 300 more Groq calls), or skip?
+2. **Comparison evals in Step 21:** run them alongside the one eval run (about 300 more Groq calls), or skip?
 
 Everything else he was asked has been answered and is recorded in `docs/decisions.md`.
 
@@ -138,5 +142,5 @@ pnpm eval                # only when Rayan asks
 
 ## Things Rayan has to do himself
 
-- Hand-test capture across the apps in `evals/capture.md` (Step 14).
+- Hand-test capture across the apps in `evals/capture.md` (part of Step 21; can be done any time before it).
 - Answer the open questions above.

@@ -36,7 +36,7 @@ pnpm eval   # vitest run --project evals, then evals/print-results.mjs
 | Rules only (Oct 10) | 98.3% | 90.0% | Tuned on these same fixtures, so expect lower on real selections. |
 | LLM, Qwen 3.8 (Oct 9) | 100% | 61.7% | Median 247 ms. Most slot misses: counting chat speaker headers as "mentions people" (Who added to 17 cases), low commitment scores on 6. |
 
-- The router prompt was tightened after the Oct 9 run (speaker headers, commitments, automated mail, contact cards, collection by content) and its schema changed (`best_collection` enum, decision 22). **None of that has been re-scored.** Step 18 is that run.
+- The router prompt was tightened after the Oct 9 run (speaker headers, commitments, automated mail, contact cards, collection by content) and its schema changed (`best_collection` enum, decision 22). **None of that has been re-scored.** Step 21 is that run.
 - Remaining rules misses: msg-16 (first names only, so no Who), msg-18 ("please ... today" read as a commitment), tbl-04 (prose with 26% numeric tokens, under the 30% threshold). Automated mail no longer gets Reply (`reply-scoring.test.ts` checks all 60 fixtures offline).
 - Visualize comparison (one partial run, Qwen 3.8, 13 cases where both answered): the old way gave a relevant chart on 7, the chart pick on 12. No HTML was written, so looks weren't compared. The router collection comparison has never run.
 - Model latency on Groq (Oct 9, router call): Qwen 3.8 with reasoning off about 175 ms; gpt-oss-20b at low effort 320 to 550 ms; gpt-oss-120b 500 to 650 ms. Live router calls since: 287 to 446 ms.
@@ -131,5 +131,5 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Metrics shows the Features table with real counts.
 
 **Later steps**
-- [ ] Reminder toast and its click (Step 19, installed build).
+- [ ] Reminder toast and its click (Step 22, installed build).
 - [ ] Phase 0 per-app table and toolbar overlap (`evals/capture.md`, Rayan's hand tests).

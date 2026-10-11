@@ -141,7 +141,7 @@ Known rough edges:
 - Notepad's taskbar button flashes after the tier-2 hand-off on the hotkey path (Windows refusing one of the foreground changes). Harmless.
 - The rules call the 39-word sample message in Notepad an `article`, because it has no speaker header.
 - Ask's answer to a message assumed you wrote it. Fixed in Step 15.1 and checked live: on the Notepad sample it now says "The writer is responding to Rayan's update...".
-- Reminder notifications are logged but no Windows toast appeared in the dev build (likely because bare `electron.exe` has no Start Menu shortcut for its app ID); check again with the installer (Step 19).
+- Reminder notifications are logged but no Windows toast appeared in the dev build (likely because bare `electron.exe` has no Start Menu shortcut for its app ID); check again with the installer (Step 22).
 
 ## Open questions for you
 
@@ -150,7 +150,6 @@ Every earlier question has been answered (Oct 10) and is recorded in `docs/decis
 Still open:
 
 1. **Who is this and What did I promise:** keep them as two actions (they now share one read of the people in the text), or merge them?
-2. **The live-check backlog:** check everything built since the Step 16 live check before Step 17, or keep building and check later?
-3. **Comparison evals:** run them alongside the one router eval in Step 18 (about 300 more Groq calls), or skip?
+2. **Comparison evals:** run them alongside the one eval run in Step 21 (about 300 more Groq calls), or skip?
 
-Next is the rest of Step 17 (eval runners, optional decision providers, Export checked live), then Step 18 (one eval run), 19 (packaging), 20 (local models), 21 (todos and calendar), and 22 (polish). See `docs/HANDOFF.md`.
+The order from here (reset Oct 11): Step 17 (optional decision providers), 18 (local models, and All models or Local only as a choice), 19 (todos and calendar), 20 (polish and UI upgrade: filled red delete buttons, a keyboard-hints setting, a new setup, the app icon, and the small fixes), 21 (all testing and evals, including the checks in the app and your hand tests), and 22 (packaging). See `docs/HANDOFF.md`.

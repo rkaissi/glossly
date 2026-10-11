@@ -68,7 +68,7 @@ Status: live (setup You step, Profile, Who with the model on the email fixture t
 
 One Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) alongside Who's people read (shared and cached). The model returns due phrases as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates. The panel lists each candidate (keep or skip, editable task, You owe / They owe, the person, the due date with a date picker) and, for each new person, the same fields as Who's Create person (decision 33), prefilled from Who's read; they are created on save. Enter saves; the message is stored as an interaction. Reminders (`reminders.ts`): at `reminderHour` (9) on the due date, or at launch if missed, up to 3 per check; clicking opens Settings > People.
 
-Status: live (extraction, save, card). Not live: the shared reader and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 19.
+Status: live (extraction, save, card). Not live: the shared reader and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 22 (packaging).
 
 ## Reply
 
