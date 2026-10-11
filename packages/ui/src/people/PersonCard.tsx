@@ -2,10 +2,12 @@
 // split into "You owe" and "They owe", recent interactions, and saved items that mention
 // them. Shared by the overlay's Who panel and the settings window's full record.
 import { useState, type KeyboardEvent } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Bookmark, CalendarDays, Check, ExternalLink, Pencil, Plus, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Bookmark, CalendarDays, ExternalLink, Pencil, Plus, X } from 'lucide-react';
 import type { CommitmentView, PersonCard, Relationship } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
+import { Select } from '../controls/Select';
+import { TaskCheck } from '../controls/Toggles';
 import { appName, firstName, formatDay, formatDue, formatEventTime } from '../dates';
 import { useAction } from '../settings/useAction';
 import { RELATIONSHIP_OPTIONS } from './relationship';
@@ -17,15 +19,12 @@ function CommitmentRow({ c, showPerson }: { c: CommitmentView; showPerson?: bool
   const done = c.status !== 'open';
   return (
     <li className={`commitment${done ? ' done' : ''}`}>
-      <button
-        className="check"
-        title={done ? 'Mark as open' : 'Mark as done'}
-        aria-label={done ? 'Mark as open' : 'Mark as done'}
+      <TaskCheck
+        checked={done}
+        label={done ? 'Mark as open' : 'Mark as done'}
         disabled={busy}
-        onClick={() => void run(() => glossly.invoke('commitments:set-status', { id: c.id, status: done ? 'open' : 'done' }))}
-      >
-        {done && <Check size={12} strokeWidth={2.5} aria-hidden />}
-      </button>
+        onChange={(on) => void run(() => glossly.invoke('commitments:set-status', { id: c.id, status: on ? 'done' : 'open' }))}
+      />
       <span className="grow">
         {c.text}
         {showPerson && c.person_name && <span className="muted"> · {c.owner === 'me' ? `to ${c.person_name}` : `from ${c.person_name}`}</span>}
@@ -101,22 +100,19 @@ function RelationshipSelect({ card, onChange }: { card: PersonCard; onChange: (c
   const { busy, error, run } = useAction();
   const set = (relationship: Relationship) => void run(async () => onChange(await glossly.invoke('people:update', { personId: card.id, relationship })));
   return (
-    <label className="relationship">
+    <div className="relationship">
       <span className="muted">Relationship</span>
-      <select value={card.relationship ?? ''} disabled={busy} aria-label="Relationship" onChange={(e) => set(e.target.value as Relationship)}>
-        {!card.relationship && (
-          <option value="" disabled>
-            Not set
-          </option>
-        )}
-        {RELATIONSHIP_OPTIONS.map(([value, text]) => (
-          <option key={value} value={value}>
-            {text}
-          </option>
-        ))}
-      </select>
+      <Select<Relationship>
+        size="sm"
+        label="Relationship"
+        value={card.relationship}
+        placeholder="Not set"
+        disabled={busy}
+        onChange={set}
+        options={RELATIONSHIP_OPTIONS.map(([value, text]) => ({ value, label: text }))}
+      />
       {error && <span className="error">{error}</span>}
-    </label>
+    </div>
   );
 }
 

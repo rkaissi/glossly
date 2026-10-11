@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { CatalogModel, ModelRef, ModelsRefreshResult, RoleName, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { Select } from '../controls/Select';
+import { Embeddings } from './Data';
+import { KeyCard, LocalCard } from './Keys';
 import { capabilityBadges, groupByProvider, roleWarning } from './format';
 import { useAction } from './useAction';
 
@@ -43,33 +46,18 @@ export function ModelSelect(props: {
   const groups = groupByProvider(view.models, providerOrder(view));
   const missing = value && !view.models.some((m) => m.ref === value);
   return (
-    <select
-      aria-label={props.label}
-      value={value ?? ''}
+    <Select<string>
+      label={props.label}
+      value={value ?? (props.nullLabel !== undefined ? '' : null)}
+      placeholder={view.models.length ? 'Pick a model' : 'Add a key first'}
       disabled={props.disabled}
-      onChange={(e) => props.onChange(e.target.value === '' ? null : e.target.value)}
-    >
-      {props.nullLabel !== undefined ? (
-        <option value="">{props.nullLabel}</option>
-      ) : (
-        value === null && (
-          <option value="" disabled>
-            {view.models.length ? 'Pick a model' : 'Add a key first'}
-          </option>
-        )
-      )}
-      {missing && <option value={value}>{value} (not available)</option>}
-      {groups.map((g) => (
-        <optgroup key={g.provider} label={g.label}>
-          {g.models.map((m) => (
-            <option key={m.ref} value={m.ref}>
-              {m.displayName}
-              {m.capabilities ? '' : ' (Untested)'}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
+      onChange={(v) => props.onChange(v === '' ? null : v)}
+      options={[
+        ...(props.nullLabel !== undefined ? [{ value: '', label: props.nullLabel }] : []),
+        ...(missing ? [{ value, label: `${value} (not available)` }] : []),
+        ...groups.flatMap((g) => g.models.map((m) => ({ value: m.ref, label: m.displayName, hint: m.capabilities ? undefined : 'Untested', group: g.label }))),
+      ]}
+    />
   );
 }
 
@@ -136,18 +124,13 @@ function LocalOnlyRow({ view }: { view: SettingsView }) {
       <div className="role-pickers">
         <label>
           <span className="small muted">Model</span>
-          <select
-            aria-label="Local only model"
-            value={cur.model ?? ''}
+          <Select<string>
+            label="Local only model"
+            value={cur.model}
             disabled={busy}
-            onChange={(e) => void run(() => glossly.invoke('local:model', { model: e.target.value }))}
-          >
-            {local.map((m) => (
-              <option key={m.ref} value={m.ref}>
-                {m.displayName}
-              </option>
-            ))}
-          </select>
+            onChange={(model) => void run(() => glossly.invoke('local:model', { model }))}
+            options={local.map((m) => ({ value: m.ref, label: m.displayName }))}
+          />
         </label>
       </div>
       {error && <p className="error small">{error}</p>}
@@ -259,13 +242,26 @@ function Catalog({ view }: { view: SettingsView }) {
   );
 }
 
+/** Keys, local models, which model does each job, and the embedding model (Keys merged in, Step 20.1). */
 export function ModelsTab({ view }: { view: SettingsView }) {
   return (
     <section>
       <h2>Models</h2>
-      <p className="muted">Every model call belongs to a role. Defaults fill in when keys change; a model you pick by hand is never replaced.</p>
+      <p className="muted">
+        Glossly has no server. Your keys are encrypted on this computer and sent only to their own provider. Each key is tested by listing the
+        provider's models.
+      </p>
+      <h3>Providers</h3>
+      {view.keys.map((k) => (
+        <KeyCard key={k.provider} k={k} />
+      ))}
+      <LocalCard local={view.local} />
+      <h3>Which model does what</h3>
+      <p className="muted small">Every model call belongs to a role. Defaults fill in when keys change; a model you pick by hand is never replaced.</p>
       <RolePickers view={view} />
       <ActionOverrides view={view} />
+      <h3>On this computer</h3>
+      <Embeddings view={view} />
       <Catalog view={view} />
     </section>
   );

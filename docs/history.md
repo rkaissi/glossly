@@ -42,7 +42,8 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | — | Oct 11 | `0e7061f` | "Don't show here" stores plain names and toggles to "Show here"; one add-person form in Who, Reply, and What did I promise; Reply's unreadable Add button fixed. |
 | 18 | Oct 11 | `9e15a17` | Privacy choice (All models / Local only) with a settings migration; local model server (Ollama, LM Studio) in Keys, Models, and the model layer; What did I promise by patterns without a model (decision 34). |
 | 19.1 | Oct 11 | `4b8b2d0` | Tasks replaces What did I promise: open tasks with the people in the message, rows that finish or move them, personal todos, the Settings > Tasks tab (decision 36). |
-| 19.2 | Oct 11 | (next) | Calendar events from the same Tasks and events call, migration 5, the Agenda tab (tasks and events by day), events in Search, on person cards, and in reminders (decision 37). |
+| 19.2 | Oct 11 | `a5ec8a7` | Calendar events from the same Tasks and events call, migration 5, the Agenda tab (tasks and events by day), events in Search, on person cards, and in reminders (decision 37). |
+| 20.1 | Oct 11 | (next) | Our own controls (`ui/src/controls/`: Popover, Select, Menu, date, range, and time pickers, Segmented, Checkbox, TaskCheck, Switch, ChoiceCards) replace every native control; the spacing and size scale and filled red destructive buttons in `theme.css`; settings tabs regrouped (Keys into Models, Privacy and data) (decision 39). |
 | — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
-Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 20 to 23 are planned in `HANDOFF.md`; Google Calendar sync (19.3) is parked (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
+Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 20.2 to 23 are planned in `HANDOFF.md`; Google Calendar sync (19.3) is parked (reordered Oct 11; the rest of Step 17, the decision providers, is parked).

@@ -60,9 +60,17 @@
   padding: 0;
   border-radius: 50%;
   background: transparent;
+  box-shadow: none;
   color: var(--fg-2);
 }
+/* A quiet x that turns red on hover (Step 20.1), not a filled red button. */
 button.chip-x.danger {
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg-2);
+}
+button.chip-x.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
 
@@ -143,25 +151,6 @@ button.chip-x.danger {
   color: var(--muted);
   text-decoration: line-through;
 }
-.commitment .check {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
-  background: transparent;
-  color: var(--primary-fg);
-}
-.commitment .check:hover:not(:disabled) {
-  border-color: var(--fg-2);
-  background: transparent;
-}
-.commitment.done .check,
-.commitment.done .check:hover:not(:disabled) {
-  background: var(--primary);
-  border-color: var(--primary);
-}
 .due {
   flex: none;
   font-size: 12px;
@@ -209,7 +198,4 @@ button.chip-x.danger {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-}
-.relationship select {
-  height: 28px;
 }

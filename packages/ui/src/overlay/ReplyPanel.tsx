@@ -385,11 +385,11 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
       {stream.status === 'error' && (
         <div className="answer-error">
           <span className="error">{stream.message}</span>
-          {stream.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
+          {stream.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Add a key</button>}
           {stream.code === 'local_only' && (
             <>
               <button onClick={() => void switchToAllModels()}>Use all models and write drafts</button>
-              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Set up a local model</button>
             </>
           )}
           {stream.code !== 'no_model' && stream.code !== 'local_only' && stream.code !== 'no_selection' && (

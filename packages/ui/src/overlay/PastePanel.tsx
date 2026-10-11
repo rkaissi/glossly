@@ -135,11 +135,11 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
       {composed && !composed.ok && (
         <div className="answer-error">
           <span className={composed.code === 'no_selection' ? 'muted' : 'error'}>{composed.message}</span>
-          {composed.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
+          {composed.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Add a key</button>}
           {composed.code === 'local_only' && (
             <>
               <button onClick={() => void switchToAllModels()}>Use all models and write it</button>
-              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Set up a local model</button>
             </>
           )}
           {(composed.code === 'provider' || composed.code === 'timeout' || composed.code === 'invalid_output') && (

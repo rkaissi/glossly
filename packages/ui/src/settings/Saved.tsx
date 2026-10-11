@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Search, Trash2 } from 'lucide-react';
 import type { LibraryItem, LibraryResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { Select } from '../controls/Select';
 import { appName, formatDay } from '../dates';
 import { useAction } from './useAction';
 
@@ -49,25 +50,18 @@ function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collect
           {item.reason === 'similar_topic' && ' · similar meaning'}
         </span>
         <span className="spacer" />
-        <select aria-label="Collection" value={item.collection ?? ''} disabled={busy} onChange={(e) => move(e.target.value)}>
-          {!item.collection && <option value="">No collection</option>}
-          {collections.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <button className="icon-btn" title="Copy" aria-label="Copy" disabled={busy} onClick={copy}>
-          {copied ? <Check size={15} strokeWidth={1.75} aria-hidden /> : <Copy size={15} strokeWidth={1.75} aria-hidden />}
+        <Select size="sm" label="Collection" value={item.collection} placeholder="No collection" disabled={busy} onChange={move} options={collections.map((c) => ({ value: c, label: c }))} />
+        <button className="icon-btn sm" title="Copy" aria-label="Copy" disabled={busy} onClick={copy}>
+          {copied ? <Check size={14} strokeWidth={1.75} aria-hidden /> : <Copy size={14} strokeWidth={1.75} aria-hidden />}
         </button>
-        <button className="icon-btn danger" title="Delete" aria-label="Delete" disabled={busy} onClick={() => setConfirming(true)}>
-          <Trash2 size={15} strokeWidth={1.75} aria-hidden />
+        <button className="icon-btn sm danger" title="Delete" aria-label="Delete" disabled={busy} onClick={() => setConfirming(true)}>
+          <Trash2 size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       {confirming && (
         <div className="confirm">
           <span className="grow">Delete this saved item? This can't be undone.</span>
-          <button className="danger solid" disabled={busy} onClick={del}>
+          <button className="danger" disabled={busy} onClick={del}>
             Delete
           </button>
           <button onClick={() => setConfirming(false)}>Cancel</button>

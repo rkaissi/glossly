@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { KeyStatus, LocalStatus, SettingsView } from '@glossly/core/api';
+import type { KeyStatus, LocalStatus } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { timeAgo } from './format';
@@ -223,21 +223,5 @@ export function LocalCard({ local }: { local: LocalStatus }) {
       )}
       {error && <p className="error">{error}</p>}
     </div>
-  );
-}
-
-export function KeysTab({ view }: { view: SettingsView }) {
-  return (
-    <section>
-      <h2>Keys</h2>
-      <p className="muted">
-        Glossly has no server. Your keys are encrypted on this computer and sent only to their own provider. Each key is tested by listing the
-        provider's models.
-      </p>
-      {view.keys.map((k) => (
-        <KeyCard key={k.provider} k={k} />
-      ))}
-      <LocalCard local={view.local} />
-    </section>
   );
 }

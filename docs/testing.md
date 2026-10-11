@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (477 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (514 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -149,6 +149,13 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Local only with no local model: the invitation gives the event and the task by patterns.
 - [ ] If one action feels too busy or the model mixes events and tasks up, note it: decision 37's fallback is two actions.
 - [ ] Local only with no local model: pattern rows matched to an open task by words show Already open or New date.
+
+**Design system and controls (Step 20.1)**
+- [ ] Settings window: every tab shows our controls and no native dropdown, date, time, or checkbox; the sidebar has the two groups; the window opens on Agenda; `#keys` and `#data` (an overlay "Add a key" button, a reminder click) land on Models and Privacy and data. Light and dark.
+- [ ] Popovers in the settings window: a Select, the date picker, and a due chip near the bottom of the window open above or scroll inside, stay attached while the page scrolls, close on Esc (focus back on the trigger) and on a click outside.
+- [ ] Overlay Tasks and events panel: the person Select, the due chips, and the event's day and time pickers. A picker near the bottom of the panel grows the window while open and shrinks it after, both with the bar below and above the selection. Esc closes only the picker, not the panel; Enter in a picker never saves the panel; Space and the arrows still work on rows.
+- [ ] Time picker: type "3pm", "15:30", "3:45p"; arrows and Enter; clearing the start makes the event all day; a new start keeps the event's length.
+- [ ] Bar buttons (slots, badges, menu, chips) look as before: no new outline.
 
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).

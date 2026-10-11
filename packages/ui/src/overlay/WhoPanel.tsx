@@ -173,7 +173,7 @@ export function WhoPanel({ s }: { s: OverlayState }) {
         <div className="inline-note">
           <Info size={14} strokeWidth={1.75} aria-hidden />
           <span>No model is set up, so this list is from the text only.</span>
-          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>
+          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>
             Add a key
           </button>
         </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import type { CommitmentView, PersonCard, PersonSummary } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { Select } from '../controls/Select';
 import { formatDay } from '../dates';
 import { CommitmentList, PersonCardView } from '../people/PersonCard';
 import { useAction } from './useAction';
@@ -104,22 +105,16 @@ function Merge({ card }: { card: PersonCard }) {
         <p className="muted small">Merging moves their aliases, messages, and commitments into {card.name}'s record and removes the other record.</p>
       </div>
       <div className="row">
-        <select
-          value={other}
-          aria-label="Person to merge"
-          onChange={(e) => {
-            setOther(e.target.value);
+        <Select
+          label="Person to merge"
+          value={other || null}
+          placeholder="Pick a person…"
+          onChange={(id) => {
+            setOther(id);
             setConfirming(false);
           }}
-        >
-          <option value="">Pick a person…</option>
-          {others.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-              {p.aliases.length ? ` (${p.aliases.join(', ')})` : ''}
-            </option>
-          ))}
-        </select>
+          options={others.map((p) => ({ value: p.id, label: p.name, hint: p.aliases.length ? p.aliases.join(', ') : undefined }))}
+        />
         <button className="danger" disabled={!pick || busy} onClick={() => setConfirming(true)}>
           Merge…
         </button>
@@ -129,7 +124,7 @@ function Merge({ card }: { card: PersonCard }) {
           <span className="grow">
             Merge {pick.name} into {card.name}? This can't be undone.
           </span>
-          <button className="danger solid" disabled={busy} onClick={() => void run(() => glossly.invoke('people:merge', { keepId: card.id, dropId: pick.id }))}>
+          <button className="danger" disabled={busy} onClick={() => void run(() => glossly.invoke('people:merge', { keepId: card.id, dropId: pick.id }))}>
             Merge
           </button>
           <button onClick={() => setConfirming(false)}>Cancel</button>
@@ -157,7 +152,7 @@ function Delete({ card }: { card: PersonCard }) {
       {confirming ? (
         <div className="confirm">
           <span className="grow">Delete {card.name}? This can't be undone.</span>
-          <button className="danger solid" disabled={busy} onClick={del}>
+          <button className="danger" disabled={busy} onClick={del}>
             Delete
           </button>
           <button onClick={() => setConfirming(false)}>Cancel</button>

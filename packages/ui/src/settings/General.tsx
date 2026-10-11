@@ -2,8 +2,9 @@ import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { AppMode, Settings, SettingsKey, SettingsView } from '@glossly/core/api';
 import { X } from 'lucide-react';
 import { glossly } from '../bridge';
+import { Select } from '../controls/Select';
+import { ChoiceCards, Switch } from '../controls/Toggles';
 import { formatAccelerator, normalizeAppKey, toAccelerator } from './format';
-import { PrivacyChoice } from './Privacy';
 import { useAction } from './useAction';
 
 const MODE_LABELS: Record<AppMode, string> = { auto: 'Auto pill', hotkey: 'Hotkey only', off: 'Off' };
@@ -110,26 +111,17 @@ function SaveMode({ view }: { view: SettingsView }) {
         <strong>Saving</strong>
         <p className="muted small">Every save goes to the collection Glossly picks for the selection, and can be undone for {view.settings.save.undoSeconds} seconds.</p>
       </div>
-      <div className="choices" role="radiogroup" aria-label="Save mode">
-        {SAVE_MODES.map((m) => (
-          <label key={m.mode} className={`choice${mode === m.mode ? ' selected' : ''}`}>
-            <input
-              type="radio"
-              name="saveMode"
-              checked={mode === m.mode}
-              disabled={busy}
-              onChange={() => {
-                setError(null);
-                void set('saveMode', m.mode);
-              }}
-            />
-            <span>
-              <strong>{m.label}</strong>
-              <span className="muted small block">{m.desc}</span>
-            </span>
-          </label>
-        ))}
-      </div>
+      <ChoiceCards
+        className="stacked"
+        label="Save mode"
+        value={mode}
+        disabled={busy}
+        options={SAVE_MODES.map((m) => ({ value: m.mode, title: m.label, desc: m.desc }))}
+        onChange={(m) => {
+          setError(null);
+          void set('saveMode', m);
+        }}
+      />
       {mode === 'hotkey' && (
         <ShortcutRecorder
           value={view.settings.saveHotkey}
@@ -151,13 +143,13 @@ function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'debugView'; 
   const { busy, error, set } = useSetting();
   return (
     <div className="field">
-      <label className="toggle">
-        <input type="checkbox" checked={view.settings[k]} disabled={busy} onChange={(e) => void set(k, e.target.checked)} />
+      <div className="toggle">
         <span>
           <strong>{label}</strong>
           <span className="muted small block">{desc}</span>
         </span>
-      </label>
+        <Switch label={label} checked={view.settings[k]} disabled={busy} onChange={(on) => void set(k, on)} />
+      </div>
       {error && <p className="error small">{error}</p>}
     </div>
   );
@@ -192,13 +184,7 @@ function AppModes({ view }: { view: SettingsView }) {
   const entries = Object.entries(modes).sort(([a], [b]) => a.localeCompare(b));
   const update = (next: Record<string, AppMode>) => void set('appModes', next);
   const modeSelect = (value: AppMode, onChange: (m: AppMode) => void, label: string) => (
-    <select value={value} aria-label={label} disabled={busy} onChange={(e) => onChange(e.target.value as AppMode)}>
-      {(Object.keys(MODE_LABELS) as AppMode[]).map((m) => (
-        <option key={m} value={m}>
-          {MODE_LABELS[m]}
-        </option>
-      ))}
-    </select>
+    <Select size="sm" label={label} value={value} disabled={busy} onChange={onChange} options={(Object.keys(MODE_LABELS) as AppMode[]).map((m) => ({ value: m, label: MODE_LABELS[m] }))} />
   );
   return (
     <div className="field">
@@ -217,7 +203,7 @@ function AppModes({ view }: { view: SettingsView }) {
               <code className="grow">{key}</code>
               {modeSelect(m, (next) => update({ ...modes, [key]: next }), `Mode for ${key}`)}
               <button
-                className="icon-btn"
+                className="icon-btn sm"
                 title={`Remove ${key}`}
                 disabled={busy}
                 onClick={() => {
@@ -226,7 +212,7 @@ function AppModes({ view }: { view: SettingsView }) {
                   update(next);
                 }}
               >
-                <X size={15} strokeWidth={1.75} aria-hidden />
+                <X size={14} strokeWidth={1.75} aria-hidden />
               </button>
             </li>
           ))}
@@ -241,7 +227,8 @@ function AppModes({ view }: { view: SettingsView }) {
   );
 }
 
-function BlockList({ view }: { view: SettingsView }) {
+/** Apps Glossly never reads from (shown in Privacy and data). */
+export function BlockList({ view }: { view: SettingsView }) {
   const { busy, error, set } = useSetting();
   const list = view.settings.blockList;
   return (
@@ -255,8 +242,8 @@ function BlockList({ view }: { view: SettingsView }) {
           {list.map((key) => (
             <li key={key}>
               <code className="grow">{key}</code>
-              <button className="icon-btn" title={`Remove ${key}`} disabled={busy} onClick={() => void set('blockList', list.filter((k) => k !== key))}>
-                <X size={15} strokeWidth={1.75} aria-hidden />
+              <button className="icon-btn sm" title={`Remove ${key}`} disabled={busy} onClick={() => void set('blockList', list.filter((k) => k !== key))}>
+                <X size={14} strokeWidth={1.75} aria-hidden />
               </button>
             </li>
           ))}
@@ -278,10 +265,8 @@ export function GeneralTab({ view }: { view: SettingsView }) {
       <h2>General</h2>
       <Hotkey view={view} />
       <SaveMode view={view} />
-      <PrivacyChoice view={view} onSetUp={() => (location.hash = '#keys')} />
-      <Toggle view={view} k="debugView" label="Debug view" desc="Shows capture method, timings, and routing details at the bottom of the bar." />
       <AppModes view={view} />
-      <BlockList view={view} />
+      <Toggle view={view} k="debugView" label="Debug view" desc="Shows capture method, timings, and routing details at the bottom of the bar." />
     </section>
   );
 }

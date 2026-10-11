@@ -1,8 +1,12 @@
 import { useCallback, useState } from 'react';
-import { CalendarDays, Check, MapPin, Trash2 } from 'lucide-react';
+import { CalendarDays, ExternalLink, MapPin, Trash2, UsersRound } from 'lucide-react';
 import type { CalendarEvent, CommitmentView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
+import { DatePicker } from '../controls/DatePicker';
+import { ActionMenu } from '../controls/Menu';
+import { Select } from '../controls/Select';
+import { Segmented, TaskCheck } from '../controls/Toggles';
 import { formatDue, formatEventTime, splitStamp } from '../dates';
 import { groupAgenda } from './agenda-groups';
 import { useAction } from './useAction';
@@ -17,43 +21,50 @@ function owes(t: CommitmentView): string {
   return t.person_name ? `You owe ${t.person_name}` : 'Your todo';
 }
 
-function Delete({ prompt, busy, onDelete }: { prompt: string; busy: boolean; onDelete: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  return confirming ? (
-    <InlineConfirm prompt={prompt} confirm="Delete" busy={busy} onConfirm={onDelete} onCancel={() => setConfirming(false)} />
-  ) : (
-    <button className="icon-btn danger" title="Delete" aria-label={prompt.replace(/\?$/, '')} disabled={busy} onClick={() => setConfirming(true)}>
-      <Trash2 size={15} strokeWidth={1.75} aria-hidden />
-    </button>
+type RowAction = 'open' | 'delete';
+
+/** The row's "…" menu (Open person, Delete); Delete swaps the row for an inline confirm. */
+function RowMenu({ personId, onDelete }: { personId?: string | null; onDelete: () => void }) {
+  return (
+    <div className="row-acts">
+      <ActionMenu<RowAction>
+        items={[
+          ...(personId ? [{ value: 'open' as const, label: 'Open person', icon: <ExternalLink size={16} strokeWidth={1.75} aria-hidden /> }] : []),
+          { value: 'delete', label: 'Delete', danger: true, separator: !!personId, icon: <Trash2 size={16} strokeWidth={1.75} aria-hidden /> },
+        ]}
+        onPick={(a) => (a === 'open' ? (location.hash = `people/${personId}`) : onDelete())}
+      />
+    </div>
   );
 }
 
 function TaskRow({ t }: { t: CommitmentView }) {
   const [text, setText] = useState(t.text);
+  const [confirming, setConfirming] = useState(false);
   const { busy, error, run } = useAction();
-  const due = formatDue(t.due_at);
   const done = t.status !== 'open';
   const saveText = () => {
     const next = text.trim();
     if (!next || next === t.text) return setText(t.text);
     void run(() => glossly.invoke('commitments:update', { id: t.id, text: next }));
   };
+  if (confirming)
+    return (
+      <li className="task confirming">
+        <InlineConfirm prompt="Delete this task?" confirm="Delete" busy={busy} onConfirm={() => void run(() => glossly.invoke('commitments:delete', { id: t.id }))} onCancel={() => setConfirming(false)} />
+      </li>
+    );
   return (
     <li className={`task${done ? ' done' : ''}`}>
-      <button
-        className={`check${done ? ' on' : ''}`}
-        role="checkbox"
-        aria-checked={done}
-        aria-label={done ? 'Reopen' : 'Mark done'}
-        title={done ? 'Reopen' : 'Mark done'}
+      <TaskCheck
+        checked={done}
+        label={done ? 'Reopen' : 'Mark done'}
         disabled={busy}
-        onClick={() => void run(() => glossly.invoke('commitments:set-status', { id: t.id, status: done ? 'open' : 'done' }))}
-      >
-        {done && <Check size={12} strokeWidth={2.5} aria-hidden />}
-      </button>
+        onChange={(on) => void run(() => glossly.invoke('commitments:set-status', { id: t.id, status: on ? 'done' : 'open' }))}
+      />
       <div className="grow task-body">
         <input
-          className="task-text"
+          className="inline-input"
           value={text}
           maxLength={300}
           aria-label="Task"
@@ -62,19 +73,18 @@ function TaskRow({ t }: { t: CommitmentView }) {
           onBlur={saveText}
           onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
         />
-        <span className="muted small">{t.person_id ? <a href={`#people/${t.person_id}`}>{owes(t)}</a> : owes(t)}</span>
+        <span className="task-sub">{t.person_id ? <a href={`#people/${t.person_id}`}>{owes(t)}</a> : owes(t)}</span>
         {error && <span className="error small block">{error}</span>}
       </div>
-      <label className={`due-chip${due.overdue && !done ? ' overdue' : ''}`}>
-        <span>{t.due_at ? due.label : 'No date'}</span>
-        <input
-          type="date"
-          aria-label="Due date"
-          value={t.due_at?.slice(0, 10) ?? ''}
-          onChange={(e) => void run(() => glossly.invoke('commitments:update', { id: t.id, due_at: e.target.value || null }))}
-        />
-      </label>
-      <Delete prompt="Delete this task?" busy={busy} onDelete={() => void run(() => glossly.invoke('commitments:delete', { id: t.id }))} />
+      <DatePicker
+        variant="chip"
+        label="Due date"
+        value={t.due_at?.slice(0, 10) ?? null}
+        overdue={done ? false : undefined}
+        disabled={busy}
+        onChange={(day) => void run(() => glossly.invoke('commitments:update', { id: t.id, due_at: day }))}
+      />
+      <RowMenu personId={t.person_id} onDelete={() => setConfirming(true)} />
     </li>
   );
 }
@@ -84,16 +94,23 @@ const onDay = (stamp: string | null, day: string): string | null => (stamp ? `${
 
 function EventRow({ e }: { e: CalendarEvent }) {
   const [title, setTitle] = useState(e.title);
+  const [confirming, setConfirming] = useState(false);
   const { busy, error, run } = useAction();
   const saveTitle = () => {
     const next = title.trim();
     if (!next || next === e.title) return setTitle(e.title);
     void run(() => glossly.invoke('calendar:update', { id: e.id, patch: { title: next } }));
   };
-  const moveTo = (day: string) => {
+  const moveTo = (day: string | null) => {
     if (!day) return;
     void run(() => glossly.invoke('calendar:update', { id: e.id, patch: { starts_at: onDay(e.starts_at, day)!, ends_at: onDay(e.ends_at, day) } }));
   };
+  if (confirming)
+    return (
+      <li className="task confirming">
+        <InlineConfirm prompt="Delete this event?" confirm="Delete" busy={busy} onConfirm={() => void run(() => glossly.invoke('calendar:delete', { id: e.id }))} onCancel={() => setConfirming(false)} />
+      </li>
+    );
   return (
     <li className="task event">
       <span className="event-icon" aria-hidden>
@@ -101,7 +118,7 @@ function EventRow({ e }: { e: CalendarEvent }) {
       </span>
       <div className="grow task-body">
         <input
-          className="task-text"
+          className="inline-input"
           value={title}
           maxLength={200}
           aria-label="Event"
@@ -110,22 +127,21 @@ function EventRow({ e }: { e: CalendarEvent }) {
           onBlur={saveTitle}
           onKeyDown={(ev) => ev.key === 'Enter' && (ev.target as HTMLInputElement).blur()}
         />
-        <span className="muted small">
-          {e.location && (
-            <>
-              <MapPin size={12} strokeWidth={1.75} aria-hidden /> {e.location}
-              {e.attendees.length > 0 && ' · '}
-            </>
-          )}
-          {e.attendees.length > 0 && <>With {e.attendees.join(', ')}</>}
-        </span>
+        {(e.location || e.attendees.length > 0) && (
+          <span className="task-sub">
+            {e.location && (
+              <>
+                <MapPin size={12} strokeWidth={1.75} aria-hidden /> {e.location}
+                {e.attendees.length > 0 && ' · '}
+              </>
+            )}
+            {e.attendees.length > 0 && <>With {e.attendees.join(', ')}</>}
+          </span>
+        )}
         {error && <span className="error small block">{error}</span>}
       </div>
-      <label className="due-chip" title="Move to another day">
-        <span>{formatEventTime(e)}</span>
-        <input type="date" aria-label="Day" value={splitStamp(e.starts_at).day} onChange={(ev) => moveTo(ev.target.value)} />
-      </label>
-      <Delete prompt="Delete this event?" busy={busy} onDelete={() => void run(() => glossly.invoke('calendar:delete', { id: e.id }))} />
+      <DatePicker variant="chip" label="Move to another day" value={splitStamp(e.starts_at).day} text={formatEventTime(e)} overdue={false} allowNone={false} disabled={busy} onChange={moveTo} />
+      <RowMenu onDelete={() => setConfirming(true)} />
     </li>
   );
 }
@@ -133,42 +149,30 @@ function EventRow({ e }: { e: CalendarEvent }) {
 /** A personal todo typed here: the user's own, with no person. */
 function AddTodo() {
   const [text, setText] = useState('');
-  const [due, setDue] = useState('');
+  const [due, setDue] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   const add = async () => {
-    const r = await run(() => glossly.invoke('commitments:add', { text, due_at: due || null }));
+    const r = await run(() => glossly.invoke('commitments:add', { text, due_at: due }));
     if (r !== undefined) {
       setText('');
-      setDue('');
+      setDue(null);
     }
   };
   return (
     <form
-      className="row"
+      className="row add-todo"
       onSubmit={(e) => {
         e.preventDefault();
         if (text.trim()) void add();
       }}
     >
       <input className="grow" placeholder="Add a todo" aria-label="New todo" maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
-      <input type="date" aria-label="Due date for the new todo" value={due} onChange={(e) => setDue(e.target.value)} />
-      <button type="submit" disabled={busy || !text.trim()}>
+      <DatePicker label="Due date for the new todo" value={due} onChange={setDue} noneText="No date" />
+      <button type="submit" className="primary" disabled={busy || !text.trim()}>
         Add
       </button>
       {error && <p className="error small">{error}</p>}
     </form>
-  );
-}
-
-function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
-  return (
-    <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map(([v, text]) => (
-        <button key={v} role="radio" aria-checked={value === v} className={value === v ? 'selected' : undefined} onClick={() => onChange(v)}>
-          {text}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -214,18 +218,19 @@ export function AgendaTab() {
         on this computer only.
       </p>
       <AddTodo />
-      <div className="row">
+      <div className="row agenda-filters">
         <Segmented label="Show" value={show} onChange={setShow} options={[['all', 'All'], ['tasks', 'Tasks'], ['events', 'Events']]} />
         <Segmented label="When" value={when} onChange={setWhen} options={[['upcoming', 'Upcoming'], ['past', 'Done and past']]} />
         <span className="spacer" />
-        <select aria-label="Person" value={personId} onChange={(e) => setPersonId(e.target.value)}>
-          <option value="">Everyone</option>
-          {(people ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <Select
+          label="Person"
+          value={personId}
+          onChange={setPersonId}
+          options={[
+            { value: '', label: 'Everyone', icon: <UsersRound size={16} strokeWidth={1.75} aria-hidden /> },
+            ...(people ?? []).map((p, i) => ({ value: p.id, label: p.name, separator: i === 0 })),
+          ]}
+        />
       </div>
 
       {loading ? (

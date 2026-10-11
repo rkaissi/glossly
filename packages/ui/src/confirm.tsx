@@ -15,7 +15,7 @@ export function InlineConfirm({
   return (
     <span className="confirm inline">
       <span>{prompt}</span>
-      <button type="button" className="danger solid" disabled={busy} onClick={onConfirm}>
+      <button type="button" className="danger" disabled={busy} onClick={onConfirm}>
         {confirm}
       </button>
       <button type="button" disabled={busy} onClick={onCancel}>

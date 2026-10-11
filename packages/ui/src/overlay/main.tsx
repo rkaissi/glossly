@@ -1,13 +1,15 @@
 // The overlay renderer: pill, dot, bar, and panels in one window. Main owns the session and
 // pushes OverlayState; this side only renders it and sends clicks and keys back.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Check, Eye, EyeOff, History, Info, Settings, Undo2, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { RoomContext, type RequestRoom } from '../controls/room';
 import { siteLabel } from '../dates';
 import { ActionIcon, GlosslyMark } from '../icons';
 import '../theme.css';
+import '../controls/controls.css';
 import './overlay.css';
 import { AskPanel } from './AskPanel';
 import { Debug } from './Debug';
@@ -128,6 +130,28 @@ function Expanded({ s }: { s: OverlayState }) {
   const items = barItems(s.slots, s.hasSelection, menuOpen);
   const undoLeft = useSecondsLeft(s.saved?.undoUntil);
   const hl = Math.min(highlight, items.length - 1);
+  const above = s.placement?.side === 'above';
+
+  // An open popover (a date or time picker) that doesn't fit asks for room; the content grows
+  // to it, so the window does too, toward the side it grows on (decision 39).
+  const [room, setRoom] = useState<ReadonlyMap<number, { below: number; above: number }>>(new Map());
+  const requestRoom = useCallback<RequestRoom>(
+    (rid, need) =>
+      setRoom((m) => {
+        if (!need && !m.has(rid)) return m;
+        const next = new Map(m);
+        if (need) next.set(rid, need);
+        else next.delete(rid);
+        return next;
+      }),
+    [],
+  );
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const h = Math.max(0, ...[...room.values()].map((r) => (above ? r.above : r.below)));
+    el.style.minHeight = h ? `${h}px` : '';
+  }, [room, above]);
 
   // Main sizes the window; report the content's real size after every change.
   useLayoutEffect(() => {
@@ -210,7 +234,7 @@ function Expanded({ s }: { s: OverlayState }) {
   const strip = Boolean(s.notice) || (!s.hasSelection && s.panel !== 'search');
   const frameCls = [
     'frame',
-    s.placement?.side === 'above' && 'above',
+    above && 'above',
     menuOpen && 'has-menu',
     strip && 'has-strip',
     s.debug && 'has-debug',
@@ -220,146 +244,148 @@ function Expanded({ s }: { s: OverlayState }) {
     .join(' ');
 
   return (
-    <div ref={ref} className={frameCls}>
-      <div className="row">
-        <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
-        {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
-        {/* Nothing selected: nothing to save, so Search and the paste actions sit next to Ask. */}
-        {s.hasSelection && !s.saved && slotButton({ slot: 2 }, save, { cls: 'save' })}
-        {s.hasSelection && s.saved && (
-          // Already saved (autosave): slot 2 undoes it while the undo window lasts.
-          <button
-            key="slot2:saved"
-            className={['slot save', isHighlighted({ slot: 2 }) && 'highlight'].filter(Boolean).join(' ')}
-            title={undoLeft > 0 ? `Undo: remove it from ${s.saved.collection}` : `Saved to ${s.saved.collection}`}
-            disabled={undoLeft === 0}
-            onClick={() => run(id, { slot: 2 })}
-          >
-            {s.keyboard && undoLeft > 0 ? <kbd>{slotKey(items, 2)}</kbd> : undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
-            <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : `Saved to ${s.saved.collection}`}</span>
-          </button>
-        )}
-        {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
-        {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
-        {shownBadges(s.badges).map(({ badge: b, title }) =>
-          b.kind === 'person' ? (
-            // Known people with open commitments or a note. Several collapse to "Jordan +2 others".
-            <button key={b.personId} className="badge" title={title} onClick={() => run(id, { action: 'who' })}>
-              <UserRound size={13} strokeWidth={1.75} aria-hidden />
-              <span>{b.label}</span>
+    <RoomContext.Provider value={requestRoom}>
+      <div ref={ref} className={frameCls}>
+        <div className="row">
+          <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
+          {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
+          {/* Nothing selected: nothing to save, so Search and the paste actions sit next to Ask. */}
+          {s.hasSelection && !s.saved && slotButton({ slot: 2 }, save, { cls: 'save' })}
+          {s.hasSelection && s.saved && (
+            // Already saved (autosave): slot 2 undoes it while the undo window lasts.
+            <button
+              key="slot2:saved"
+              className={['slot save', isHighlighted({ slot: 2 }) && 'highlight'].filter(Boolean).join(' ')}
+              title={undoLeft > 0 ? `Undo: remove it from ${s.saved.collection}` : `Saved to ${s.saved.collection}`}
+              disabled={undoLeft === 0}
+              onClick={() => run(id, { slot: 2 })}
+            >
+              {s.keyboard && undoLeft > 0 ? <kbd>{slotKey(items, 2)}</kbd> : undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
+              <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : `Saved to ${s.saved.collection}`}</span>
             </button>
-          ) : (
-            // Saved items related to this selection: opens the Recall cards.
-            <button key="recall" className="badge" title={title} onClick={() => run(id, { action: 'recall' })}>
-              <History size={13} strokeWidth={1.75} aria-hidden />
-              <span>{badgeLabel(b)}</span>
-            </button>
-          ),
-        )}
-      </div>
-
-      {menuOpen && (
-        <div className="menu" role="menu">
-          {s.hasSelection && (
-            <>
-              <div className="menu-label">
-                More actions {s.keyboard && s.mode === 'bar' && <kbd>Tab</kbd>}
-              </div>
-              {more.length > 0 ? (
-                more.map((m) => (
-                  <button
-                    key={m.action}
-                    role="menuitem"
-                    className={`menu-item${m.available ? '' : ' later'}${isHighlighted({ action: m.action }) ? ' highlight' : ''}`}
-                    title={titleFor(m)}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      run(id, { action: m.action });
-                    }}
-                  >
-                    <ActionIcon action={m.action} />
-                    <span>{m.label}</span>
-                  </button>
-                ))
-              ) : (
-                <div className="menu-empty">No other actions fit this selection.</div>
-              )}
-              <div className="menu-sep" />
-            </>
           )}
-          {s.siteKey &&
-            (s.hiddenHere ? (
-              <button
-                role="menuitem"
-                className="menu-item"
-                title="Show the pill here again when you select text"
-                onClick={() => void glossly.invoke('bar:show-here', { sessionId: id })}
-              >
-                <Eye size={16} strokeWidth={1.75} aria-hidden />
-                <span>Show here ({siteLabel(s.siteKey)})</span>
+          {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
+          {slots?.slot4 && slotButton({ slot: 4 }, slots.slot4, { fresh: true })}
+          {shownBadges(s.badges).map(({ badge: b, title }) =>
+            b.kind === 'person' ? (
+              // Known people with open commitments or a note. Several collapse to "Jordan +2 others".
+              <button key={b.personId} className="badge" title={title} onClick={() => run(id, { action: 'who' })}>
+                <UserRound size={13} strokeWidth={1.75} aria-hidden />
+                <span>{b.label}</span>
               </button>
             ) : (
-              <button
-                role="menuitem"
-                className="menu-item"
-                title="Show the bar here only when you press the hotkey"
-                onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
-              >
-                <EyeOff size={16} strokeWidth={1.75} aria-hidden />
-                <span>Don't show here ({siteLabel(s.siteKey)})</span>
+              // Saved items related to this selection: opens the Recall cards.
+              <button key="recall" className="badge" title={title} onClick={() => run(id, { action: 'recall' })}>
+                <History size={13} strokeWidth={1.75} aria-hidden />
+                <span>{badgeLabel(b)}</span>
               </button>
-            ))}
-          <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('settings:open', {})}>
-            <Settings size={16} strokeWidth={1.75} aria-hidden />
-            <span>Settings</span>
-          </button>
-          <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>
-            <X size={16} strokeWidth={1.75} aria-hidden />
-            <span>Close</span>
-            {s.keyboard && <kbd>Esc</kbd>}
-          </button>
+            ),
+          )}
         </div>
-      )}
 
-      {s.notice && (
-        <div className="strip">
-          <Info size={15} strokeWidth={1.75} aria-hidden />
-          <span>{s.notice}</span>
-        </div>
-      )}
-      {!s.hasSelection && !s.notice && s.panel !== 'search' && (
-        <div className="strip">
-          <Info size={15} strokeWidth={1.75} aria-hidden />
-          <span>Nothing selected. Search what you saved, ask a question, or select text and press the hotkey again.</span>
-        </div>
-      )}
+        {menuOpen && (
+          <div className="menu" role="menu">
+            {s.hasSelection && (
+              <>
+                <div className="menu-label">
+                  More actions {s.keyboard && s.mode === 'bar' && <kbd>Tab</kbd>}
+                </div>
+                {more.length > 0 ? (
+                  more.map((m) => (
+                    <button
+                      key={m.action}
+                      role="menuitem"
+                      className={`menu-item${m.available ? '' : ' later'}${isHighlighted({ action: m.action }) ? ' highlight' : ''}`}
+                      title={titleFor(m)}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        run(id, { action: m.action });
+                      }}
+                    >
+                      <ActionIcon action={m.action} />
+                      <span>{m.label}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="menu-empty">No other actions fit this selection.</div>
+                )}
+                <div className="menu-sep" />
+              </>
+            )}
+            {s.siteKey &&
+              (s.hiddenHere ? (
+                <button
+                  role="menuitem"
+                  className="menu-item"
+                  title="Show the pill here again when you select text"
+                  onClick={() => void glossly.invoke('bar:show-here', { sessionId: id })}
+                >
+                  <Eye size={16} strokeWidth={1.75} aria-hidden />
+                  <span>Show here ({siteLabel(s.siteKey)})</span>
+                </button>
+              ) : (
+                <button
+                  role="menuitem"
+                  className="menu-item"
+                  title="Show the bar here only when you press the hotkey"
+                  onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
+                >
+                  <EyeOff size={16} strokeWidth={1.75} aria-hidden />
+                  <span>Don't show here ({siteLabel(s.siteKey)})</span>
+                </button>
+              ))}
+            <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('settings:open', {})}>
+              <Settings size={16} strokeWidth={1.75} aria-hidden />
+              <span>Settings</span>
+            </button>
+            <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>
+              <X size={16} strokeWidth={1.75} aria-hidden />
+              <span>Close</span>
+              {s.keyboard && <kbd>Esc</kbd>}
+            </button>
+          </div>
+        )}
 
-      {s.mode === 'panel' &&
-        s.panel &&
-        (s.panel === 'ask' ? (
-          <AskPanel key="ask" s={s} />
-        ) : s.panel === 'save' ? (
-          <SavePanel key="save" s={s} />
-        ) : s.panel === 'who' ? (
-          <WhoPanel key="who" s={s} />
-        ) : s.panel === 'promises' ? (
-          <PromisesPanel key="promises" s={s} />
-        ) : s.panel === 'reply' ? (
-          <ReplyPanel key="reply" s={s} />
-        ) : s.panel === 'search' ? (
-          <SearchPanel key="search" s={s} />
-        ) : s.panel === 'recall' ? (
-          <RecallPanel key="recall" s={s} />
-        ) : s.panel === 'visualize' ? (
-          <VisualizePanel key="visualize" s={s} />
-        ) : s.panel === 'paste_list' || s.panel === 'paste_summary' ? (
-          <PastePanel key={s.panel} s={s} kind={s.panel === 'paste_list' ? 'list' : 'summary'} />
-        ) : (
-          <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
-        ))}
+        {s.notice && (
+          <div className="strip">
+            <Info size={15} strokeWidth={1.75} aria-hidden />
+            <span>{s.notice}</span>
+          </div>
+        )}
+        {!s.hasSelection && !s.notice && s.panel !== 'search' && (
+          <div className="strip">
+            <Info size={15} strokeWidth={1.75} aria-hidden />
+            <span>Nothing selected. Search what you saved, ask a question, or select text and press the hotkey again.</span>
+          </div>
+        )}
 
-      {s.debug && <Debug d={s.debug} slots={slots} />}
-    </div>
+        {s.mode === 'panel' &&
+          s.panel &&
+          (s.panel === 'ask' ? (
+            <AskPanel key="ask" s={s} />
+          ) : s.panel === 'save' ? (
+            <SavePanel key="save" s={s} />
+          ) : s.panel === 'who' ? (
+            <WhoPanel key="who" s={s} />
+          ) : s.panel === 'promises' ? (
+            <PromisesPanel key="promises" s={s} />
+          ) : s.panel === 'reply' ? (
+            <ReplyPanel key="reply" s={s} />
+          ) : s.panel === 'search' ? (
+            <SearchPanel key="search" s={s} />
+          ) : s.panel === 'recall' ? (
+            <RecallPanel key="recall" s={s} />
+          ) : s.panel === 'visualize' ? (
+            <VisualizePanel key="visualize" s={s} />
+          ) : s.panel === 'paste_list' || s.panel === 'paste_summary' ? (
+            <PastePanel key={s.panel} s={s} kind={s.panel === 'paste_list' ? 'list' : 'summary'} />
+          ) : (
+            <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
+          ))}
+
+        {s.debug && <Debug d={s.debug} slots={slots} />}
+      </div>
+    </RoomContext.Provider>
   );
 }
 

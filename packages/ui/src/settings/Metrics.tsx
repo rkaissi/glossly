@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { MetricsSummary } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { Segmented } from '../controls/Toggles';
 import { pct } from './format';
 import { useAction } from './useAction';
 
@@ -41,15 +42,9 @@ export function MetricsTab() {
     <section>
       <div className="row">
         <h2 className="grow">Metrics</h2>
-        <select value={days} aria-label="Time range" onChange={(e) => setDays(Number(e.target.value))}>
-          {RANGES.map((d) => (
-            <option key={d} value={d}>
-              Last {d} days
-            </option>
-          ))}
-        </select>
+        <Segmented label="Time range" value={String(days)} onChange={(d) => setDays(Number(d))} options={RANGES.map((d) => [String(d), `${d} days`] as const)} />
       </div>
-      <p className="muted">Counted on this computer only. Nothing is sent anywhere; export from the Data tab to share them.</p>
+      <p className="muted">Counted on this computer only. Nothing is sent anywhere; export from Privacy and data to share them.</p>
       {error && <p className="error">{error}</p>}
       {m && (
         <>

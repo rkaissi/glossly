@@ -2,6 +2,11 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ExternalLink, Info, RotateCcw } from 'lucide-react';
 import type { CalendarEvent, CommitmentView, EventCandidate, EventSaveRow, OverlayState, PromiseRow, PromiseSaveRow, PromisesByRules, PromisesResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { DatePicker } from '../controls/DatePicker';
+import { addMinutes } from '../controls/logic';
+import { Select } from '../controls/Select';
+import { TimePicker } from '../controls/TimePicker';
+import { Checkbox, TaskCheck } from '../controls/Toggles';
 import { formatDue, formatEventTime, joinStamp, splitStamp } from '../dates';
 import { PersonFields } from '../people/PersonForm';
 import { draftToCreate, type PersonDraft } from '../people/draft';
@@ -114,34 +119,43 @@ function toEventSave(d: EventDraft): EventSaveRow {
   };
 }
 
+/** Minutes from one "HH:MM" to a later one. */
+const minutesBetween = (a: string, b: string) => {
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  return m(b) - m(a);
+};
+
 const canSaveEvent = (d: EventDraft) => d.selected && d.title.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day);
 
 /** A candidate event: what, when (day, start, end; no start is all day), where, and who. */
 function EventRowView({ d, onChange }: { d: EventDraft; onChange: (patch: Partial<EventDraft>) => void }) {
   return (
     <li className={`promise event${d.selected ? '' : ' off'}`}>
-      <button
-        className={`check${d.selected ? ' on' : ''}`}
-        role="checkbox"
-        aria-checked={d.selected}
-        aria-label={d.selected ? 'Skip this event' : 'Add this event'}
+      <Checkbox
+        checked={d.selected}
+        label={d.selected ? 'Skip this event' : 'Add this event'}
         tabIndex={-1}
-        onClick={() => onChange({ selected: !d.selected })}
-      >
-        {d.selected && <Check size={12} strokeWidth={2.5} aria-hidden />}
-      </button>
+        onChange={(selected) => onChange({ selected })}
+      />
       <div className="promise-body">
         <input className="promise-text" value={d.title} maxLength={200} aria-label="Event" spellCheck={false} onChange={(e) => onChange({ title: e.target.value })} />
         <div className="promise-meta event-when" title={d.when_phrase ? `"${d.when_phrase}"` : undefined}>
-          <input type="date" aria-label="Day" tabIndex={-1} value={d.day} onChange={(e) => onChange({ day: e.target.value })} />
-          <input type="time" aria-label="Starts" tabIndex={-1} value={d.start} onChange={(e) => onChange({ start: e.target.value })} />
-          {d.start ? (
+          <DatePicker variant="chip" label="Day" value={d.day || null} allowNone={false} overdue={false} tabIndex={-1} onChange={(day) => day && onChange({ day })} />
+          <TimePicker
+            size="sm"
+            label="Starts"
+            value={d.start}
+            placeholder="All day"
+            allowEmpty
+            tabIndex={-1}
+            // A new start keeps the event's length, or makes it an hour long.
+            onChange={(start) => onChange({ start, end: !start ? '' : d.end && d.start && d.end > d.start ? addMinutes(start, minutesBetween(d.start, d.end)) : d.end > start ? d.end : addMinutes(start, 60) })}
+          />
+          {d.start && (
             <>
               <span className="muted">to</span>
-              <input type="time" aria-label="Ends" tabIndex={-1} value={d.end} onChange={(e) => onChange({ end: e.target.value })} />
+              <TimePicker size="sm" label="Ends" value={d.end} placeholder="End" allowEmpty tabIndex={-1} onChange={(end) => onChange({ end })} />
             </>
-          ) : (
-            <span className="muted">All day</span>
           )}
         </div>
         <div className="promise-meta">
@@ -168,17 +182,13 @@ function ExistingRow({ d, highlight, onChange, onFocusRow }: { d: Draft; highlig
   const same = d.change === 'same';
   return (
     <li className={`promise existing${d.selected ? '' : ' off'}${highlight ? ' highlight' : ''}`} onFocus={onFocusRow}>
-      <button
-        className={`check${d.selected ? ' on' : ''}`}
-        role="checkbox"
-        aria-checked={d.selected}
-        aria-label={d.selected ? 'Leave it' : CHANGE_LABEL[d.change as 'done']}
+      <Checkbox
+        checked={d.selected}
+        label={d.selected ? 'Leave it' : CHANGE_LABEL[d.change as 'done']}
         tabIndex={-1}
         disabled={same}
-        onClick={() => onChange({ selected: !d.selected })}
-      >
-        {d.selected && <Check size={12} strokeWidth={2.5} aria-hidden />}
-      </button>
+        onChange={(selected) => onChange({ selected })}
+      />
       <div className="promise-body">
         <span className="promise-text static">{d.text}</span>
         <div className="promise-meta">
@@ -186,13 +196,15 @@ function ExistingRow({ d, highlight, onChange, onFocusRow }: { d: Draft; highlig
           <span className="muted small">{owesLabel(d)}</span>
           <span className="spacer" />
           {d.change === 'moved' ? (
-            <label className="due-edit" title={d.due_phrase ? `"${d.due_phrase}"` : undefined}>
-              <span>
-                {d.existing!.due_at ? `${was.label} → ` : ''}
-                {now.label}
-              </span>
-              <input type="date" aria-label="New due date" tabIndex={-1} value={d.due_at?.slice(0, 10) ?? ''} onChange={(e) => onChange({ due_at: e.target.value || null })} />
-            </label>
+            <DatePicker
+              variant="chip"
+              label="New due date"
+              value={d.due_at?.slice(0, 10) ?? null}
+              text={`${d.existing!.due_at ? `${was.label} → ` : ''}${now.label}`}
+              title={d.due_phrase ? `"${d.due_phrase}"` : undefined}
+              tabIndex={-1}
+              onChange={(day) => onChange({ due_at: day })}
+            />
           ) : (
             d.existing!.due_at && <span className={`small${was.overdue ? ' overdue' : ' muted'}`}>{was.label}</span>
           )}
@@ -214,19 +226,15 @@ function OpenTasks({ tasks, onDone, onDue }: { tasks: CommitmentView[]; onDone: 
       <h4>Already open with {names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} and ${names[1]}` : 'these people'}</h4>
       <ul className="promise-list">
         {tasks.map((t) => {
-          const due = formatDue(t.due_at);
           return (
             <li key={t.id} className="promise">
-              <button className="check" role="checkbox" aria-checked={false} aria-label="Mark done" title="Mark done" tabIndex={-1} onClick={() => onDone(t)} />
+              <TaskCheck checked={false} label="Mark done" tabIndex={-1} onChange={() => onDone(t)} />
               <div className="promise-body">
                 <span className="promise-text static">{t.text}</span>
                 <div className="promise-meta">
                   <span className="muted small">{owesLabel(t)}</span>
                   <span className="spacer" />
-                  <label className={`due-edit${due.overdue ? ' overdue' : ''}`}>
-                    <span>{t.due_at ? due.label : 'No date'}</span>
-                    <input type="date" aria-label="Due date" tabIndex={-1} value={t.due_at?.slice(0, 10) ?? ''} onChange={(e) => onDue(t, e.target.value || null)} />
-                  </label>
+                  <DatePicker variant="chip" label="Due date" value={t.due_at?.slice(0, 10) ?? null} noneText="No date" tabIndex={-1} onChange={(day) => onDue(t, day)} />
                 </div>
               </div>
             </li>
@@ -248,19 +256,14 @@ function Row({
   onChange: (patch: Partial<Draft>) => void;
   onFocusRow: () => void;
 }) {
-  const due = formatDue(d.due_at);
   return (
     <li className={`promise${d.selected ? '' : ' off'}${highlight ? ' highlight' : ''}`} onFocus={onFocusRow}>
-      <button
-        className={`check${d.selected ? ' on' : ''}`}
-        role="checkbox"
-        aria-checked={d.selected}
-        aria-label={d.selected ? 'Skip this one' : 'Keep this one'}
+      <Checkbox
+        checked={d.selected}
+        label={d.selected ? 'Skip this one' : 'Keep this one'}
         tabIndex={-1}
-        onClick={() => onChange({ selected: !d.selected })}
-      >
-        {d.selected && <Check size={12} strokeWidth={2.5} aria-hidden />}
-      </button>
+        onChange={(selected) => onChange({ selected })}
+      />
       <div className="promise-body">
         <input className="promise-text" value={d.text} maxLength={300} aria-label="What" spellCheck={false} onChange={(e) => onChange({ text: e.target.value })} />
         <div className="promise-meta">
@@ -272,27 +275,28 @@ function Row({
           >
             {d.owner === 'me' ? 'You owe' : 'They owe'}
           </button>
-          <select
+          <Select<PersonChoice>
+            size="sm"
+            label="Person"
             value={d.person}
-            aria-label="Person"
             tabIndex={-1}
-            onChange={(e) => onChange({ person: e.target.value as PersonChoice })}
-          >
-            {d.match && <option value="match">{d.match.kind === 'fuzzy' ? `${d.match.name}?` : d.match.name}</option>}
-            {d.person_name && <option value="new">New person: {d.person_name}</option>}
-            <option value="none">No one</option>
-          </select>
+            onChange={(person) => onChange({ person })}
+            options={[
+              ...(d.match ? [{ value: 'match' as const, label: d.match.kind === 'fuzzy' ? `${d.match.name}?` : d.match.name }] : []),
+              ...(d.person_name ? [{ value: 'new' as const, label: `New person: ${d.person_name}` }] : []),
+              { value: 'none', label: 'No one' },
+            ]}
+          />
           <span className="spacer" />
-          <label className={`due-edit${due.overdue ? ' overdue' : ''}`} title={d.due_phrase ? `"${d.due_phrase}"` : 'No deadline in the text'}>
-            <span>{d.due_at ? due.label : d.due_phrase ? `No date ("${d.due_phrase}")` : 'No date'}</span>
-            <input
-              type="date"
-              aria-label="Due date"
-              tabIndex={-1}
-              value={d.due_at?.slice(0, 10) ?? ''}
-              onChange={(e) => onChange({ due_at: e.target.value || null })}
-            />
-          </label>
+          <DatePicker
+            variant="chip"
+            label="Due date"
+            value={d.due_at?.slice(0, 10) ?? null}
+            noneText={d.due_phrase ? `No date ("${d.due_phrase}")` : 'No date'}
+            title={d.due_phrase ? `"${d.due_phrase}"` : 'No deadline in the text'}
+            tabIndex={-1}
+            onChange={(day) => onChange({ due_at: day })}
+          />
         </div>
       </div>
     </li>
@@ -382,14 +386,15 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
-    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
+    const control = e.target instanceof Element && e.target.closest('[data-control]') !== null;
+    const typing = e.target instanceof HTMLInputElement || control;
     if (phase.kind === 'saved' && e.key === 'Enter') {
       e.preventDefault();
       void glossly.invoke('bar:close', { sessionId: s.sessionId });
       return;
     }
     if (phase.kind !== 'review') return;
-    if (e.key === 'Enter' && !(e.target instanceof HTMLSelectElement)) {
+    if (e.key === 'Enter' && !control) {
       e.preventDefault();
       void save();
     } else if (!typing && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && rows.length) {
@@ -408,11 +413,11 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
       {phase.kind === 'error' && (
         <div className="answer-error">
           <span className="error">{phase.result.message}</span>
-          {phase.result.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
+          {phase.result.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Add a key</button>}
           {phase.result.code === 'local_only' && (
             <>
               <button onClick={() => void switchToAllModels()}>Use all models and try again</button>
-              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Set up a local model</button>
             </>
           )}
           {phase.result.code !== 'no_model' && phase.result.code !== 'local_only' && (
@@ -433,7 +438,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
                 {meta.byRules === 'local_only' ? 'Local only is on with no local model' : 'No model is set up'}, so these were found by simple patterns. Check
                 each one.
               </span>
-              <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>
+              <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>
                 {meta.byRules === 'local_only' ? 'Set up a local model' : 'Add a key'}
               </button>
             </div>

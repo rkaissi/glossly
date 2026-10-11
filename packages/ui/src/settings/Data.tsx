@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { EmbedStatus, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { pct } from './format';
+import { BlockList } from './General';
+import { PrivacyChoice } from './Privacy';
 import { useAction } from './useAction';
 
 const EMBED_STATE: Record<EmbedStatus['state'], string> = {
@@ -23,7 +25,8 @@ export function EmbedLine({ embed }: { embed: EmbedStatus }) {
   );
 }
 
-function Embeddings({ view }: { view: SettingsView }) {
+/** The local embedding model (shown in Models). */
+export function Embeddings({ view }: { view: SettingsView }) {
   const { busy, error, run } = useAction();
   const e = view.embed;
   const canStart = e.state === 'not_downloaded' || e.state === 'error';
@@ -116,7 +119,7 @@ function Destructive(props: {
           <button onClick={() => setConfirming(false)} disabled={busy}>
             Cancel
           </button>
-          <button className="danger solid" onClick={() => void go()} disabled={busy}>
+          <button className="danger" onClick={() => void go()} disabled={busy}>
             {props.confirm}
           </button>
         </div>
@@ -170,12 +173,15 @@ function ResetSettings() {
   );
 }
 
-export function DataTab({ view }: { view: SettingsView }) {
+/** Where model calls go, what Glossly never reads, and the data it keeps (Step 20.1: Privacy, the block list, and Data in one tab). */
+export function PrivacyDataTab({ view }: { view: SettingsView }) {
   return (
     <section>
-      <h2>Data</h2>
+      <h2>Privacy and data</h2>
       <p className="muted">Everything stays on this computer in one database. Nothing is sent anywhere except the model calls you trigger.</p>
-      <Embeddings view={view} />
+      <PrivacyChoice view={view} onSetUp={() => (location.hash = 'models')} />
+      <BlockList view={view} />
+      <h3>Your data</h3>
       <Export />
       <DeleteAll />
       <ResetSettings />

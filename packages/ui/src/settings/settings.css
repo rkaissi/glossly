@@ -99,18 +99,6 @@ code {
   flex-wrap: wrap;
 }
 
-button.danger {
-  color: var(--danger);
-}
-button.danger.solid {
-  background: var(--danger);
-  color: #fff;
-}
-button.danger.solid:hover:not(:disabled) {
-  background: var(--danger);
-  filter: brightness(1.08);
-}
-
 /* ---- layout: sidebar and page ---- */
 
 .settings {
@@ -143,6 +131,11 @@ button.danger.solid:hover:not(:disabled) {
   text-decoration: none;
   border-radius: var(--radius-sm);
   transition: background-color var(--fade) ease;
+}
+.settings nav .nav-group {
+  padding: var(--s-5) 10px var(--s-1);
+  font-size: 12px;
+  color: var(--muted);
 }
 .settings nav a svg {
   color: var(--fg-2);
@@ -253,14 +246,12 @@ table {
 .field details summary {
   cursor: pointer;
 }
+/* A setting with a switch on the right: title and line on the left. */
 .toggle {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  cursor: pointer;
-}
-.toggle input {
-  margin-top: 3px;
+  gap: var(--s-4);
+  align-items: center;
+  justify-content: space-between;
 }
 
 kbd.hotkey {
@@ -289,17 +280,6 @@ kbd.hotkey {
 }
 .list li + li {
   border-top: 1px solid var(--border);
-}
-.icon-btn {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  color: var(--muted);
-}
-button.icon-btn.danger,
-button.chip-x.danger {
-  color: var(--danger);
 }
 
 .confirm {
@@ -589,6 +569,7 @@ th {
   padding: 0;
   border-radius: 50%;
   background: transparent;
+  box-shadow: none;
   color: var(--fg-2);
 }
 .list-input .error {
@@ -689,27 +670,9 @@ th {
   font: inherit;
 }
 
-/* Save mode: one choice per row, the picked one outlined. */
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.choice {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.choice.selected {
-  border-color: var(--border-strong);
-  background: var(--surface-2);
-}
-.choice input {
-  margin-top: 3px;
+/* Save mode: one choice per row (ChoiceCards, controls.css). */
+.choices.stacked {
+  grid-template-columns: 1fr;
 }
 
 /* ---- Saved ---- */
@@ -728,6 +691,7 @@ button.filter {
   background: transparent;
   color: var(--fg-2);
   font-size: 13px;
+  box-shadow: none;
 }
 button.filter .muted {
   margin-left: 4px;
@@ -766,9 +730,8 @@ button.filter.on .muted {
   align-items: center;
   gap: 8px;
 }
-.saved-meta select {
-  height: 30px;
-  max-width: 180px;
+.saved-meta .trigger {
+  max-width: 200px;
 }
 button.link {
   align-self: flex-start;
@@ -776,98 +739,82 @@ button.link {
   padding: 0;
   border: 0;
   background: none;
+  box-shadow: none;
   color: var(--fg-2);
   text-decoration: underline;
 }
 
-/* Agenda tab (decisions 36 and 37). */
+/* Agenda tab (decisions 36 and 37), on the Step 20.1 row: round check, title that edits in
+   place, a quiet person line, the due chip, and a "…" menu that shows on hover. */
 .agenda-group h3 {
-  margin: 18px 0 6px;
+  margin: var(--s-5) 0 var(--s-2);
   font-size: 13px;
+}
+.agenda-filters {
+  margin: var(--s-4) 0 var(--s-2);
+}
+.add-todo {
+  margin-top: var(--s-4);
+}
+.list.tasks li.task {
+  gap: 10px;
+  min-height: var(--row-h);
+  padding: 6px var(--s-2) 6px var(--row-px);
+}
+.list.tasks li.task:hover {
+  background: var(--surface-2);
+}
+.list.tasks li.task.confirming {
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
 }
 .task .event-icon {
   display: inline-flex;
-  margin-top: 7px;
-  color: var(--fg-2);
-}
-.segmented {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: var(--radius-sm);
-  background: var(--pressed);
-}
-.segmented button {
-  height: 28px;
-  padding: 0 12px;
-  border: none;
-  background: transparent;
-}
-.segmented button.selected {
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
-}
-.tasks .task {
-  align-items: flex-start;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-.task .check {
   width: 18px;
-  height: 18px;
-  min-width: 18px;
-  margin-top: 7px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
-  background: transparent;
-  color: var(--primary-fg);
-}
-.task .check.on {
-  background: var(--primary);
-  border-color: var(--primary);
+  justify-content: center;
+  color: var(--fg-2);
 }
 .task-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
-.task-text {
-  height: 30px;
-  border-color: transparent;
-  background: transparent;
-  padding: 0 6px;
-  margin-left: -6px;
+.task-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.task-text:hover,
-.task-text:focus {
-  border-color: var(--border-strong);
-  background: var(--surface);
+.task-sub a {
+  color: inherit;
+  text-decoration: none;
 }
-.task.done .task-text {
+.task-sub a:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+.task.done input.inline-input {
   color: var(--muted);
   text-decoration: line-through;
 }
-.due-chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  height: 26px;
-  margin-top: 2px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  font-size: 12px;
-  color: var(--fg-2);
-  white-space: nowrap;
-  cursor: pointer;
+.task.done {
+  animation: row-settle 400ms var(--ease-out);
 }
-.due-chip.overdue {
-  color: var(--danger);
+@keyframes row-settle {
+  from {
+    background: var(--surface-2);
+  }
 }
-.due-chip input {
-  position: absolute;
-  inset: 0;
+.row-acts {
+  display: flex;
+  gap: 2px;
   opacity: 0;
-  cursor: pointer;
+  transition: opacity var(--fade);
+}
+.task:hover .row-acts,
+.task:focus-within .row-acts {
+  opacity: 1;
+}
+.row-acts:has(.open) {
+  opacity: 1;
 }

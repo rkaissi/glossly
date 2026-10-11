@@ -132,12 +132,12 @@ export function AskPanel({ s }: { s: OverlayState }) {
             <div className="answer-error">
               <span className="error">{answer.message}</span>
               {answer.code === 'no_model' && (
-                <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>
+                <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Add a key</button>
               )}
               {answer.code === 'local_only' && (
                 <>
                   <button onClick={() => void switchToAllModels()}>Use all models and ask</button>
-                  <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+                  <button onClick={() => void glossly.invoke('settings:open', { tab: 'models' })}>Set up a local model</button>
                 </>
               )}
             </div>

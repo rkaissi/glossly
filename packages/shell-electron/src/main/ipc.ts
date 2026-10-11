@@ -40,7 +40,7 @@ import type { SettingsWindow } from './settings-window';
 const log = logger('ipc');
 
 const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
-const TABS = ['profile', 'people', 'saved', 'keys', 'models', 'general', 'data', 'metrics'] as const;
+const TABS = ['agenda', 'people', 'saved', 'profile', 'models', 'privacy', 'general', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
 const CHANGES: readonly TaskChange[] = ['new', 'same', 'done', 'moved'];

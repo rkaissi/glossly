@@ -1,0 +1,646 @@
+/*
+ * Our own controls (Step 20.1, decision 39), shared by the overlay and the settings window.
+ * Sizes come from the scale in theme.css. Hovers are explicit here: the base `button:hover`
+ * would otherwise repaint a checked control grey.
+ */
+
+/* ---- popover ---- */
+
+.popover {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  min-width: 180px;
+  padding: var(--s-1);
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+  background: var(--popover);
+  backdrop-filter: var(--popover-blur);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  color: var(--fg);
+  font: 14px/1.45 var(--font);
+  animation: pop-in 140ms var(--ease-out);
+  transform-origin: top left;
+}
+.popover[data-align='end'] {
+  transform-origin: top right;
+}
+.popover[data-side='above'] {
+  transform-origin: bottom left;
+  animation-name: pop-in-above;
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+}
+@keyframes pop-in-above {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+}
+
+/* ---- menu ---- */
+
+.pop-menu {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.popover > .pop-menu:only-child {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.pop-item {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-md);
+  padding: 0 var(--s-2);
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: default;
+  user-select: none;
+}
+.pop-item svg {
+  flex: none;
+  color: var(--fg-2);
+}
+.pop-item .pop-check {
+  visibility: hidden;
+  color: var(--fg);
+}
+.pop-item[aria-selected='true'] .pop-check {
+  visibility: visible;
+}
+.pop-item.active {
+  background: var(--hover);
+}
+.pop-item[aria-disabled] {
+  opacity: 0.4;
+}
+.pop-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pop-hint {
+  padding-left: var(--s-4);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.pop-item.danger,
+.pop-item.danger svg {
+  color: var(--danger);
+}
+.pop-item.danger.active {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.pop-sep {
+  flex: none;
+  height: 1px;
+  margin: var(--s-1) calc(-1 * var(--s-1));
+  background: var(--border);
+}
+.pop-head {
+  flex: none;
+  padding: 6px var(--s-2) 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* ---- triggers: select, date, range ---- */
+
+button.trigger {
+  justify-content: space-between;
+  gap: var(--s-2);
+  min-width: 160px;
+  max-width: 100%;
+  height: var(--h-md);
+  padding: 0 var(--s-2) 0 var(--s-3);
+  text-align: left;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border-strong) inset,
+    var(--shadow-sm);
+}
+button.trigger:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.trigger[aria-expanded='true'] {
+  box-shadow: 0 0 0 1px var(--fg-2) inset;
+}
+button.trigger.sm {
+  height: var(--h-sm);
+  min-width: 0;
+  padding: 0 6px 0 10px;
+  font-size: 13px;
+}
+.trigger-value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  overflow: hidden;
+}
+.trigger-value svg {
+  flex: none;
+  color: var(--muted);
+}
+.trigger-value .placeholder {
+  color: var(--muted);
+}
+.trigger-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform var(--fade) var(--ease-out);
+}
+button.trigger[aria-expanded='true'] .trigger-chevron {
+  transform: rotate(180deg);
+}
+.clip1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The due chip in list rows. */
+button.date-chip {
+  gap: 5px;
+  height: 24px;
+  padding: 0 var(--s-2);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+button.date-chip:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.date-chip .trigger-value {
+  gap: 5px;
+}
+button.date-chip .trigger-value svg {
+  color: inherit;
+}
+button.date-chip.overdue {
+  color: var(--danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent) inset;
+}
+button.date-chip.today {
+  color: var(--fg);
+  font-weight: 600;
+}
+button.date-chip.empty {
+  color: var(--muted);
+  box-shadow: none;
+}
+
+/* ---- calendar ---- */
+
+.date-pop {
+  padding: var(--s-2);
+}
+.date-pop .shortcuts {
+  margin: calc(-1 * var(--s-1)) calc(-1 * var(--s-1)) var(--s-2);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--border);
+}
+.cal {
+  width: 236px;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  height: var(--h-md);
+  margin-bottom: var(--s-1);
+}
+.cal-month {
+  flex: 1;
+  padding-left: var(--s-2);
+  font-weight: 600;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px 2px;
+  justify-content: center;
+}
+.cal-dow {
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+button.cal-day {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  transition: none;
+}
+button.cal-day:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.cal-day.out {
+  color: var(--faint);
+}
+button.cal-day.today {
+  font-weight: 700;
+}
+button.cal-day.today::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+}
+button.cal-day.sel,
+button.cal-day.sel:hover:not(:disabled),
+button.cal-day.range-start,
+button.cal-day.range-end,
+button.cal-day.range-start:hover:not(:disabled),
+button.cal-day.range-end:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--primary-fg);
+  font-weight: 600;
+}
+button.cal-day.in-range,
+button.cal-day.in-range:hover:not(:disabled) {
+  background: var(--pressed);
+  border-radius: 0;
+}
+button.cal-day.range-start:not(.range-end) {
+  border-radius: 999px 0 0 999px;
+}
+button.cal-day.range-end:not(.range-start) {
+  border-radius: 0 999px 999px 0;
+}
+
+.range-pop {
+  padding: 0;
+}
+.range {
+  display: flex;
+}
+.range-quick {
+  width: 156px;
+  padding: var(--s-1);
+  border-right: 1px solid var(--border);
+}
+.range-months {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-2);
+}
+.range-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-top: 1px solid var(--border);
+}
+button.range-trigger {
+  min-width: 220px;
+}
+
+/* ---- time ---- */
+
+.time-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 112px;
+  height: var(--h-md);
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border-strong) inset,
+    var(--shadow-sm);
+  cursor: text;
+}
+.time-field.sm {
+  width: 100px;
+  height: var(--h-sm);
+  padding: 0 8px;
+  font-size: 13px;
+}
+.time-field svg {
+  flex: none;
+  color: var(--muted);
+}
+.time-field input {
+  all: unset;
+  width: 100%;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.time-field:focus-within {
+  box-shadow: 0 0 0 1px var(--fg-2) inset;
+}
+.time-field.disabled {
+  opacity: 0.4;
+}
+.time-pop {
+  min-width: 0;
+}
+.time-list {
+  max-height: 304px;
+  overflow-y: auto;
+  scroll-padding: var(--s-1);
+}
+.time-list .pop-item {
+  justify-content: center;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+.time-list .pop-item[aria-selected='true'] {
+  font-weight: 600;
+  background: var(--pressed);
+}
+
+/* ---- segmented ---- */
+
+.seg {
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(var(--n, 1), var(--cell, auto));
+  height: var(--h-md);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1px var(--border) inset;
+}
+.seg.sm {
+  height: var(--h-sm);
+}
+.seg-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / var(--n, 1));
+  transform: translateX(calc(var(--i, 0) * 100%));
+  border-radius: 6px;
+  background: var(--seg-thumb);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: transform 220ms var(--ease-out);
+}
+.seg button {
+  position: relative;
+  height: auto;
+  padding: 0 var(--s-3);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.seg button:hover:not(:disabled),
+.seg button:active:not(:disabled) {
+  background: transparent;
+  color: var(--fg);
+}
+.seg button[aria-checked='true'] {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* ---- checkbox, task check, switch ---- */
+
+.check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: default;
+  user-select: none;
+}
+.check-label.disabled {
+  opacity: 0.5;
+}
+button.cb {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--border-strong) inset;
+  transition:
+    background-color 120ms,
+    box-shadow 120ms;
+}
+button.cb svg {
+  color: var(--primary-fg);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 120ms,
+    transform 160ms var(--ease-out);
+}
+button.cb[aria-checked='true'],
+button.cb[aria-checked='mixed'] {
+  background: var(--primary);
+  box-shadow: none;
+  animation: tick-pop 220ms var(--ease-out);
+}
+button.cb[aria-checked='true'] svg {
+  opacity: 1;
+  transform: none;
+}
+button.cb[aria-checked='mixed'] svg {
+  display: none;
+}
+button.cb[aria-checked='mixed']::after {
+  content: '';
+  width: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary-fg);
+}
+button.cb:hover:not(:disabled),
+button.cb:active:not(:disabled) {
+  background: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--border-hover) inset;
+}
+
+button.tick {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: 0 0 0 1.5px var(--faint) inset;
+  transition:
+    background-color 150ms,
+    box-shadow 150ms;
+}
+button.tick svg {
+  color: var(--muted);
+  opacity: 0;
+}
+button.tick:hover:not(:disabled),
+button.tick:active:not(:disabled) {
+  background: transparent;
+  box-shadow: 0 0 0 1.5px var(--fg-2) inset;
+}
+button.tick:hover:not(:disabled) svg {
+  opacity: 0.5;
+}
+button.tick[aria-checked='true'] {
+  background: var(--primary);
+  box-shadow: none;
+  animation: tick-pop 260ms var(--ease-out);
+}
+button.tick[aria-checked='true'] svg {
+  opacity: 1;
+  color: var(--primary-fg);
+}
+button.cb[aria-checked='true']:hover:not(:disabled),
+button.cb[aria-checked='mixed']:hover:not(:disabled),
+button.cb[aria-checked='true']:active:not(:disabled),
+button.tick[aria-checked='true']:hover:not(:disabled),
+button.tick[aria-checked='true']:active:not(:disabled) {
+  background: var(--toggle-on-hover);
+  box-shadow: none;
+}
+@keyframes tick-pop {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+button.sw {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color 180ms;
+}
+button.sw::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 220ms var(--ease-out),
+    width 160ms var(--ease-out);
+}
+button.sw[aria-checked='true'] {
+  background: var(--primary);
+}
+button.sw[aria-checked='true']::after {
+  transform: translateX(16px);
+  background: var(--primary-fg);
+}
+button.sw:active:not(:disabled)::after {
+  width: 20px;
+}
+button.sw[aria-checked='true']:active:not(:disabled)::after {
+  transform: translateX(12px);
+}
+button.sw:hover:not(:disabled),
+button.sw:active:not(:disabled) {
+  background: var(--border-hover);
+}
+button.sw[aria-checked='true']:hover:not(:disabled),
+button.sw[aria-checked='true']:active:not(:disabled) {
+  background: var(--toggle-on-hover);
+}
+
+/* ---- choice cards (radio) ---- */
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--s-2);
+}
+button.choice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  height: auto;
+  padding: var(--s-3);
+  text-align: left;
+  white-space: normal;
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+button.choice:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.choice[aria-checked='true'],
+button.choice[aria-checked='true']:hover:not(:disabled) {
+  background: var(--surface-2);
+  box-shadow: 0 0 0 1.5px var(--fg) inset;
+}
+.choice-dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.5px var(--border-strong) inset;
+  transition: box-shadow 150ms var(--ease-out);
+}
+button.choice[aria-checked='true'] .choice-dot {
+  box-shadow: 0 0 0 5px var(--fg) inset;
+}
+
+/* ---- inputs inside list rows look like text until hovered or focused ---- */
+
+input.inline-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  transition:
+    color 250ms ease,
+    background-color var(--fade),
+    border-color var(--fade);
+}
+input.inline-input:hover {
+  background: var(--hover);
+}
+input.inline-input:focus,
+input.inline-input:focus-visible {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}

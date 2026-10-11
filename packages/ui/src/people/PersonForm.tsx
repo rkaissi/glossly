@@ -3,6 +3,7 @@ import { UserRoundPlus } from 'lucide-react';
 import type { PersonCard, Relationship } from '@glossly/core/api';
 import { draftToCreate, type PersonDraft } from './draft';
 import { glossly } from '../bridge';
+import { Select } from '../controls/Select';
 import { useAction } from '../settings/useAction';
 import { RELATIONSHIP_OPTIONS } from './relationship';
 
@@ -15,13 +16,12 @@ export function PersonFields({ value, onChange, showName = true }: { value: Pers
       <input value={value.email} placeholder="Email (optional)" aria-label="Email" spellCheck={false} onChange={(e) => set({ email: e.target.value })} />
       <input value={value.handle} placeholder="Handle (optional)" aria-label="Handle" spellCheck={false} onChange={(e) => set({ handle: e.target.value })} />
       <input className="wide" value={value.note} placeholder="About this person (optional)" aria-label="About" onChange={(e) => set({ note: e.target.value })} />
-      <select value={value.relationship} aria-label="Relationship" onChange={(e) => set({ relationship: e.target.value as Relationship })}>
-        {RELATIONSHIP_OPTIONS.map(([v, text]) => (
-          <option key={v} value={v}>
-            {text}
-          </option>
-        ))}
-      </select>
+      <Select<Relationship>
+        label="Relationship"
+        value={value.relationship}
+        onChange={(relationship) => set({ relationship })}
+        options={RELATIONSHIP_OPTIONS.map(([v, text]) => ({ value: v, label: text }))}
+      />
     </div>
   );
 }

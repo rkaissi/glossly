@@ -1,5 +1,6 @@
 import type { Privacy, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { ChoiceCards } from '../controls/Toggles';
 import { useAction } from './useAction';
 
 const CHOICES: { value: Privacy; label: string; desc: string }[] = [
@@ -32,7 +33,7 @@ function LocalOnlyStatus({ view, onSetUp }: { view: SettingsView; onSetUp: () =>
   );
 }
 
-/** The privacy choice (decision 34), in General and in setup. */
+/** The privacy choice (decision 34), in Privacy and data and in setup. */
 export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: () => void }) {
   const { busy, error, run } = useAction();
   const current = view.settings.privacy;
@@ -46,17 +47,7 @@ export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: 
       <div className="field-label">
         <strong>Where model calls go</strong>
       </div>
-      <div className="choices" role="radiogroup" aria-label="Where model calls go">
-        {CHOICES.map((c) => (
-          <label key={c.value} className={`choice${current === c.value ? ' selected' : ''}`}>
-            <input type="radio" name="privacy" checked={current === c.value} disabled={busy} onChange={() => set(c.value)} />
-            <span>
-              <strong>{c.label}</strong>
-              <span className="muted small block">{c.desc}</span>
-            </span>
-          </label>
-        ))}
-      </div>
+      <ChoiceCards label="Where model calls go" value={current} disabled={busy} onChange={set} options={CHOICES.map((c) => ({ value: c.value, title: c.label, desc: c.desc }))} />
       {current === 'local' && <LocalOnlyStatus view={view} onSetUp={onSetUp} />}
       {error && <p className="error small">{error}</p>}
     </div>

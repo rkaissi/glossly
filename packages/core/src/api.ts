@@ -374,7 +374,7 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
-export type SettingsTab = 'profile' | 'people' | 'agenda' | 'saved' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
+export type SettingsTab = 'agenda' | 'people' | 'saved' | 'profile' | 'models' | 'privacy' | 'general' | 'metrics';
 
 // ---- channel maps ----
 

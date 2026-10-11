@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import type { Identity, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
+import { Switch } from '../controls/Toggles';
 import { parseEmail, parseHandle } from './format';
 import { useAction } from './useAction';
 
@@ -226,8 +227,7 @@ function LearnedStyle({ learning }: { learning: boolean }) {
   const notes = view?.notes ?? [];
   return (
     <div className="field">
-      <label className="toggle">
-        <input type="checkbox" checked={learning} disabled={busy} onChange={(e) => toggle(e.target.checked)} />
+      <div className="toggle">
         <span>
           <strong>Learn from the drafts I pick and edit</strong>
           <span className="muted small block">
@@ -236,7 +236,8 @@ function LearnedStyle({ learning }: { learning: boolean }) {
             notes on how you edit. All of it stays on this computer and goes to your model provider only inside a Reply request.
           </span>
         </span>
-      </label>
+        <Switch label="Learn from the drafts I pick and edit" checked={learning} disabled={busy} onChange={toggle} />
+      </div>
       {learning && view && prefs.length === 0 && notes.length === 0 && (
         <p className="muted small">Nothing learned yet. After a few replies, what you tend to pick shows here.</p>
       )}
