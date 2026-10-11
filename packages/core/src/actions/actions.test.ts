@@ -151,9 +151,9 @@ describe('Ask', () => {
   it('says who is asking, so a message is not read as their own', () => {
     const anon = buildAskPrompt(DEFAULT_SETTINGS, { selection: selection() }).prompt;
     expect(anon).toContain('## The person asking\nUnknown. They are reading the selection');
-    const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Rayan Kaissi', emails: ['Rayan@Example.com'], handles: ['@rayan'] } };
+    const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Alex Morgan', emails: ['Alex@Example.com'], handles: ['@alex'] } };
     const { prompt } = buildAskPrompt(settings, { selection: selection() });
-    expect(prompt).toContain('## The person asking\nRayan Kaissi (also: rayan@example.com, @rayan). They are reading the selection; they did not write it');
+    expect(prompt).toContain('## The person asking\nAlex Morgan (also: alex@example.com, @alex). They are reading the selection; they did not write it');
   });
 
   it('labels notes by short date', () => {

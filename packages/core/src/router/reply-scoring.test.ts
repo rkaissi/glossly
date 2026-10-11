@@ -51,8 +51,8 @@ describe('Reply scoring', () => {
   });
 
   it('drops Reply for the user’s own message, even when the model says otherwise', () => {
-    const me = { name: 'Rayan Kaissi', emails: [], handles: [] };
-    const c = ctx({ context_before: 'Rayan Kaissi  9:41 AM\n', text: "I'll send the slides before Friday, ok?" });
+    const me = { name: 'Alex Morgan', emails: [], handles: [] };
+    const c = ctx({ context_before: 'Alex Morgan  9:41 AM\n', text: "I'll send the slides before Friday, ok?" });
     const f = extractFeatures(c, [], me);
     expect(f.authorIsMe).toBe(true);
     expect(extractFeatures(c).authorIsMe).toBe(false);

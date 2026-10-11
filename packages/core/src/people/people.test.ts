@@ -6,7 +6,7 @@ import type { SelectionPayload } from '../types';
 import { detectPeople, type DetectInput } from './detect';
 import { FIRST_NAME_SCORE, resolvePerson } from './resolve';
 
-const me = { name: 'Rayan Kaissi', emails: ['rayan@example.com'], handles: ['rayank'] };
+const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: ['alexm'] };
 const noOne = { name: '', emails: [], handles: [] };
 
 let store: Store;
@@ -146,7 +146,7 @@ describe('detectPeople', () => {
   it('takes the last chat header as the author and leaves the user out', () => {
     const d = detectPeople(
       input({
-        text: 'Elena Moretti  3:12 PM\nWho owns the billing migration now that Chris moved teams?\nSam Lee  3:15 PM\nI think it went to Fatima Noor, but ask Rayan Kaissi',
+        text: 'Elena Moretti  3:12 PM\nWho owns the billing migration now that Chris moved teams?\nSam Lee  3:15 PM\nI think it went to Fatima Noor, but ask Alex Morgan',
       }),
       me,
     );
@@ -161,20 +161,20 @@ describe('detectPeople', () => {
   });
 
   it('knows when the user wrote the selected message', () => {
-    const d = detectPeople(input({ before: 'Rayan  9:41 AM\n', text: "I'll send the slides to Daniel Park tomorrow" }), me);
+    const d = detectPeople(input({ before: 'Alex  9:41 AM\n', text: "I'll send the slides to Daniel Park tomorrow" }), me);
     expect(d.authorIsMe).toBe(true);
     expect(d.author).toBeNull();
     expect(d.people.map((p) => p.name)).toEqual(['Daniel Park']);
   });
 
   it('reads email From lines, sign-offs, and DM titles', () => {
-    expect(detectPeople(input({ before: 'From: Helen Park <Helen.Park@lumen.co>\nTo: Rayan\n', text: 'Could you share the pricing?' }), me).author).toMatchObject({
+    expect(detectPeople(input({ before: 'From: Helen Park <Helen.Park@lumen.co>\nTo: Alex\n', text: 'Could you share the pricing?' }), me).author).toMatchObject({
       name: 'Helen Park',
       email: 'helen.park@lumen.co',
     });
-    expect(detectPeople(input({ text: 'Hi Rayan,\n\nCould you share that version?\n\nBest,\nHelen' }), me).author?.name).toBe('Helen');
+    expect(detectPeople(input({ text: 'Hi Alex,\n\nCould you share that version?\n\nBest,\nHelen' }), me).author?.name).toBe('Helen');
     expect(detectPeople(input({ text: 'is staging getting wiped tonight?', window_title: 'Dana Ortiz (DM) | Northwind - Slack' }), me).author?.name).toBe('Dana Ortiz');
-    expect(detectPeople(input({ text: 'From: rayan@example.com\nsee attached' }), me).authorIsMe).toBe(true);
+    expect(detectPeople(input({ text: 'From: alex@example.com\nsee attached' }), me).authorIsMe).toBe(true);
   });
 
   it('pairs names with emails and adds handles and known people', () => {

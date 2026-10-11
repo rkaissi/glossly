@@ -9,7 +9,7 @@ import type { SelectionPayload } from '../types';
 import { buildPromisesPrompt, extractPromises, reminderCutoff, reminderText, savePromises, type ExtractedCommitments } from './promises';
 import { detectInputFor } from './who';
 
-const me = { name: 'Rayan Kaissi', emails: ['rayan@example.com'], handles: [] };
+const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: [] };
 const settings = { ...DEFAULT_SETTINGS, identity: me };
 // Wednesday, Oct 14 2026.
 const now = new Date(2026, 9, 14, 10, 0);
@@ -57,7 +57,7 @@ describe('What did I promise', () => {
   it('tells the model who the user and the author are, and the day, without asking it for dates', () => {
     const det = detectPeople(detectInputFor(selection), me);
     const prompt = buildPromisesPrompt(settings, { selection, author: det.author, authorIsMe: det.authorIsMe }, now);
-    expect(prompt).toContain('## The user\nRayan Kaissi (also: rayan@example.com)');
+    expect(prompt).toContain('## The user\nAlex Morgan (also: alex@example.com)');
     expect(prompt).toContain('## Message author\nMaya Lin');
     expect(prompt).toContain('Wednesday, October 14, 2026 (for context only');
     expect(prompt).toContain('Maya Lin  9:41 AM\n[SELECTION]');

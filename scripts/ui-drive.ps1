@@ -56,7 +56,7 @@ switch ($cmd) {
   'notepad' {
     $file = Join-Path $dir 'sample.txt'
     if (-not (Test-Path $file)) {
-      Set-Content $file "Hi Rayan, thanks for the update on the launch plan. I'll send the revised budget by Friday, and can you confirm the venue booking with Sam Carter before the end of the week? Let me know if anything changes."
+      Set-Content $file "Hi Alex, thanks for the update on the launch plan. I'll send the revised budget by Friday, and can you confirm the venue booking with Sam Carter before the end of the week? Let me know if anything changes."
     }
     # Windows 11 Notepad opens the file as a tab in an existing window; never kill the user's Notepad.
     if ($arg) { $file = Join-Path $dir $arg }

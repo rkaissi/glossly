@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from '../settings';
 import type { SelectionPayload } from '../types';
 import { buildReplyPrompt, reply } from './reply';
 
-const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Rayan Kaissi', emails: [], handles: ['rayank'] } };
+const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Alex Morgan', emails: [], handles: ['alexm'] } };
 const now = new Date(2026, 9, 14, 10, 0);
 
 const selection: SelectionPayload = {
@@ -39,7 +39,7 @@ const author = { name: 'Maya Lin', email: null, handle: null, role: 'author' as 
 describe('Reply', () => {
   it('puts the user, the person record, voice samples, and the thread in the prompt', () => {
     const p = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: maya, voice: ['sounds good!! will do', 'yep on it'] }, now);
-    expect(p).toContain('## The user\nRayan Kaissi (also: @rayank)');
+    expect(p).toContain('## The user\nAlex Morgan (also: @alexm)');
     expect(p).toContain('## Replying to\nMaya Lin');
     expect(p).toContain('Relationship to the user: colleague');
     expect(p).toContain('How the user knows them: PM on the Acme account');

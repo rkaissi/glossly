@@ -104,7 +104,7 @@ export function IdentityForm({ value, onChange, autoFocus }: { value: Identity; 
           values={value.handles}
           onChange={(handles) => onChange({ ...value, handles })}
           parse={parseHandle}
-          placeholder="Slack or Discord names, e.g. rayan.k"
+          placeholder="Slack or Discord names, e.g. alex.m"
           invalid="Type a handle."
         />
       </div>

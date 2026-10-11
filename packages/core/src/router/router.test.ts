@@ -58,7 +58,7 @@ describe('extractFeatures', () => {
     expect(extractFeatures(ctx('try:\n    run()\nexcept Exception:\n    raise')).codeScore).toBeGreaterThanOrEqual(0.45);
     expect(extractFeatures(ctx(THREAD)).namePairs).toEqual([]);
     expect(extractFeatures(ctx('[10:31] Tomas Berg: ask Grace Hopper')).namePairs).toEqual(['Grace Hopper']);
-    expect(extractFeatures(ctx('Hi Rayan, thanks')).namePairs).toEqual([]);
+    expect(extractFeatures(ctx('Hi Alex, thanks')).namePairs).toEqual([]);
     expect(extractFeatures(ctx('p50 42ms, p90 118ms, p99 410ms, error rate 0.4%')).numericDensity).toBeGreaterThan(0.3);
   });
 
