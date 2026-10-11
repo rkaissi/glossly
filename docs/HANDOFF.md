@@ -94,7 +94,7 @@ Everything else he was asked has been answered and is recorded in `docs/decision
 - Logs and metrics carry codes, counts, and timings, never selected text, keys, or site keys.
 - Nothing destructive without an inline confirm and a red control. People are never created or merged without a confirm.
 - Keep everything outside `helpers/windows` OS-neutral (macOS later).
-- Docs and tests use fictional people and `example.com` addresses only.
+- Docs and tests use fictional people and `example.com` addresses only (AGENTS.md, first section). The current files are clean, but commits before `e03a177` still hold some real names, screenshot-derived addresses, and the personal commit email. Rayan chose (Oct 11) not to rewrite history for now; revisit before the repo goes public (a `git filter-repo` pass plus a force-push).
 
 **Known platform limits**
 - WinForms (.NET Framework) text boxes expose no TextPattern; those apps need the hotkey's copy fallback. WPF counts `\r\n` as one character (handled).
