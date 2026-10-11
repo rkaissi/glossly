@@ -612,6 +612,14 @@ Rayan asked for a prompt-engineering pass, structured output where it helps, and
 - The Metrics tab has a Features table between Actions and By day, and names the newer actions (Search, Related, Paste snippets, Write it for here).
 - The rest of Step 17 is open: eval runners, the optional decision providers, and Export and Delete all checked live.
 
+### Comparisons, and Promises shares Who's people reader (Oct 10, late night)
+
+428 unit tests pass (plus a new promises test); `pnpm typecheck` is clean. Not run live.
+
+- **Promises and Who share one people reader** (`Capture.readPeople`: Who's model read, cached per text, with in-flight calls shared). What did I promise runs it alongside its own call, or takes it from the cache. A commitment's name grows to the full name the reader found ("Daniel" to "Daniel Park", only when exactly one person fits; `findDetected`), and someone not saved yet gets `PromiseRow.details` (email, handle, note from role and about, relationship). The panel lists "New people" with a relationship select prefilled from that guess (else Other); saving creates them with those details. Cost: one extra Fast call per Promises open when Who's answer isn't cached. Who and Promises stay separate actions (Rayan to decide; see the recommendation in chat).
+- **Comparison evals** (run only with `GROQ_API_KEY` and `GLOSSLY_COMPARE=1`; helpers in `evals/lib.ts`, old code and prompts in `evals/legacy/`): `evals/visualize-compare.eval.ts` (the model writing the Vega-Lite spec against the structured pick, 20 cases in `fixtures/visualize/charts.json` with what a relevant chart is; renders both with vega, flags mixed scales, crowded labels, reordering, design overrides; writes JSON and a side-by-side HTML page to `evals/results/`) and `evals/router-collection-compare.eval.ts` (string collection with the code fix-up against the enum, 60 fixtures, Qwen 3.8 and gpt-oss-20b; counts outright failures, retries, and how often the old version needed the fix-up).
+- **What ran**: one partial Visualize run on Qwen 3.8 (15 of 20 cases before the 10-minute test timeout; two of those lost to rate limits). On the 13 cases where both answered: the old way was relevant on 7, the new one on 12. The old way wrote one spec that wasn't valid JSON (no chart), charted a table with no numbers and a prose list of mixed metrics, reordered two ordered axes (most likely alphabetical), and crowded long labels on vertical bars; the new one's only miss was plotting visitors and signups on one axis (mixed scale), which both did. No HTML or JSON was written, so looks were not compared. The router comparison never ran. Timeouts are now an hour and calls are paced (`GLOSSLY_COMPARE_GAP_MS`, 2.5 s); a full run of both is about 300 calls.
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

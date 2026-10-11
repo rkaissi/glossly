@@ -1,0 +1,61 @@
+{
+  "$comment": "Chart cases for evals/visualize-compare.eval.ts. The 10 table fixtures from fixtures/tables.json are added to these. expect.chart false means no chart is the right answer. kinds: charts that fit. x: the column the axis should use (null: any, e.g. when the model names the columns). measures: the numeric columns that may be plotted; single: plot exactly one (mixed scales). order: data means the rows' order matters (bars must not be re-sorted).",
+  "cases": [
+    { "id": "tbl-01", "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Region", "measures": ["Q1", "Q2", "Q3"] } },
+    { "id": "tbl-02", "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Plan", "measures": ["Seats", "Price/mo"], "single": true } },
+    { "id": "tbl-03", "expect": { "chart": true, "kinds": ["line", "area", "bar"], "x": "date", "measures": ["visitors", "signups"], "single": true } },
+    { "id": "tbl-04", "expect": { "chart": false } },
+    { "id": "tbl-05", "expect": { "chart": false } },
+    { "id": "tbl-06", "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Benchmark", "measures": ["v1 4", "v1 5"] } },
+    { "id": "tbl-07", "expect": { "chart": true, "kinds": ["bar", "line", "area"], "x": null, "order": "data" } },
+    { "id": "tbl-08", "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Item", "measures": ["Qty", "Unit cost"], "single": true } },
+    { "id": "tbl-09", "expect": { "chart": "either", "kinds": ["bar", "horizontal_bar"], "x": null, "single": true } },
+    { "id": "tbl-10", "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Team", "measures": ["W", "L", "Pts"] } },
+    {
+      "id": "viz-01",
+      "text": "Month,Revenue\nJan,41200\nFeb,39800\nMar,45100\nApr,47300\nMay,46900\nJun,51200\nJul,53800\nAug,52100\nSep,55900\nOct,58400\nNov,61000\nDec,66700",
+      "expect": { "chart": true, "kinds": ["line", "area", "bar"], "x": "Month", "measures": ["Revenue"], "order": "data" }
+    },
+    {
+      "id": "viz-02",
+      "text": "Country\tExports (USD bn)\nUnited States of America\t2065\nPeople's Republic of China\t3380\nFederal Republic of Germany\t1688\nKingdom of the Netherlands\t935\nJapan\t717\nRepublic of Korea\t632\nUnited Kingdom of Great Britain\t521\nFrench Republic\t648\nItalian Republic\t677\nKingdom of Belgium\t439",
+      "expect": { "chart": true, "kinds": ["horizontal_bar", "bar"], "prefer": "horizontal_bar", "x": "Country", "measures": ["Exports (USD bn)"] }
+    },
+    {
+      "id": "viz-03",
+      "text": "Ad spend,Sales\n1000,12100\n1500,15800\n2000,18900\n2500,24100\n3000,25900\n3500,31200\n4000,33800\n4500,38100\n5000,40200\n5500,44900",
+      "expect": { "chart": true, "kinds": ["point", "line"], "prefer": "point", "x": "Ad spend", "measures": ["Sales"] }
+    },
+    { "id": "viz-04", "text": "Total\t1234", "expect": { "chart": false } },
+    {
+      "id": "viz-05",
+      "text": "Browser | Share\nChrome | 65.3%\nSafari | 18.4%\nEdge | 5.2%\nFirefox | 2.8%\nSamsung Internet | 2.4%\nOpera | 2.1%\nOther | 3.8%",
+      "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Browser", "measures": ["Share"] }
+    },
+    {
+      "id": "viz-06",
+      "text": "Week\tiOS\tAndroid\tWeb\n2026-08-03\t1210\t980\t640\n2026-08-10\t1260\t1010\t655\n2026-08-17\t1305\t1080\t700\n2026-08-24\t1290\t1120\t720\n2026-08-31\t1350\t1190\t760\n2026-09-07\t1410\t1240\t790",
+      "expect": { "chart": true, "kinds": ["line", "area"], "x": "Week", "measures": ["iOS", "Android", "Web"] }
+    },
+    {
+      "id": "viz-07",
+      "text": "Year,Revenue ($M),Profit ($M)\n2019,12.4,1.1\n2020,10.9,0.4\n2021,14.2,1.8\n2022,17.5,2.6\n2023,19.8,3.1\n2024,23.0,3.9\n2025,26.4,4.7",
+      "expect": { "chart": true, "kinds": ["line", "bar", "area"], "x": "Year", "measures": ["Revenue ($M)", "Profit ($M)"] }
+    },
+    {
+      "id": "viz-08",
+      "text": "Answer,Count\nStrongly disagree,4\nDisagree,11\nNeutral,23\nAgree,41\nStrongly agree,19",
+      "expect": { "chart": true, "kinds": ["bar", "horizontal_bar"], "x": "Answer", "measures": ["Count"], "order": "data" }
+    },
+    {
+      "id": "viz-09",
+      "text": "Team,Quarter,Revenue\nNorth,Q1,120\nNorth,Q2,140\nNorth,Q3,162\nSouth,Q1,90\nSouth,Q2,95\nSouth,Q3,101\nWest,Q1,70\nWest,Q2,88\nWest,Q3,97",
+      "expect": { "chart": true, "kinds": ["bar", "line", "horizontal_bar"], "x": null, "measures": ["Revenue"], "split": true }
+    },
+    {
+      "id": "viz-10",
+      "text": "Date,High (C)\n2026-09-01,24\n2026-09-02,26\n2026-09-03,27\n2026-09-04,23\n2026-09-05,21\n2026-09-06,22\n2026-09-07,25\n2026-09-08,28\n2026-09-09,29\n2026-09-10,27\n2026-09-11,24\n2026-09-12,20\n2026-09-13,19\n2026-09-14,21\n2026-09-15,23\n2026-09-16,25\n2026-09-17,26\n2026-09-18,24\n2026-09-19,22\n2026-09-20,20\n2026-09-21,18\n2026-09-22,19\n2026-09-23,21\n2026-09-24,22\n2026-09-25,20",
+      "expect": { "chart": true, "kinds": ["line", "area"], "x": "Date", "measures": ["High (C)"] }
+    }
+  ]
+}
