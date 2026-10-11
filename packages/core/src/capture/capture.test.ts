@@ -147,6 +147,19 @@ describe('placement', () => {
     expect(p.mark!.y + 9).toBe(410);
   });
 
+  it('puts the dot just past the end of the last line, not at the mouse-up point (decision 44)', () => {
+    const obstacles = [
+      { x: 500, y: 300, w: 420, h: 48 },
+      { x: 500, y: 450, w: 420, h: 36 },
+    ];
+    // Two lines; the second is shorter, and the mouse was released out past its end.
+    const twoLines = { x: 600, y: 380, w: 300, h: 40 };
+    const p = placePill({ selection: twoLines, anchor: { x: 890, y: 412 }, lastLine: { x: 600, y: 400, w: 120, h: 20 }, obstacles, size, workArea });
+    expect(p.mode).toBe('dot');
+    expect(p.mark!.x).toBe(600 + 120 + 3);
+    expect(p.mark!.y + 9).toBe(410);
+  });
+
   it('keeps the dot window on screen at the right edge', () => {
     const obstacles = [
       { x: 1700, y: 340, w: 220, h: 48 },

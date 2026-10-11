@@ -44,6 +44,8 @@ export const Commands = {
       is_password: z.boolean(),
       control_type: z.string(),
       truncated: z.boolean(),
+      /** The last line's rect, where the dot goes (decision 44). Older helpers leave it out. */
+      last_line: RectSchema.nullable().optional(),
     }),
   },
   context: {
@@ -79,6 +81,8 @@ export const Commands = {
       process_name: z.string(),
       title: z.string(),
       class_name: z.string(),
+      /** The window's visible frame, physical px; null when minimized. Older helpers leave it out. */
+      rect: RectSchema.nullable().optional(),
     }),
   },
   popups_near: {

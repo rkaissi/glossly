@@ -19,6 +19,11 @@ export interface PlacementInput {
   selection: Rect;
   /** Where the selection ends, usually the mouse-up point. Defaults to the bottom-right corner. */
   anchor?: Point;
+  /**
+   * The selection's last line, from the helper. The dot goes just past its end instead of near the
+   * mouse-up point, which can be mid-word or out past a shorter last line (decision 44).
+   */
+  lastLine?: Rect | null;
   /** Toolbars and popups from popups_near. */
   obstacles: Rect[];
   size: Size;
@@ -43,6 +48,8 @@ export interface PlacementInput {
 const MARGIN = 6;
 /** Room left of the dot inside its window, for its shadow. */
 const DOT_PAD = 6;
+/** Space between the end of the last selected line and the dot. */
+const DOT_GAP = 3;
 
 function intersects(a: Rect, b: Rect, margin = 0): boolean {
   return a.x - margin < b.x + b.w && b.x < a.x + a.w + margin && a.y - margin < b.y + b.h && b.y < a.y + a.h + margin;
@@ -83,10 +90,13 @@ export function placePill(input: PlacementInput): Placement {
   // Both sides taken: a dot just past the end of the selection, centered on its last line.
   // The window extends right and down from the dot, the directions Windows grows it in if it
   // enforces a larger minimum size, so the dot's offset inside it stays put.
+  const line = input.lastLine;
+  const endX = line ? line.x + line.w + DOT_GAP : anchorX + 4;
+  const endY = line ? line.y + Math.round(line.h / 2) : anchor.y;
   const offY = Math.round((dotWin.h - dot) / 2);
-  const markY = Math.min(Math.max(anchor.y - Math.round(dot / 2), sel.y), sel.y + sel.h - dot);
+  const markY = Math.min(Math.max(endY - Math.round(dot / 2), sel.y), sel.y + sel.h - dot);
   const win: Rect = {
-    x: clampX(anchorX + 4 - DOT_PAD, dotWin.w, area),
+    x: clampX(endX - DOT_PAD, dotWin.w, area),
     y: Math.min(Math.max(markY - offY, area.y), area.y + area.h - dotWin.h),
     w: dotWin.w,
     h: dotWin.h,

@@ -550,6 +550,13 @@ export function registerIpc(deps: IpcDeps): void {
     log.info('exported');
     return { path: r.filePath };
   });
+  handle('entities:backfill', async () => {
+    const r = await services.save.backfillEntities();
+    log.info('entities backfill', { done: r.done, left: r.left, failed: Boolean(r.error) });
+    broadcastSettings();
+    if (r.done) broadcastPeople();
+    return r;
+  });
   handle('data:delete-all', async () => {
     capture.close('delete_all');
     capture.clearCaches();

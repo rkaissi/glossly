@@ -256,11 +256,39 @@ export class SaveService {
       } catch (e) {
         if (!alive()) return { ...result, cancelled: true };
         // Local only with no local model: the item stays saved and embedded, just without entities.
-        if (e instanceof LlmError && e.code === 'local_only') result.entitiesSkipped = 'local_only';
-        else this.deps.metrics?.record('save_enrich_error', { stage: 'entities', code: errorCode(e) });
+        if (e instanceof LlmError && e.code === 'local_only') {
+          result.entitiesSkipped = 'local_only';
+          this.deps.store.setEntitiesPending(item.id, true);
+        } else this.deps.metrics?.record('save_enrich_error', { stage: 'entities', code: errorCode(e) });
       }
+    } else {
+      // No model can look yet; Privacy and data offers to find them once one can (decision 44).
+      this.deps.store.setEntitiesPending(item.id, true);
     }
     return { ...result, cancelled: !alive() };
+  }
+
+  /**
+   * Finds people and places for items saved while no model could (decision 44), oldest first, one
+   * Fast call each. Stops at the first failure (a rate limit, say) so the rest wait for the next try.
+   */
+  async backfillEntities(signal?: AbortSignal, limit = 200): Promise<{ done: number; left: number; error?: string }> {
+    const { store, llm } = this.deps;
+    if (!llm.hasModel('fast')) return { done: 0, left: store.countEntitiesPending(), error: 'No model is set up to find them.' };
+    let done = 0;
+    for (const item of store.itemsWithEntitiesPending(limit)) {
+      if (signal?.aborted) break;
+      const alive = () => !signal?.aborted && store.getItem(item.id) !== null;
+      try {
+        await this.extractEntities(item, signal, alive);
+      } catch (e) {
+        this.deps.metrics?.record('save_enrich_error', { stage: 'backfill', code: errorCode(e) });
+        return { done, left: store.countEntitiesPending(), error: e instanceof LlmError ? e.message : 'The model call failed.' };
+      }
+      store.setEntitiesPending(item.id, false);
+      done++;
+    }
+    return { done, left: store.countEntitiesPending() };
   }
 
   private async embed(item: Item, alive: () => boolean = () => true): Promise<boolean> {

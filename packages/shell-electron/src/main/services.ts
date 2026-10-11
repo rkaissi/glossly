@@ -161,6 +161,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
       local: this.localStatus(),
       models: this.catalog(),
       embed: this.embed.getStatus(),
+      entitiesPending: this.store.countEntitiesPending(),
       platform: process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : 'win32',
       builtins: { blockList: DEFAULT_BLOCK_LIST, hotkeyOnly: DEFAULT_HOTKEY_ONLY },
     };

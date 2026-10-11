@@ -3,7 +3,7 @@ using static Glossly.Helper.Win32;
 
 namespace Glossly.Helper;
 
-internal sealed record ForegroundResult(long Handle, int Pid, string ProcessName, string Title, string ClassName);
+internal sealed record ForegroundResult(long Handle, int Pid, string ProcessName, string Title, string ClassName, Rect? Rect);
 internal sealed record RestoreFocusResult(bool Restored, string Method);
 internal sealed record WindowCornersResult(bool Applied);
 
@@ -14,7 +14,16 @@ internal static class Focus
         var h = GetForegroundWindow();
         if (h == IntPtr.Zero) throw new HelperException("no_foreground", "No foreground window");
         GetWindowThreadProcessId(h, out uint pid);
-        return new ForegroundResult(h.ToInt64(), (int)pid, ProcessName((int)pid), WindowTitle(h), ClassName(h));
+        return new ForegroundResult(h.ToInt64(), (int)pid, ProcessName((int)pid), WindowTitle(h), ClassName(h), WindowBounds(h));
+    }
+
+    /// <summary>The window's visible frame in physical pixels, or null when minimized or unknown.</summary>
+    public static Rect? WindowBounds(IntPtr h)
+    {
+        if (IsIconic(h)) return null;
+        if (DwmGetWindowBounds(h, DWMWA_EXTENDED_FRAME_BOUNDS, out var r, System.Runtime.InteropServices.Marshal.SizeOf<RECT>()) != 0 && !GetWindowRect(h, out r)) return null;
+        int w = r.Right - r.Left, ht = r.Bottom - r.Top;
+        return w > 0 && ht > 0 ? new Rect(r.Left, r.Top, w, ht) : null;
     }
 
     /// <summary>
@@ -48,13 +57,14 @@ internal static class Focus
         if (!IsWindow(h)) throw new HelperException("window_gone", "The window no longer exists");
         if (IsIconic(h)) ShowWindow(h, SW_RESTORE);
         if (GetForegroundWindow() == h) return new RestoreFocusResult(true, "already");
+        var before = GetForegroundWindow();
 
         Input.ReleaseModifiers();
-        if (SetForegroundWindow(h) && Verify(h)) return new RestoreFocusResult(true, "direct");
+        if (SetForegroundWindow(h) && Verify(h)) return Landed(h, before, "direct");
 
         // Windows only lets a process take the foreground right after it received input.
         Input.TapDummyKey();
-        if (SetForegroundWindow(h) && Verify(h)) return new RestoreFocusResult(true, "dummy_key");
+        if (SetForegroundWindow(h) && Verify(h)) return Landed(h, before, "dummy_key");
 
         var fg = GetForegroundWindow();
         uint fgThread = GetWindowThreadProcessId(fg, out _);
@@ -69,8 +79,19 @@ internal static class Focus
         {
             if (attached) AttachThreadInput(me, fgThread, false);
         }
-        if (Verify(h)) return new RestoreFocusResult(true, "attach_thread_input");
+        if (Verify(h)) return Landed(h, before, "attach_thread_input");
         throw new HelperException("focus_failed", "Could not bring the window to the foreground");
+    }
+
+    /// <summary>
+    /// A refused SetForegroundWindow leaves the taskbar button flashing (Notepad's after the tier-2
+    /// hand-off); once focus has landed, both windows involved stop.
+    /// </summary>
+    private static RestoreFocusResult Landed(IntPtr h, IntPtr before, string method)
+    {
+        StopFlash(h);
+        StopFlash(before);
+        return new RestoreFocusResult(true, method);
     }
 
     private static bool Verify(IntPtr h, int timeoutMs = 200)

@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import type { ChatRequest, LlmProvider } from '../llm/types';
 import { LlmError } from '../llm/types';
 import { inferTypes, parseNumber, parseTable, safeColumns, splitDelimited, toCsv } from './table';
-import { isValidSpec, rulesSpec, specFromChoice, visualize, type ChartChoice } from './visualize';
+import { categoryAxis, isValidSpec, rulesSpec, specFromChoice, visualize, type ChartChoice } from './visualize';
 
 const TSV = 'Region\tQ1\tQ2\nNorth\t120\t140\nSouth\t90\t95\nWest\t70\t88';
 
@@ -135,5 +135,18 @@ describe('visualize', () => {
     expect(await visualize({ llm, settings: settings(true) }, TSV)).toMatchObject({ ok: true, chartBy: 'rules' });
     expect(await visualize({ llm, settings: settings(true) }, 'Revenue was up a lot.')).toMatchObject({ ok: false, code: 'local_only' });
     expect(llm.calls).toEqual([]);
+  });
+});
+
+describe('categoryAxis', () => {
+  it('keeps short labels level and leans many long ones, never 90 degrees', () => {
+    expect(categoryAxis(['Q1', 'Q2', 'Q3', 'Q4'])).toMatchObject({ labelAngle: 0, labelOverlap: 'greedy' });
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    expect(categoryAxis(months).labelAngle).toBe(-40);
+  });
+  it('is set on line charts over categories too (Vega-Lite would turn them 90 degrees)', () => {
+    const table = { columns: ['Stage', 'Count'], rows: [['Lead', 40], ['Qualified', 22], ['Proposal', 9], ['Won', 4]], source: 'tsv' as const };
+    const spec = specFromChoice({ chart: 'line', x: 'Stage', measures: ['Count'], split_by: '', sort: 'data' }, table, ['nominal', 'quantitative']) as { encoding: { x: { axis?: { labelAngle: number } } } };
+    expect(spec.encoding.x.axis?.labelAngle).toBe(0);
   });
 });

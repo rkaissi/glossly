@@ -270,6 +270,10 @@ export class Capture {
     private readonly onTried: (step: TryItStep) => void = () => {},
   ) {
     helper.on('event', (ev) => this.onHelperEvent(ev));
+    overlay.useSourceBounds(() => {
+      const r = this.session?.fg?.rect;
+      return r ? toDipRect(r) : null;
+    });
     helper.on('down', () => {
       this.inputWatch = false;
     });
@@ -442,6 +446,7 @@ export class Capture {
       const placement = placePill({
         selection: bounds,
         anchor: p,
+        lastLine: sel.last_line ? toDipRect(sel.last_line) : null,
         obstacles,
         size: SIZES.pill,
         growW: MAX_W,

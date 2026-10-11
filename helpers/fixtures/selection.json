@@ -3,41 +3,73 @@
   "cases": [
     {
       "name": "editable text box (WPF)",
-      "request": { "id": 2, "cmd": "selection" },
+      "request": {
+        "id": 2,
+        "cmd": "selection"
+      },
       "response": {
         "id": 2,
         "ok": true,
         "result": {
           "text": "quick brown fox jumps",
           "method": "uia",
-          "bounds": { "x": 292, "y": 310, "w": 161, "h": 22 },
+          "bounds": {
+            "x": 292,
+            "y": 310,
+            "w": 161,
+            "h": 22
+          },
           "is_editable": true,
           "is_password": false,
           "control_type": "edit",
-          "truncated": false
+          "truncated": false,
+          "last_line": {
+            "x": 292,
+            "y": 310,
+            "w": 161,
+            "h": 22
+          }
         }
       }
     },
     {
       "name": "web page in Chrome",
-      "request": { "id": "s-7", "cmd": "selection", "max_chars": 20000 },
+      "request": {
+        "id": "s-7",
+        "cmd": "selection",
+        "max_chars": 20000
+      },
       "response": {
         "id": "s-7",
         "ok": true,
         "result": {
           "text": "Can you send the onboarding deck by Friday?",
           "method": "uia",
-          "bounds": { "x": 812, "y": 430, "w": 260, "h": 18 },
+          "bounds": {
+            "x": 812,
+            "y": 430,
+            "w": 260,
+            "h": 40
+          },
           "is_editable": false,
           "is_password": false,
           "control_type": "document",
-          "truncated": false
+          "truncated": false,
+          "last_line": {
+            "x": 812,
+            "y": 452,
+            "w": 96,
+            "h": 18
+          }
         }
       }
     },
     {
       "name": "nothing selected, provider without bounds",
-      "request": { "id": 3, "cmd": "selection" },
+      "request": {
+        "id": 3,
+        "cmd": "selection"
+      },
       "response": {
         "id": 3,
         "ok": true,
@@ -48,13 +80,17 @@
           "is_editable": false,
           "is_password": false,
           "control_type": "document",
-          "truncated": false
+          "truncated": false,
+          "last_line": null
         }
       }
     },
     {
       "name": "password field reads nothing",
-      "request": { "id": 6, "cmd": "selection" },
+      "request": {
+        "id": 6,
+        "cmd": "selection"
+      },
       "response": {
         "id": 6,
         "ok": true,
@@ -65,7 +101,8 @@
           "is_editable": true,
           "is_password": true,
           "control_type": "edit",
-          "truncated": false
+          "truncated": false,
+          "last_line": null
         }
       }
     }

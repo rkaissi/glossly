@@ -17,7 +17,7 @@ internal sealed record Rect(int X, int Y, int W, int H)
     [JsonIgnore] public bool IsEmpty => W <= 0 || H <= 0;
 }
 
-internal sealed record SelectionResult(string Text, string Method, Rect? Bounds, bool IsEditable, bool IsPassword, string ControlType, bool Truncated);
+internal sealed record SelectionResult(string Text, string Method, Rect? Bounds, bool IsEditable, bool IsPassword, string ControlType, bool Truncated, Rect? LastLine = null);
 internal sealed record ContextResult(string Before, string After);
 internal sealed record FieldResult(bool Found, Rect? Bounds, string ControlType);
 internal sealed record ContainerResult(string Text, int SelectionStart, int SelectionLength, string Source, string ContainerType);
@@ -91,14 +91,16 @@ internal sealed class Uia : IDisposable
         bool truncated = text.Length > maxChars;
         if (truncated) text = text[..maxChars];
 
+        var rects = Safe(() => loc.Range.GetBoundingRectangles());
         return new SelectionResult(
             text,
             "uia",
-            Bounds(loc.Range),
+            Union(rects),
             IsEditable(loc.Origin) || IsEditable(loc.Element),
             false,
             TypeName(loc.Element),
-            truncated);
+            truncated,
+            LastLine(rects));
     }
 
     public bool FocusedIsPassword()
@@ -593,9 +595,26 @@ internal sealed class Uia : IDisposable
         return true;
     }
 
-    private static Rect? Bounds(ITextRange range)
+    private static Rect? Bounds(ITextRange range) => Union(Safe(() => range.GetBoundingRectangles()));
+
+    /// <summary>
+    /// The selection's last line: the last non-empty rect (rects come in reading order), joined with
+    /// the others on the same line (some apps return one rect per text run). The dot sits at its end.
+    /// </summary>
+    private static Rect? LastLine(System.Drawing.Rectangle[]? rects)
     {
-        var rects = Safe(() => range.GetBoundingRectangles());
+        if (rects == null) return null;
+        var lines = rects.Where(x => x.Width > 0 && x.Height > 0).ToArray();
+        if (lines.Length == 0) return null;
+        var last = lines[^1];
+        int mid = last.Top + last.Height / 2;
+        var same = lines.Where(x => x.Top <= mid && x.Bottom >= mid).ToArray();
+        int l = same.Min(x => x.Left), t = same.Min(x => x.Top), r = same.Max(x => x.Right), b = same.Max(x => x.Bottom);
+        return new Rect(l, t, r - l, b - t);
+    }
+
+    private static Rect? Union(System.Drawing.Rectangle[]? rects)
+    {
         if (rects == null || rects.Length == 0) return null;
         int l = int.MaxValue, t = int.MaxValue, r = int.MinValue, b = int.MinValue;
         foreach (var x in rects)

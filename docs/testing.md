@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (547 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (561 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -168,6 +168,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Motion: buttons squish on press; checks pop with their mark; settings tab changes and task rows rise in; the calendar view switch settles; events lift on hover; bar actions pop in on open and panels' parts rise in. With Windows' Animation effects off, none of it plays.
 - [ ] The settings window and its taskbar button show the Glass icon (light and dark taskbar); the tray keeps the plain mark.
 - [ ] Spacing (decision 43): every overlay panel (Ask, Save, Who, Tasks and events, Reply, Related, Search, Paste, Visualize) in light and dark: 14 and 16 px icons, the quiet row buttons one height, nothing clipped by the window after the size changes.
+- [ ] Small fixes (decision 44): with toolbars above and below a two-line selection whose last line is shorter, the dot sits just past the last selected character (helper `last_line`); a collection like "Client research" shows alone in the Save slot with a "Save to …" tooltip; Esc from a panel with nothing selected shows the "Nothing selected" strip only on the bare bar; an Ask answer with "10 a.m." reads with spaces; Visualize over a 12-month table leans its labels; a panel opened from a selection near the bottom of a window that isn't maximized stops at the window's edge and scrolls (room at least 320 DIP); Notepad's taskbar button doesn't flash after Ask; under Local only with no local model, save two items, switch to All models, and Privacy and data offers "Find them" for 2 (then remove the test items).
 
 **Setup redesign (Step 20.3)** (throwaway profile)
 - [ ] Every step on mica, light and dark: dots, the slide from the right going on and from the left going back, the Welcome demo looping, nothing re-animating when a card or tab is picked.

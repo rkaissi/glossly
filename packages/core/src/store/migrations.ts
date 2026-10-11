@@ -156,6 +156,10 @@ export const MIGRATIONS: string[] = [
      before this have none. */ `
   ALTER TABLE commitments ADD COLUMN completed_at TEXT;
   `,
+  /* 7: Items saved while no model could find their people and places (Local only with no local
+     model, or no key yet), so they can be offered a backfill later (Step 20.3, decision 44). */ `
+  ALTER TABLE items ADD COLUMN entities_pending INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */

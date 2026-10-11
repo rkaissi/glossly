@@ -241,6 +241,43 @@ describe('SaveService', () => {
     expect(store.listEvents().map((e) => e.kind)).toEqual(['save_done']);
   });
 
+  it('marks items no model could read, and backfills them once one can (decision 44)', async () => {
+    let refuse = true;
+    const llm = new FakeLlm(() => {
+      if (refuse) throw new LlmError('local_only', 'Local only is on');
+      return { entities: [{ kind: 'company', name: 'Northwind' }] };
+    });
+    const { svc } = setup({ llm });
+    const a = svc.save({ selection: selection(), collection: 'Notes' });
+    await a.enriched;
+    const noModel = new SaveService({ store, llm: new FakeLlm(undefined, false), embedder: () => null, settings: () => DEFAULT_SETTINGS });
+    const b = noModel.save({ selection: selection(), collection: 'Notes' });
+    await b.enriched;
+    expect(store.countEntitiesPending()).toBe(2);
+
+    expect(await noModel.backfillEntities()).toMatchObject({ done: 0, left: 2, error: expect.any(String) });
+    refuse = false;
+    expect(await svc.backfillEntities()).toEqual({ done: 2, left: 0 });
+    expect(store.entitiesForItem(a.item.id).map((e) => e.display)).toEqual(['Northwind']);
+    expect(store.entitiesForItem(b.item.id).map((e) => e.display)).toEqual(['Northwind']);
+  });
+
+  it('stops the backfill at the first failure and keeps the rest pending', async () => {
+    let calls = 0;
+    const llm = new FakeLlm(() => {
+      calls++;
+      if (calls === 1) throw new LlmError('local_only', 'Local only is on');
+      if (calls === 4) throw new LlmError('provider', 'Slow down');
+      return { entities: [] };
+    });
+    const { svc } = setup({ llm });
+    await svc.save({ selection: selection(), collection: 'Notes' }).enriched;
+    store.setEntitiesPending(svc.save({ selection: selection(), collection: 'Notes' }).item.id, true);
+    await svc.idle();
+    const r = await svc.backfillEntities();
+    expect(r).toMatchObject({ done: 1, left: 1, error: 'Slow down' });
+  });
+
   it('creates a missing collection', () => {
     const { svc } = setup();
     const { item: saved } = svc.save({ selection: selection(), collection: 'Recipes' });

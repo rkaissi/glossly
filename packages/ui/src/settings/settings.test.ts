@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CatalogModel } from '@glossly/core/api';
+import type { CatalogModel, SettingsView } from '@glossly/core/api';
 import {
+  canBackfill,
   capabilityBadges,
   errorText,
   formatAccelerator,
@@ -96,5 +97,23 @@ describe('formatting', () => {
     expect(timeAgo('2026-10-10T11:55:00Z', now)).toBe('5 minutes ago');
     expect(timeAgo('2026-10-10T11:00:00Z', now)).toBe('1 hour ago');
     expect(timeAgo('2026-10-08T12:00:00Z', now)).toBe('2 days ago');
+  });
+});
+
+describe('canBackfill', () => {
+  const view = (privacy: 'all' | 'local', o: { key?: boolean; local?: { loopback: boolean; model: string | null } } = {}) =>
+    ({
+      settings: { privacy, local: { model: o.local?.model ?? null } },
+      keys: [{ hasKey: Boolean(o.key), lastTest: o.key ? { ok: true, models: 3, at: '' } : null }],
+      local: o.local ? { baseUrl: 'http://localhost:11434/v1', loopback: o.local.loopback, lastTest: { ok: true, models: 2, at: '' } } : { baseUrl: null, loopback: false, lastTest: null },
+    }) as unknown as SettingsView;
+  it('needs any working model under All models', () => {
+    expect(canBackfill(view('all'))).toBe(false);
+    expect(canBackfill(view('all', { key: true }))).toBe(true);
+  });
+  it('needs a local model on this computer under Local only, whatever keys exist', () => {
+    expect(canBackfill(view('local', { key: true }))).toBe(false);
+    expect(canBackfill(view('local', { local: { loopback: false, model: 'local:qwen3:4b' } }))).toBe(false);
+    expect(canBackfill(view('local', { local: { loopback: true, model: 'local:qwen3:4b' } }))).toBe(true);
   });
 });

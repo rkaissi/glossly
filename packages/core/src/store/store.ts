@@ -382,6 +382,20 @@ export class Store {
     return rows.map((r) => ({ item_id: r.item_id, similarity: 1 - r.distance }));
   }
 
+  /** Marks or clears an item whose entities no model has looked for yet (decision 44). */
+  setEntitiesPending(itemId: string, pending: boolean): void {
+    this.db.prepare('UPDATE items SET entities_pending = ? WHERE id = ?').run(pending ? 1 : 0, itemId);
+  }
+
+  countEntitiesPending(): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM items WHERE entities_pending = 1').get() as { n: number }).n;
+  }
+
+  /** Oldest first. */
+  itemsWithEntitiesPending(limit = 100): Item[] {
+    return this.db.prepare('SELECT * FROM items WHERE entities_pending = 1 ORDER BY created_at LIMIT ?').all(limit) as unknown as Item[];
+  }
+
   itemsWithoutVectors(limit = 100): Item[] {
     if (!this.hasVectors || !this.vectorTableExists()) return [];
     return this.db

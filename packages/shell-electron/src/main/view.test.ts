@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { ExpiringLru, Lru, replyCacheKey, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, shouldHideOverlay, slotsView } from './view';
+import { ExpiringLru, Lru, replyCacheKey, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -228,5 +228,27 @@ describe("Reply's cache key", () => {
     expect(cache.get('a')).toBe(1);
     now = 1001;
     expect(cache.get('a')).toBeUndefined();
+  });
+});
+
+describe('saveLabel', () => {
+  it('says "Save to" while it fits the slot, else the collection alone', () => {
+    expect(saveLabel('Notes')).toBe('Save to Notes');
+    expect(saveLabel('Reading')).toBe('Save to Reading');
+    expect(saveLabel('People notes')).toBe('People notes');
+    expect(slotsView(route({}, 'Client research'), 'rules').slot2).toMatchObject({ label: 'Client research', collection: 'Client research' });
+  });
+});
+
+describe('sourceRoom', () => {
+  const source = { x: 100, y: 100, w: 1000, h: 700 };
+  it('is the height left inside the source window toward the side the panel grows', () => {
+    expect(sourceRoom({ x: 300, y: 400, w: 400, h: 40 }, 'below', source, 320)).toBe(400);
+    expect(sourceRoom({ x: 300, y: 500, w: 400, h: 40 }, 'above', source, 320)).toBe(440);
+  });
+  it('lets the screen decide when the source is unknown, the bar sits outside it, or the room is too small', () => {
+    expect(sourceRoom({ x: 300, y: 400, w: 400, h: 40 }, 'below', null, 320)).toBeNull();
+    expect(sourceRoom({ x: 300, y: 790, w: 400, h: 40 }, 'below', source, 320)).toBeNull();
+    expect(sourceRoom({ x: 300, y: 600, w: 400, h: 40 }, 'below', source, 320)).toBeNull();
   });
 });

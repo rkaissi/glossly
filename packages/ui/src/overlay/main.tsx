@@ -1,6 +1,6 @@
 // The overlay renderer: pill, dot, bar, and panels in one window. Main owns the session and
 // pushes OverlayState; this side only renders it and sends clicks and keys back.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Check, Eye, EyeOff, History, Info, Settings, Undo2, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
@@ -205,7 +205,8 @@ function Expanded({ s }: { s: OverlayState }) {
 
   const isHighlighted = (target: BarItem) => s.keyboard && s.mode === 'bar' && sameItem(items[hl], target);
   const titleFor = (view: SlotView) => {
-    const title = view.available ? view.label : `${view.label}: coming in a later phase`;
+    const label = view.action === 'save' && 'collection' in view && view.collection ? `Save to ${view.collection}` : view.label;
+    const title = view.available ? label : `${label}: coming in a later phase`;
     return view.score !== undefined ? `${title} (score ${view.score.toFixed(2)})` : title;
   };
 
@@ -233,7 +234,10 @@ function Expanded({ s }: { s: OverlayState }) {
   const ask: SlotView = slots?.slot1 ?? { action: 'ask', label: 'Ask', available: true };
   const save: SlotView = slots?.slot2 ?? { action: 'save', label: 'Save', available: true };
   const more = slots?.more ?? [];
-  const strip = Boolean(s.notice) || (!s.hasSelection && s.panel !== 'search');
+  // The "Nothing selected" hint is for the bare bar; an open panel (search, paste, Ask) explains itself.
+  const strip = Boolean(s.notice) || (!s.hasSelection && s.mode !== 'panel');
+  // Main caps a panel at the room left in the source window; the panel then scrolls (decision 44).
+  const capped = s.mode === 'panel' && s.panelMaxH !== null;
   const frameCls = [
     'frame',
     above && 'above',
@@ -241,13 +245,14 @@ function Expanded({ s }: { s: OverlayState }) {
     strip && 'has-strip',
     s.debug && 'has-debug',
     s.mode === 'panel' && 'has-panel',
+    capped && 'capped',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
     <RoomContext.Provider value={requestRoom}>
-      <div ref={ref} className={frameCls}>
+      <div ref={ref} className={frameCls} style={capped ? ({ '--panel-max': `${s.panelMaxH}px` } as CSSProperties) : undefined}>
         <div className="row">
           <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
           {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
@@ -355,7 +360,7 @@ function Expanded({ s }: { s: OverlayState }) {
             <span>{s.notice}</span>
           </div>
         )}
-        {!s.hasSelection && !s.notice && s.panel !== 'search' && (
+        {!s.hasSelection && !s.notice && s.mode !== 'panel' && (
           <div className="strip">
             <Info size={14} strokeWidth={1.75} aria-hidden />
             <span>Nothing selected. Search what you saved, ask a question, or select text and press the hotkey again.</span>

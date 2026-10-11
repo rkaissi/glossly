@@ -60,6 +60,7 @@ Result:
 | `text` | string | `""` when nothing is selected, or when `is_password` |
 | `method` | `"uia"` or `"ax"` | |
 | `bounds` | rect or `null` | Union of the selection's line rectangles. `null` if the provider does not report them; the app falls back to the cursor position |
+| `last_line` | rect or `null` | The selection's last line (the last rectangle, joined with others on the same line). The dot sits at its end (decision 44). `null` without bounds |
 | `is_editable` | bool | Edit control, or a value that is not read-only |
 | `is_password` | bool | If true, `text` is always empty |
 | `control_type` | string | Lower-case control type of the text provider (`edit`, `document`, ...), for the debug view |
@@ -120,7 +121,7 @@ Errors: `password_field`.
 
 ### `foreground`
 
-Result: `{"handle": int, "pid": int, "process_name": "slack.exe", "title": string, "class_name": string}`. `process_name` is lower-case with `.exe` (on macOS: the bundle executable name). `handle` is an opaque integer to pass back to `restore_focus`.
+Result: `{"handle": int, "pid": int, "process_name": "slack.exe", "title": string, "class_name": string, "rect": rect | null}`. `process_name` is lower-case with `.exe` (on macOS: the bundle executable name). `handle` is an opaque integer to pass back to `restore_focus`. `rect` is the window's visible frame in physical pixels (DWM extended frame bounds, else `GetWindowRect`), null when it is minimized; the overlay keeps panels inside it when there is room (decision 44).
 
 ### `popups_near`
 
@@ -171,7 +172,7 @@ Result: `{"text": string, "method": "copy", "clipboard_restored": bool}`. `text`
 | --- | --- |
 | `handle` | Required, from `foreground` |
 
-Restores the window if minimized, then tries `SetForegroundWindow`, then a dummy key press, then `AttachThreadInput`. Each attempt is verified.
+Restores the window if minimized, then tries `SetForegroundWindow`, then a dummy key press, then `AttachThreadInput`. Each attempt is verified. Once focus lands, the target and the window that had focus stop any taskbar flashing a refused attempt started (`FlashWindowEx`, decision 44).
 
 Result: `{"restored": true, "method": "already" | "direct" | "dummy_key" | "attach_thread_input"}`. Errors: `window_gone`, `focus_failed`.
 

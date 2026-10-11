@@ -3,7 +3,7 @@ import { BrowserWindow, screen } from 'electron';
 import type { OverlayMode, OverlayState, Placement, Rect, Size } from '@glossly/core';
 import { logger } from './log';
 import { hasWindowMaterial, preloadPath, rendererUrl } from './paths';
-import { fitOnScreen, hwndFromBuffer } from './view';
+import { fitOnScreen, hwndFromBuffer, sourceRoom } from './view';
 
 const log = logger('overlay');
 
@@ -50,7 +50,11 @@ export const HIDDEN_STATE: OverlayState = {
   notice: null,
   saved: null,
   canInsert: false,
+  panelMaxH: null,
 };
+
+/** A panel is kept inside its source window only when that leaves it at least this much height (DIP). */
+const MIN_SOURCE_ROOM = 320;
 
 /**
  * The pill, bar, and panel share one window, created once at launch and kept hidden. It is
@@ -71,6 +75,8 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   private materialStale = false;
   private corners: Corners | null = null;
   private setCorners: ((c: Corners) => Promise<void>) | null = null;
+  /** The window the selection came from (DIP), when the helper knows it. */
+  private sourceBounds: () => Rect | null = () => null;
 
   constructor() {
     super();
@@ -127,6 +133,11 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   }
 
   /** Wires the helper's window_corners; applied whenever the material changes. */
+  /** Capture tells the overlay where the source window is, so panels stay inside it (decision 44). */
+  useSourceBounds(get: () => Rect | null): void {
+    this.sourceBounds = get;
+  }
+
   useCorners(set: (c: Corners) => Promise<void>): void {
     this.setCorners = set;
     this.refreshCorners();
@@ -273,14 +284,15 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
     if (!Number.isFinite(w) || !Number.isFinite(h)) return;
     const cur = this.bounds();
     const display = screen.getDisplayMatching({ x: cur.x, y: cur.y, width: cur.w, height: cur.h }).workArea;
-    const rect = fitOnScreen(
-      cur,
-      w,
-      h,
-      { x: display.x, y: display.y, w: display.width, h: display.height },
-      s.placement?.side === 'above',
-      LIMITS,
-    );
+    const above = s.placement?.side === 'above';
+    // A panel stays inside the window the text came from when that leaves it enough room; the
+    // renderer then scrolls the panel inside this height instead of covering what is below.
+    const room = s.mode === 'panel' ? sourceRoom(cur, above ? 'above' : 'below', this.sourceBounds(), MIN_SOURCE_ROOM) : null;
+    if (room !== s.panelMaxH) {
+      this.patch({ panelMaxH: room });
+      return;
+    }
+    const rect = fitOnScreen(cur, w, h, { x: display.x, y: display.y, w: display.width, h: display.height }, above, room ? { ...LIMITS, maxH: Math.min(LIMITS.maxH, room) } : LIMITS);
     if (rect.w === cur.w && rect.h === cur.h && rect.x === cur.x && rect.y === cur.y) return;
     const placement: Placement | null = s.placement ? { ...s.placement, rect } : null;
     this.state = { ...s, placement };

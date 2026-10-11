@@ -12,6 +12,19 @@ internal static class Win32
     public struct RECT { public int Left, Top, Right, Bottom; }
 
     [StructLayout(LayoutKind.Sequential)]
+    public struct FLASHWINFO { public uint cbSize; public IntPtr hwnd; public uint dwFlags; public uint uCount; public uint dwTimeout; }
+    public const uint FLASHW_STOP = 0;
+    [DllImport("user32.dll")] public static extern bool FlashWindowEx(ref FLASHWINFO info);
+
+    /// <summary>Stops a taskbar button flashing (Windows flashes it when it refuses a foreground change).</summary>
+    public static void StopFlash(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        var info = new FLASHWINFO { cbSize = (uint)Marshal.SizeOf<FLASHWINFO>(), hwnd = hwnd, dwFlags = FLASHW_STOP };
+        FlashWindowEx(ref info);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct MSG
     {
         public IntPtr hwnd; public uint message; public UIntPtr wParam; public IntPtr lParam; public uint time; public POINT pt;
@@ -64,6 +77,8 @@ internal static class Win32
     public const int SW_RESTORE = 9;
     public const uint SMTO_ABORTIFHUNG = 0x0002;
     public const int DWMWA_CLOAKED = 14;
+    /// <summary>The window as drawn, without the invisible resize borders GetWindowRect includes.</summary>
+    public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
     public const ushort VK_SHIFT = 0x10, VK_CONTROL = 0x11, VK_MENU = 0x12, VK_SPACE = 0x20, VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_C = 0x43, VK_V = 0x56;
     public const ushort VK_NONAME_DUMMY = 0xE8;
     public const uint CF_UNICODETEXT = 13;
@@ -96,6 +111,7 @@ internal static class Win32
     [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wParam, IntPtr lParam, uint flags, uint timeout, out UIntPtr result);
     [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out int value, int size);
+    [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] public static extern int DwmGetWindowBounds(IntPtr hwnd, int attr, out RECT value, int size);
     [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
 

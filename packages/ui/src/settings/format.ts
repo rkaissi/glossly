@@ -7,6 +7,10 @@ export const hasWorkingKey = (view: SettingsView) => view.keys.some((k) => k.has
 /** A working key, or a local server that lists models. */
 export const hasWorkingModel = (view: SettingsView) => hasWorkingKey(view) || Boolean(view.local.baseUrl && view.local.lastTest?.ok);
 
+/** A model may run now: any working one under All models; under Local only, a local model on this computer (decision 34). */
+export const canBackfill = (view: SettingsView) =>
+  view.settings.privacy === 'local' ? Boolean(view.settings.local.model && view.local.baseUrl && view.local.loopback && view.local.lastTest?.ok) : hasWorkingModel(view);
+
 export interface ProviderGroup {
   provider: string;
   label: string;

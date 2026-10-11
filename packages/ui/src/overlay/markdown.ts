@@ -12,13 +12,21 @@ export type Block =
 
 const INLINE = /(`[^`\n]+`|\*\*[^*\n]+\*\*)/g;
 
+/** Spaces some models write (no-break, narrow no-break, thin) that Segoe UI can draw with no width. */
+const ODD_SPACES = /[  -   　]/g;
+/** "a.m.." at the end of a sentence: the abbreviation's period doubles as the full stop. */
+const DOUBLE_STOP = /\b((?:[a-z]\.){2,})\.(?!\.)/gi;
+
+/** Prose as it should read: plain spaces, one full stop after an abbreviation ("at 10 a.m."). */
+export const tidyText = (s: string): string => s.replace(ODD_SPACES, ' ').replace(DOUBLE_STOP, '$1');
+
 export function parseInline(s: string): Inline[] {
   const out: Inline[] = [];
   for (const part of s.split(INLINE)) {
     if (!part) continue;
     if (part.length > 2 && part.startsWith('`') && part.endsWith('`')) out.push({ t: 'code', v: part.slice(1, -1) });
-    else if (part.length > 4 && part.startsWith('**') && part.endsWith('**')) out.push({ t: 'bold', v: part.slice(2, -2) });
-    else out.push({ t: 'text', v: part });
+    else if (part.length > 4 && part.startsWith('**') && part.endsWith('**')) out.push({ t: 'bold', v: tidyText(part.slice(2, -2)) });
+    else out.push({ t: 'text', v: tidyText(part) });
   }
   return out;
 }

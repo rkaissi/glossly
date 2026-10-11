@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SlotsView, SlotView } from '@glossly/core/api';
 import { barItems, barKey, slotKey, type BarKeyContext, type KeyInput } from './keys';
-import { parseInline, parseMarkdown } from './markdown';
+import { parseInline, parseMarkdown, tidyText } from './markdown';
 
 const slot = (action: SlotView['action'], available = false): SlotView => ({ action, label: action, available });
 
@@ -107,5 +107,24 @@ describe('parseMarkdown', () => {
   });
   it('leaves an unclosed bold marker as text', () => {
     expect(parseInline('half **bold')).toEqual([{ t: 'text', v: 'half **bold' }]);
+  });
+});
+
+describe('tidyText', () => {
+  it('turns narrow and no-break spaces into plain ones (they could render with no width)', () => {
+    expect(tidyText('Meet at\u202f10\u202fa.m. on\u00a0Friday')).toBe('Meet at 10 a.m. on Friday');
+  });
+  it('drops the full stop doubled after an abbreviation, and keeps an ellipsis', () => {
+    expect(tidyText('It starts at 10 a.m.. Bring the deck.')).toBe('It starts at 10 a.m. Bring the deck.');
+    expect(tidyText('Lists, e.g.. this one')).toBe('Lists, e.g. this one');
+    expect(tidyText('Wait for it...')).toBe('Wait for it...');
+    expect(tidyText('Ends at 5 p.m.')).toBe('Ends at 5 p.m.');
+  });
+  it('leaves inline code alone', () => {
+    expect(parseInline('Run `a\u00a0b..` at\u202f9')).toEqual([
+      { t: 'text', v: 'Run ' },
+      { t: 'code', v: 'a\u00a0b..' },
+      { t: 'text', v: ' at 9' },
+    ]);
   });
 });

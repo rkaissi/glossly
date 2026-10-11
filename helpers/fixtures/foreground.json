@@ -3,7 +3,10 @@
   "cases": [
     {
       "name": "Slack desktop",
-      "request": { "id": 2, "cmd": "foreground" },
+      "request": {
+        "id": 2,
+        "cmd": "foreground"
+      },
       "response": {
         "id": 2,
         "ok": true,
@@ -12,13 +15,22 @@
           "pid": 20300,
           "process_name": "slack.exe",
           "title": "#design - Acme - Slack",
-          "class_name": "Chrome_WidgetWin_1"
+          "class_name": "Chrome_WidgetWin_1",
+          "rect": {
+            "x": 120,
+            "y": 80,
+            "w": 1600,
+            "h": 1000
+          }
         }
       }
     },
     {
       "name": "Google Docs in Chrome",
-      "request": { "id": 5, "cmd": "foreground" },
+      "request": {
+        "id": 5,
+        "cmd": "foreground"
+      },
       "response": {
         "id": 5,
         "ok": true,
@@ -27,7 +39,32 @@
           "pid": 8812,
           "process_name": "chrome.exe",
           "title": "Q4 plan - Google Docs - Google Chrome",
-          "class_name": "Chrome_WidgetWin_1"
+          "class_name": "Chrome_WidgetWin_1",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "w": 2560,
+            "h": 1528
+          }
+        }
+      }
+    },
+    {
+      "name": "Minimized window",
+      "request": {
+        "id": 7,
+        "cmd": "foreground"
+      },
+      "response": {
+        "id": 7,
+        "ok": true,
+        "result": {
+          "handle": 331120,
+          "pid": 4410,
+          "process_name": "notepad.exe",
+          "title": "notes.txt - Notepad",
+          "class_name": "Notepad",
+          "rect": null
         }
       }
     }

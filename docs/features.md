@@ -17,7 +17,7 @@ Spec phase mapping: Phase 0 is Capture; Phase 1 is the bar, Ask, Save, and Setti
 - **Cleanup**: captured text goes through `cleanText` (decision 19).
 - **Debug view** (Settings > General, or the tray): method, trigger, routing stage, fallback reason, timings, pill wait, obstacles, tier-1 context. Rayan normally has it off, so diagnose from `main.log` and events.
 
-Status: live in Notepad, Chrome, and the settings window (pill 116 to 125 ms with no toolbar expected; it never moved in pixel diffs). Not live: other apps in `evals/capture.md`, real selection toolbars, the copy-fallback branch inside the app, plain-name rules and Show here, the stuck-bar fix. Known: Edge's own selection mini-menu counts as a new obstacle; Notepad's taskbar button flashes after the tier-2 hand-off (harmless); the dot sits 4 DIP right of the mouse-up point (`placement.ts`, `anchorX + 4`) and can cover the next letter mid-word (a fix needs the last line's rect from the helper).
+Status: live in Notepad, Chrome, and the settings window (pill 116 to 125 ms with no toolbar expected; it never moved in pixel diffs). Not live: other apps in `evals/capture.md`, real selection toolbars, the copy-fallback branch inside the app, plain-name rules and Show here, the stuck-bar fix. Known: Edge's own selection mini-menu counts as a new obstacle. Fixed in Step 20.3, not live (decision 44): the dot sits just past the end of the last selected line (helper `last_line`), and the taskbar flash after the tier-2 hand-off is stopped once focus lands.
 
 ## The bar and keyboard map
 
@@ -25,19 +25,25 @@ Glossly menu, Ask, Save to {collection}, slots 3 and 4, badges (person, "N relat
 
 Keys (`overlay/keys.ts`): `1` to `4` run the Nth button by position (so the empty bar reads 1 Ask, 2 Search, 3 Paste snippets), `Enter` runs the highlighted one, `Tab` opens the menu with More's first item highlighted, arrows move, `Esc` closes the menu, then the panel, then the bar. Each action shows its key in a chip right of its label when General > Show keyboard shortcuts says so (Always, On hotkey (the default: a bar opened with the hotkey), or Never), decided once when the bar opens (decision 41); the keys work whenever the bar has focus.
 
-Status: live (Step 13 and 16 checks). Not live: numbering by position.
+Long collection names show alone in the Save slot ("Client research"); the tooltip says "Save to …" (decision 44). A panel that would run past the bottom (or top) of the window the text came from is capped at the room left in it, if that is at least 320 DIP, and scrolls; the "Nothing selected" strip shows only on the bare bar.
+
+Status: live (Step 13 and 16 checks). Not live: numbering by position, the Step 20.3 fixes (Save label, panels inside the source window, the strip).
 
 ## Ask
 
 Streams an answer on the Chat role (`actions/ask.ts`, `prompts/ask.md`). The prompt has the asker's identity (so it doesn't treat the reader as a message's author), the selection, surrounding text with a `[SELECTION]` mark, and up to 3 saved notes from Recall ("From your note, Oct 10"). With nothing selected it uses the surroundings: "Around their cursor" with a `[CURSOR]` mark, or "What is on their screen". Asking to remember something calls the `remember` tool, which saves a note with Undo (decision 24). `Ctrl+C` copies the answer. Errors offer "Add a key", or under Local only with no local model "Use all models and ask" and "Set up a local model".
 
-Status: live (first token about 0.7 s, remember and Undo, Local only). Not live: `Ctrl+C`, surroundings with nothing selected.
+Answers are tidied for display: no-break and narrow spaces become plain spaces, and "a.m.." loses its extra stop (decision 44).
+
+Status: live (first token about 0.7 s, remember and Undo, Local only). Not live: `Ctrl+C`, surroundings with nothing selected, the text tidying.
 
 ## Save and save modes
 
 `SaveService` (`actions/save.ts`) inserts at once, then in the background embeds text plus why and extracts entities (Fast role; skipped under Local only with no local model). Undo works for 10 s (`save.undoSeconds`) plus a grace. The panel: collection chips (Tab cycles), a why field, "Saved to Notes · just now", Undo. The label takes the route's `best_collection` once when it settles. Modes (decision 15): Manual, save hotkey (toast with Undo; the default falls back to `Ctrl+Alt+Shift+S` then `Ctrl+Shift+Alt+B` if taken), Autosave (pill shows "Saved", the bar's slot 2 is "Undo save (Ns)"; moves once to the route's collection). Autosave and the save hotkey cost a model call per save (entities, and the router for the hotkey), which can hit Groq free-tier limits; the item is still saved.
 
-Status: live (all three modes, Undo, embeddings and entities on real data).
+Items saved while no model could find their people and places are marked; Privacy and data offers "Find them" once a model can run (decision 44).
+
+Status: live (all three modes, Undo, embeddings and entities on real data). Not live: the entities backfill.
 
 ## Recall and Search
 
@@ -97,7 +103,7 @@ Status: live in the Step 15 version (three drafts in under 9 s, Insert into a te
 2. **Chart** (`visualize/visualize.ts`, decision 22): one Fast call returns a chart pick (`prompts/visualize-chart.md`); `specFromChoice` writes the Vega-Lite spec, validated against the Vega-Lite schema with Ajv. No model (Local only without a local model, or no key): `rulesChoice` picks with code. Any failure shows the table with one line why.
 3. **Panel** (`VisualizePanel.tsx`): `vega-embed` loaded on open (separate chunk), rendered with `vega-interpreter` because the CSP blocks `new Function`. One series in ink; several use a validated categorical palette. Chart/Table toggle, Copy as image (PNG 2x), Copy CSV, Save (a `chart` item with Undo). Results cached per text.
 
-Status: the earlier version (model-written specs) was live after two fixes; the chart-pick rewrite and the cache are not. Known: x labels can rotate 90°; a TSV from Notepad may arrive with tabs as spaces and go to the model.
+Status: the earlier version (model-written specs) was live after two fixes; the chart-pick rewrite and the cache are not. Known: a TSV from Notepad may arrive with tabs as spaces and go to the model. Fixed in Step 20.3, not live: category labels stay level or lean 40 degrees, never 90 (`categoryAxis`).
 
 ## Settings window and setup
 

@@ -25,11 +25,19 @@ function slot(action: ActionId, score?: number): SlotView {
   return { action, label: ACTION_LABELS[action], ...(score !== undefined && { score }), available: isAvailable(action) };
 }
 
+/**
+ * The Save slot's label: "Save to Notes", or the collection alone ("People notes") when the whole
+ * label wouldn't fit the 172 px slot next to a key chip (about 16 characters of Segoe UI at 13 px).
+ * The tooltip always says "Save to …".
+ */
+export const SAVE_LABEL_MAX = 16;
+export const saveLabel = (collection: string): string => (`Save to ${collection}`.length <= SAVE_LABEL_MAX ? `Save to ${collection}` : collection);
+
 export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView {
   const collection = r.decisions.best_collection;
   return {
     slot1: slot('ask'),
-    slot2: { ...slot('save'), label: `Save to ${collection}`, collection },
+    slot2: { ...slot('save'), label: saveLabel(collection), collection },
     slot3: r.slots.slot3 ? slot(r.slots.slot3.action, r.slots.slot3.score) : null,
     slot4: r.slots.slot4 ? slot(r.slots.slot4.action, r.slots.slot4.score) : null,
     more: r.slots.more.map((a) => slot(a.action, a.score)),
@@ -140,6 +148,17 @@ export function fitOnScreen(cur: Rect, w: number, h: number, area: Rect, above: 
 export function growFrom(from: Rect, side: 'below' | 'above' | 'end', size: Size, area: Rect): Rect {
   const y = side === 'above' ? from.y + from.h - size.h : from.y;
   return clampRect({ x: from.x, y, w: size.w, h: size.h }, area);
+}
+
+/**
+ * The height a window growing from `cur` toward `side` has inside the source window, or null
+ * when the source is unknown, doesn't hold `cur`, or leaves less than `min` (then the screen is
+ * the limit, as before).
+ */
+export function sourceRoom(cur: Rect, side: 'above' | 'below', source: Rect | null, min: number): number | null {
+  if (!source || cur.y < source.y - 1 || cur.y + cur.h > source.y + source.h + 1) return null;
+  const room = Math.floor(side === 'above' ? cur.y + cur.h - source.y : source.y + source.h - cur.y);
+  return room >= min ? room : null;
 }
 
 /** Distance from a point to the nearest edge of a rect; 0 inside. */

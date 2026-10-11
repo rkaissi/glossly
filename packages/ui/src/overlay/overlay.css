@@ -287,6 +287,19 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   gap: 10px;
   animation: fade-in 150ms ease-out;
 }
+/* Kept inside the source window (decision 44): the frame stops at the room main allows and the
+   panel scrolls; the row and strips keep their size. */
+.frame.capped {
+  max-height: var(--panel-max);
+}
+.frame.capped > * {
+  flex: none;
+}
+.frame.capped > .panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
 /* Decision 41: the overlay's glass is the window itself, so containers stay put and what's
    inside moves: a panel's parts rise in one after another, bar actions pop in. */
 .panel > * {

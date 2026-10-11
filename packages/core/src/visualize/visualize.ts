@@ -17,6 +17,18 @@ const MAX_PROMPT_CHARS = 6000;
 const SAMPLE_ROWS = 8;
 const CHART_SIZE = { width: 440, height: 220 };
 
+/**
+ * The category axis under a vertical chart. Vega-Lite turns discrete x labels 90 degrees on its
+ * own; they stay level while they fit side by side (about 6.5 px a character at 11 px), else lean
+ * 40 degrees. Labels that would still collide are thinned, and long ones are cut at 100 px.
+ */
+export function categoryAxis(labels: readonly string[]): { labelAngle: number; labelOverlap: 'greedy'; labelLimit: number } {
+  const distinct = [...new Set(labels)];
+  const longest = Math.max(0, ...distinct.map((l) => Math.min(l.length, 16)));
+  const fits = distinct.length * (longest * 6.5 + 10) <= CHART_SIZE.width;
+  return { labelAngle: fits ? 0 : -40, labelOverlap: 'greedy', labelLimit: 100 };
+}
+
 export const VisualizeTableSchema = z.object({
   columns: z.array(z.string()).describe('Short column names.'),
   rows: z.array(z.array(z.string())).describe('One array per row, one string per column, in column order.'),
@@ -97,7 +109,9 @@ export function specFromChoice(c: ChartChoice, table: ParsedTable, types: FieldT
   } else {
     const valueAxis = horizontal ? 'x' : 'y';
     const sort = mark !== 'bar' || c.sort === 'data' ? null : c.sort === 'ascending' ? valueAxis : '-' + valueAxis;
-    const cat = { field: c.x, type: typeOf(c.x), sort, ...(mark === 'bar' && !horizontal && { axis: { labelAngle: 0 } }) };
+    const xi = table.columns.indexOf(c.x);
+    const labels = table.rows.map((r) => (r[xi] === null || r[xi] === undefined ? '' : String(r[xi])));
+    const cat = { field: c.x, type: typeOf(c.x), sort, ...(!horizontal && typeOf(c.x) !== 'temporal' && { axis: categoryAxis(labels) }) };
     const value = { field: several ? 'value' : measures[0], type: 'quantitative', ...(several && { title: null }) };
     encoding = horizontal ? { y: cat, x: value } : { x: cat, y: value };
   }

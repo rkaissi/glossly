@@ -106,7 +106,7 @@ export interface SlotView {
 export interface SlotsView {
   /** Always Ask. */
   slot1: SlotView;
-  /** Always "Save to {collection}". */
+  /** "Save to {collection}", or the collection alone when that is too long (`saveLabel`). */
   slot2: SlotView & { collection: string };
   slot3: SlotView | null;
   slot4: SlotView | null;
@@ -158,6 +158,11 @@ export interface OverlayState {
   saved: SavedNotice | null;
   /** Nothing is selected and the focused control takes text, so a search result is inserted there instead of copied. */
   canInsert: boolean;
+  /**
+   * The tallest the panel may be (DIP) so it stays inside the window the text came from; null
+   * when the screen is the limit. The panel scrolls inside it (decision 44).
+   */
+  panelMaxH: number | null;
 }
 
 // ---- Ask ----
@@ -351,6 +356,8 @@ export interface SettingsView {
   local: LocalStatus;
   models: CatalogModel[];
   embed: EmbedStatus;
+  /** Saved items no model has looked for people and places in yet (decision 44). */
+  entitiesPending: number;
   platform: 'win32' | 'darwin' | 'linux';
   /** Built-in app lists, shown read-only next to the user's own entries. */
   builtins: { blockList: readonly string[]; hotkeyOnly: readonly string[] };
@@ -518,6 +525,8 @@ export interface InvokeChannels {
   'metrics:summary': { args: { days: number }; result: MetricsSummary };
   'embed:status': { args: void; result: EmbedStatus };
   'embed:download': { args: void; result: void };
+  /** Finds people and places for items saved while no model could (decision 44). */
+  'entities:backfill': { args: void; result: { done: number; left: number; error?: string } };
   /** `personId` (with tab "people") opens that person's full record. */
   'settings:open': { args: { tab?: SettingsTab; personId?: string }; result: void };
   /**
