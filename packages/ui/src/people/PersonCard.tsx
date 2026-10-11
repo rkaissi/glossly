@@ -183,7 +183,7 @@ function Aliases({ card, onChange, removable }: { card: PersonCard; onChange: (c
         />
       ) : (
         <button className="ghost alias-add" onClick={() => setAdding(true)}>
-          <Plus size={13} strokeWidth={1.75} aria-hidden />
+          <Plus size={14} strokeWidth={1.75} aria-hidden />
           Alias
         </button>
       )}

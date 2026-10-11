@@ -40,10 +40,10 @@ export function RecallPanel({ s }: { s: OverlayState }) {
               actions={
                 <>
                   <button className="ghost icon-only" title="Copy" aria-label="Copy" onClick={() => copy(h.itemId)}>
-                    {copied === h.itemId ? <Check size={13} strokeWidth={2} aria-hidden /> : <Copy size={13} strokeWidth={1.75} aria-hidden />}
+                    {copied === h.itemId ? <Check size={14} strokeWidth={2} aria-hidden /> : <Copy size={14} strokeWidth={1.75} aria-hidden />}
                   </button>
                   <button className="ghost" title="Not related to this selection" onClick={() => dismiss(h.itemId)}>
-                    <X size={13} strokeWidth={1.75} aria-hidden />
+                    <X size={14} strokeWidth={1.75} aria-hidden />
                     Not related
                   </button>
                 </>

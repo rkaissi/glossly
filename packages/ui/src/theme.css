@@ -45,6 +45,8 @@
   --s-5: 24px;
   --s-6: 32px;
   --h-sm: 28px;
+  /* Quiet buttons inside the overlay's dense panel rows (Copy, Edit, Redo, Undo). */
+  --h-xs: 26px;
   --h-md: 32px;
   --h-lg: 36px;
   --icon-sm: 14px;

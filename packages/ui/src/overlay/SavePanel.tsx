@@ -91,7 +91,7 @@ export function SavePanel({ s }: { s: OverlayState }) {
     <div className="panel" onKeyDown={onKeyDown}>
       {saved ? (
         <h2 className="saved-line">
-          <Check size={17} strokeWidth={2} aria-hidden />
+          <Check size={16} strokeWidth={2} aria-hidden />
           <span>
             Saved to {phase.done.collection}
             <span className="muted"> · just now</span>
@@ -125,7 +125,7 @@ export function SavePanel({ s }: { s: OverlayState }) {
           {saved ? (
             left > 0 && (
               <button onClick={() => void undo()}>
-                <Undo2 size={15} strokeWidth={1.75} aria-hidden />
+                <Undo2 size={14} strokeWidth={1.75} aria-hidden />
                 Undo ({left}s)
               </button>
             )

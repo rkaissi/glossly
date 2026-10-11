@@ -167,6 +167,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] General > Show keyboard shortcuts: Always (a hovered bar shows chips), On hotkey (only a hotkey bar), Never (no chips; 1 to 4 still work on a hotkey bar). Chips sit right of the labels; a long Save label shortens before its chip; nothing moves while the bar is open; the bar stays within 680 px.
 - [ ] Motion: buttons squish on press; checks pop with their mark; settings tab changes and task rows rise in; the calendar view switch settles; events lift on hover; bar actions pop in on open and panels' parts rise in. With Windows' Animation effects off, none of it plays.
 - [ ] The settings window and its taskbar button show the Glass icon (light and dark taskbar); the tray keeps the plain mark.
+- [ ] Spacing (decision 43): every overlay panel (Ask, Save, Who, Tasks and events, Reply, Related, Search, Paste, Visualize) in light and dark: 14 and 16 px icons, the quiet row buttons one height, nothing clipped by the window after the size changes.
 
 **Setup redesign (Step 20.3)** (throwaway profile)
 - [ ] Every step on mica, light and dark: dots, the slide from the right going on and from the left going back, the Welcome demo looping, nothing re-animating when a card or tab is picked.

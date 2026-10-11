@@ -215,7 +215,7 @@ function Catalog({ view }: { view: SettingsView }) {
           {n}
         </p>
       ))}
-      {groups.length === 0 && <p className="muted">No models yet. Add a key in the Keys tab.</p>}
+      {groups.length === 0 && <p className="muted">No models yet. Add a key under Providers above.</p>}
       {groups.map((g) => (
         <div key={g.provider} className="catalog">
           <h4>

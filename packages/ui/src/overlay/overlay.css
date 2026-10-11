@@ -356,8 +356,8 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   outline: none;
 }
 .send {
-  width: 30px;
-  height: 30px;
+  width: var(--h-sm);
+  height: var(--h-sm);
   padding: 0;
   border-radius: 50%;
 }
@@ -371,7 +371,7 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   color: var(--muted);
 }
 .panel-foot button {
-  height: 26px;
+  height: var(--h-xs);
   padding: 0 10px;
   font-size: 12.5px;
 }
@@ -541,7 +541,7 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   flex: none;
 }
 .inline-note button {
-  height: 26px;
+  height: var(--h-xs);
   padding: 0 9px;
   font-size: 12.5px;
   margin-left: auto;
@@ -669,7 +669,7 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 }
 /* Secondary only: a primary button keeps its own text color (black on white was unreadable). */
 .reply-head button:not(.primary) {
-  height: 26px;
+  height: var(--h-xs);
   padding: 0 9px;
   gap: 6px;
   font-size: 12.5px;
@@ -722,8 +722,8 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   font-weight: 400;
 }
 .draft-intent .icon-only {
-  width: 26px;
-  height: 26px;
+  width: var(--h-xs);
+  height: var(--h-xs);
   padding: 0;
 }
 .draft-text {
@@ -856,12 +856,12 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   color: var(--muted);
 }
 .saved-actions button {
-  height: 24px;
+  height: var(--h-xs);
   padding: 0 8px;
   font-size: 12px;
 }
 .saved-actions .icon-only {
-  width: 24px;
+  width: var(--h-xs);
   padding: 0;
 }
 .saved-actions .copied {
@@ -976,7 +976,7 @@ html:not([data-material='acrylic']) .toast {
   flex-wrap: wrap;
 }
 .event-place {
-  height: 26px;
+  height: var(--h-xs);
   flex: 1;
   min-width: 0;
   max-width: 220px;

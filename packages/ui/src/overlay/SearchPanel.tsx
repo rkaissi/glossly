@@ -83,7 +83,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
   return (
     <div className="panel search" onKeyDown={onKeyDown}>
       <div className="composer">
-        <SearchIcon size={15} strokeWidth={1.75} aria-hidden className="muted" />
+        <SearchIcon size={14} strokeWidth={1.75} aria-hidden className="muted" />
         <input
           ref={input}
           value={query}
@@ -114,7 +114,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
                   actions={
                     copied === h.itemId ? (
                       <span className="copied">
-                        <Check size={13} strokeWidth={2} aria-hidden /> Copied
+                        <Check size={14} strokeWidth={2} aria-hidden /> Copied
                       </span>
                     ) : (
                       <button
@@ -128,7 +128,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
                           copy(h.itemId);
                         }}
                       >
-                        <Copy size={13} strokeWidth={1.75} aria-hidden />
+                        <Copy size={14} strokeWidth={1.75} aria-hidden />
                       </button>
                     )
                   }

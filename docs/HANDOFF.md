@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 11, 2026: **Step 20.3, second chunk, landed** (decision 42): the setup redesign, built as `docs/design/mockups/20-3-design-pass.html` shows. Seven steps, one screen each with progress dots and one primary button (Welcome with the demo loop, Where should AI run, Add a key or Connect a local model, your name, Models are ready, Setting up search, Try it here); the Try it checklist ticks from a new `setup:tried` push that `Capture` sends when the pill, the bar, or an action comes from the Try it window (decision 11's capture kept). Checked in a browser preview of the built page with fictional data; never run in the real app. Before it, the first chunk (decision 41): spring motion, key hints, the Glass app icon. Nothing from Steps 18 to 20.3 is checked in the real app yet. 547 unit tests pass; `pnpm typecheck` is clean.
+Last updated Oct 11, 2026: **Step 20.3, third chunk, landed** (decision 43): the spacing and size check. Settings tabs follow one rhythm (title, one line, cards 16 px apart, 40 px between groups, 16 by 20 px card padding, 28 px icon buttons in rows); the overlay's icons are 14 or 16 px only and its quiet panel buttons share `--h-xs`. Before it, the setup redesign (decision 42) and motion, key hints, and the Glass icon (decision 41). Previewed in the browser with fictional data; the overlay side has never been seen running. Nothing from Steps 18 to 20.3 is checked in the real app yet. 547 unit tests pass; `pnpm typecheck` is clean.
 
 ## Start here
 
@@ -30,12 +30,12 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 20.3's first chunk, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
 - **Steps 18 to 20.3's setup (Oct 11):** built with unit tests only (the settings side of 20.1 to 20.3 also previewed in the browser with fictional data); their live checks are in the backlog under "Local models and privacy", "Tasks and events", "Design system and controls", "Tasks and Calendar", "Motion, key hints, app icon", and "Setup redesign". The overlay side of Step 20 (the panel's pickers and its window growing for them, key chips, the overlay's motion) has never been seen running.
-- **Not started:** the rest of 20.3 (the spacing check, then the small fixes) and Steps 21 to 23 below. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
+- **Not started:** the rest of 20.3 (the small fixes) and Steps 21 to 23 below. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data, from `packages/shell-electron/out`; his Notepad has a few unsaved sample tabs from earlier checks. When it next starts from a fresh build, migration 6 (`commitments.completed_at`) runs on his database and the new settings (`weekStart`, `calendarView`, `keyHints`) take their defaults. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish and the design pass, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; Steps 20.1 and 20.2 and the first two chunks of 20.3 (motion, hints, icon; setup) are done; **next is the 20.3 spacing check, then the small fixes**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish and the design pass, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; Steps 20.1 and 20.2 and the first three chunks of 20.3 (motion, hints, icon; setup; spacing) are done; **next are the 20.3 small fixes**, which finish Step 20. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
 **Step 19: tasks and calendar, in the app first** (decision 36). What did I promise becomes **Tasks**: one action and one list for promises, requests, and personal todos. Internally the action id stays `promises` and the table stays `commitments` (metrics history and migrations keep working).
 
@@ -60,10 +60,10 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 *20.2 Tasks and Calendar (done, Oct 11; decision 40).* `settings/Tasks.tsx` and `settings/Calendar.tsx` with their logic files and tests; Agenda is gone (`#agenda` opens Tasks). The overlay's Tasks and events panel already uses the 20.1 pickers and chips. Rayan's calls from the mockups: glass events tinted from the window background, date words leave quick-add titles, Monday week start with a setting, the calendar remembers its view, Google Calendar's drag gestures. Not done: dragging in Month, recurring events, and Google Calendar sync (parked).
 
 *20.3 Everything else, through the same design pass.*
-- **Spacing and size audit of every tab and panel (next)** (Profile, People, Saved, Models, Privacy and data, General, Metrics, and every overlay panel): consistent margins, smaller icons and icon buttons, more room between groups.
+- ~~Spacing and size audit~~: done (third chunk, decision 43). The page rhythm is at the top of `settings.css`; `--h-xs` is in `theme.css`.
 - ~~Keyboard hints setting~~, ~~app icon~~, ~~motion~~: done (first chunk, decision 41). The installer's `.ico` comes from `packages/shell-electron/resources/icon.png` in Step 22.
 - ~~Setup redesign~~: done (second chunk, decision 42). `settings/Setup.tsx`, `setup-logic.ts`, `setup.css`; the `setup:tried` push from `Capture` (`index.ts` wires it to the settings window).
-- **The small fixes:**
+- **The small fixes (next):**
   - The dot sits 4 DIP right of the mouse-up point and can cover the next letter (`placement.ts`, `anchorX + 4`); a real fix needs the last line's rect from the helper.
   - Long Save labels truncate at the 172 px slot cap ("Save to People not…").
   - The "Nothing selected…" strip stays above the paste panel and is truncated there.
@@ -123,6 +123,7 @@ None right now. Everything he was asked has been answered and is recorded in `do
 
 **Motion and key hints (Step 20.3, decision 41)**
 - Animate with the spring tokens in `theme.css` (`--spring-soft`, `--spring-pop`, `--spring-gentle` and their `-ms` durations) and the shared keyframes (`rise-in`, `pop-in-small`, `squash-pop`); exits use `--ease-in`, short, no bounce. The generator for new springs is in `docs/design/mockups/20-3-design-pass.html` (`spring()`); keep overshoot under 10%.
+- Spacing (decision 43): settings cards and settings are padded `var(--s-4) 20px`, 16 px apart, groups 40 px apart (`section > h3`); row icon buttons are `icon-btn sm` with 14 px icons; overlay icons are 14 or 16 px; quiet buttons in overlay panel rows use `--h-xs`.
 - Every button squishes on `:active` through `transform`; a button that needs its own transform should opt out (toggles with a role already do).
 - In the overlay the glass is the window, so never scale or move a container there; animate what's inside.
 - Key chips: the bar reads `s.keyHints` once, in `Expanded`'s `hints` state, when it opens; `s.keyboard` still decides whether the keys work.

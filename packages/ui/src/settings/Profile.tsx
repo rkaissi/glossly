@@ -142,8 +142,8 @@ function VoiceSamples() {
       {pendingId === v.id ? (
         <InlineConfirm prompt="Remove this sample?" confirm="Remove" busy={busy} onConfirm={() => remove(v.id)} onCancel={() => setPendingId(null)} />
       ) : (
-        <button className="icon-btn danger" title="Remove" aria-label="Remove sample" disabled={busy} onClick={() => setPendingId(v.id)}>
-          <X size={15} strokeWidth={1.75} aria-hidden />
+        <button className="icon-btn sm danger" title="Remove" aria-label="Remove sample" disabled={busy} onClick={() => setPendingId(v.id)}>
+          <X size={14} strokeWidth={1.75} aria-hidden />
         </button>
       )}
     </li>
@@ -217,8 +217,8 @@ function LearnedStyle({ learning }: { learning: boolean }) {
       {pending === key ? (
         <InlineConfirm prompt="Forget this?" confirm="Forget" busy={busy} onConfirm={onRemove} onCancel={() => setPending(null)} />
       ) : (
-        <button className="icon-btn danger" title="Forget" aria-label="Forget" disabled={busy} onClick={() => setPending(key)}>
-          <X size={15} strokeWidth={1.75} aria-hidden />
+        <button className="icon-btn sm danger" title="Forget" aria-label="Forget" disabled={busy} onClick={() => setPending(key)}>
+          <X size={14} strokeWidth={1.75} aria-hidden />
         </button>
       )}
     </li>
@@ -289,7 +289,7 @@ export function ProfileTab({ view }: { view: SettingsView }) {
             setDone(false);
           }}
         />
-        <div className="row">
+        <div className="row form-actions">
           <button className="primary" disabled={!dirty || busy || !draft.name.trim()} onClick={save}>
             Save
           </button>

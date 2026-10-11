@@ -115,7 +115,7 @@ export function SavedTab() {
         Everything you saved with Glossly, by collection. Search finds the words, and similar meaning once the embedding model is ready. Nothing here is sent anywhere.
       </p>
       <div className="search">
-        <Search size={15} strokeWidth={1.75} aria-hidden />
+        <Search size={14} strokeWidth={1.75} aria-hidden />
         <input
           autoFocus
           value={query}

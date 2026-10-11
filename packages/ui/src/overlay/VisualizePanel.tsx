@@ -164,7 +164,7 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
   return (
     <div className="panel visualize">
       <h2 className="saved-line">
-        <ActionIcon action="visualize" size={17} />
+        <ActionIcon action="visualize" size={16} />
         <span>
           Visualize
           {result?.ok && (

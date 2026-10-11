@@ -236,7 +236,7 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
         )}
         {personId && (
           <span className="muted small-text">
-            <Check size={13} strokeWidth={2} aria-hidden /> Added
+            <Check size={14} strokeWidth={2} aria-hidden /> Added
           </span>
         )}
       </div>

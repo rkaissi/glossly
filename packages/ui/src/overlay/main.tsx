@@ -273,13 +273,13 @@ function Expanded({ s }: { s: OverlayState }) {
             b.kind === 'person' ? (
               // Known people with open commitments or a note. Several collapse to "Jordan +2 others".
               <button key={b.personId} className="badge" title={title} onClick={() => run(id, { action: 'who' })}>
-                <UserRound size={13} strokeWidth={1.75} aria-hidden />
+                <UserRound size={14} strokeWidth={1.75} aria-hidden />
                 <span>{b.label}</span>
               </button>
             ) : (
               // Saved items related to this selection: opens the Recall cards.
               <button key="recall" className="badge" title={title} onClick={() => run(id, { action: 'recall' })}>
-                <History size={13} strokeWidth={1.75} aria-hidden />
+                <History size={14} strokeWidth={1.75} aria-hidden />
                 <span>{badgeLabel(b)}</span>
               </button>
             ),
@@ -351,13 +351,13 @@ function Expanded({ s }: { s: OverlayState }) {
 
         {s.notice && (
           <div className="strip">
-            <Info size={15} strokeWidth={1.75} aria-hidden />
+            <Info size={14} strokeWidth={1.75} aria-hidden />
             <span>{s.notice}</span>
           </div>
         )}
         {!s.hasSelection && !s.notice && s.panel !== 'search' && (
           <div className="strip">
-            <Info size={15} strokeWidth={1.75} aria-hidden />
+            <Info size={14} strokeWidth={1.75} aria-hidden />
             <span>Nothing selected. Search what you saved, ask a question, or select text and press the hotkey again.</span>
           </div>
         )}

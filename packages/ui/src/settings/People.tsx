@@ -16,12 +16,12 @@ function PeopleList() {
       <h2>People</h2>
       <p className="muted">
         Everyone here was added by you, from "Who is this", a task you saved, or a reply you inserted. Nothing is looked up online. Open tasks and
-        events are in the <a href="#agenda">Agenda</a> tab.
+        events are in the <a href="#tasks">Tasks</a> and <a href="#calendar">Calendar</a> tabs.
       </p>
 
       <h3>Everyone</h3>
       <div className="search">
-        <Search size={15} strokeWidth={1.75} aria-hidden />
+        <Search size={14} strokeWidth={1.75} aria-hidden />
         <input value={query} placeholder="Search names, emails, and handles" spellCheck={false} onChange={(e) => setQuery(e.target.value)} />
       </div>
       {people && people.length > 0 ? (

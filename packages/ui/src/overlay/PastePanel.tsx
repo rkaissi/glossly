@@ -93,7 +93,7 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
   return (
     <div className="panel paste" onKeyDown={onKeyDown}>
       <h2 className="saved-line">
-        <ActionIcon action={kind === 'list' ? 'paste_list' : 'paste_summary'} size={17} />
+        <ActionIcon action={kind === 'list' ? 'paste_list' : 'paste_summary'} size={16} />
         <span>
           {title}
           {count && <span className="muted"> · {count}</span>}

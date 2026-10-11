@@ -321,6 +321,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
   return (
     <section>
       <h2>General</h2>
+      <p className="muted">How Glossly opens, saves, and shows dates.</p>
       <Hotkey view={view} />
       <KeyHintsField view={view} />
       <SaveMode view={view} />

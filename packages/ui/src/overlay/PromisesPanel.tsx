@@ -493,7 +493,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
       {phase.kind === 'saved' && (
         <h2 className="saved-line">
-          <Check size={17} strokeWidth={2} aria-hidden />
+          <Check size={16} strokeWidth={2} aria-hidden />
           <span>
             {[
               phase.saved > 0 && `Saved ${phase.saved} ${phase.saved === 1 ? 'task' : 'tasks'}`,

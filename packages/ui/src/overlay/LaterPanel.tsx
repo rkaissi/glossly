@@ -15,7 +15,7 @@ export function LaterPanel({ action, sessionId, keyboard }: { action: ActionId; 
   return (
     <div className="panel">
       <h2 className="saved-line">
-        <ActionIcon action={action} size={17} />
+        <ActionIcon action={action} size={16} />
         <span>{about.title}</span>
       </h2>
       <p>{about.text}</p>
