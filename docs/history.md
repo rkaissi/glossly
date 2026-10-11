@@ -50,6 +50,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3c | Oct 11 | `c9eefb4` | Spacing and size check: one page rhythm for the settings tabs, 28 px row icon buttons, overlay icons at 14 or 16 px, `--h-xs` for quiet panel buttons; stale Agenda and Keys mentions fixed (decision 43). |
 | 20.3d | Oct 11 | `d5c4d98` | Small fixes, Step 20 done: dot at the last line's end (helper `last_line`), short Save labels, strip only on the bare bar, Ask's spaces, Visualize labels, panels inside the source window (helper `foreground.rect`), taskbar flash, entities backfill (migration 7) (decision 44). |
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
+| 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
 Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 21 to 23 are planned in `HANDOFF.md`; Google Calendar sync (19.3) is parked (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
