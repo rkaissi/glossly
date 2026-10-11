@@ -1,5 +1,5 @@
 /*
- * The settings window and first-run setup (Step 13): a ChatGPT-style sidebar on the window's
+ * The settings window (Step 13; setup has its own setup.css): a ChatGPT-style sidebar on the window's
  * material, and the page on a lighter surface with cards. With mica (html[data-material='mica'])
  * the sidebar is clear and the page is translucent; otherwise both are solid.
  */
@@ -429,107 +429,6 @@ th {
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-
-/* ---- setup ---- */
-
-.setup {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--page);
-}
-.stepper {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  list-style: none;
-  margin: 0;
-  padding: 18px 28px;
-  border-bottom: 1px solid var(--border);
-  counter-reset: step;
-}
-.stepper li {
-  counter-increment: step;
-  display: flex;
-  align-items: center;
-  color: var(--muted);
-  padding: 4px 14px 4px 4px;
-}
-.stepper li::before {
-  content: counter(step);
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  margin-right: 8px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  font-size: 11.5px;
-}
-.stepper li.current {
-  color: var(--fg);
-  font-weight: 600;
-}
-.stepper li.current::before {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-fg);
-}
-.stepper li.done {
-  color: var(--fg-2);
-}
-.stepper li.done::before {
-  content: '✓';
-  color: var(--fg);
-}
-.setup-body {
-  flex: 1;
-  overflow-y: auto;
-  /* Full width so the scrollbar sits at the window edge; the content is centered at 720 px. */
-  padding: 40px max(28px, calc((100% - 720px) / 2)) 32px;
-}
-.setup-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 28px;
-  border-top: 1px solid var(--border);
-}
-.setup-foot button {
-  min-width: 96px;
-  height: 36px;
-}
-.intro {
-  padding-left: 20px;
-  margin: 0 0 24px;
-  font-size: 15px;
-  line-height: 1.7;
-}
-.steps {
-  padding-left: 20px;
-  margin: 0 0 20px;
-  line-height: 1.7;
-}
-.sample {
-  margin-bottom: 16px;
-}
-.sample-label {
-  margin-bottom: 6px;
-}
-.sample > p,
-.message {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  font-size: 15px;
-  line-height: 1.6;
-  margin: 0;
-  user-select: text;
-}
-.message p {
-  margin: 4px 0 0;
 }
 
 /* ---- profile: name, emails, handles ---- */

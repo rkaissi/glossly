@@ -39,7 +39,13 @@ async function main(): Promise<void> {
   });
   helper.on('ready', () => overlay.refreshCorners());
   const settingsWindow = new SettingsWindow();
-  const capture = new Capture(helper, overlay, services, () => settingsWindow.captureSourceHandle());
+  const capture = new Capture(
+    helper,
+    overlay,
+    services,
+    () => settingsWindow.captureSourceHandle(),
+    (step) => settingsWindow.send('setup:tried', { step }),
+  );
   const hotkey = new HotkeyManager(() => {
     capture.hotkey().catch((e: unknown) => log.error('hotkey failed', errorInfo(e)));
   });

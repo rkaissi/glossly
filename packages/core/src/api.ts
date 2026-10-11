@@ -527,6 +527,9 @@ export interface InvokeChannels {
   'setup:try-it': { args: { active: boolean }; result: void };
 }
 
+/** What the setup's Try it step saw happen on its sample message, in the order a user meets them. */
+export type TryItStep = 'pill' | 'bar' | 'action';
+
 /** Main -> renderer pushes (webContents.send / ipcRenderer.on). */
 export interface PushChannels {
   'overlay:state': OverlayState;
@@ -541,6 +544,8 @@ export interface PushChannels {
   'settings:changed': SettingsView;
   /** People, aliases, commitments, or interactions changed; views re-fetch. */
   'people:changed': Record<string, never>;
+  /** Only while setup's Try it step is showing: the pill, bar, or an action ran on its own window (decision 11). */
+  'setup:tried': { step: TryItStep };
 }
 
 export type InvokeChannel = keyof InvokeChannels;

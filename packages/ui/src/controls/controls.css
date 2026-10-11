@@ -398,6 +398,15 @@ button.range-trigger {
 .seg.sm {
   height: var(--h-sm);
 }
+.seg.full {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr));
+}
+.seg.full button {
+  gap: 6px;
+  padding: 0 var(--s-2);
+}
 .seg-thumb {
   position: absolute;
   top: 2px;

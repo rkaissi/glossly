@@ -12,6 +12,7 @@ export function Segmented<T extends string>({
   onChange,
   label,
   size = 'md',
+  full,
   disabled,
 }: {
   value: T;
@@ -19,6 +20,8 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
   label: string;
   size?: 'sm' | 'md';
+  /** As wide as its container, in equal columns (setup's provider tabs). */
+  full?: boolean;
   disabled?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -60,7 +63,7 @@ export function Segmented<T extends string>({
 
   return (
     // --n and --i go in the first paint, so the highlight never slides in from the first option.
-    <div ref={ref} className={`seg${size === 'sm' ? ' sm' : ''}`} role="radiogroup" aria-label={label} style={{ '--n': options.length, '--i': index } as CSSProperties} data-control>
+    <div ref={ref} className={`seg${size === 'sm' ? ' sm' : ''}${full ? ' full' : ''}`} role="radiogroup" aria-label={label} style={{ '--n': options.length, '--i': index } as CSSProperties} data-control>
       <span className="seg-thumb" aria-hidden />
       {options.map(([v, text], i) => (
         <button

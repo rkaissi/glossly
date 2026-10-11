@@ -53,6 +53,7 @@ import {
   keyMatches,
   resolveAppMode,
   type ActionId,
+  type TryItStep,
   type AppMode,
   type AskErrorEvent,
   type AskSaved,
@@ -266,6 +267,7 @@ export class Capture {
     private readonly overlay: Overlay,
     private readonly services: Services,
     private readonly captureSource: () => number | null = () => null,
+    private readonly onTried: (step: TryItStep) => void = () => {},
   ) {
     helper.on('event', (ev) => this.onHelperEvent(ev));
     helper.on('down', () => {
@@ -292,6 +294,12 @@ export class Capture {
 
   private isOwn(fg: Foreground): boolean {
     return this.ownPids().has(fg.pid) && fg.handle !== this.captureSource();
+  }
+
+  /** Tells setup's Try it step what happened, when the session reads from its window. */
+  private tried(s: Session, step: TryItStep): void {
+    const h = this.captureSource();
+    if (h !== null && s.fg?.handle === h) this.onTried(step);
   }
 
   /** The "Don't show here" key; none for Glossly's own Try-it window. */
@@ -509,6 +517,7 @@ export class Capture {
         },
         placement.rect,
       );
+      this.tried(session, 'pill');
       this.services.metrics.record('pill_shown', {
         method: sel.method,
         ms: timings.total,
@@ -749,6 +758,7 @@ export class Capture {
       );
     }
     this.services.metrics.record('bar_shown', { trigger: 'hotkey', ms: timings.total, has_selection: Boolean(selection) });
+    if (selection) this.tried(session, 'bar');
     if (selection) {
       void this.routeModel(session);
       void this.runRecall(session);
@@ -822,6 +832,7 @@ export class Capture {
       rect,
     );
     this.services.metrics.record('bar_shown', { trigger: viaHotkey ? 'hotkey' : 'auto', ms: ms(s.t0) });
+    this.tried(s, 'bar');
     void this.routeModel(s);
     void this.runRecall(s);
   }
@@ -920,6 +931,7 @@ export class Capture {
     }
     this.stopWatch();
     this.services.metrics.record('action_clicked', { action, ms: ms(s.t0), trigger: s.trigger });
+    this.tried(s, 'action');
     if (action === 'recall') this.services.metrics.record('recall_opened', { count: this.visibleRecall(s).length });
 
     if (needsTier2(action) && s.selection) await this.readTier2(s);

@@ -14,7 +14,7 @@ const EMBED_STATE: Record<EmbedStatus['state'], string> = {
   error: 'Failed',
 };
 
-export function EmbedLine({ embed }: { embed: EmbedStatus }) {
+function EmbedLine({ embed }: { embed: EmbedStatus }) {
   const progress = embed.state === 'downloading' && embed.progress !== undefined ? ` ${pct(embed.progress / 100)}` : '';
   return (
     <span className={embed.state === 'error' ? 'error' : embed.state === 'ready' ? 'ok' : undefined}>

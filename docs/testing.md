@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (537 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (547 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -136,7 +136,6 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Local only with the local model: Ask streams from it, Save finds entities, Who writes notes, What did I promise uses it, Reply drafts; slots 3 and 4 still come from rules (`routed` with `fallback: local_only`). Stop Ollama mid-use: Ask says "Couldn't reach the local model".
 - [ ] Local only with no local server: Ask, Reply, and Paste's summary show "Use all models and…" and "Set up a local model" (opens Keys); What did I promise lists pattern rows with the "found by simple patterns" note; Who shows the text-only note with "Use all models"; Visualize charts a TSV.
 - [ ] A local server at a LAN address: Keys warns, General's Local only line says it isn't used, and Ask refuses under Local only.
-- [ ] Setup on a throwaway profile: choosing Local only enables Next with no key; All models needs a key or a local server.
 
 **Tasks and events (Steps 19.1 and 19.2)**
 - [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Tasks.
@@ -168,6 +167,13 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] General > Show keyboard shortcuts: Always (a hovered bar shows chips), On hotkey (only a hotkey bar), Never (no chips; 1 to 4 still work on a hotkey bar). Chips sit right of the labels; a long Save label shortens before its chip; nothing moves while the bar is open; the bar stays within 680 px.
 - [ ] Motion: buttons squish on press; checks pop with their mark; settings tab changes and task rows rise in; the calendar view switch settles; events lift on hover; bar actions pop in on open and panels' parts rise in. With Windows' Animation effects off, none of it plays.
 - [ ] The settings window and its taskbar button show the Glass icon (light and dark taskbar); the tray keeps the plain mark.
+
+**Setup redesign (Step 20.3)** (throwaway profile)
+- [ ] Every step on mica, light and dark: dots, the slide from the right going on and from the left going back, the Welcome demo looping, nothing re-animating when a card or tab is picked.
+- [ ] Where should AI run saves at once; under All models, Add a key keeps Continue off until a key tests (a bad key shows the provider's error; a good one shows Working with Replace); the Local tab connects to Ollama or LM Studio. Under Local only, Connect a local model is optional.
+- [ ] Name required; "alex@example.com, @alexm" lands in Profile as one email and one handle; Enter continues.
+- [ ] Models are ready matches the Models tab (Local only with no model: "Ready without a model"). Setting up search starts the download and shows progress; Continue works mid-download and the download finishes after setup.
+- [ ] Try it: selecting in the sample ticks the first item (`pill shown` in `main.log`), hovering the pill or the hotkey ticks the second, an action ticks the third; nothing ticks from selections in other apps; leaving the step logs `try-it {active:false}`. Undo anything saved.
 
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).

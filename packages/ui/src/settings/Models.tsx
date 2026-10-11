@@ -138,7 +138,7 @@ function LocalOnlyRow({ view }: { view: SettingsView }) {
   );
 }
 
-export function RolePickers({ view }: { view: SettingsView }) {
+function RolePickers({ view }: { view: SettingsView }) {
   return (
     <div className="roles">
       {ROLES.map((r) => (

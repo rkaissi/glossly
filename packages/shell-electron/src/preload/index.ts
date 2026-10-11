@@ -14,6 +14,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'embed:progress': true,
   'settings:changed': true,
   'people:changed': true,
+  'setup:tried': true,
 };
 const PUSH = Object.keys(PUSH_CHANNELS) as PushChannel[];
 

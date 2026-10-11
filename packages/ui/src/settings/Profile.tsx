@@ -73,7 +73,7 @@ function ListInput({
 }
 
 /** Name, emails, and handles: how Glossly tells your messages and promises from other people's. */
-export function IdentityForm({ value, onChange, autoFocus }: { value: Identity; onChange: (next: Identity) => void; autoFocus?: boolean }) {
+function IdentityForm({ value, onChange, autoFocus }: { value: Identity; onChange: (next: Identity) => void; autoFocus?: boolean }) {
   return (
     <div className="identity">
       <label className="form-row">
