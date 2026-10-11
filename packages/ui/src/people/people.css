@@ -203,3 +203,13 @@ button.chip-x.danger {
   font-size: 12.5px;
   margin: 0;
 }
+
+.relationship {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.relationship select {
+  height: 28px;
+}

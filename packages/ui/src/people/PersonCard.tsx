@@ -3,11 +3,12 @@
 // them. Shared by the overlay's Who panel and the settings window's full record.
 import { useState, type KeyboardEvent } from 'react';
 import { ArrowDownLeft, ArrowUpRight, Bookmark, Check, ExternalLink, Pencil, Plus, X } from 'lucide-react';
-import type { CommitmentView, PersonCard } from '@glossly/core/api';
+import type { CommitmentView, PersonCard, Relationship } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { appName, firstName, formatDay, formatDue } from '../dates';
 import { useAction } from '../settings/useAction';
+import { RELATIONSHIP_OPTIONS } from './relationship';
 import './people.css';
 
 function CommitmentRow({ c, showPerson }: { c: CommitmentView; showPerson?: boolean }) {
@@ -92,6 +93,30 @@ function Note({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) 
         {error && <span className="error">{error}</span>}
       </div>
     </div>
+  );
+}
+
+/** How the user knows them. Reply learns per relationship, so changing it moves what was learned with them. */
+function RelationshipSelect({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) => void }) {
+  const { busy, error, run } = useAction();
+  const set = (relationship: Relationship) => void run(async () => onChange(await glossly.invoke('people:update', { personId: card.id, relationship })));
+  return (
+    <label className="relationship">
+      <span className="muted">Relationship</span>
+      <select value={card.relationship ?? ''} disabled={busy} aria-label="Relationship" onChange={(e) => set(e.target.value as Relationship)}>
+        {!card.relationship && (
+          <option value="" disabled>
+            Not set
+          </option>
+        )}
+        {RELATIONSHIP_OPTIONS.map(([value, text]) => (
+          <option key={value} value={value}>
+            {text}
+          </option>
+        ))}
+      </select>
+      {error && <span className="error">{error}</span>}
+    </label>
   );
 }
 
@@ -200,6 +225,7 @@ export function PersonCardView({
         </div>
       )}
       <Aliases card={card} onChange={onChange} removable={removableAliases} />
+      <RelationshipSelect card={card} onChange={onChange} />
       <Note card={card} onChange={onChange} />
 
       {card.youOwe.length > 0 && (

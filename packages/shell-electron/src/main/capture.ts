@@ -1028,7 +1028,7 @@ export class Capture {
     const s = this.current(sessionId);
     if (!s?.selection) {
       setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
-      return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet };
+      return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
     }
     s.reply?.ctl.abort();
     const ctl = new AbortController();
@@ -1093,7 +1093,7 @@ export class Capture {
         fail(code, message);
       }
     })();
-    return { requestId, to, identitySet };
+    return { requestId, to, identitySet, channel };
   }
 
   cancelReply(requestId: string): void {

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ClipboardCheck, Copy, CornerDownLeft, Info, PenLine, Pencil, RotateCcw, UserRoundPlus } from 'lucide-react';
-import type { AskErrorEvent, OverlayState, ReplyRedo, ReplyRedoAsk, ReplyStart } from '@glossly/core/api';
+import type { AskErrorEvent, OverlayState, Relationship, ReplyRedo, ReplyRedoAsk, ReplyStart } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { appName } from '../dates';
+import { RELATIONSHIP_OPTIONS } from '../people/relationship';
 import { parseDrafts } from './drafts';
 
 type Stream =
@@ -54,6 +55,8 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
   const [busy, setBusy] = useState(false);
   const [personId, setPersonId] = useState<string | undefined>(undefined);
   const [own, setOwn] = useState('');
+  // "Add to people" asks how the user knows them first; work chat suggests a colleague.
+  const [adding, setAdding] = useState<Relationship | null>(null);
   const [redoOpen, setRedoOpen] = useState(false);
   const [asks, setAsks] = useState<ReplyRedoAsk[]>([]);
   const [redoNote, setRedoNote] = useState('');
@@ -170,11 +173,12 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
     setNote('Copied.');
   };
 
-  const addPerson = async () => {
+  const addPerson = async (relationship: Relationship) => {
     const name = start?.to.name;
     if (!name) return;
-    const card = await glossly.invoke('people:create', { name, ...(name.includes('@') && { email: name }) }).catch(() => null);
+    const card = await glossly.invoke('people:create', { name, relationship, ...(name.includes('@') && { email: name }) }).catch(() => null);
     if (card) setPersonId(card.id);
+    setAdding(null);
   };
 
   const turnOffLocalOnly = async () => {
@@ -224,11 +228,32 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
     <div className="panel reply" tabIndex={-1} ref={panel} onKeyDown={onKeyDown}>
       <div className="reply-head">
         <h2>{heading}</h2>
-        {to?.name && !to.authorIsMe && !known && to.match === 'none' && (
-          <button className="ghost" title="Add them to your people, so replies and promises are kept with them" onClick={() => void addPerson()}>
+        {to?.name && !to.authorIsMe && !known && to.match === 'none' && !adding && (
+          <button
+            className="ghost"
+            title="Add them to your people, so replies and promises are kept with them"
+            onClick={() => setAdding(start?.channel === 'work_chat' ? 'colleague' : 'other')}
+          >
             <UserRoundPlus size={14} strokeWidth={1.75} aria-hidden />
             Add to people
           </button>
+        )}
+        {adding && !known && (
+          <span className="add-person">
+            <select value={adding} aria-label="Relationship" onChange={(e) => setAdding(e.target.value as Relationship)}>
+              {RELATIONSHIP_OPTIONS.map(([value, text]) => (
+                <option key={value} value={value}>
+                  {text}
+                </option>
+              ))}
+            </select>
+            <button className="primary" onClick={() => void addPerson(adding)}>
+              Add
+            </button>
+            <button className="ghost" onClick={() => setAdding(null)}>
+              Cancel
+            </button>
+          </span>
         )}
         {personId && (
           <span className="muted small-text">

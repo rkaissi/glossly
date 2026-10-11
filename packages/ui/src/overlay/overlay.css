@@ -976,3 +976,13 @@ html:not([data-material='acrylic']) .toast {
 .viz-table tr:last-child td {
   border-bottom: none;
 }
+
+.reply-head .add-person {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.reply-head .add-person select {
+  height: 28px;
+}

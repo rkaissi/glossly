@@ -536,7 +536,7 @@ Not a new step. Rayan selected a Discord message that was a contact card (Full N
 - **People have a relationship** (`people/relationship.ts`: friend, family, colleague, professional, acquaintance, stranger, other; null is unknown). **Migration 4** adds `people.relationship` and turns stored "chat" into "messaging" (it can't be split after the fact).
 - **Learning levels** (`preferencesFor`): the person (3 signals), else their relationship on this kind of platform (5, pooled across everyone with that relationship), else the kind of platform (5). Signals keep only the person id; the relationship is joined in at read time, so changing someone's relationship moves what was learned with them. Voice samples rank person, then relationship, then platform. Reply's prompt tells the model the relationship. Profile lists "with friends in messaging apps" and Forget works per level.
 - **Inference**: Who's model call returns a relationship guess and a separate `about` line (the old `relation` field). Relationship is `z.enum(RELATIONSHIPS)` (friend, family, colleague, professional, acquaintance, stranger, other). The prompt says to use other when the text does not show a clearer one. Create person prefills name, email, that relationship, and the about line (with the role) when the text has them. The about box says "About this person".
-- **Left to do**: editing the relationship on an existing person (the overlay card and Settings > People record; `people:update` already accepts `relationship`); people created from What did I promise or Reply's "Add to people" start as unknown (no inference there yet).
+- **Left to do** (done in Step 16.14, except What did I promise): editing the relationship on an existing person; people created from What did I promise or Reply's "Add to people" start as unknown.
 
 ### Reply drafts, and Who's create-person fields (Oct 10, night)
 
@@ -595,6 +595,14 @@ Rayan asked for a prompt-engineering pass, structured output where it helps, and
 - **Field descriptions** (`.describe`, which reach the JSON schema the model sees) on Who, What did I promise, and entity extraction. Promise confidence is no longer bounded in the schema (like Who, a row scored 85 failed the whole call); it is read as 0.85 and clamped.
 - **Prompts rewritten**: `extract-entities.md` (fullest form once, no roles, dates, amounts, addresses, or the user) and `visualize-table.md` (label column first, prose figures become rows, no computed totals). With 16.9 to 16.12: `reply.md`, `style-notes.md`, `ask.md`, and `paste-compose.md` are new or rewritten. `who.md` and `extract-commitments.md` were already in good shape and kept.
 - **Still streamed as text**: Ask (an answer) and Reply (three drafts with checked tags; Groq doesn't stream strict structured output).
+
+### Step 16.14: setting a person's relationship (Oct 10, night)
+
+427 unit tests pass; `pnpm typecheck` is clean. Not run live.
+
+- **The person card** (the overlay's Who panel and Settings > People) has a Relationship select under the aliases: the base list, plus "Not set" while it is null. A change saves at once (`people:update`), and since signals keep only the person id, what Reply learned with them moves to the new relationship's group.
+- **Reply's "Add to people"** now asks first: a select (suggesting Colleague in work chat, Other elsewhere), Add, and Cancel. `ReplyStart` carries `channel` for the suggestion.
+- **Left as is**: people created when saving from What did I promise start with no relationship; it is one click on their card.
 
 ## Next steps, in order
 
@@ -699,7 +707,7 @@ Do these before Phase 3. Bugs first, and the small ones before the people rewrit
     - **Ask remembers when asked.** If the question is "remember this" (or the same intent), a tool on the Ask stream saves a note into a collection and says what it saved. Don't add a second model call for it. Recall hits go into the Ask prompt as the spec's saved notes.
     - **New actions share the slot rule.** Todo, calendar, paste, and anything added later get a relevance score. The bar shows the top two above `slotThreshold`. The rest stay in More. Don't add a third visible slot.
     - Visualize stays as in the spec (deterministic table parse, LLM fallback, validated Vega-Lite).
-16.8. **Relationship and platform kinds for Reply** (mostly done, see Step 16.8; editing a saved person's relationship is left).
+16.8. ~~**Relationship and platform kinds for Reply**~~ (done, see Steps 16.8 and 16.14).
 16.7. ~~**Reply learns from picks and edits**~~ (done Oct 10, see Step 16.7 above; Rayan asked for it before Step 17).
 17. **Phase 4, Windows parts:** eval runners for every eval in the spec's table (commitments, date resolver, recall, visualize, router, and a people-extraction eval built from the Step 15.5 fixtures), optional decision providers behind settings (Jev, OpenAI Decisions; check their current docs), metrics view (done; extend it for the Phase 2 and 3 metrics), and Export and Delete all verified live. Skip the Swift helper and macOS onboarding.
 18. **One eval run.** Once everything above is done and looks good, run `pnpm eval` once (Rayan approved one run; Groq free-tier limits). Record every number in `STATUS.md`, including the tuned router prompt's slot match (Step 5). If the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection`, and compute people and commitment scores from rules. The Who model call is separate and is not dropped because of that.

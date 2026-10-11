@@ -197,6 +197,8 @@ export interface ReplyStart {
   requestId: string;
   to: ReplyTo;
   identitySet: boolean;
+  /** The kind of platform, so "Add to people" can suggest a relationship (work chat: colleague). */
+  channel: ReplyChannel;
 }
 export interface ReplyInsertArgs {
   sessionId: number;
