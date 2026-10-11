@@ -30,3 +30,31 @@ export interface SearchResults {
   /** False when the embedding model isn't ready, so only exact words were searched. */
   semantic: boolean;
 }
+
+/** The Saved tab in Settings: every saved item, searchable, by collection. */
+export interface LibraryQuery {
+  query: string;
+  /** A collection's name, or null for all of them. */
+  collection: string | null;
+  /** How many to return; the tab asks for more as the user scrolls. */
+  limit: number;
+}
+
+export interface LibraryItem extends RecallHit {
+  kind: 'selection' | 'note' | 'chart';
+  /** True when `text` was clipped for display; Copy still copies all of it. */
+  clipped: boolean;
+}
+
+export interface LibraryResult {
+  query: string;
+  collection: string | null;
+  items: LibraryItem[];
+  /** True when there may be more than `items` (ask again with a larger limit). */
+  more: boolean;
+  /** Every collection with its item count, and the count across all of them. */
+  collections: { name: string; count: number }[];
+  total: number;
+  /** False when the embedding model isn't ready, so only exact words were searched. */
+  semantic: boolean;
+}

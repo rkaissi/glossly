@@ -187,6 +187,15 @@ export class SaveService {
     return c.name;
   }
 
+  /** Deletes a saved item for good (the Saved tab, after a confirm), stopping its enrichment first so nothing lands after. */
+  remove(itemId: string): boolean {
+    this.undoDeadlines.delete(itemId);
+    this.running.get(itemId)?.ctl.abort();
+    const deleted = this.deps.store.deleteItem(itemId);
+    if (deleted) this.deps.metrics?.record('item_deleted');
+    return deleted;
+  }
+
   /** Deletes the item if still inside the undo window. Returns whether it was undone. */
   undo(itemId: string): boolean {
     const until = this.undoDeadlines.get(itemId);

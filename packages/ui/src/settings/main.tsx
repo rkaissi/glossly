@@ -1,8 +1,8 @@
-// The settings window: first-run setup (#setup) and the settings tabs (#profile, #keys,
-// #models, #general, #data, #metrics). Main changes the hash on an open window to switch tabs.
+// The settings window: first-run setup (#setup) and the tabs (#profile, #people, #saved,
+// #keys, #models, #general, #data, #metrics). Main changes the hash on an open window to switch tabs.
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
+import { Activity, Bookmark, Cpu, Database, KeyRound, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { GlosslyMark } from '../icons';
@@ -15,11 +15,13 @@ import { MetricsTab } from './Metrics';
 import { ModelsTab } from './Models';
 import { PeopleTab } from './People';
 import { ProfileTab } from './Profile';
+import { SavedTab } from './Saved';
 import { Setup } from './Setup';
 
 const TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'people', label: 'People' },
+  { id: 'saved', label: 'Saved' },
   { id: 'keys', label: 'Keys' },
   { id: 'models', label: 'Models' },
   { id: 'general', label: 'General' },
@@ -28,7 +30,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
-const TAB_ICONS: Record<Tab, LucideIcon> = { profile: UserRound, people: UsersRound, keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
+const TAB_ICONS: Record<Tab, LucideIcon> = { profile: UserRound, people: UsersRound, saved: Bookmark, keys: KeyRound, models: Cpu, general: SlidersHorizontal, data: Database, metrics: Activity };
 
 // Main loads the page with ?material=mica when the window is Windows 11 mica.
 document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
@@ -103,6 +105,7 @@ function App() {
       <main>
         {tab === 'profile' && <ProfileTab view={view} />}
         {tab === 'people' && <PeopleTab personId={personId} />}
+        {tab === 'saved' && <SavedTab />}
         {tab === 'keys' && <KeysTab view={view} />}
         {tab === 'models' && <ModelsTab view={view} />}
         {tab === 'general' && <GeneralTab view={view} />}

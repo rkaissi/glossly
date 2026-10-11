@@ -15,7 +15,7 @@ import type { BarAction, ContentType, DecisionProviderId } from './router/types'
 import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
-import type { RecallHit, SearchResults } from './recall/types';
+import type { LibraryQuery, LibraryResult, RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
 import type { PickDraft, ReplyChannel, ReplyRedo, StyleDimension, StylePreference } from './people/reply-style';
@@ -28,7 +28,7 @@ export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
 export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePreference } from './people/reply-style';
 export type { Relationship } from './people/relationship';
-export type { RecallHit, RecallReason, SearchResults } from './recall/types';
+export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 
@@ -325,7 +325,7 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
-export type SettingsTab = 'profile' | 'people' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
+export type SettingsTab = 'profile' | 'people' | 'saved' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
 
 // ---- channel maps ----
 
@@ -389,6 +389,12 @@ export interface InvokeChannels {
   'search:query': { args: { sessionId: number; query: string }; result: SearchResults };
   /** Copies a saved item's full text. */
   'items:copy': { args: { itemId: string }; result: void };
+  /** The Saved tab in Settings: saved items by collection, searched by words and meaning. Local. */
+  'library:query': { args: LibraryQuery; result: LibraryResult };
+  /** Deletes a saved item for good (the Saved tab asks first), with its vector and orphaned entities. */
+  'items:delete': { args: { itemId: string }; result: { deleted: boolean } };
+  /** Moves a saved item to another collection (created if needed). Null when the item is gone. */
+  'items:move': { args: { itemId: string; collection: string }; result: { collection: string | null } };
   /** Pastes a search result into the focused field (only offered when `canInsert`), else the clipboard. */
   'items:insert': { args: { sessionId: number; itemId: string }; result: ReplyInsertResult };
 

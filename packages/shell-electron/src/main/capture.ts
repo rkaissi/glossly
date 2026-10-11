@@ -43,6 +43,7 @@ import {
   pasteSummary,
   recentSnippets,
   search as searchSaved,
+  library as librarySaved,
   placeBar,
   placePill,
   pollForToolbar,
@@ -68,6 +69,8 @@ import {
   type ReplyTo,
   type RecallHit,
   type SearchResults,
+  type LibraryQuery,
+  type LibraryResult,
   type VisualizeResult,
   type Placement,
   type Point,
@@ -1598,6 +1601,11 @@ ${s.selection.text}`;
 
   async search(query: string): Promise<SearchResults> {
     return searchSaved({ ...this.recallDeps(), people: this.services.people }, query);
+  }
+
+  /** The Saved tab in Settings. Local, like the search box. */
+  library(q: LibraryQuery): Promise<LibraryResult> {
+    return librarySaved(this.recallDeps(), q);
   }
 
   /** Saved notes for Ask: the cards picked with "Ask about these", else the top recall hits. */

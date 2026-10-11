@@ -207,16 +207,36 @@ export class Store {
     return rows.map((r) => r.id);
   }
 
-  /** Items whose text, note, or window title contains `query` (case-insensitive), newest first. */
-  searchItemText(query: string, limit: number): string[] {
+  /** Items whose text, note, or window title contains `query` (case-insensitive), newest first; optionally in one collection. */
+  searchItemText(query: string, limit: number, collectionId?: string): string[] {
     const q = `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const inCollection = collectionId ? 'AND collection_id = ?' : '';
     const rows = this.db
       .prepare(
-        `SELECT id FROM items WHERE text LIKE ? ESCAPE '\\' OR why LIKE ? ESCAPE '\\' OR window_title LIKE ? ESCAPE '\\'
+        `SELECT id FROM items WHERE (text LIKE ? ESCAPE '\\' OR why LIKE ? ESCAPE '\\' OR window_title LIKE ? ESCAPE '\\') ${inCollection}
          ORDER BY created_at DESC, rowid DESC LIMIT ?`,
       )
-      .all(q, q, q, limit) as { id: string }[];
+      .all(q, q, q, ...(collectionId ? [collectionId] : []), limit) as { id: string }[];
     return rows.map((r) => r.id);
+  }
+
+  /** Newest first, `offset` in, optionally in one collection (the Saved tab's pages). */
+  itemIdsPage(limit: number, offset: number, collectionId?: string): string[] {
+    const rows = (
+      collectionId
+        ? this.db.prepare('SELECT id FROM items WHERE collection_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?').all(collectionId, limit, offset)
+        : this.db.prepare('SELECT id FROM items ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?').all(limit, offset)
+    ) as { id: string }[];
+    return rows.map((r) => r.id);
+  }
+
+  /** Every collection with how many items it holds, in the order they were made, plus the total. */
+  collectionCounts(): { collections: { name: string; count: number }[]; total: number } {
+    const rows = this.db
+      .prepare('SELECT c.name AS name, COUNT(i.id) AS count FROM collections c LEFT JOIN items i ON i.collection_id = c.id GROUP BY c.id ORDER BY c.created_at, c.rowid')
+      .all() as { name: string; count: number }[];
+    const total = (this.db.prepare('SELECT COUNT(*) AS n FROM items').get() as { n: number }).n;
+    return { collections: rows.map((r) => ({ name: r.name, count: Number(r.count) })), total: Number(total) };
   }
 
   /** Every person, company, product, and place entity, for matching against a selection. */

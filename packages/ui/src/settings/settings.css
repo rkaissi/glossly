@@ -711,3 +711,71 @@ th {
 .choice input {
   margin-top: 3px;
 }
+
+/* ---- Saved ---- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+button.filter {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-2);
+  font-size: 13px;
+}
+button.filter .muted {
+  margin-left: 4px;
+}
+button.filter.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-fg);
+}
+button.filter.on .muted {
+  color: inherit;
+  opacity: 0.7;
+}
+.saved-list li.saved-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 12px 12px 10px;
+}
+.saved-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  user-select: text;
+  line-height: 1.5;
+}
+.clip4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.saved-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.saved-meta select {
+  height: 30px;
+  max-width: 180px;
+}
+button.link {
+  align-self: flex-start;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  text-decoration: underline;
+}

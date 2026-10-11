@@ -4,7 +4,7 @@ import type { Embedder } from '../embed/types';
 import { DEFAULT_SETTINGS } from '../settings';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
-import { containsTerm, recall, search } from './recall';
+import { containsTerm, library, recall, search } from './recall';
 
 const require = createRequire(import.meta.url);
 const vecExtensionPath = (require('sqlite-vec') as { getLoadablePath(): string }).getLoadablePath();
@@ -126,5 +126,33 @@ describe('search', () => {
     const r = await search({ ...deps, people: new PeopleRepo(store) }, '40%');
     expect(r.items).toHaveLength(1);
     expect(r.semantic).toBe(false);
+  });
+});
+
+describe('library', () => {
+  it('lists newest first by collection, pages, and searches by words then meaning', async () => {
+    const { save, deps } = setup();
+    const a = await save('Launch moved to Thursday', '2026-10-01T10:00:00-04:00');
+    const b = await save('Budget for the offsite', '2026-10-02T10:00:00-04:00');
+    const c = await save('Launch checklist', '2026-10-03T10:00:00-04:00');
+    const reading = store.collectionByName('Reading')!;
+    store.setItemCollection(b.id, reading.id);
+
+    const all = await library(deps, { query: '', collection: null, limit: 2 });
+    expect(all.items.map((i) => i.itemId)).toEqual([c.id, b.id]);
+    expect(all.more).toBe(true);
+    expect(all.total).toBe(3);
+    expect(all.collections.find((x) => x.name === 'Notes')?.count).toBe(2);
+    expect(all.collections.find((x) => x.name === 'Reading')?.count).toBe(1);
+
+    const inReading = await library(deps, { query: '', collection: 'Reading', limit: 10 });
+    expect(inReading.items.map((i) => i.itemId)).toEqual([b.id]);
+    expect(inReading.more).toBe(false);
+
+    const found = await library(deps, { query: 'thursday', collection: null, limit: 10 });
+    expect(found.items.map((i) => [i.itemId, i.reason])).toEqual([[a.id, 'text_match']]);
+    const byMeaning = await library(deps, { query: 'launch', collection: 'Notes', limit: 10 });
+    expect(byMeaning.items.map((i) => i.itemId).sort()).toEqual([a.id, c.id].sort());
+    expect((await library(deps, { query: '', collection: 'Gone', limit: 10 })).items).toEqual([]);
   });
 });

@@ -6,7 +6,7 @@ import type { Settings } from '../settings';
 import type { PeopleRepo } from '../store/people';
 import type { EntityKind, Store } from '../store/store';
 import type { Item } from '../types';
-import type { RecallHit, RecallReason, SearchResults } from './types';
+import type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './types';
 
 export interface RecallDeps {
   store: Store;
@@ -141,4 +141,44 @@ export async function search(deps: RecallDeps & { people: PeopleRepo }, query: s
   const lower = q.toLowerCase();
   const commitments = open.filter((c) => c.text.toLowerCase().includes(lower) || (c.person_name ?? '').toLowerCase().includes(lower));
   return { query: q, items, people: people.list(q).slice(0, SIDE_LIMIT), commitments: commitments.slice(0, SIDE_LIMIT), semantic: embedderReady };
+}
+
+const LIBRARY_HIT_CHARS = 1500;
+
+/**
+ * The Saved tab: with no query, the newest items (in one collection, or all); with a query,
+ * items with those words first, then items close in meaning (`recall.searchSimilarity`).
+ */
+export async function library(deps: RecallDeps, q: LibraryQuery): Promise<LibraryResult> {
+  const { store } = deps;
+  const query = q.query.replace(/\s+/g, ' ').trim().slice(0, 200);
+  const limit = Math.max(1, Math.min(q.limit, 500));
+  const counts = store.collectionCounts();
+  const col = q.collection ? store.collectionByName(q.collection) : null;
+  const semantic = Boolean(deps.embedder()) && store.hasVectors;
+  const base = { query, collection: col?.name ?? null, collections: counts.collections, total: counts.total, semantic };
+  // A collection that doesn't exist (renamed or gone) has nothing in it.
+  if (q.collection && !col) return { ...base, items: [], more: false };
+
+  const toItem = (it: Item & { collection: string | null }, reason: RecallReason, term: string | null, similarity: number | null): LibraryItem => ({
+    ...toHit(it, reason, term, similarity),
+    text: clip(it.text.trim(), LIBRARY_HIT_CHARS),
+    clipped: it.text.trim().length > LIBRARY_HIT_CHARS,
+    kind: it.kind,
+  });
+
+  if (!query) {
+    const ids = store.itemIdsPage(limit + 1, 0, col?.id);
+    return { ...base, items: store.itemsWithCollection(ids.slice(0, limit)).map((it) => toItem(it, 'text_match', null, null)), more: ids.length > limit };
+  }
+
+  const exact = store.searchItemText(query, limit + 1, col?.id);
+  const similar = ((await nearest(deps, query, limit * 3, deps.settings().recall.searchSimilarity)) ?? []).filter((r) => !exact.includes(r.item_id));
+  const sims = new Map(similar.map((r) => [r.item_id, r.similarity]));
+  const matches = store.itemsWithCollection([...exact, ...similar.map((r) => r.item_id)]).filter((it) => !col || it.collection_id === col.id);
+  return {
+    ...base,
+    items: matches.slice(0, limit).map((it) => (sims.has(it.id) ? toItem(it, 'similar_topic', null, sims.get(it.id)!) : toItem(it, 'text_match', query, null))),
+    more: matches.length > limit,
+  };
 }

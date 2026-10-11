@@ -37,7 +37,7 @@ import type { SettingsWindow } from './settings-window';
 const log = logger('ipc');
 
 const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
-const TABS = ['profile', 'people', 'keys', 'models', 'general', 'data', 'metrics'] as const;
+const TABS = ['profile', 'people', 'saved', 'keys', 'models', 'general', 'data', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
 const MAX_CLIPBOARD = 1_000_000;
@@ -178,6 +178,21 @@ export function registerIpc(deps: IpcDeps): void {
     clipboard.writeText(cleanText(item.text));
   });
   handle('items:insert', (a) => capture.insertItem(num(a.sessionId), str(a.itemId, 100)));
+  handle('library:query', (a) => {
+    const limit = num(a.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error('Invalid argument');
+    return capture.library({ query: str(a.query ?? '', 500), collection: optStr(a.collection, 100) ?? null, limit });
+  });
+  handle('items:delete', (a) => {
+    const deleted = services.save.remove(str(a.itemId, 100));
+    if (deleted) log.info('item deleted');
+    return { deleted };
+  });
+  handle('items:move', (a) => {
+    const name = str(a.collection, 100).trim();
+    if (!name) throw new Error('Pick a collection.');
+    return { collection: services.save.move(str(a.itemId, 100), name) };
+  });
 
   // ---- Reply ----
   handle('reply:start', (a, e) => capture.startReply(num(a.sessionId), e.sender, replyRedo(a.redo)));
