@@ -1068,9 +1068,8 @@ export class Capture {
     const people = this.services.people;
     const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
     const a = det.author;
-    // Who wrote it identifies the conversation and survives a page reload; the text before it is the fallback.
     const author = det.authorIsMe ? 'me' : (a?.email ?? (a?.handle ? `@${a.handle}` : null) ?? a?.name ?? null);
-    const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, author, before: s.selection.context_before, text: s.selection.text });
+    const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, author, text: s.selection.text });
     // The panel was closed and opened again while the drafts were still being written: carry on
     // with that run. The text so far comes back with this answer; the rest streams under the same id.
     const running = s.reply;
@@ -1134,8 +1133,7 @@ export class Capture {
       return start;
     }
 
-    // No text: whether the key came from the author or the text before, so a miss can be traced.
-    log.info('reply drafts', { cached: false, redo: Boolean(redo), keyed_by: author ? 'author' : 'before' });
+    log.info('reply drafts', { cached: false, redo: Boolean(redo), author: Boolean(author) });
     void (async () => {
       const t = performance.now();
       let firstMs: number | null = null;

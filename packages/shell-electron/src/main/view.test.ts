@@ -208,26 +208,16 @@ describe('Lru', () => {
 });
 
 describe("Reply's cache key", () => {
-  const base = { place: '- slack', author: null, before: 'Maya Lin  9:41 AM\n', text: 'sounds good?' };
+  const base = { place: '- slack', author: null, text: 'sounds good?' };
 
-  it('ignores the window title, timestamps, and whitespace, and is a hash', () => {
+  it('is a hash of the place, the author when found, and the text, ignoring whitespace and case of the place', () => {
     const k = replyCacheKey(base);
     expect(k).toMatch(/^[0-9a-f]{64}$/);
-    expect(replyCacheKey({ ...base, before: 'Maya Lin  10:02 AM\n' })).toBe(k);
     expect(replyCacheKey({ ...base, text: '  sounds\n good? ' })).toBe(k);
     expect(replyCacheKey({ ...base, place: '- Slack' })).toBe(k);
-  });
-
-  it('tells the same short message in two conversations apart', () => {
-    expect(replyCacheKey({ ...base, before: 'Jordan Hale  9:41 AM\n' })).not.toBe(replyCacheKey(base));
-    expect(replyCacheKey({ ...base, place: 'discord.exe' })).not.toBe(replyCacheKey(base));
-  });
-
-  it('keys on the author when one was found, so a reload that changes the page around it still hits', () => {
-    const byMaya = { ...base, author: 'Maya Lin' };
-    expect(replyCacheKey({ ...byMaya, before: 'NEW\nMaya Lin  9:41 AM\n' })).toBe(replyCacheKey(byMaya));
-    expect(replyCacheKey({ ...byMaya, author: 'Jordan Hale' })).not.toBe(replyCacheKey(byMaya));
-    expect(replyCacheKey({ ...byMaya, author: 'me' })).not.toBe(replyCacheKey(byMaya));
+    expect(replyCacheKey({ ...base, place: 'discord.exe' })).not.toBe(k);
+    expect(replyCacheKey({ ...base, author: 'Maya Lin' })).not.toBe(k);
+    expect(replyCacheKey({ ...base, author: 'Maya Lin' })).not.toBe(replyCacheKey({ ...base, author: 'Jordan Hale' }));
   });
 
   it('expires entries', () => {

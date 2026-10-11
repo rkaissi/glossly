@@ -212,22 +212,18 @@ export class Lru<K, V> {
   }
 }
 
-/** How much of the text before a selection identifies its conversation for Reply's cache. */
-const REPLY_KEY_BEFORE = 200;
-
 /**
- * Reply's cache key for one highlight, hashed: the site or app, who wrote the message (their
- * email, handle, or name as detected, or "me"), and the selected text. The author is what tells
- * the same short "sounds good?" in two conversations apart, and unlike the page around the
- * message it survives a reload (unread dividers, "NEW" markers, and lazily loaded messages
- * change that). With no author found, the text just before the selection stands in for it, with
- * digits dropped so moving timestamps ("2m ago", "9:41 AM") don't change the key. The window
- * title is left out: unread counts change it ("(3) #design | Acme - Slack").
+ * Reply's cache key for one highlight, hashed: the site or app, the selected text, and who wrote
+ * it when that was detected (their email, handle, or name, or "me"). Kept simple on purpose: at
+ * worst the same short message in two chats on one site shares drafts, and "None of these"
+ * writes new ones. The window title is left out (unread counts change it), and so is the page
+ * around the message (a reload changes it).
  */
-export function replyCacheKey(input: { place: string; author: string | null; before: string; text: string }): string {
+export function replyCacheKey(input: { place: string; author: string | null; text: string }): string {
   const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
-  const who = input.author ? `by:${norm(input.author).toLowerCase()}` : `after:${norm(input.before.slice(-REPLY_KEY_BEFORE).replace(/\d+/g, ''))}`;
-  return createHash('sha256').update([input.place.toLowerCase(), who, norm(input.text)].join('\u0000')).digest('hex');
+  return createHash('sha256')
+    .update([input.place.toLowerCase(), input.author ? norm(input.author).toLowerCase() : '', norm(input.text)].join('\u0000'))
+    .digest('hex');
 }
 
 /** An Lru whose entries also expire, for model answers that go stale (Reply's drafts). */
