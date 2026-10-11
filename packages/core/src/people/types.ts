@@ -52,8 +52,11 @@ export interface Interaction {
 }
 
 /** pasted: from the Profile tab. inserted: a reply inserted as drafted. inserted_edited: edited first. */
-/** `inserted` (an unedited draft) is no longer stored; migration 3 removed the old ones. */
-export type VoiceOrigin = 'pasted' | 'inserted' | 'inserted_edited';
+/**
+ * `inserted` (an unedited draft) is no longer stored; migration 3 removed the old ones.
+ * `written` is a reply the user wrote themselves instead of taking a draft.
+ */
+export type VoiceOrigin = 'pasted' | 'inserted' | 'inserted_edited' | 'written';
 
 export interface VoiceSample {
   id: string;

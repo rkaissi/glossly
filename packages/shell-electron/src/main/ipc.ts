@@ -1,7 +1,9 @@
 import { writeFileSync } from 'node:fs';
 import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
+  REPLY_REDO_ASKS,
   STYLE_DIMENSIONS,
+  WROTE_OWN,
   aliasKindOf,
   allPreferences,
   asRelationship,
@@ -10,6 +12,8 @@ import {
   preferenceScope,
   type ReplyChannel,
   type ReplyPick,
+  type ReplyRedo,
+  type ReplyRedoAsk,
   type StyleDimension,
   type StyleView,
   type ActionId,
@@ -76,8 +80,24 @@ const replyPick = (v: unknown): ReplyPick | undefined => {
     return { text: str(d.text, 10_000), kind: optStr(d.kind, 30) ?? null, tone: optStr(d.tone, 30) ?? null };
   });
   const chosen = num(p.chosen);
-  if (!Number.isInteger(chosen) || chosen < 0 || chosen >= drafts.length) throw new Error('Invalid argument');
+  // WROTE_OWN (-1): the user wrote their own reply instead of taking a draft.
+  if (!Number.isInteger(chosen) || chosen < WROTE_OWN || chosen >= drafts.length) throw new Error('Invalid argument');
   return { drafts, chosen };
+};
+/** "None of these": the drafts passed on, the asks from the panel's list, and what the user typed. */
+const replyRedo = (v: unknown): ReplyRedo | undefined => {
+  if (v === undefined || v === null) return undefined;
+  const r = obj(v);
+  if (!Array.isArray(r.passedOn) || r.passedOn.length > 3 || !Array.isArray(r.asks) || r.asks.length > REPLY_REDO_ASKS.length) throw new Error('Invalid argument');
+  const passedOn = r.passedOn.map((raw) => {
+    const d = obj(raw);
+    return { intent: str(d.intent ?? '', 100), text: str(d.text, 10_000) };
+  });
+  const asks = r.asks.map((a) => {
+    if (!(REPLY_REDO_ASKS as readonly unknown[]).includes(a)) throw new Error('Invalid argument');
+    return a as ReplyRedoAsk;
+  });
+  return { passedOn, asks: [...new Set(asks)], note: optStr(r.note, 500) ?? null };
 };
 
 export function registerIpc(deps: IpcDeps): void {
@@ -160,7 +180,7 @@ export function registerIpc(deps: IpcDeps): void {
   handle('items:insert', (a) => capture.insertItem(num(a.sessionId), str(a.itemId, 100)));
 
   // ---- Reply ----
-  handle('reply:start', (a, e) => capture.startReply(num(a.sessionId), e.sender));
+  handle('reply:start', (a, e) => capture.startReply(num(a.sessionId), e.sender, replyRedo(a.redo)));
   handle('reply:cancel', (a) => capture.cancelReply(str(a.requestId, 100)));
   handle('reply:insert', async (a) => {
     if (typeof a.edited !== 'boolean') throw new Error('Invalid argument');

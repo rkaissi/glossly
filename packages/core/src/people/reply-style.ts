@@ -1,7 +1,9 @@
 // What Reply learns from the drafts the user picks and edits, in code: no text is kept for a
 // pick, only which way it leaned on a few traits. Code measures length, greeting, sign-off,
-// exclamation marks, emoji, and contractions; the model tags each draft's kind (acknowledge,
-// ask, shift, ...) and tone (playful, warm, ...). A trait becomes a preference only when recent picks agree,
+// exclamation marks, emoji, contractions, capitalization, the final period, apostrophes,
+// dashes, ellipses, line breaks, sentence and word length, and how much punctuation; the
+// model tags each draft's kind (acknowledge, ask, shift, ...) and tone (playful, warm, ...).
+// An edit is read by comparing the draft before and after. A trait becomes a preference only when recent picks agree,
 // so one long reply after a run of short ones changes nothing, and a new habit takes over
 // as the old picks age out. It is learned at three levels: the person, the relationship
 // (friends, colleagues, ...) on that kind of platform, and the kind of platform.
@@ -12,7 +14,25 @@ import { RELATIONSHIP_PLURALS, type Relationship } from './relationship';
 export type ReplyChannel = 'email' | 'messaging' | 'work_chat' | 'other';
 export const REPLY_CHANNELS = ['email', 'messaging', 'work_chat', 'other'] as const satisfies readonly ReplyChannel[];
 
-export const STYLE_DIMENSIONS = ['length', 'greeting', 'signoff', 'exclamation', 'emoji', 'contractions', 'kind', 'tone'] as const;
+export const STYLE_DIMENSIONS = [
+  'length',
+  'greeting',
+  'signoff',
+  'exclamation',
+  'emoji',
+  'contractions',
+  'capitals',
+  'end_period',
+  'apostrophes',
+  'dashes',
+  'ellipsis',
+  'line_breaks',
+  'sentence_length',
+  'word_length',
+  'punctuation',
+  'kind',
+  'tone',
+] as const;
 export type StyleDimension = (typeof STYLE_DIMENSIONS)[number];
 
 /** What a draft does. The model tags each draft with one (prompts/reply.md); keep the two lists in sync. */
@@ -21,8 +41,23 @@ export type ReplyKind = (typeof REPLY_KINDS)[number];
 export const REPLY_TONES = ['playful', 'warm', 'neutral', 'direct', 'formal'] as const;
 export type ReplyTone = (typeof REPLY_TONES)[number];
 
-/** length: shorter or longer. kind and tone: the category. Every other dimension: with or without. */
-export type StylePole = 'shorter' | 'longer' | 'with' | 'without' | ReplyKind | ReplyTone;
+/**
+ * length, sentence_length, word_length: shorter or longer. punctuation: lighter or heavier.
+ * kind and tone: the category. Every other dimension: with or without.
+ */
+export type StylePole = 'shorter' | 'longer' | 'with' | 'without' | 'lighter' | 'heavier' | ReplyKind | ReplyTone;
+
+/** What the user can ask for when none of the drafts fit ("None of these"). The panel has a label for each. */
+export const REPLY_REDO_ASKS = ['shorter', 'longer', 'casual', 'formal', 'different'] as const;
+export type ReplyRedoAsk = (typeof REPLY_REDO_ASKS)[number];
+
+export interface ReplyRedo {
+  /** The drafts as shown, label and text. */
+  passedOn: { intent: string; text: string }[];
+  asks: ReplyRedoAsk[];
+  /** What the user typed ("say I'm out until Monday"), if anything. */
+  note?: string | null;
+}
 
 /** A draft as the panel showed it: its text, and the kind and tone the model tagged it with. */
 export interface PickDraft {
@@ -85,14 +120,79 @@ export interface DraftTraits {
   signoff: boolean;
   exclamation: boolean;
   emoji: boolean;
+  /** Any contraction, with or without its apostrophe ("don't" or "dont"). */
   contractions: boolean;
+  /** Sentences (and "I") start with a capital; false when two thirds start lowercase; null when it can't tell. */
+  capitals: boolean | null;
+  /** The message body ends on a period; null when it ends on ? or !, an ellipsis, or nothing readable. */
+  end_period: boolean | null;
+  /** Contractions keep their apostrophes; false for "dont" and "im"; null with no contractions. */
+  apostrophes: boolean | null;
+  /** Em or en dashes, or a spaced hyphen, in the body. */
+  dashes: boolean;
+  ellipsis: boolean;
+  /** The body (without a greeting line or sign-off) is more than one line or paragraph. */
+  line_breaks: boolean;
+  /** Words per sentence, on average (0 with no sentence). */
+  sentenceWords: number;
+  /** Letters per word, on average (0 with no words). */
+  wordLetters: number;
+  /** Punctuation marks per 10 words in the body; apostrophes don't count. */
+  punctuation: number;
 }
 
 const GREETING = /^(?:hi|hey|hello|hiya|yo|dear|good (?:morning|afternoon|evening)|greetings|morning)\b/i;
 const SIGNOFF = /^(?:best|thanks|thank you|many thanks|cheers|regards|kind regards|best regards|warm regards|warmly|sincerely|talk soon|speak soon|take care|all the best|[-–—]\s*\S+)\b/i;
 const CONTRACTION =
   /\b(?:i'm|i'll|i've|i'd|you're|you'll|you've|we're|we'll|we've|they're|they'll|it's|that's|there's|here's|let's|what's|can't|won't|don't|doesn't|didn't|isn't|aren't|wasn't|weren't|couldn't|wouldn't|shouldn't|haven't|hasn't)\b/i;
+/** Contractions written without the apostrophe. Only forms that aren't also words ("its", "wont", "lets", "ill" are left out). */
+const BARE_CONTRACTION = /\b(?:im|ive|dont|doesnt|didnt|isnt|arent|wasnt|werent|cant|couldnt|wouldnt|shouldnt|havent|hasnt|youre|theyre|thats|whats|theres|heres)\b/i;
 const EMOJI = /\p{Extended_Pictographic}/u;
+const PUNCTUATION = /[,.;:!?—–…()"“”]/g;
+
+/** How a sentence starts: a capital, a lowercase letter, or neither (a number, a link, an @mention). */
+function startCase(sentence: string): 'upper' | 'lower' | null {
+  const s = sentence.replace(/^[^\p{L}\p{N}@#]+/u, '');
+  if (/^(?:[@#]|https?:|www\.)/i.test(s)) return null;
+  const c = s[0];
+  if (!c || !/\p{L}/u.test(c)) return null;
+  if (c !== c.toLowerCase()) return 'upper';
+  if (c !== c.toUpperCase()) return 'lower';
+  return null;
+}
+
+const sentencesOf = (text: string) =>
+  text
+    .split(/(?<=[.!?…])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => /\p{L}/u.test(s));
+
+function capitalsOf(text: string): boolean | null {
+  let upper = 0;
+  let lower = 0;
+  for (const s of sentencesOf(text)) {
+    const c = startCase(s);
+    if (c === 'upper') upper++;
+    else if (c === 'lower') lower++;
+  }
+  // "I" on its own says the same thing ("i think so").
+  upper += (text.match(/\bI\b/g) ?? []).length;
+  lower += (text.match(/\bi\b/g) ?? []).length;
+  const all = upper + lower;
+  if (all === 0) return null;
+  if (upper / all >= 2 / 3) return true;
+  if (lower / all >= 2 / 3) return false;
+  return null;
+}
+
+function endPeriodOf(lastLine: string | undefined): boolean | null {
+  const end = (lastLine ?? '').replace(/[\s\p{Extended_Pictographic}\u{FE0F}\u{200D}]+$/u, '');
+  if (!end || /(?:\.\.\.|…)$/.test(end)) return null;
+  const c = end[end.length - 1]!;
+  if (c === '.') return true;
+  if (/[\p{L}\p{N})"'’”]/u.test(c)) return false;
+  return null;
+}
 
 export function draftTraits(text: string): DraftTraits {
   const lines = text
@@ -100,15 +200,34 @@ export function draftTraits(text: string): DraftTraits {
     .map((l) => l.trim())
     .filter(Boolean);
   const first = lines[0] ?? '';
-  const tail = lines.slice(-2);
+  const signoffAt = lines.length > 1 ? lines.findIndex((l, i) => i >= lines.length - 2 && SIGNOFF.test(l)) : -1;
   const plain = text.replace(/[‘’]/g, "'");
+  // The body: without the sign-off, and without a greeting that sits on its own line ("Hi Jordan,").
+  let bodyLines = signoffAt >= 0 ? lines.slice(0, signoffAt) : lines;
+  if (bodyLines.length > 1 && GREETING.test(first) && first.split(/\s+/).length <= 4) bodyLines = bodyLines.slice(1);
+  const body = bodyLines.join('\n').replace(/[‘’]/g, "'");
+  const bodyWords = body.split(/\s+/).filter(Boolean).length;
+  const sentences = sentencesOf(body);
+  const tokens = plain.match(/[\p{L}']+/gu)?.filter((w) => /\p{L}/u.test(w)) ?? [];
+  const letters = tokens.reduce((n, w) => n + w.replace(/'/g, '').length, 0);
+  const withApostrophe = CONTRACTION.test(plain);
+  const bare = BARE_CONTRACTION.test(plain);
   return {
     words: text.split(/\s+/).filter(Boolean).length,
     greeting: GREETING.test(first),
-    signoff: lines.length > 1 && tail.some((l) => SIGNOFF.test(l)),
+    signoff: signoffAt >= 0,
     exclamation: text.includes('!'),
     emoji: EMOJI.test(text),
-    contractions: CONTRACTION.test(plain),
+    contractions: withApostrophe || bare,
+    capitals: capitalsOf(plain),
+    end_period: endPeriodOf(bodyLines[bodyLines.length - 1]),
+    apostrophes: bare && !withApostrophe ? false : withApostrophe && !bare ? true : null,
+    dashes: /[—–]|\S[^\S\n]-[^\S\n]/.test(body),
+    ellipsis: /\.\.\.|…/.test(text),
+    line_breaks: bodyLines.length > 1,
+    sentenceWords: sentences.length ? Math.round((bodyWords / sentences.length) * 10) / 10 : 0,
+    wordLetters: tokens.length ? Math.round((letters / tokens.length) * 100) / 100 : 0,
+    punctuation: bodyWords ? Math.round(((body.replace(/\.\.\./g, '…').match(PUNCTUATION) ?? []).length / bodyWords) * 100) / 10 : 0,
   };
 }
 
@@ -131,48 +250,122 @@ export const MEANINGFUL_EDIT = 0.15;
 
 export const isMeaningfulEdit = (original: string, final: string) => editRatio(original, final) >= MEANINGFUL_EDIT;
 
-const BOOLEAN_DIMENSIONS = ['greeting', 'signoff', 'exclamation', 'emoji', 'contractions'] as const;
-/** Drafts closer in length than this don't say anything about length. */
-const LENGTH_SPREAD = 1.25;
-const EDIT_SHORTER = 0.85;
-const EDIT_LONGER = 1.15;
+type Flag = 'greeting' | 'signoff' | 'exclamation' | 'emoji' | 'contractions' | 'capitals' | 'end_period' | 'apostrophes' | 'dashes' | 'ellipsis' | 'line_breaks';
+const FLAGS: readonly Flag[] = ['greeting', 'signoff', 'exclamation', 'emoji', 'contractions', 'capitals', 'end_period', 'apostrophes', 'dashes', 'ellipsis', 'line_breaks'];
+
+/** A measured trait with two directions: which way an edit moved it, and whether drafts differ enough on it for a pick to say anything. */
+interface Scale {
+  dimension: 'length' | 'sentence_length' | 'word_length' | 'punctuation';
+  value: (t: DraftTraits) => number;
+  down: StylePole;
+  up: StylePole;
+  /** -1, 0, or 1: the direction an edit from `a` to `b` moved it, past noise. */
+  moved: (a: number, b: number) => number;
+  /** The drafts differ enough for a pick between them to count. */
+  spread: (min: number, max: number) => boolean;
+}
+
+const ratio = (down: number, up: number) => (a: number, b: number) => (a <= 0 ? 0 : b <= a * down ? -1 : b >= a * up ? 1 : 0);
+const SCALES: Scale[] = [
+  { dimension: 'length', value: (t) => t.words, down: 'shorter', up: 'longer', moved: ratio(0.85, 1.15), spread: (min, max) => min > 0 && max >= min * 1.25 },
+  { dimension: 'sentence_length', value: (t) => t.sentenceWords, down: 'shorter', up: 'longer', moved: ratio(0.8, 1.25), spread: (min, max) => min > 0 && max >= min * 1.3 },
+  {
+    dimension: 'word_length',
+    value: (t) => t.wordLetters,
+    down: 'shorter',
+    up: 'longer',
+    moved: (a, b) => (a <= 0 || b <= 0 ? 0 : b - a <= -0.4 ? -1 : b - a >= 0.4 ? 1 : 0),
+    spread: (min, max) => min > 0 && max - min >= 0.5,
+  },
+  {
+    dimension: 'punctuation',
+    value: (t) => t.punctuation,
+    down: 'lighter',
+    up: 'heavier',
+    moved: (a, b) => (b - a <= -0.5 && b <= a * 0.7 ? -1 : b - a >= 0.5 && b >= a * 1.4 ? 1 : 0),
+    spread: (min, max) => max - min >= 1 && max >= min * 1.4,
+  },
+];
+
+/** What an edit from `a` to `b` changed, each worth 2: an edit shows what the user would send. */
+function editSignals(a: DraftTraits, b: DraftTraits): StyleSignal[] {
+  const out: StyleSignal[] = [];
+  for (const s of SCALES) {
+    const dir = s.moved(s.value(a), s.value(b));
+    if (dir) out.push({ dimension: s.dimension, pole: dir < 0 ? s.down : s.up, weight: 2 });
+  }
+  for (const d of FLAGS) {
+    const x = a[d];
+    const y = b[d];
+    if (x !== null && y !== null && x !== y) out.push({ dimension: d, pole: y ? 'with' : 'without', weight: 2 });
+  }
+  return out;
+}
+
+/** Where the picked draft stands among the others, each worth 1; only traits the drafts differ on. */
+function spreadSignals(traits: DraftTraits[], chosen: number, skip: Set<StyleDimension>): StyleSignal[] {
+  const c = traits[chosen]!;
+  const out: StyleSignal[] = [];
+  for (const s of SCALES) {
+    if (skip.has(s.dimension)) continue;
+    const values = traits.map(s.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (!s.spread(min, max)) continue;
+    if (s.value(c) === min) out.push({ dimension: s.dimension, pole: s.down, weight: 1 });
+    else if (s.value(c) === max) out.push({ dimension: s.dimension, pole: s.up, weight: 1 });
+  }
+  for (const d of FLAGS) {
+    const v = c[d];
+    if (skip.has(d) || v === null) continue;
+    if (traits.some((t) => t[d] !== null && t[d] !== v)) out.push({ dimension: d, pole: v ? 'with' : 'without', weight: 1 });
+  }
+  return out;
+}
+
+/** `chosen` for a reply the user wrote themselves instead of taking a draft. */
+export const WROTE_OWN = -1;
 
 /**
  * Which way one pick leaned. An edit says more than a pick, so where the user changed a trait
  * (or the length), that counts twice and replaces the pick's signal for it. A pick only counts
  * on a trait when the drafts differ on it. Kind and tone come from the model's tags and count
- * once (an edit can't be read for them).
+ * once (an edit can't be read for them). A reply the user wrote themselves (`WROTE_OWN`)
+ * counts twice on whatever it does differently from every draft.
  */
 export function pickSignals(input: { drafts: PickDraft[]; chosen: number; final: string }): StyleSignal[] {
   const { drafts, chosen, final } = input;
-  const picked = drafts[chosen];
-  if (drafts.length < 2 || !picked) return [];
+  if (drafts.length === 0) return [];
   const traits = drafts.map((d) => draftTraits(d.text));
-  const c = traits[chosen]!;
   const f = draftTraits(final);
-  const out: StyleSignal[] = [];
+  const key = (s: StyleSignal) => `${s.dimension}:${s.pole}`;
 
-  if (c.words > 0 && f.words <= c.words * EDIT_SHORTER) out.push({ dimension: 'length', pole: 'shorter', weight: 2 });
-  else if (c.words > 0 && f.words >= c.words * EDIT_LONGER) out.push({ dimension: 'length', pole: 'longer', weight: 2 });
-  else {
-    const words = traits.map((t) => t.words);
-    const min = Math.min(...words);
-    const max = Math.max(...words);
-    if (min > 0 && max >= min * LENGTH_SPREAD) {
-      if (c.words === min) out.push({ dimension: 'length', pole: 'shorter', weight: 1 });
-      else if (c.words === max) out.push({ dimension: 'length', pole: 'longer', weight: 1 });
-    }
+  if (chosen === WROTE_OWN) {
+    // Only what the user's reply does against all of the drafts: the drafts had it wrong together.
+    const [firstEdits, ...rest] = traits.map((t) => editSignals(t, f));
+    const everywhere = rest.map((r) => new Set(r.map(key)));
+    return (firstEdits ?? []).filter((s) => everywhere.every((set) => set.has(key(s))));
   }
 
-  for (const d of BOOLEAN_DIMENSIONS) {
-    if (c[d] !== f[d]) out.push({ dimension: d, pole: f[d] ? 'with' : 'without', weight: 2 });
-    else if (traits.some((t) => t[d] !== c[d])) out.push({ dimension: d, pole: c[d] ? 'with' : 'without', weight: 1 });
-  }
+  const picked = drafts[chosen];
+  if (!picked) return [];
+  const out = editSignals(traits[chosen]!, f);
+  if (drafts.length < 2) return out;
+  out.push(...spreadSignals(traits, chosen, new Set(out.map((s) => s.dimension))));
 
   const kind = asKind(picked.kind);
   if (kind && drafts.some((d) => asKind(d.kind) !== kind)) out.push({ dimension: 'kind', pole: kind, weight: 1 });
   const tone = asTone(picked.tone);
   if (tone && drafts.some((d) => asTone(d.tone) !== tone)) out.push({ dimension: 'tone', pole: tone, weight: 1 });
+  return out;
+}
+
+/** What an edit changed, measured in code, for the style notes ("words 42 → 18", "Writes in lowercase"). */
+export function measuredChanges(original: string, final: string): string[] {
+  const a = draftTraits(original);
+  const b = draftTraits(final);
+  const out = [`words ${a.words} → ${b.words}`];
+  for (const s of editSignals(a, b)) if (s.dimension !== 'length') out.push(preferenceLabel(s));
   return out;
 }
 
@@ -261,6 +454,15 @@ const PHRASES: Record<StyleDimension, Partial<Record<StylePole, string>>> = {
   exclamation: { with: 'Uses exclamation marks', without: 'Avoids exclamation marks' },
   emoji: { with: 'Uses emoji', without: 'Avoids emoji' },
   contractions: { with: 'Writes casually, with contractions', without: 'Writes formally, without contractions' },
+  capitals: { with: 'Capitalizes sentences', without: 'Writes in lowercase' },
+  end_period: { with: 'Ends with a period', without: 'Leaves off the final period' },
+  apostrophes: { with: 'Keeps apostrophes in contractions', without: "Drops apostrophes (dont, im)" },
+  dashes: { with: 'Uses dashes', without: 'Avoids dashes' },
+  ellipsis: { with: 'Uses ellipses (...)', without: 'Avoids ellipses' },
+  line_breaks: { with: 'Splits replies into separate lines', without: 'Writes one block of text' },
+  sentence_length: { shorter: 'Writes short sentences', longer: 'Writes longer sentences' },
+  word_length: { shorter: 'Uses short, plain words', longer: 'Uses longer words' },
+  punctuation: { lighter: 'Uses little punctuation', heavier: 'Uses more punctuation' },
   kind: {
     acknowledge: 'Usually picks a reply that acknowledges',
     answer: 'Usually picks a reply that answers',

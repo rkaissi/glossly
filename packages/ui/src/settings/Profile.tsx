@@ -171,7 +171,7 @@ function VoiceSamples() {
       )}
       {inserted.length > 0 && (
         <details className="small">
-          <summary className="muted">From replies you edited ({inserted.length})</summary>
+          <summary className="muted">From replies you edited or wrote ({inserted.length})</summary>
           <ul className="list">{inserted.map(sample)}</ul>
         </details>
       )}

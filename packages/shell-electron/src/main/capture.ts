@@ -32,6 +32,7 @@ import {
   preferenceLine,
   pickSignals,
   isMeaningfulEdit,
+  WROTE_OWN,
   writeStyleNotes,
   STYLE_NOTES_EVERY,
   recall as recallFor,
@@ -62,6 +63,7 @@ import {
   type PasteCompose,
   type ReplyInsertResult,
   type ReplyPick,
+  type ReplyRedo,
   type ReplyStart,
   type ReplyTo,
   type RecallHit,
@@ -986,7 +988,7 @@ export class Capture {
   // ---- Reply ----
 
   /** Three drafts to the selected message's author, streamed to `target` on reply:*. */
-  async startReply(sessionId: number, target: WebContents): Promise<ReplyStart> {
+  async startReply(sessionId: number, target: WebContents, redo?: ReplyRedo): Promise<ReplyStart> {
     const requestId = randomUUID();
     const identity = this.settings.identity;
     const identitySet = identity.name.trim().length > 0;
@@ -1033,7 +1035,14 @@ export class Capture {
       voice: people.voiceForPrompt(5, audience),
       preferences,
       notes: learning ? people.styleNotes().map((n) => n.text) : [],
+      redo: redo ?? null,
     };
+    if (redo) {
+      // "Shorter" or "Longer" on all three drafts says which way they were wrong; the other asks only steer this run.
+      const length = redo.asks.includes('shorter') ? 'shorter' : redo.asks.includes('longer') ? 'longer' : null;
+      if (learning && length) people.addStyleSignals([{ dimension: 'length', pole: length, weight: 1 }], { channel, personId: state.personId });
+      this.services.metrics.record('reply_redo', { asks: redo.asks.join(','), typed: Boolean(redo.note?.trim()) });
+    }
 
     void (async () => {
       const t = performance.now();
@@ -1086,16 +1095,19 @@ export class Capture {
     r.learned = true;
     const people = this.services.people;
     const channel = replyChannel(s.selection.source_app, s.selection.window_title);
-    const original = pick.drafts[pick.chosen]?.text;
-    if (original === undefined) return;
-    const edited = isMeaningfulEdit(original, final);
-    if (edited) {
+    const own = pick.chosen === WROTE_OWN;
+    const original = own ? undefined : pick.drafts[pick.chosen]?.text;
+    if (!own && original === undefined) return;
+    const edited = own || isMeaningfulEdit(original!, final);
+    // A reply the user wrote is all theirs: a voice sample, but no draft to compare for the style notes.
+    if (own) people.addVoice(final, 'written', { channel, personId });
+    else if (edited) {
       people.addVoice(final, 'inserted_edited', { channel, personId, original });
       this.countStyleEdit();
     }
     const signals = pickSignals({ drafts: pick.drafts, chosen: pick.chosen, final });
     people.addStyleSignals(signals, { channel, personId });
-    log.info('reply learned', { signals: signals.length, channel, edited, person: Boolean(personId) });
+    log.info('reply learned', { signals: signals.length, channel, edited, own, person: Boolean(personId) });
   }
 
   private styleNotesRunning = false;

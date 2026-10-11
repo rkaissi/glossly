@@ -4,6 +4,7 @@ import replyPrompt from '../../prompts/reply.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import type { DetectedPerson } from '../people/detect';
 import { describeIdentity } from '../people/names';
+import type { ReplyRedo, ReplyRedoAsk } from '../people/reply-style';
 import type { PersonCard } from '../people/types';
 import type { Settings } from '../settings';
 import type { ContainerContext, SelectionPayload } from '../types';
@@ -22,7 +23,17 @@ export interface ReplyInput {
   preferences?: string[];
   /** Style notes written from the user's edits (Profile). */
   notes?: string[];
+  /** "None of these": the drafts the user passed on and what they asked for instead. */
+  redo?: ReplyRedo | null;
 }
+
+const REDO_LINES: Record<ReplyRedoAsk, string> = {
+  shorter: 'Shorter than these.',
+  longer: 'Longer and fuller than these.',
+  casual: 'More casual than these.',
+  formal: 'More formal than these.',
+  different: 'Different answers: do not repeat the intents of these drafts.',
+};
 
 const MAX_SELECTION = 6000;
 const THREAD_CHARS = 6000;
@@ -83,6 +94,15 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     '</selection>',
   );
   if (thread.trim() !== SELECTION_MARK) parts.push('', `## Thread (${SELECTION_MARK} marks the selected message)`, '<thread>', thread, '</thread>');
+  const redo = input.redo;
+  if (redo && (redo.passedOn.length || redo.asks.length || redo.note?.trim())) {
+    parts.push('', '## Drafts the user passed on');
+    redo.passedOn.slice(0, 3).forEach((d) => parts.push('<passed>', `${d.intent}: ${clip(d.text, MAX_VOICE_CHARS)}`, '</passed>'));
+    parts.push('', '## What the user wants instead');
+    redo.asks.forEach((a) => parts.push(`- ${REDO_LINES[a]}`));
+    if (redo.note?.trim()) parts.push(`- In their words: "${clip(redo.note.trim(), 300)}"`);
+    if (!redo.asks.length && !redo.note?.trim()) parts.push('- Something different from these.');
+  }
   return parts.join('\n');
 }
 

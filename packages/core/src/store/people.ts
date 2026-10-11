@@ -486,7 +486,7 @@ export class PeopleRepo {
   }
 
   /**
-   * Up to `n` samples for a Reply prompt: pasted ones first, then edited replies ranked by the
+   * Up to `n` samples for a Reply prompt: pasted ones first, then edited and self-written replies ranked by the
    * same person, then the same relationship (friends, colleagues), then the same kind of
    * platform. Newest first among equals.
    */
@@ -501,7 +501,7 @@ export class PeopleRepo {
       (to.relationship && v.person_id && relOf.get(v.person_id) === to.relationship ? 2 : 0) +
       (to.channel && v.channel === to.channel ? 1 : 0);
     const edited = all
-      .filter((v) => v.origin === 'inserted_edited')
+      .filter((v) => v.origin === 'inserted_edited' || v.origin === 'written')
       .map((v, i) => ({ v, i }))
       .sort((a, b) => rank(b.v) - rank(a.v) || a.i - b.i)
       .map(({ v }) => v);

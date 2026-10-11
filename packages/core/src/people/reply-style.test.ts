@@ -4,7 +4,9 @@ import {
   draftTraits,
   editRatio,
   isMeaningfulEdit,
+  measuredChanges,
   pickSignals,
+  WROTE_OWN,
   preferenceLine,
   preferencesFor,
   replyChannel,
@@ -34,10 +36,36 @@ describe('replyChannel', () => {
 
 describe('draftTraits', () => {
   it('reads length, greeting, sign-off, exclamation marks, emoji, and contractions', () => {
-    expect(draftTraits(short)).toEqual({ words: 5, greeting: false, signoff: false, exclamation: false, emoji: false, contractions: false });
+    expect(draftTraits(short)).toMatchObject({ words: 5, greeting: false, signoff: false, exclamation: false, emoji: false, contractions: false });
     expect(draftTraits(medium)).toMatchObject({ greeting: true, signoff: true, contractions: true, exclamation: false });
     expect(draftTraits('Hey! Love it 🎉')).toMatchObject({ greeting: true, exclamation: true, emoji: true, signoff: false });
     expect(draftTraits('On it.\n- A')).toMatchObject({ signoff: true });
+  });
+
+  it('reads capitalization, the final period, and apostrophes', () => {
+    expect(draftTraits('Sounds good. See you then.')).toMatchObject({ capitals: true, end_period: true });
+    expect(draftTraits('sounds good, i think we can do friday')).toMatchObject({ capitals: false, end_period: false });
+    expect(draftTraits('Can you send it?')).toMatchObject({ end_period: null });
+    expect(draftTraits('42 is the number')).toMatchObject({ capitals: null });
+    expect(draftTraits("I don't know yet.")).toMatchObject({ contractions: true, apostrophes: true });
+    expect(draftTraits('i dont know yet')).toMatchObject({ contractions: true, apostrophes: false });
+    expect(draftTraits('I do not know yet.')).toMatchObject({ contractions: false, apostrophes: null });
+  });
+
+  it('reads the body without the greeting line and sign-off', () => {
+    // Email: the body ends on a period even though the message ends on a name.
+    expect(draftTraits(medium)).toMatchObject({ end_period: true, line_breaks: false, dashes: false });
+    expect(draftTraits('Hi Jordan,\n\nYes, Friday works.\n\nI will bring the slides.\n\nBest,\nAlex')).toMatchObject({ line_breaks: true });
+    expect(draftTraits('Friday works — I will bring them.')).toMatchObject({ dashes: true });
+    expect(draftTraits('Friday works - see you.')).toMatchObject({ dashes: true });
+    expect(draftTraits('Okay...')).toMatchObject({ ellipsis: true, end_period: null });
+  });
+
+  it('measures sentence length, word length, and punctuation', () => {
+    const t = draftTraits('Yes. Friday works for me. See you.');
+    expect(t.sentenceWords).toBe(2.3);
+    expect(draftTraits('yes ok').wordLetters).toBe(2.5);
+    expect(draftTraits('Yes, absolutely; Friday works: see you!').punctuation).toBeGreaterThan(draftTraits('yes friday works see you').punctuation);
   });
 });
 
@@ -68,6 +96,36 @@ describe('pickSignals', () => {
   it('reads a cut by more than 15% as wanting it shorter', () => {
     const s = pickSignals({ drafts: [d(short), d(long)], chosen: 1, final: 'Hi Jordan,\n\nFriday works. I will bring the slides.\n\nBest regards,\nAlex' });
     expect(s).toContainEqual({ dimension: 'length', pole: 'shorter', weight: 2 });
+  });
+
+  it('reads capitalization, punctuation, and apostrophes from an edit', () => {
+    const drafts = [d("Sure, I'll send it over by Friday."), d('No problem, it will be there by Friday.')];
+    const s = pickSignals({ drafts, chosen: 0, final: 'sure ill send it over by friday' });
+    expect(s).toContainEqual({ dimension: 'capitals', pole: 'without', weight: 2 });
+    expect(s).toContainEqual({ dimension: 'end_period', pole: 'without', weight: 2 });
+    expect(s).toContainEqual({ dimension: 'punctuation', pole: 'lighter', weight: 2 });
+    // "ill" is also a word, so it doesn't count as a contraction without its apostrophe.
+    expect(s.find((x) => x.dimension === 'apostrophes')).toBeUndefined();
+    const t = pickSignals({ drafts, chosen: 0, final: "Sure, I'll send it — by Friday." });
+    expect(t).toContainEqual({ dimension: 'dashes', pole: 'with', weight: 2 });
+    expect(pickSignals({ drafts, chosen: 0, final: 'Sure, Im on it, dont worry.' })).toContainEqual({ dimension: 'apostrophes', pole: 'without', weight: 2 });
+  });
+
+  it('learns from a reply the user wrote themselves only what every draft got wrong', () => {
+    const drafts = [d('Hi Maya, thanks so much! I will send it by Friday.'), d('Hi Maya, sure thing. It will be with you by Friday.'), d('Thanks Maya. Sending it Friday.')];
+    const s = pickSignals({ drafts, chosen: WROTE_OWN, final: 'yep friday' });
+    expect(s).toContainEqual({ dimension: 'capitals', pole: 'without', weight: 2 });
+    expect(s).toContainEqual({ dimension: 'end_period', pole: 'without', weight: 2 });
+    expect(s).toContainEqual({ dimension: 'length', pole: 'shorter', weight: 2 });
+    // Two drafts had a greeting and one didn't, so the greeting says nothing.
+    expect(s.find((x) => x.dimension === 'greeting')).toBeUndefined();
+    expect(s.find((x) => x.dimension === 'kind' || x.dimension === 'tone')).toBeUndefined();
+  });
+
+  it('describes an edit in measured terms for the style notes', () => {
+    expect(measuredChanges('Hi Jordan,\n\nThat works for me. See you Friday.\n\nBest,\nAlex', 'that works, see you friday')).toEqual(
+      expect.arrayContaining(['words 11 → 5', 'Skips the greeting', 'Skips the sign-off', 'Writes in lowercase', 'Leaves off the final period']),
+    );
   });
 
   it("counts the model's kind and tone tags when the drafts differ, and ignores unknown tags", () => {

@@ -18,7 +18,7 @@ import type { WhoView } from './actions/who';
 import type { RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
-import type { PickDraft, ReplyChannel, StyleDimension, StylePreference } from './people/reply-style';
+import type { PickDraft, ReplyChannel, ReplyRedo, StyleDimension, StylePreference } from './people/reply-style';
 import type { Relationship } from './people/relationship';
 
 export type { CatalogModel, Capabilities } from './llm/catalog';
@@ -26,7 +26,7 @@ export type { MetricsSummary } from './metrics';
 export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
-export type { PickDraft, ReplyChannel, StyleDimension, StylePreference } from './people/reply-style';
+export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePreference } from './people/reply-style';
 export type { Relationship } from './people/relationship';
 export type { RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
@@ -361,8 +361,8 @@ export interface InvokeChannels {
   /** Saves the last Visualize result as a chart item in the route's collection. */
   'visualize:save': { args: { sessionId: number }; result: SaveDone };
 
-  /** Streams three drafts (Chat role) to the sender's reply:* channels. */
-  'reply:start': { args: { sessionId: number }; result: ReplyStart };
+  /** Streams three drafts (Chat role) to the sender's reply:* channels. With `redo`, three new ones after "None of these". */
+  'reply:start': { args: { sessionId: number; redo?: ReplyRedo }; result: ReplyStart };
   'reply:cancel': { args: { requestId: string }; result: void };
   /** Gives focus back to the source window and pastes (spec: Inserting text). Never sends. */
   'reply:insert': { args: ReplyInsertArgs; result: ReplyInsertResult };

@@ -77,6 +77,24 @@ describe('Reply', () => {
     expect(p).toContain("## Notes on how the user writes\n- Drops 'Hope you're well'");
   });
 
+  it('adds the drafts the user passed on and what they want instead', () => {
+    const p = buildReplyPrompt(
+      settings,
+      {
+        selection,
+        author,
+        authorIsMe: false,
+        person: null,
+        voice: [],
+        redo: { passedOn: [{ intent: 'Yes, Friday', text: 'Sure, I will send them Friday.' }], asks: ['shorter', 'different'], note: "say I'm out until Monday" },
+      },
+      now,
+    );
+    expect(p).toContain('## Drafts the user passed on\n<passed>\nYes, Friday: Sure, I will send them Friday.\n</passed>');
+    expect(p).toContain("## What the user wants instead\n- Shorter than these.\n- Different answers: do not repeat the intents of these drafts.\n- In their words: \"say I'm out until Monday\"");
+    expect(buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: null, voice: [] }, now)).not.toContain('passed on');
+  });
+
   it('streams on the chat role with action reply', () => {
     const calls: ChatRequest[] = [];
     const llm: LlmProvider = {
@@ -90,7 +108,8 @@ describe('Reply', () => {
     reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [] });
     expect(calls[0]).toMatchObject({ role: 'chat', action: 'reply' });
     expect(calls[0]!.instructions).toContain('Write exactly 3 drafts');
-    expect(calls[0]!.instructions).toContain('write all three drafts in line with it');
+    expect(calls[0]!.instructions).toContain('Follow every line in all three drafts');
     expect(calls[0]!.instructions).not.toContain('deliberately differs');
+    expect(calls[0]!.instructions).toContain('All three answer the selected message');
   });
 });

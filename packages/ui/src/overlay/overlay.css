@@ -770,6 +770,30 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   font: inherit;
   line-height: 1.5;
 }
+.draft.own:not(.picked) {
+  border-style: dashed;
+  background: transparent;
+}
+.draft.own:not(.picked) .draft-intent {
+  color: var(--muted);
+}
+.redo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.redo-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.redo-row input {
+  flex: 1;
+  min-width: 0;
+}
 .panel-foot button svg {
   margin-right: 2px;
 }
