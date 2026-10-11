@@ -200,34 +200,28 @@ function EventEditor({ anchor, draft: initial, onClose }: { anchor: HTMLElement;
           </div>
         </div>
         {error && <p className="error small">{error}</p>}
+        {/* Delete is one button that grows into the red confirm in place, so deleting is two clicks
+            on the same spot; Cancel stays where it was and backs out first (decision 46). */}
         <div className="ee-foot">
-          {confirming ? (
-            // Where the trash button was, in the same order as every inline confirm.
-            <>
-              <span className="small">Delete this event?</span>
-              <button type="button" className="danger sm" onClick={() => void remove()}>
-                Delete
-              </button>
-              <button type="button" className="sm" onClick={() => setConfirming(false)}>
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              {d.id && (
-                <button type="button" className="icon-btn sm danger" title="Delete event" aria-label="Delete event" onClick={() => setConfirming(true)}>
-                  <Trash2 size={14} strokeWidth={1.75} aria-hidden />
-                </button>
-              )}
-              <span className="grow" />
-              <button type="button" className="ghost sm" onClick={() => onClose(false)}>
-                Cancel
-              </button>
-              <button type="submit" className="primary sm">
-                {d.id ? 'Save' : 'Add event'}
-              </button>
-            </>
+          {d.id && (
+            <button
+              type="button"
+              className={`ee-delete${confirming ? ' armed' : ''}`}
+              title={confirming ? 'Delete this event' : 'Delete event'}
+              aria-label={confirming ? 'Confirm: delete this event' : 'Delete event'}
+              onClick={() => (confirming ? void remove() : setConfirming(true))}
+            >
+              <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+              <span>Delete</span>
+            </button>
           )}
+          <span className="grow" />
+          <button type="button" className="ghost sm" onClick={() => (confirming ? setConfirming(false) : onClose(false))}>
+            Cancel
+          </button>
+          <button type="submit" className={`primary sm${confirming ? ' invisible' : ''}`} disabled={confirming} aria-hidden={confirming || undefined}>
+            {d.id ? 'Save' : 'Add event'}
+          </button>
         </div>
       </form>
     </Popover>

@@ -314,17 +314,17 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .panel > :nth-child(n + 4) {
   animation-delay: 120ms;
 }
-.frame .row .slot {
+/* Only actions that arrive with the bar pop in (slots 3 and 4, More's picks). Ask and Save were
+   already on the pill, so they stay put when it becomes the bar, even as Save's label fills in
+   (decision 46). */
+.frame .row .slot:nth-child(n + 4) {
   animation: pop-in-small var(--spring-pop-ms) var(--spring-pop) both;
 }
-.frame .row .slot:nth-child(3) {
+.frame .row .slot:nth-child(5) {
   animation-delay: 30ms;
 }
-.frame .row .slot:nth-child(4) {
+.frame .row .slot:nth-child(n + 6) {
   animation-delay: 60ms;
-}
-.frame .row .slot:nth-child(n + 5) {
-  animation-delay: 90ms;
 }
 .panel h2 {
   margin: 0;
