@@ -62,8 +62,8 @@ export function resolvePerson(lookup: PeopleLookup, c: PersonCandidate, sourceAp
 export const FIRST_NAME_SCORE = 0.9;
 
 /**
- * One side is only a first name ("Shivani" for a saved "Priya Desai", or the reverse): a
- * saved person with that first name is offered as "Is this the same Shivani?" instead of a
+ * One side is only a first name ("Jordan" for a saved "Jordan Hale", or the reverse): a
+ * saved person with that first name is offered as "Is this the same Jordan?" instead of a
  * duplicate. In any app, since chats and sign-offs often show only a first name. Several
  * matches prefer someone seen in this app.
  */

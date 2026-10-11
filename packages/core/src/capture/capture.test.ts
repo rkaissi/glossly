@@ -33,7 +33,7 @@ describe('app matching', () => {
   });
 
   it('keeps the site name when it comes first, past an unread count', () => {
-    const dm = { process_name: 'chrome.exe', title: '(214) Discord | Ted Marsh, Noah Ellis - Google Chrome' };
+    const dm = { process_name: 'chrome.exe', title: '(214) Discord | Casey Lin, Robin Diaz - Google Chrome' };
     const server = { process_name: 'chrome.exe', title: 'Discord | #general | Acme Server - Google Chrome' };
     expect(siteKeyFor(dm)).toBe('Discord |');
     expect(siteKeyFor(server)).toBe('Discord |');

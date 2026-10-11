@@ -213,17 +213,17 @@ describe('resolvePerson', () => {
 
   it('asks about a saved person when only the first name is shown, in any app', () => {
     const r = repo();
-    const shivani = r.create({ name: 'Priya Desai' });
-    const vishnu = r.create({ name: 'Vishnu' });
-    expect(resolvePerson(r, { name: 'Shivani' }, 'chrome.exe')).toEqual({ kind: 'fuzzy', personId: shivani.id, score: FIRST_NAME_SCORE });
-    expect(resolvePerson(r, { name: 'Vishnu Satish' }, 'chrome.exe')).toMatchObject({ kind: 'fuzzy', personId: vishnu.id });
+    const jordan = r.create({ name: 'Jordan Hale' });
+    const morgan = r.create({ name: 'Morgan' });
+    expect(resolvePerson(r, { name: 'Jordan' }, 'chrome.exe')).toEqual({ kind: 'fuzzy', personId: jordan.id, score: FIRST_NAME_SCORE });
+    expect(resolvePerson(r, { name: 'Morgan Ellis' }, 'chrome.exe')).toMatchObject({ kind: 'fuzzy', personId: morgan.id });
     // Two full names with the same first name are different people unless the user says so.
-    expect(resolvePerson(r, { name: 'Shivani Rao' }, 'chrome.exe')).toEqual({ kind: 'none' });
+    expect(resolvePerson(r, { name: 'Jordan Reyes' }, 'chrome.exe')).toEqual({ kind: 'none' });
     expect(resolvePerson(r, { name: 'Jo' }, 'chrome.exe')).toEqual({ kind: 'none' });
-    // Two saved Shivanis: the one seen in this app is offered.
-    const other = r.create({ name: 'Shivani Rao' });
+    // Two saved Jordans: the one seen in this app is offered.
+    const other = r.create({ name: 'Jordan Reyes' });
     r.addInteraction({ person_id: other.id, direction: 'inbound', text: 'hi', source_app: 'discord.exe' });
-    expect(resolvePerson(r, { name: 'Shivani' }, 'discord.exe')).toMatchObject({ kind: 'fuzzy', personId: other.id });
+    expect(resolvePerson(r, { name: 'Jordan' }, 'discord.exe')).toMatchObject({ kind: 'fuzzy', personId: other.id });
   });
 });
 
