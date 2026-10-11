@@ -61,7 +61,7 @@ describe('todos (decision 36)', () => {
 });
 
 describe('matchOpenTasks', () => {
-  const task = (id: string, owner: 'me' | 'them', text: string): CommitmentView => ({ id, owner, text, due_at: null, status: 'open', person_id: 'p1', person_name: 'Jordan Hale' });
+  const task = (id: string, owner: 'me' | 'them', text: string): CommitmentView => ({ id, owner, text, due_at: null, status: 'open', completed_at: null, person_id: 'p1', person_name: 'Jordan Hale' });
   const open = [
     { key: 't1', task: task('a', 'me', 'send the Q3 budget') },
     { key: 't2', task: task('b', 'them', 'review the contract') },

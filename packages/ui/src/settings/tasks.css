@@ -1,0 +1,259 @@
+/* The Tasks tab (Step 20.2, decision 40), on the Step 20.1 scale and controls. */
+
+.tasks-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.tasks-head h2 {
+  margin: 0;
+}
+.tasks-head p {
+  margin: 2px 0 0;
+}
+
+.quick-add {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 44px;
+  padding: 0 6px 0 var(--s-3);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow:
+    0 0 0 1px var(--border) inset,
+    var(--shadow-sm);
+  transition: box-shadow var(--fade);
+}
+.quick-add:focus-within {
+  box-shadow:
+    0 0 0 1px var(--fg-2) inset,
+    var(--shadow-sm);
+}
+.quick-add > svg {
+  flex: none;
+  color: var(--muted);
+}
+.quick-add input {
+  all: unset;
+  flex: 1;
+  min-width: 0;
+}
+.quick-add input::placeholder {
+  color: var(--muted);
+}
+.quick-hint {
+  display: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.quick-add:focus-within .quick-hint {
+  display: inline;
+}
+
+.task-filters {
+  display: flex;
+  gap: 6px;
+  margin: var(--s-4) 0 var(--s-2);
+}
+button.fchip {
+  gap: 6px;
+  height: var(--h-sm);
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--fg-2);
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+}
+button.fchip .n {
+  font-size: 12px;
+  color: var(--muted);
+}
+button.fchip:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.fchip[aria-pressed='true'],
+button.fchip[aria-pressed='true']:hover:not(:disabled) {
+  background: var(--primary);
+  color: var(--primary-fg);
+  box-shadow: none;
+}
+button.fchip[aria-pressed='true'] .n {
+  color: inherit;
+  opacity: 0.65;
+}
+
+.task-section {
+  margin-top: var(--s-5);
+}
+.task-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0 var(--s-1) var(--s-2);
+  font: 600 13px var(--font);
+}
+.task-section-head.overdue {
+  color: var(--danger);
+}
+.task-section-head .n,
+button.collapse .n {
+  font-weight: 400;
+  color: var(--muted);
+}
+.task-section-head .when {
+  font-weight: 400;
+  color: var(--muted);
+}
+button.collapse {
+  height: auto;
+  gap: var(--s-2);
+  padding: 0 var(--s-1) var(--s-2);
+  background: transparent;
+  box-shadow: none;
+  font: 600 13px var(--font);
+}
+button.collapse:hover:not(:disabled) {
+  background: transparent;
+}
+button.collapse svg {
+  color: var(--muted);
+  transition: transform var(--fade) var(--ease-out);
+}
+button.collapse[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row-h);
+  padding: 4px var(--s-2) 4px var(--row-px);
+  transition: background-color var(--fade);
+}
+.task-row + .task-row {
+  border-top: 1px solid var(--border);
+}
+.task-row:hover {
+  background: var(--surface-2);
+}
+.task-row.confirming {
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+.task-row.leaving {
+  animation: task-leave 420ms var(--ease-out) forwards;
+}
+@keyframes task-leave {
+  0% {
+    background: var(--surface-2);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+.task-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.task-row.done input.inline-input {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.task-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.task-who:hover {
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.task-when {
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.task-row .row-acts {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--fade);
+}
+.task-row:hover .row-acts,
+.task-row:focus-within .row-acts,
+.task-row .row-acts:has([aria-expanded='true']) {
+  opacity: 1;
+}
+
+.empty-state {
+  padding: var(--s-6) 0;
+  text-align: center;
+  color: var(--muted);
+}
+.empty-state strong {
+  display: block;
+  margin-bottom: 4px;
+  font: 600 15px var(--font-display);
+  color: var(--fg);
+}
+
+/* The Undo bar after a task is checked off. */
+.toast-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-fg);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  transform: translateX(-50%);
+  animation: toast-in 200ms var(--ease-out);
+}
+.toast-bar button {
+  flex: none;
+  height: var(--h-sm);
+  background: transparent;
+  color: inherit;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-fg) 30%, transparent) inset;
+}
+.toast-bar button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary-fg) 12%, transparent);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}

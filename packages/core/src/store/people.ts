@@ -364,7 +364,7 @@ export class PeopleRepo {
     }
     return this.db
       .prepare(
-        `SELECT c.id, c.owner, c.text, c.due_at, c.status, c.person_id, p.name AS person_name
+        `SELECT c.id, c.owner, c.text, c.due_at, c.status, c.completed_at, c.person_id, p.name AS person_name
          FROM commitments c LEFT JOIN people p ON p.id = c.person_id
          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
          ORDER BY c.status = 'open' DESC, c.due_at IS NULL, c.due_at, c.created_at DESC`,
@@ -372,8 +372,9 @@ export class PeopleRepo {
       .all(...args) as unknown as CommitmentView[];
   }
 
+  /** Done and dropped tasks remember when (migration 6); reopening clears it. */
   setCommitmentStatus(id: string, status: CommitmentStatus): void {
-    this.db.prepare('UPDATE commitments SET status = ? WHERE id = ?').run(status, id);
+    this.db.prepare('UPDATE commitments SET status = ?, completed_at = ? WHERE id = ?').run(status, status === 'open' ? null : new Date().toISOString(), id);
   }
 
   /** Edits a task's text or due date. A new due date gets a new reminder. */

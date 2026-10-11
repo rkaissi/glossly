@@ -152,6 +152,10 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX calendar_event_people_person ON calendar_event_people(person_id);
   `,
+  /* 6: When a task was finished (Step 20.2), for the Tasks tab's Completed list. Tasks finished
+     before this have none. */ `
+  ALTER TABLE commitments ADD COLUMN completed_at TEXT;
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */

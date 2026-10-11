@@ -1,9 +1,9 @@
 // The settings window: first-run setup (#setup) and the tabs, in two groups (Step 20.1): what you
-// keep (#agenda, #people, #saved) and the settings (#profile, #models, #privacy, #general, #metrics).
-// Main changes the hash on an open window to switch tabs. #keys and #data are older names.
-import { Fragment, useEffect, useState } from 'react';
+// keep (#tasks, #calendar, #people, #saved) and the settings (#profile, #models, #privacy, #general, #metrics).
+// Main changes the hash on an open window to switch tabs. #keys, #data, and #agenda are older names.
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, Bookmark, CalendarCheck, Cpu, Shield, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
+import { Activity, Bookmark, CalendarDays, CircleCheck, Cpu, Shield, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { GlosslyMark } from '../icons';
@@ -18,10 +18,15 @@ import { PeopleTab } from './People';
 import { ProfileTab } from './Profile';
 import { SavedTab } from './Saved';
 import { Setup } from './Setup';
-import { AgendaTab } from './Agenda';
+import { CalendarTab } from './Calendar';
+import { TasksTab } from './Tasks';
+import { useLive } from './useLive';
+import { WeekStartContext } from '../controls/week';
+import { toDay } from '../controls/logic';
 
 const TABS = [
-  { id: 'agenda', label: 'Agenda', group: 'mine' },
+  { id: 'tasks', label: 'Tasks', group: 'mine' },
+  { id: 'calendar', label: 'Calendar', group: 'mine' },
   { id: 'people', label: 'People', group: 'mine' },
   { id: 'saved', label: 'Saved', group: 'mine' },
   { id: 'profile', label: 'Profile', group: 'settings' },
@@ -32,10 +37,18 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
-const TAB_ICONS: Record<Tab, LucideIcon> = { agenda: CalendarCheck, people: UsersRound, saved: Bookmark, profile: UserRound, models: Cpu, privacy: Shield, general: SlidersHorizontal, metrics: Activity };
+const TAB_ICONS: Record<Tab, LucideIcon> = { tasks: CircleCheck, calendar: CalendarDays, people: UsersRound, saved: Bookmark, profile: UserRound, models: Cpu, privacy: Shield, general: SlidersHorizontal, metrics: Activity };
 
-/** Tabs that moved in Step 20.1: Keys is part of Models, Data of Privacy and data. */
-const MOVED: Record<string, Tab> = { keys: 'models', data: 'privacy' };
+/** Tabs that moved: Keys is part of Models and Data of Privacy and data (Step 20.1); Agenda became Tasks and Calendar (Step 20.2). */
+const MOVED: Record<string, Tab> = { keys: 'models', data: 'privacy', agenda: 'tasks' };
+
+/** Open tasks due today or earlier, beside Tasks in the sidebar. */
+function DueCount() {
+  const open = useLive(useCallback(() => glossly.invoke('commitments:list', { status: 'open' }), []));
+  const today = toDay(new Date());
+  const n = (open ?? []).filter((t) => t.due_at && t.due_at.slice(0, 10) <= today).length;
+  return n > 0 ? <span className="nav-count">{n}</span> : null;
+}
 
 // Main loads the page with ?material=mica when the window is Windows 11 mica.
 document.documentElement.dataset.material = new URLSearchParams(location.search).get('material') ?? 'none';
@@ -77,53 +90,57 @@ function App() {
   // Until setup is finished, a window opened without a tab shows setup.
   const [head, personId] = splitHash(hash);
   if (head === 'setup' || (!isTab(head) && !view.settings.firstRunComplete)) {
-    return <Setup view={view} onDone={() => (location.hash = 'agenda')} />;
+    return <Setup view={view} onDone={() => (location.hash = 'tasks')} />;
   }
-  const tab: Tab = isTab(head) ? head : 'agenda';
+  const tab: Tab = isTab(head) ? head : 'tasks';
   return (
-    <div className="settings">
-      <nav>
-        <div className="brand">
-          <GlosslyMark size={18} />
-          Glossly
-        </div>
-        {TABS.map((t, i) => {
-          const Icon = TAB_ICONS[t.id];
-          return (
-            <Fragment key={t.id}>
-              {t.group !== TABS[i - 1]?.group && t.group === 'settings' && <div className="nav-group">Settings</div>}
-              <a href={`#${t.id}`} className={t.id === tab ? 'current' : undefined} aria-current={t.id === tab ? 'page' : undefined}>
-                <Icon size={16} strokeWidth={1.75} aria-hidden />
-                {t.label}
-              </a>
-            </Fragment>
-          );
-        })}
-        <span className="spacer" />
-        {!view.settings.firstRunComplete && (
-          <a href="#setup" className="setup-link">
-            <Sparkles size={16} strokeWidth={1.75} aria-hidden />
-            Finish setup
-          </a>
-        )}
-        {view.settings.firstRunComplete && !view.settings.identity.name.trim() && tab !== 'profile' && (
-          <a href="#profile" className="setup-link">
-            <UserRound size={16} strokeWidth={1.75} aria-hidden />
-            Add your name
-          </a>
-        )}
-      </nav>
-      <main>
-        {tab === 'profile' && <ProfileTab view={view} />}
-        {tab === 'people' && <PeopleTab personId={personId} />}
-        {tab === 'agenda' && <AgendaTab />}
-        {tab === 'saved' && <SavedTab />}
-        {tab === 'models' && <ModelsTab view={view} />}
-        {tab === 'general' && <GeneralTab view={view} />}
-        {tab === 'privacy' && <PrivacyDataTab view={view} />}
-        {tab === 'metrics' && <MetricsTab />}
-      </main>
-    </div>
+    <WeekStartContext.Provider value={view.settings.weekStart}>
+      <div className="settings">
+        <nav>
+          <div className="brand">
+            <GlosslyMark size={18} />
+            Glossly
+          </div>
+          {TABS.map((t, i) => {
+            const Icon = TAB_ICONS[t.id];
+            return (
+              <Fragment key={t.id}>
+                {t.group !== TABS[i - 1]?.group && t.group === 'settings' && <div className="nav-group">Settings</div>}
+                <a href={`#${t.id}`} className={t.id === tab ? 'current' : undefined} aria-current={t.id === tab ? 'page' : undefined}>
+                  <Icon size={16} strokeWidth={1.75} aria-hidden />
+                  {t.label}
+                  {t.id === 'tasks' && <DueCount />}
+                </a>
+              </Fragment>
+            );
+          })}
+          <span className="spacer" />
+          {!view.settings.firstRunComplete && (
+            <a href="#setup" className="setup-link">
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden />
+              Finish setup
+            </a>
+          )}
+          {view.settings.firstRunComplete && !view.settings.identity.name.trim() && tab !== 'profile' && (
+            <a href="#profile" className="setup-link">
+              <UserRound size={16} strokeWidth={1.75} aria-hidden />
+              Add your name
+            </a>
+          )}
+        </nav>
+        <main>
+          {tab === 'profile' && <ProfileTab view={view} />}
+          {tab === 'people' && <PeopleTab personId={personId} />}
+          {tab === 'tasks' && <TasksTab />}
+          {tab === 'calendar' && <CalendarTab view={view} />}
+          {tab === 'saved' && <SavedTab />}
+          {tab === 'models' && <ModelsTab view={view} />}
+          {tab === 'general' && <GeneralTab view={view} />}
+          {tab === 'privacy' && <PrivacyDataTab view={view} />}
+          {tab === 'metrics' && <MetricsTab />}
+        </main>
+      </div>
+    </WeekStartContext.Provider>
   );
 }
 

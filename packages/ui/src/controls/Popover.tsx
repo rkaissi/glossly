@@ -5,6 +5,12 @@ import { RoomContext } from './room';
 
 let nextRoomId = 1;
 
+/**
+ * Open popovers, oldest first. Esc closes only the top one, and a click inside a popover above
+ * this one (a picker opened from it) doesn't count as outside.
+ */
+const stack: HTMLElement[] = [];
+
 /** The nearest ancestor that scrolls, whose box clips the anchor; null means the window. */
 function scrollParent(el: HTMLElement): HTMLElement | null {
   for (let p = el.parentElement; p; p = p.parentElement) {
@@ -35,7 +41,8 @@ export function Popover({
   anchor: RefObject<HTMLElement | null>;
   /** `restoreFocus` is true for Esc and picks, false for clicks outside and scrolling away. */
   onClose: (restoreFocus: boolean) => void;
-  align?: 'start' | 'end';
+  /** side: beside the anchor (an event in the calendar). */
+  align?: 'start' | 'end' | 'side';
   /** As wide as the anchor (the time list). */
   matchWidth?: boolean;
   /** Move focus into the popover on open (to `[data-autofocus]`, else the popover itself). */
@@ -88,15 +95,17 @@ export function Popover({
 
     const ro = new ResizeObserver(place);
     ro.observe(el);
+    stack.push(el);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || stack[stack.length - 1] !== el) return;
       e.preventDefault();
       e.stopPropagation();
       closeRef.current(true);
     };
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (!el.contains(t) && !a.contains(t)) closeRef.current(false);
+      const above = stack.slice(stack.indexOf(el) + 1);
+      if (!el.contains(t) && !a.contains(t) && !above.some((p) => p.contains(t))) closeRef.current(false);
     };
     addEventListener('scroll', place, true);
     addEventListener('resize', place);
@@ -108,6 +117,7 @@ export function Popover({
       removeEventListener('resize', place);
       removeEventListener('keydown', onKey, true);
       removeEventListener('mousedown', onDown, true);
+      stack.splice(stack.indexOf(el), 1);
       requestRoom?.(roomId.current, null);
     };
   }, [anchor, align, matchWidth, focus, requestRoom]);

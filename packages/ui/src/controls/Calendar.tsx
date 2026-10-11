@@ -1,9 +1,10 @@
-import { useRef, type KeyboardEvent } from 'react';
+import { useContext, useRef, type KeyboardEvent } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { addDays, addMonths, monthGrid, monthLabel, WEEKDAYS, type Day } from './logic';
+import { addDays, addMonths, monthGrid, monthLabel, weekdayNames, type Day } from './logic';
+import { WeekStartContext } from './week';
 
 /**
- * One month as a grid of days (Monday first). Arrow keys move the focused day, PageUp and
+ * One month as a grid of days, starting on the `weekStart` setting's day. Arrow keys move the focused day, PageUp and
  * PageDown move a month, Enter picks. `dayClass` adds range styling; `onHover` previews it.
  */
 export function Calendar({
@@ -31,6 +32,7 @@ export function Calendar({
   nav?: 'both' | 'prev' | 'next' | 'none';
 }) {
   const grid = useRef<HTMLDivElement>(null);
+  const ws = useContext(WeekStartContext);
   const inMonth = (d: Day) => d.slice(0, 7) === month.slice(0, 7);
 
   const moveFocus = (d: Day) => {
@@ -73,12 +75,12 @@ export function Calendar({
         )}
       </div>
       <div className="cal-grid" role="grid" aria-label={monthLabel(month)} ref={grid} onKeyDown={onKeyDown}>
-        {WEEKDAYS.map((w) => (
+        {weekdayNames(ws).map((w) => (
           <span key={w} className="cal-dow" aria-hidden>
-            {w}
+            {w.slice(0, 2)}
           </span>
         ))}
-        {monthGrid(month).map((d) => {
+        {monthGrid(month, ws).map((d) => {
           const cls = ['cal-day', !inMonth(d) && 'out', d === today && 'today', d === selected && 'sel', dayClass?.(d)].filter(Boolean).join(' ');
           return (
             <button

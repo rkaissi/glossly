@@ -3,7 +3,7 @@ import type { AppMode, Settings, SettingsKey, SettingsView } from '@glossly/core
 import { X } from 'lucide-react';
 import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
-import { ChoiceCards, Switch } from '../controls/Toggles';
+import { ChoiceCards, Segmented, Switch } from '../controls/Toggles';
 import { formatAccelerator, normalizeAppKey, toAccelerator } from './format';
 import { useAction } from './useAction';
 
@@ -259,6 +259,33 @@ export function BlockList({ view }: { view: SettingsView }) {
   );
 }
 
+/** The calendar and date pickers start weeks on Monday (the default) or Sunday. */
+function WeekStartField({ view }: { view: SettingsView }) {
+  const { busy, error, set } = useSetting();
+  return (
+    <div className="field">
+      <div className="toggle">
+        <span>
+          <strong>Week starts on</strong>
+          <span className="muted small block">For the Calendar tab and every date picker.</span>
+        </span>
+        <Segmented
+          size="sm"
+          label="Week starts on"
+          disabled={busy}
+          value={String(view.settings.weekStart) as '0' | '1'}
+          options={[
+            ['1', 'Monday'],
+            ['0', 'Sunday'],
+          ]}
+          onChange={(v) => void set('weekStart', Number(v))}
+        />
+      </div>
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
 export function GeneralTab({ view }: { view: SettingsView }) {
   return (
     <section>
@@ -266,6 +293,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
       <Hotkey view={view} />
       <SaveMode view={view} />
       <AppModes view={view} />
+      <WeekStartField view={view} />
       <Toggle view={view} k="debugView" label="Debug view" desc="Shows capture method, timings, and routing details at the bottom of the bar." />
     </section>
   );

@@ -3,6 +3,7 @@ import {
   addDays,
   addMinutes,
   addMonths,
+  diffDays,
   anchorHidden,
   dateShortcuts,
   formatTime,
@@ -19,6 +20,7 @@ import {
   roomNeeded,
   TIME_STEPS,
   typeAhead,
+  weekdayNames,
   weekStart,
 } from './logic';
 
@@ -46,6 +48,13 @@ describe('placePopover', () => {
     expect(placePopover(rect(100, 800), { w: 250, h: 100 }, VIEW, 'end').left).toBe(800 + 160 - 250);
     expect(placePopover(rect(100, 900), { w: 250, h: 100 }, VIEW).left).toBe(1000 - 250 - 8);
     expect(placePopover(rect(100, -40), { w: 250, h: 100 }, VIEW).left).toBe(8);
+  });
+  it('goes beside an anchor for side placement', () => {
+    expect(placePopover(rect(200, 100), { w: 300, h: 400 }, VIEW, 'side')).toEqual({ top: 200, left: 266, maxHeight: null, side: 'below' });
+    // no room on the right: to the left
+    expect(placePopover(rect(200, 700, 32, 200), { w: 300, h: 400 }, VIEW, 'side').left).toBe(394);
+    // near the bottom: moved up to fit
+    expect(placePopover(rect(700, 100), { w: 300, h: 400 }, VIEW, 'side').top).toBe(392);
   });
   it('reports the room a popover below needs, and when the anchor is scrolled away', () => {
     expect(roomNeeded(rect(100, 0), 300, 600)).toBeNull(); // fits below
@@ -103,6 +112,15 @@ describe('days', () => {
   it('starts weeks on Monday', () => {
     expect(weekStart('2026-10-11')).toBe('2026-10-05'); // a Sunday
     expect(weekStart('2026-10-12')).toBe('2026-10-12'); // a Monday
+  });
+  it('starts weeks on Sunday when set', () => {
+    expect(weekStart('2026-10-11', 0)).toBe('2026-10-11'); // a Sunday
+    expect(weekStart('2026-10-14', 0)).toBe('2026-10-11');
+    expect(monthGrid('2026-10-11', 0)[0]).toBe('2026-09-27');
+    expect(weekdayNames(0)[0]).toBe('Sun');
+    expect(weekdayNames()).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(diffDays('2026-11-01', '2026-10-30')).toBe(2);
+    expect(diffDays('2026-03-01', '2026-03-31')).toBe(-30);
   });
   it('draws six weeks from the Monday on or before the 1st', () => {
     const g = monthGrid('2026-10-11');

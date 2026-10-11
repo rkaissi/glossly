@@ -161,7 +161,7 @@ export function SearchPanel({ s }: { s: OverlayState }) {
             <h3 className="section-label">Upcoming events</h3>
             <ul className="saved-list">
               {results!.events.map((e) => (
-                <li key={e.id} className="saved-row clickable" onClick={() => void glossly.invoke('settings:open', { tab: 'agenda' })}>
+                <li key={e.id} className="saved-row clickable" onClick={() => void glossly.invoke('settings:open', { tab: 'calendar' })}>
                   <div className="saved-text">{e.title}</div>
                   <div className="saved-meta">
                     <span className="muted">{formatEventTime(e)}</span>

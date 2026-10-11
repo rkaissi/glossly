@@ -132,6 +132,15 @@ code {
   border-radius: var(--radius-sm);
   transition: background-color var(--fade) ease;
 }
+.settings nav a .nav-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.settings section.tasks-tab {
+  max-width: 760px;
+}
 .settings nav .nav-group {
   padding: var(--s-5) 10px var(--s-1);
   font-size: 12px;
@@ -744,77 +753,3 @@ button.link {
   text-decoration: underline;
 }
 
-/* Agenda tab (decisions 36 and 37), on the Step 20.1 row: round check, title that edits in
-   place, a quiet person line, the due chip, and a "…" menu that shows on hover. */
-.agenda-group h3 {
-  margin: var(--s-5) 0 var(--s-2);
-  font-size: 13px;
-}
-.agenda-filters {
-  margin: var(--s-4) 0 var(--s-2);
-}
-.add-todo {
-  margin-top: var(--s-4);
-}
-.list.tasks li.task {
-  gap: 10px;
-  min-height: var(--row-h);
-  padding: 6px var(--s-2) 6px var(--row-px);
-}
-.list.tasks li.task:hover {
-  background: var(--surface-2);
-}
-.list.tasks li.task.confirming {
-  background: color-mix(in srgb, var(--danger) 7%, transparent);
-}
-.task .event-icon {
-  display: inline-flex;
-  width: 18px;
-  justify-content: center;
-  color: var(--fg-2);
-}
-.task-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.task-sub {
-  font-size: 12.5px;
-  color: var(--muted);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.task-sub a {
-  color: inherit;
-  text-decoration: none;
-}
-.task-sub a:hover {
-  color: var(--fg);
-  text-decoration: underline;
-}
-.task.done input.inline-input {
-  color: var(--muted);
-  text-decoration: line-through;
-}
-.task.done {
-  animation: row-settle 400ms var(--ease-out);
-}
-@keyframes row-settle {
-  from {
-    background: var(--surface-2);
-  }
-}
-.row-acts {
-  display: flex;
-  gap: 2px;
-  opacity: 0;
-  transition: opacity var(--fade);
-}
-.task:hover .row-acts,
-.task:focus-within .row-acts {
-  opacity: 1;
-}
-.row-acts:has(.open) {
-  opacity: 1;
-}

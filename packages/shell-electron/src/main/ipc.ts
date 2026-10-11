@@ -40,7 +40,7 @@ import type { SettingsWindow } from './settings-window';
 const log = logger('ipc');
 
 const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
-const TABS = ['agenda', 'people', 'saved', 'profile', 'models', 'privacy', 'general', 'metrics'] as const;
+const TABS = ['tasks', 'calendar', 'people', 'saved', 'profile', 'models', 'privacy', 'general', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
 const CHANGES: readonly TaskChange[] = ['new', 'same', 'done', 'moved'];
@@ -72,6 +72,11 @@ const str = (v: unknown, max = 10_000): string => {
   return v;
 };
 const optStr = (v: unknown, max = 10_000): string | undefined => (v === undefined || v === null || v === '' ? undefined : str(v, max));
+/** A list of at most `maxItems` strings of at most `max` characters each. */
+const strList = (v: unknown, maxItems: number, max: number): string[] => {
+  if (!Array.isArray(v) || v.length > maxItems) throw new Error('Invalid argument');
+  return v.map((x) => str(x, max));
+};
 const obj = (v: unknown): Record<string, unknown> => {
   if (typeof v !== 'object' || v === null) throw new Error('Invalid argument');
   return v as Record<string, unknown>;
@@ -383,8 +388,29 @@ export function registerIpc(deps: IpcDeps): void {
     }
     if (p.all_day !== undefined) patch.all_day = p.all_day === true;
     if (p.location !== undefined) patch.location = p.location === null ? null : str(p.location, 300);
+    if (p.personIds !== undefined) patch.personIds = strList(p.personIds, 50, 100);
     services.calendar.update(str(a.id, 100), patch);
     broadcastPeople();
+  });
+  handle('calendar:add', (a) => {
+    const starts = str(a.starts_at, 40);
+    const ends = a.ends_at === null || a.ends_at === undefined ? null : str(a.ends_at, 40);
+    if (!DUE.test(starts) || (ends && !DUE.test(ends))) throw new Error('Invalid date');
+    const e = services.calendar.add(
+      {
+        title: str(a.title, 200),
+        starts_at: starts,
+        ends_at: ends,
+        all_day: a.all_day === true,
+        location: a.location === null || a.location === undefined ? null : str(a.location, 300),
+        attendees: strList(a.attendees ?? [], 50, 100),
+        personIds: strList(a.personIds ?? [], 50, 100),
+      },
+      null,
+    );
+    log.info('event added', { allDay: e.all_day, people: e.people.length });
+    broadcastPeople();
+    return e;
   });
   handle('calendar:delete', (a) => {
     services.calendar.delete(str(a.id, 100));

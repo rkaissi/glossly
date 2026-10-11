@@ -12,7 +12,7 @@ const MAX_PER_CHECK = 3;
  * Due-date notifications for saved commitments (spec: on the due date at 9:00 local time), and
  * reminders before calendar events (decision 37: `eventReminderMinutes` before a timed one, the
  * reminder hour for an all-day one). Each shows once (`notified_at`). Clicking one opens
- * Settings > Agenda.
+ * Settings > Tasks or Calendar.
  */
 export class Reminders {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -21,7 +21,7 @@ export class Reminders {
 
   constructor(
     private readonly services: Services,
-    private readonly openAgenda: () => void,
+    private readonly openTab: (tab: 'tasks' | 'calendar') => void,
   ) {}
 
   start(): void {
@@ -39,11 +39,11 @@ export class Reminders {
     this.timer = null;
   }
 
-  private notify(title: string, body: string): void {
+  private notify(title: string, body: string, tab: 'tasks' | 'calendar'): void {
     const n = new Notification({ title, body });
     this.live.add(n);
     n.on('click', () => {
-      this.openAgenda();
+      this.openTab(tab);
       this.live.delete(n);
     });
     n.on('close', () => this.live.delete(n));
@@ -57,14 +57,14 @@ export class Reminders {
       const events = calendar.dueReminders(now, settings.eventReminderMinutes, cutoff);
       for (const e of events.slice(0, MAX_PER_CHECK)) {
         const { title, body } = eventReminderText(e);
-        this.notify(title, body);
+        this.notify(title, body, 'calendar');
         calendar.markNotified(e.id);
         log.info('event reminder shown', { all_day: e.all_day });
       }
       const due = people.dueUnnotified(cutoff);
       for (const c of due.slice(0, Math.max(0, MAX_PER_CHECK - events.length))) {
         const { title, body } = reminderText(c, now);
-        this.notify(title, body);
+        this.notify(title, body, 'tasks');
         people.markNotified(c.id);
         log.info('reminder shown', { owner: c.owner, overdue: (c.due_at ?? '').slice(0, 10) < isoNow(now).slice(0, 10) });
       }

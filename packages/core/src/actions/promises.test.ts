@@ -304,7 +304,7 @@ describe('reminders', () => {
   });
 
   it('words the notification by owner and lateness', () => {
-    const c = { id: 'c', owner: 'me' as const, text: 'send the slides', due_at: '2026-10-14', status: 'open' as const, person_id: 'p', person_name: 'Maya Lin' };
+    const c = { id: 'c', owner: 'me' as const, text: 'send the slides', due_at: '2026-10-14', status: 'open' as const, completed_at: null, person_id: 'p', person_name: 'Maya Lin' };
     expect(reminderText(c, now)).toEqual({ title: 'You promised Maya Lin', body: 'send the slides\nDue today' });
     expect(reminderText({ ...c, owner: 'them', due_at: '2026-10-12T15:00:00-04:00' }, now)).toEqual({
       title: 'Maya Lin promised you',

@@ -50,4 +50,6 @@ export interface EventPatch {
   ends_at?: string | null;
   all_day?: boolean;
   location?: string | null;
+  /** The saved people at the event, replacing the current ones (the Calendar tab's editor). */
+  personIds?: string[];
 }

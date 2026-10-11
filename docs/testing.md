@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (514 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (537 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -139,11 +139,10 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Setup on a throwaway profile: choosing Local only enables Next with no key; All models needs a key or a local server.
 
 **Tasks and events (Steps 19.1 and 19.2)**
-- [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Agenda.
+- [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Tasks.
 - [ ] A reply that finishes one ("Here is the budget") and moves another ("can we push the review to Monday?"): rows tagged Mark done and New date with the old → new date; Save updates both (`promises_saved {updated: 2}`), no duplicates.
 - [ ] Restating an open task shows it as Already open, unchecked, and Space doesn't check it.
-- [ ] Settings > Agenda: Add a todo with a date, edit text and date, mark done, reopen, filter by person and by Tasks / Events, Done and past, delete with the confirm. A reminder click opens Agenda.
-- [ ] An invitation ("Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?" from a fictional sender): the bar offers Tasks and events; the panel has the event (day, 1 PM to 2 PM, place) and the task (bring the deck); Save adds both; the event shows in the Agenda under its day, in Search, and on the sender's card if saved. A second event on that day shows under "Already that day".
+- [ ] An invitation ("Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?" from a fictional sender): the bar offers Tasks and events; the panel has the event (day, 1 PM to 2 PM, place) and the task (bring the deck); Save adds both; the event shows in Calendar on its day, in Search, and on the sender's card if saved. A second event on that day shows under "Already that day".
 - [ ] "Send the report by Friday 5pm" gives a task, not an event. An all-day event ("offsite Oct 20") saves without times.
 - [ ] Event reminders: a timed event 15 minutes ahead shows a toast once; an all-day one at 9:00 on its day (same toast caveat as tasks, Step 22).
 - [ ] Local only with no local model: the invitation gives the event and the task by patterns.
@@ -151,11 +150,19 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Local only with no local model: pattern rows matched to an open task by words show Already open or New date.
 
 **Design system and controls (Step 20.1)**
-- [ ] Settings window: every tab shows our controls and no native dropdown, date, time, or checkbox; the sidebar has the two groups; the window opens on Agenda; `#keys` and `#data` (an overlay "Add a key" button, a reminder click) land on Models and Privacy and data. Light and dark.
+- [ ] Settings window: every tab shows our controls and no native dropdown, date, time, or checkbox; the sidebar has the two groups; the window opens on Tasks; `#keys` and `#data` (an overlay "Add a key" button, a reminder click) land on Models and Privacy and data. Light and dark.
 - [ ] Popovers in the settings window: a Select, the date picker, and a due chip near the bottom of the window open above or scroll inside, stay attached while the page scrolls, close on Esc (focus back on the trigger) and on a click outside.
 - [ ] Overlay Tasks and events panel: the person Select, the due chips, and the event's day and time pickers. A picker near the bottom of the panel grows the window while open and shrinks it after, both with the bar below and above the selection. Esc closes only the picker, not the panel; Enter in a picker never saves the panel; Space and the arrows still work on rows.
 - [ ] Time picker: type "3pm", "15:30", "3:45p"; arrows and Enter; clearing the start makes the event all day; a new start keeps the event's length.
 - [ ] Bar buttons (slots, badges, menu, chips) look as before: no new outline.
+
+**Tasks and Calendar (Step 20.2)**
+- [ ] Tasks: quick add "Send Jordan the deck by Friday" (title without "by Friday", due Friday); filters and counts; person filter; edit a title; change and clear a date from the hover button; check one off (slides out, Undo works); Completed shows "Done today"; delete with the confirm; the sidebar count. A reminder click opens Tasks (a task) or Calendar (an event); `#agenda` lands on Tasks.
+- [ ] Calendar Week: drag on empty time to create (editor beside the draft), a plain click makes an hour; resize by the bottom edge; move within a day and to another day; overlapping events side by side; tasks in the all-day row check off; the red now line; opens scrolled to 7 AM.
+- [ ] Calendar editor: day, start (keeps the length), end, all day, place, add and remove people, save, delete with the confirm; pickers open over the editor and Esc closes only the top one.
+- [ ] Calendar Month and Agenda: chips, "N more" opens Agenda for that day, a click on a day adds an event; Agenda's range picker and arrows; the Tasks switch; the tab reopens on the last view.
+- [ ] Glass events in light and dark, on mica and without it; General > Week starts on Sunday changes Week, Month, and the date pickers in settings.
+- [ ] Migration 6 on Rayan's database: done tasks show "Done" without a date; tasks done from now on show when.
 
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).

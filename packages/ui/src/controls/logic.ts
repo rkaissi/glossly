@@ -24,7 +24,8 @@ const GAP = 6;
  * Where a popover goes: below its anchor if it fits, else above if that fits, else on the
  * roomier side with a scrolling cap. Always inside the viewport (the window), with an 8 px margin.
  */
-export function placePopover(anchor: Rect, size: { w: number; h: number }, viewport: { w: number; h: number }, align: 'start' | 'end' = 'start'): Placement {
+export function placePopover(anchor: Rect, size: { w: number; h: number }, viewport: { w: number; h: number }, align: 'start' | 'end' | 'side' = 'start'): Placement {
+  if (align === 'side') return placeBeside(anchor, size, viewport);
   const below = viewport.h - MARGIN - (anchor.bottom + GAP);
   const above = anchor.top - GAP - MARGIN;
   let side: Placement['side'];
@@ -43,6 +44,19 @@ export function placePopover(anchor: Rect, size: { w: number; h: number }, viewp
   const wanted = align === 'end' ? anchor.right - size.w : anchor.left;
   const left = Math.max(MARGIN, Math.min(wanted, viewport.w - size.w - MARGIN));
   return { top, left, maxHeight, side };
+}
+
+/**
+ * Beside the anchor (an event in the calendar): to its right if it fits, else to its left, else
+ * over it at the right edge; top-aligned with it and kept inside the window.
+ */
+function placeBeside(anchor: Rect, size: { w: number; h: number }, viewport: { w: number; h: number }): Placement {
+  const right = anchor.right + GAP;
+  const left = right + size.w <= viewport.w - MARGIN ? right : anchor.left - GAP - size.w >= MARGIN ? anchor.left - GAP - size.w : viewport.w - MARGIN - size.w;
+  const room = viewport.h - 2 * MARGIN;
+  const h = Math.min(size.h, room);
+  const top = Math.max(MARGIN, Math.min(anchor.top, viewport.h - MARGIN - h));
+  return { top, left: Math.max(MARGIN, left), maxHeight: size.h > room ? room : null, side: 'below' };
 }
 
 /**
@@ -121,18 +135,27 @@ export const addMonths = (day: Day, n: number): Day => {
 
 export const monthOf = (day: Day): Day => `${day.slice(0, 7)}-01`;
 
-/** Monday of the week `day` is in (weeks start on Monday). */
-export const weekStart = (day: Day): Day => addDays(day, -((fromDay(day).getDay() + 6) % 7));
+/** Whole days from `b` to `a` (negative when `a` is earlier). */
+export const diffDays = (a: Day, b: Day): number => Math.round((fromDay(a).getTime() - fromDay(b).getTime()) / 86_400_000);
 
-/** Six weeks of days from the Monday on or before the 1st of `month`, for a month grid. */
-export function monthGrid(month: Day): Day[] {
-  const start = weekStart(monthOf(month));
+/** The first day of a week: 1 Monday (the default), 0 Sunday (the `weekStart` setting). */
+export type WeekStart = 0 | 1;
+
+/** The first day of the week `day` is in. */
+export const weekStart = (day: Day, ws: WeekStart = 1): Day => addDays(day, -((fromDay(day).getDay() - ws + 7) % 7));
+
+/** Six weeks of days from the week start on or before the 1st of `month`, for a month grid. */
+export function monthGrid(month: Day, ws: WeekStart = 1): Day[] {
+  const start = weekStart(monthOf(month), ws);
   return Array.from({ length: 42 }, (_, i) => addDays(start, i));
 }
 
 export const monthLabel = (month: Day): string => fromDay(month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-export const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/** Weekday names in grid order: "Mon" to "Sun", or "Sun" to "Sat". */
+export const weekdayNames = (ws: WeekStart = 1): string[] => Array.from({ length: 7 }, (_, i) => DAY_NAMES[(ws + i) % 7]!);
 
 /** "Fri, Oct 17", with the year when it isn't `today`'s. */
 export function dayLabel(day: Day, today: Day): string {
@@ -143,10 +166,10 @@ export function dayLabel(day: Day, today: Day): string {
 }
 
 /** The date picker's shortcuts: Today, Tomorrow, Next week (next Monday), and No date. */
-export function dateShortcuts(today: Day): { label: string; day: Day | null; hint: string }[] {
+export function dateShortcuts(today: Day, ws: WeekStart = 1): { label: string; day: Day | null; hint: string }[] {
   const weekday = (d: Day) => fromDay(d).toLocaleDateString('en-US', { weekday: 'short' });
   const tomorrow = addDays(today, 1);
-  const nextWeek = addDays(weekStart(today), 7);
+  const nextWeek = addDays(weekStart(today, ws), 7);
   return [
     { label: 'Today', day: today, hint: weekday(today) },
     { label: 'Tomorrow', day: tomorrow, hint: weekday(tomorrow) },
@@ -163,8 +186,8 @@ export interface DayRange {
 }
 
 /** The range picker's quick ranges. */
-export function quickRanges(today: Day): { label: string; range: DayRange }[] {
-  const mon = weekStart(today);
+export function quickRanges(today: Day, ws: WeekStart = 1): { label: string; range: DayRange }[] {
+  const mon = weekStart(today, ws);
   const first = monthOf(today);
   return [
     { label: 'Today', range: { from: today, to: today } },

@@ -126,6 +126,14 @@ export class CalendarRepo {
     this.db
       .prepare(`UPDATE calendar_events SET title = ?, starts_at = ?, ends_at = ?, all_day = ?, location = ?${moved ? ', notified_at = NULL' : ''} WHERE id = ?`)
       .run(title, next.starts_at, next.all_day ? null : next.ends_at, next.all_day ? 1 : 0, next.location?.trim() ? oneLine(next.location, MAX_LOCATION) : null, id);
+    if (patch.personIds) {
+      const ids = patch.personIds;
+      this.store.tx(() => {
+        this.db.prepare('DELETE FROM calendar_event_people WHERE event_id = ?').run(id);
+        const link = this.db.prepare('INSERT OR IGNORE INTO calendar_event_people (event_id, person_id) SELECT ?, id FROM people WHERE id = ?');
+        for (const pid of ids) link.run(id, pid);
+      });
+    }
   }
 
   delete(id: string): void {

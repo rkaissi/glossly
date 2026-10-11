@@ -510,9 +510,9 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
       <div className="panel-foot">
         {phase.kind === 'saved' && (
-          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'agenda' })}>
+          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: phase.saved + phase.updated > 0 ? 'tasks' : 'calendar' })}>
             <ExternalLink size={14} strokeWidth={1.75} aria-hidden />
-            Open Agenda
+            {phase.saved + phase.updated > 0 ? 'Open Tasks' : 'Open Calendar'}
           </button>
         )}
         <span className="spacer" />

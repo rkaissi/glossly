@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 
 /**
@@ -49,11 +49,6 @@ export function Segmented<T extends string>({
     void document.fonts?.ready.then(size);
   }, [labels]);
 
-  useLayoutEffect(() => {
-    ref.current?.style.setProperty('--n', String(options.length));
-    ref.current?.style.setProperty('--i', String(index));
-  }, [options.length, index]);
-
   const onKeyDown = (e: KeyboardEvent, i: number) => {
     const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
     if (!d) return;
@@ -64,7 +59,8 @@ export function Segmented<T extends string>({
   };
 
   return (
-    <div ref={ref} className={`seg${size === 'sm' ? ' sm' : ''}`} role="radiogroup" aria-label={label} data-control>
+    // --n and --i go in the first paint, so the highlight never slides in from the first option.
+    <div ref={ref} className={`seg${size === 'sm' ? ' sm' : ''}`} role="radiogroup" aria-label={label} style={{ '--n': options.length, '--i': index } as CSSProperties} data-control>
       <span className="seg-thumb" aria-hidden />
       {options.map(([v, text], i) => (
         <button

@@ -374,7 +374,7 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
-export type SettingsTab = 'agenda' | 'people' | 'saved' | 'profile' | 'models' | 'privacy' | 'general' | 'metrics';
+export type SettingsTab = 'tasks' | 'calendar' | 'people' | 'saved' | 'profile' | 'models' | 'privacy' | 'general' | 'metrics';
 
 // ---- channel maps ----
 
@@ -474,6 +474,8 @@ export interface InvokeChannels {
   'commitments:delete': { args: { id: string }; result: void };
   /** Calendar events for the Agenda tab, by day range ("YYYY-MM-DD", inclusive) and person. */
   'calendar:list': { args: { from?: string; to?: string; personId?: string }; result: CalendarEvent[] };
+  /** An event typed in the Calendar tab. */
+  'calendar:add': { args: EventSaveRow; result: CalendarEvent };
   'calendar:update': { args: { id: string; patch: EventPatch }; result: void };
   'calendar:delete': { args: { id: string }; result: void };
   /** A personal todo typed in the Agenda tab: owner "me", no person. */

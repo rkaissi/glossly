@@ -86,6 +86,8 @@ export interface CommitmentView {
   text: string;
   due_at: string | null;
   status: CommitmentStatus;
+  /** When it was done or dropped; null while open and for tasks finished before migration 6. */
+  completed_at: string | null;
   person_id: string | null;
   person_name: string | null;
 }

@@ -1,16 +1,17 @@
-import { useRef, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown } from 'lucide-react';
 import { Calendar } from './Calendar';
 import { MenuList } from './Menu';
 import { addMonths, dayLabel, monthOf, ordered, quickRanges, rangeLabel, rangeRole, toDay, type Day, type DayRange } from './logic';
 import { Popover } from './Popover';
+import { WeekStartContext } from './week';
 
 /**
  * Our date range picker: quick ranges on the left, two months (one in a narrow window), the
  * range previewed while hovering for the last day, then Apply. Hovering only restyles days, so
  * a click always lands on the day under the mouse.
  */
-export function DateRangePicker({ value, onChange, label, disabled }: { value: DayRange; onChange: (range: DayRange) => void; label: string; disabled?: boolean }) {
+export function DateRangePicker({ value, onChange, label, disabled, className }: { value: DayRange; onChange: (range: DayRange) => void; label: string; disabled?: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   const today = toDay(new Date());
@@ -24,7 +25,7 @@ export function DateRangePicker({ value, onChange, label, disabled }: { value: D
       <button
         ref={ref}
         type="button"
-        className="trigger range-trigger"
+        className={`trigger range-trigger${className ? ` ${className}` : ''}`}
         aria-label={`${label}: ${shown}`}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -78,7 +79,7 @@ function RangeBody({ value, today, onApply, onCancel }: { value: DayRange; today
       setAnchorDay(null);
     }
   };
-  const quick = quickRanges(today);
+  const quick = quickRanges(today, useContext(WeekStartContext));
   const current = anchorDay ? undefined : quick.find((q) => q.range.from === draft.from && q.range.to === draft.to)?.label;
 
   const cal = (month: Day, nav: 'both' | 'prev' | 'next') => (
