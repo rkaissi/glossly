@@ -1,10 +1,10 @@
 # Glossly status: Phases 0 to 3
 
-Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the detailed build notes.
+Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the current state and next steps; `docs/features.md` has what each feature does and how far it's been checked; `docs/decisions.md` has every decision in full.
 
 ## Summary
 
-All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 330 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
+All the code for Phases 0 and 1 is written and works end to end on this machine. You can select text and get the pill, or press the hotkey to get the bar. Ask streams an answer from Groq, Save stores the item with an embedding and entities and can be undone, and first-run setup and every settings tab work with your real key. `pnpm typecheck` is clean, and `pnpm test` passes 432 unit tests. Step 13 (Oct 10) redesigned the overlay, settings, and setup: Windows 11 acrylic and mica, monochrome, and a bar that fits its buttons; checked live in light and dark mode.
 
 Phase 0 is not signed off yet, for two reasons:
 
@@ -67,7 +67,9 @@ Built ahead of schedule because the privacy rules require them from day one or t
 | --- | --- | --- |
 | Recall ranking, badge, expandable cards, dismiss logging | Built (Step 16.1) | Runs when the bar opens, on the selection, on this computer only: saved items sharing a person, company, product, or place come first, then items similar in meaning (0.78 or more). The bar shows "N related"; the cards show the snippet with the shared name marked, why it matched, and when and where it was saved, with Copy, "Not related" (logged without text), and "Ask about these". Ask also gets the top 3 as saved notes. There is no "open source" button, since saved items keep the app and window title but no link. |
 | Visualize: table parsing, LLM fallback, validated Vega-Lite, copy and save | Built (Step 16.6) | Markdown, TSV, CSV, semicolons, pipes, and aligned columns are read in code; other text goes to the model for rows. The model then writes a Vega-Lite spec, which must pass the Vega-Lite JSON schema, use only the table's columns, and load nothing from outside; otherwise the table is shown. Local only or no key: code picks a plain bar or line chart. Copy as image, Copy CSV, Save (a chart item with Undo), and a table view. |
-| Search box over saved items when nothing is selected | Built (Step 16.1) | The hotkey with nothing selected opens search: saved items by words and by meaning, people, and open promises. Also new on that bar (Step 16.2): paste your recent snippets as a list, or as a short summary written by the model. |
+| Search box over saved items when nothing is selected | Built (Step 16.1) | The hotkey with nothing selected opens search: saved items by words and by meaning, people, and open promises. Also new on that bar: Paste snippets (the saved snippets that fit what you're writing, or your recent ones, as a list or as saved) and Write it for here (the model shapes them for the email, chat, or document you're in; Steps 16.2 and 16.12, the latter not checked live yet). |
+
+After the Step 16 live check (not checked live yet): Reply learning your style from picks and edits, with Write my own and None of these (16.7 to 16.9), a Saved tab in Settings (16.10), Ask using what's around your cursor when nothing is selected (16.11), structured model outputs (16.13), relationships on people (16.8, 16.14), and the Features table in Metrics (17.1). The list of what's waiting for a live check is in `docs/testing.md`.
 
 Also in Step 16: Save mode (Manual, a save hotkey, or autosave on highlight; 16.3), Ask saving a note when asked to remember something (16.4), and one slot rule for every action (16.5).
 
@@ -87,6 +89,8 @@ The rules were tuned on these same fixtures, so expect lower numbers on real sel
 Pending your hand tests; see `evals/capture.md`. So far, Notepad passes on both paths (UIA read in about 55 to 60 ms, tier 2 in 50 to 93 ms), and the settings window passes on the auto path (UIA, 283 to 335 ms to the pill).
 
 ## Decisions that differ from the spec
+
+The first thirteen, in plain terms. `docs/decisions.md` has all of them (31 so far) with the reasons, and its numbers are the ones code comments cite.
 
 1. **AI SDK v7 instead of v6.** v7 is current; the API changed (`instructions`, `Output.object`, `result.stream`).
 2. **`node:sqlite` instead of `better-sqlite3`.** Built into Node and Electron, so there are no native rebuilds. Works with `sqlite-vec`.
@@ -138,27 +142,15 @@ Known rough edges:
 - The rules call the 39-word sample message in Notepad an `article`, because it has no speaker header.
 - Ask's answer to a message assumed you wrote it. Fixed in Step 15.1 and checked live: on the Notepad sample it now says "The writer is responding to Rayan's update...".
 - Reminder notifications are logged but no Windows toast appeared in the dev build (likely because bare `electron.exe` has no Start Menu shortcut for its app ID); check again with the installer (Step 19).
-- Your name isn't set yet: Settings shows "Add your name" until you fill in Profile (the live check's test name was removed).
 
 ## Open questions for you
 
-**Answered Oct 10** (the plan is in `docs/HANDOFF.md`). Steps 12 to 16 are done, plus the Oct 10 evening fix for the bar going off screen and shared inboxes showing up as people, and a late-evening round: key numbers follow the buttons on the empty bar, Search inserts into the field you pressed the hotkey in, Reply's Insert finds the page's reply box, and Who and Visualize reuse their answer instead of calling the model again (not checked live yet). Later that night: a hotkey bar that Windows never put in front now closes on a click outside, captured text is cleaned of OBJ marks and invisible characters, and Paste recent offers List or As saved (not checked live yet). Step 16.7: Reply keeps only replies you edited as voice samples, learns which drafts you pick (length, greeting, sign-off, tone, kind) per kind of app and per person, writes style notes from your edits, and shows all of it in Profile with a way to forget each (not checked live yet). Who no longer offers a duplicate for a first name alone: "Shivani" asks whether it is the saved Priya Desai. Next is Step 17. Steps 18 to 22 and a parked subscription follow.
+Every earlier question has been answered (Oct 10) and is recorded in `docs/decisions.md`: pill speed (decision 16), router timeout (26), Delete all data versus Reset settings (10), strict Local only (12), the redesign (13), packaging after all Windows phases and one eval run at the end (30).
 
-- Pill speed: keep checking for toolbars but make it faster; a visible pill never moves.
-- Router timeout: raise it to 600 ms. **Done in Step 12.3** (Oct 10): the default `router.decisionTimeoutMs` is 600, and a stored value of exactly 400 (the old default) is moved to 600 once, the first time the new version opens the database (tracked in meta `settings_migrations`, so a 400 you set later is kept). The Models tab's Decision description shows the current budget.
-- Delete all data: keep API keys and settings. A separate "Reset settings" button clears settings and keys. **Done in Step 12.4** (Oct 10); see decision 10.
-- Local only: strict. Nothing goes to a cloud model, including entity extraction and Ask. Local model support comes later (Step 20). **Done in Step 12.5** (Oct 10); see decision 12.
-- Packaging: after every Windows-buildable spec phase is done.
-- Router eval: one run at the end, once everything looks good.
-- New: the purple oval is the "dot" placement. Windows won't shrink the window below 29×38, which stretches the dot, and it shows too often because static toolbars count as obstacles. **Fixed in Step 12** (Oct 10): the dot is a fixed 18 px circle inside a 40×40 click-through window, and only obstacles that appeared after the selection's mouse-down count. Already-present ones (menu bars, app chrome, unrelated always-on-top windows), tooltips, windows behind the app, click-through overlays, and anything covering the selection are ignored. Every pill now records what it found (source, kind, size, side, why it was or wasn't counted) in the debug view, the `pill_shown` event, and `main.log` ("pill obstacles"). Before the fix, 8 of 120 pills were dots and 9 went above.
-- New: a redesign with Windows 11 glass, monochrome, and a bar that fits its buttons. **Built in Step 13** (Oct 10); see decision 13.
-- Pill speed, **built in Step 12.2** (Oct 10). The pill checks for the app's own selection toolbar every 35 ms from 100 ms after mouse-up, and shows as soon as one is found (on the other side) or once the app's wait is over with none found. The wait is the full 250 ms in apps and sites known to show selection toolbars (Word, PowerPoint, Outlook, OneNote, Notion, Slack, Google Docs and Slides, Word and Outlook on the web, Medium) and 100 ms everywhere else. When a toolbar from the app itself shows up somewhere with the short wait (one extra check runs at 250 ms, after the pill is up), Glossly remembers that app or site and how soon the toolbar showed (setting `toolbarWaits`: a process name or site suffix plus a number of ms, no text) and waits that long there next time. A shown pill never moves. The check got cheaper too: the helper takes the mouse-down snapshot itself on a background thread, the window scan and the UIA probes run in parallel, the probes use a UIA cache request, there are 4 probes instead of 6, and process names no longer come from a full process list. The debug view has a "pill wait" line (when it was shown, the wait and why, the checks, and whether a toolbar was found), `pill_shown` records `wait_ms`, `wait_reason`, `polls`, and `popups_ms`, and `main.log` has a "pill shown" line per pill.
+Still open:
 
-The original questions:
+1. **Who is this and What did I promise:** keep them as two actions (they now share one read of the people in the text), or merge them?
+2. **The live-check backlog:** check everything built since the Step 16 live check before Step 17, or keep building and check later?
+3. **Comparison evals:** run them alongside the one router eval in Step 18 (about 300 more Groq calls), or skip?
 
-1. **Pill speed.** The pill took about 360 ms (250 ms toolbar wait plus `popups_near`) against the 150 ms target. Should it be faster and less careful about toolbars? One option is to show the pill at once and move it if a toolbar appears. (Answered; built in Step 12.2.)
-2. **Router timeout.** The model router missed its 400 ms budget on 2 of 6 live calls (404 and 418 ms) and fell back to rules. Raise `router.decisionTimeoutMs` to about 600 ms, or accept rules as the frequent fallback? (Answered; done in Step 12.3.)
-3. **"Delete all data".** It currently also removes saved API keys and resets settings. Is that what you want, or should keys and preferences survive it? (Answered; done in Step 12.4.)
-4. **Local only.** It currently turns off only the router's model call, as the spec says. Save's entity extraction still calls the Fast model because you clicked an action. Should Local only also skip that? (Answered; done in Step 12.5.)
-5. **Packaging.** The `electron-builder` config (helper output into `resources/helper`, `asarUnpack` for sqlite-vec and onnxruntime) isn't written. Do it before Phase 2, or when testers are lined up?
-6. **Router eval.** Can I run `pnpm eval` once to score the tuned prompt? If it stays under the rules' 90% slot match, I'd suggest using the model only for content type and collection, and computing people and commitment scores from rules.
+Next is the rest of Step 17 (eval runners, optional decision providers, Export checked live), then Step 18 (one eval run), 19 (packaging), 20 (local models), 21 (todos and calendar), and 22 (polish). See `docs/HANDOFF.md`.
