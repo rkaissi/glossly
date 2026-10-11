@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 11, 2026: **Step 18 landed** (decision 34): the privacy choice (All models / Local only) replaces the checkbox, a local model server (Ollama, LM Studio) works in Keys, Models, and the model layer, and with no local model Local only falls back to code, including What did I promise by sentence patterns. Not checked live; never run against a real Ollama. 452 unit tests pass; `pnpm typecheck` is clean.
+Last updated Oct 11, 2026: **Step 19.1 landed** (decision 36): What did I promise is now Tasks, with the open tasks per person beside what the message says, rows that finish or move an open task, personal todos, and a Settings > Tasks tab; unit tested only. Before it, **Step 18** (decision 34): the privacy choice (All models / Local only) replaces the checkbox, a local model server (Ollama, LM Studio) works in Keys, Models, and the model layer, and with no local model Local only falls back to code, including What did I promise by sentence patterns. Neither is checked live; Step 18 never ran against a real Ollama. 458 unit tests pass; `pnpm typecheck` is clean.
 
 ## Start here
 
@@ -28,15 +28,28 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Built:** spec Phases 0 to 3 (capture, the bar, Ask, Save, settings and setup, people and Who, What did I promise, Reply, Recall, Search, Visualize) plus everything Rayan added along the way: the glass redesign, Save modes, paste with nothing selected, Ask's remember tool, Reply that learns your style, the Saved tab, relationships. Of Phase 4, the metrics view is done (Step 17.1).
 - **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, 18, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
-- **Step 18 (Oct 11):** built with unit tests only; its live checks are in the backlog under "Local models and privacy".
-- **Not started:** Steps 19 to 23 below. (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
+- **Step 18 and 19.1 (Oct 11):** built with unit tests only; their live checks are in the backlog under "Local models and privacy" and "Tasks".
+- **Not started:** Steps 19.2 to 23 below. (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice) is done. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice) and 19.1 (Tasks) are done; **next is 19.2, calendar events**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
-**Step 19: todos and calendar, in the app first.** A selection can become a todo or a calendar event, detected like commitments (one structured call, the user confirms, due phrases through `resolveDue`), stored locally, shown in Search and on a person's card, with reminders through the commitment notifier. Add the action ids to `CONTEXTUAL_ACTIONS` with a score (see "Routing and slots" in `docs/architecture.md`); `LaterPanel` covers an action whose panel isn't built yet. **Google Calendar and reminders sync is the second half**, only after the local list works.
+**Step 19: tasks and calendar, in the app first** (decision 36). What did I promise becomes **Tasks**: one action and one list for promises, requests, and personal todos. Internally the action id stays `promises` and the table stays `commitments` (metrics history and migrations keep working).
+
+*19.1 Tasks (done, Oct 11).*
+- A task is a commitment with an optional person: You owe (owner `me`), They owe (`them`), or a personal todo (owner `me`, no person: "renew passport by Nov 1").
+- **What you owe someone doesn't depend only on the message.** The panel has two parts:
+  - **From this message:** what the text says: new promises, requests, and todos (one Fast call, or patterns without a model, decision 34). Each row is checked against the open tasks with the same people: the model gets those tasks (id, owner, text, due) and says whether the row is **new**, **the same** as an open one (no duplicate), **finishes** one ("sent you the slides"), or **moves** its date ("can we push it to Monday?"). Without a model, a close text match (`canonicalize` plus token overlap) offers "Same as…". Every change waits for the user's confirm.
+  - **Already open with these people:** every open task with the author and anyone the message names (matched to saved people), whatever this message says, each with Done and a date change. A message from Jordan shows what you already owe Jordan and what Jordan owes you.
+- Settings gets a **Tasks** tab (open and done, filter by person, edit text and date, delete with a confirm). Tasks already show on person cards and in Search; personal todos join them.
+- Router: the `promises` score also counts todo-like text ("remember to", "need to", a verb with a date) and a message from someone with open tasks. Label "Tasks" in the bar and More.
+- Reminders keep using the commitment notifier.
+
+*19.2 Calendar events.* A selection with a date and time ("lunch Thursday 1pm at Northwind") becomes an event: one structured call (title, start, end or duration, all day, location, people), dates resolved in code (`resolveDue`, extended for times and ranges), the user confirms, stored locally (new `calendar_events` table, migration 5), shown in Search and on person cards, with a reminder before it starts. New action `event` in `CONTEXTUAL_ACTIONS` with a score (see "Routing and slots" in `docs/architecture.md`). Without a model: a date-and-time pattern pass, like tasks.
+
+*19.3 Google Calendar and reminders sync*, only after the local list works.
 
 **Step 20: polish and UI upgrade.** Keep it quiet and native to Windows 11; no illustration pass, no second theme.
 - **Destructive buttons are filled red** (solid red background, white text), not red outlines, in both windows: Delete person, Delete all data, Reset settings, Merge, Remove key, alias, or sample, Delete saved item. The inline confirm stays.
@@ -72,9 +85,7 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 
 ## Open questions for Rayan
 
-1. **Who is this and What did I promise:** keep them as two actions (they now share one people read), or merge them? Left separate pending his call.
-
-Everything else he was asked has been answered and is recorded in `docs/decisions.md` (Oct 11: comparison evals skipped and the router on rules under Local only, decision 35).
+None right now. Everything he was asked has been answered and is recorded in `docs/decisions.md` (Oct 11: comparison evals skipped and the router on rules under Local only, decision 35; What did I promise merges into Tasks, Who is this stays separate, decision 36).
 
 ## Things to remember
 

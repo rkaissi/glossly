@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (452 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (458 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -137,6 +137,13 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Local only with no local server: Ask, Reply, and Paste's summary show "Use all models and…" and "Set up a local model" (opens Keys); What did I promise lists pattern rows with the "found by simple patterns" note; Who shows the text-only note with "Use all models"; Visualize charts a TSV.
 - [ ] A local server at a LAN address: Keys warns, General's Local only line says it isn't used, and Ask refuses under Local only.
 - [ ] Setup on a throwaway profile: choosing Local only enables Next with no key; All models needs a key or a local server.
+
+**Tasks (Step 19.1)**
+- [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Tasks.
+- [ ] A reply that finishes one ("Here is the budget") and moves another ("can we push the review to Monday?"): rows tagged Mark done and New date with the old → new date; Save updates both (`promises_saved {updated: 2}`), no duplicates.
+- [ ] Restating an open task shows it as Already open, unchecked, and Space doesn't check it.
+- [ ] Settings > Tasks: Add a todo with a date, edit text and date, mark done, reopen, filter by person, delete with the confirm. A reminder click opens Tasks.
+- [ ] Local only with no local model: pattern rows matched to an open task by words show Already open or New date.
 
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).

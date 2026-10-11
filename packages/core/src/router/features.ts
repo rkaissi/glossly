@@ -15,6 +15,8 @@ export interface Features {
   namePairs: string[];
   /** IDs of known people whose name or alias appears. */
   knownPeople: string[];
+  /** Known people in the text who have open tasks with the user. */
+  peopleWithTasks: number;
   tableShape: boolean;
   numericDensity: number;
   chatLines: number;
@@ -62,7 +64,7 @@ const MESSENGER_TITLES = /(?:- Gmail|- Outlook|Outlook$|- Slack|Discord|WhatsApp
 const CODE_EDITORS = ['code.exe', 'cursor.exe', 'devenv.exe', 'idea64.exe', 'pycharm64.exe', 'webstorm64.exe', 'rider64.exe', 'sublime_text.exe', 'notepad++.exe', 'zed.exe'];
 
 const COMMITMENT =
-  /\b(?:I'll|I will|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you)\b/gi;
+  /\b(?:I'll|I will|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|remember to|don't forget|do not forget|to-?do|reminder|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you)\b/gi;
 const DATE_WORD =
   /\b(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|end of (?:day|week|month)|eod|eow|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{1,2}(?::\d{2})?\s?[ap]m)\b/i;
 const AUTOMATED =
@@ -148,9 +150,8 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
   );
 
   const lower = text.toLowerCase();
-  const knownPeople = people
-    .filter((p) => [p.name, ...p.aliases].some((a) => a.length >= 3 && lower.includes(a.toLowerCase())))
-    .map((p) => p.id);
+  const known = people.filter((p) => [p.name, ...p.aliases].some((a) => a.length >= 3 && lower.includes(a.toLowerCase())));
+  const knownPeople = known.map((p) => p.id);
 
   const codeLines = lines.filter(isCodeLine).length;
   const nonEmpty = lines.filter((l) => l.trim()).length || 1;
@@ -166,6 +167,7 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     phones,
     namePairs,
     knownPeople,
+    peopleWithTasks: known.filter((p) => (p.open ?? 0) > 0).length,
     tableShape: detectTable(lines),
     numericDensity: numericDensity(text),
     chatLines: lines.filter((l) => CHAT_LINE.test(l)).length,

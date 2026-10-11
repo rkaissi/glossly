@@ -1,6 +1,6 @@
 import type { DetectedPerson, Relationship } from '@glossly/core/api';
 
-/** Everything adding a person asks for, the same in Who is this, Reply, and What did I promise. */
+/** Everything adding a person asks for, the same in Who is this, Reply, and Tasks. */
 export interface PersonDraft {
   name: string;
   email: string;
@@ -26,7 +26,7 @@ export function draftFrom(found: Partial<Pick<DetectedPerson, 'name' | 'email' |
   };
 }
 
-/** The fields as `people:create` (and a new person in What did I promise) takes them: trimmed, blanks left out. */
+/** The fields as `people:create` (and a new person in Tasks) takes them: trimmed, blanks left out. */
 export function draftToCreate(d: PersonDraft) {
   return {
     name: d.name.trim(),

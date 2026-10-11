@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { rulesCommitments, splitDue } from './promise-rules';
+import type { CommitmentView } from '../people/types';
+import { matchOpenTasks, rulesCommitments, splitDue } from './promise-rules';
 
 // Wednesday, Oct 14 2026.
 const now = new Date(2026, 9, 14, 10, 0);
@@ -44,5 +45,36 @@ describe('rulesCommitments', () => {
   it('handles curly apostrophes and line breaks', () => {
     const out = rulesCommitments('Thanks!\nI’ll call the vendor on Thursday', other, now);
     expect(out.commitments).toEqual([{ owner: 'them', person_name: 'Jordan Hale', text: 'call the vendor', due_phrase: 'on Thursday', confidence: 0.6 }]);
+  });
+});
+
+describe('todos (decision 36)', () => {
+  it('reads todo lines and reminders as the user\'s own', () => {
+    const out = rulesCommitments('todo: renew passport by Nov 1\nRemember to book the flights', me, now);
+    expect(out.commitments.map((c) => [c.owner, c.text, c.due_phrase, c.person_name])).toEqual([
+      ['me', 'renew passport', 'by Nov 1', ''],
+      ['them', 'book the flights', '', ''],
+    ]);
+    // "I need to" binds whoever wrote it.
+    expect(rulesCommitments('I need to finish the report by Friday.', other, now).commitments[0]).toMatchObject({ owner: 'them', text: 'finish the report' });
+  });
+});
+
+describe('matchOpenTasks', () => {
+  const task = (id: string, owner: 'me' | 'them', text: string): CommitmentView => ({ id, owner, text, due_at: null, status: 'open', person_id: 'p1', person_name: 'Jordan Hale' });
+  const open = [
+    { key: 't1', task: task('a', 'me', 'send the Q3 budget') },
+    { key: 't2', task: task('b', 'them', 'review the contract') },
+  ];
+  const row = (owner: 'me' | 'them', text: string, due_phrase = '') => ({ owner, person_name: 'Jordan Hale', text, due_phrase, confidence: 0.6 });
+
+  it('matches by words and owner, and a new deadline means moved', () => {
+    const out = matchOpenTasks({ commitments: [row('me', 'send me the budget for Q3'), row('them', 'review the contract', 'Monday'), row('me', 'review the contract')] }, open);
+    expect(out.commitments.map((c) => [c.change, c.open_task])).toEqual([
+      ['same', 't1'],
+      ['moved', 't2'],
+      // Same words, other owner, and t2 is taken: new.
+      ['new', 'none'],
+    ]);
   });
 });

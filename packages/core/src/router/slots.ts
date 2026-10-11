@@ -14,7 +14,8 @@ export function scoreActions(d: Decisions, f: Features): Record<ContextualAction
   return {
     reply: answerable ? d.authored_by_other : 0,
     who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact),
-    promises: d.contains_commitment,
+    // Tasks (decision 36): what the text says, or a message involving someone you have open tasks with.
+    promises: Math.max(d.contains_commitment, isMessage && f.peopleWithTasks > 0 ? 0.55 : 0),
     visualize: d.content_type === 'table_or_numbers' ? 1 : 0,
   };
 }

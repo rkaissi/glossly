@@ -344,12 +344,17 @@ export class PeopleRepo {
   }
 
   /** Commitments with the person's name, open ones by due date (undated last), then the rest newest first. */
-  commitments(filter: { personId?: string; status?: CommitmentStatus } = {}): CommitmentView[] {
+  commitments(filter: { personId?: string; personIds?: string[]; status?: CommitmentStatus } = {}): CommitmentView[] {
     const where: string[] = [];
     const args: string[] = [];
     if (filter.personId) {
       where.push('c.person_id = ?');
       args.push(filter.personId);
+    }
+    if (filter.personIds) {
+      if (filter.personIds.length === 0) return [];
+      where.push(`c.person_id IN (${filter.personIds.map(() => '?').join(', ')})`);
+      args.push(...filter.personIds);
     }
     if (filter.status) {
       where.push('c.status = ?');
@@ -367,6 +372,16 @@ export class PeopleRepo {
 
   setCommitmentStatus(id: string, status: CommitmentStatus): void {
     this.db.prepare('UPDATE commitments SET status = ? WHERE id = ?').run(status, id);
+  }
+
+  /** Edits a task's text or due date. A new due date gets a new reminder. */
+  updateCommitment(id: string, patch: { text?: string; due_at?: string | null }): void {
+    if (patch.text !== undefined) {
+      const text = patch.text.replace(/\s+/g, ' ').trim().slice(0, 300);
+      if (!text) throw new Error('A task needs text.');
+      this.db.prepare('UPDATE commitments SET text = ? WHERE id = ?').run(text, id);
+    }
+    if (patch.due_at !== undefined) this.db.prepare('UPDATE commitments SET due_at = ?, notified_at = NULL WHERE id = ?').run(patch.due_at, id);
   }
 
   deleteCommitment(id: string): void {

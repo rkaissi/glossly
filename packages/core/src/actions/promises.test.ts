@@ -22,9 +22,11 @@ class FakeLlm implements LlmProvider {
   }
   async structured<T>(req: ChatRequest, schema: z.ZodType<T>): Promise<T> {
     this.calls.push(req);
-    return schema.parse(this.answer());
+    return this.loose ? (this.answer() as T) : schema.parse(this.answer());
   }
   usable = true;
+  /** Skip schema checks (to feed answers a real model's enum would refuse). */
+  loose = false;
   hasModel() {
     return this.usable;
   }
@@ -45,9 +47,9 @@ const selection: SelectionPayload = {
 
 const answer: ExtractedCommitments = {
   commitments: [
-    { owner: 'me', person_name: 'Maya Lin', text: "send the slides from Tuesday's review", due_phrase: 'before Friday', confidence: 0.92 },
-    { owner: 'them', person_name: 'Maya', text: 'share the slides with Daniel', due_phrase: '', confidence: 0.4 },
-    { owner: 'me', person_name: 'Maya Lin', text: "Send the slides from  Tuesday's review", due_phrase: 'Friday', confidence: 0.9 },
+    { owner: 'me', person_name: 'Maya Lin', text: "send the slides from Tuesday's review", due_phrase: 'before Friday', confidence: 0.92, change: 'new', open_task: 'none' },
+    { owner: 'them', person_name: 'Maya', text: 'share the slides with Daniel', due_phrase: '', confidence: 0.4, change: 'new', open_task: 'none' },
+    { owner: 'me', person_name: 'Maya Lin', text: "Send the slides from  Tuesday's review", due_phrase: 'Friday', confidence: 0.9, change: 'new', open_task: 'none' },
   ],
 };
 
@@ -121,7 +123,7 @@ describe('What did I promise', () => {
       ],
       { message: selection.text, sourceApp: 'slack.exe', authorPersonId: maya.id, authorIsMe: false },
     );
-    expect(r).toEqual({ saved: 4, created: 1 });
+    expect(r).toEqual({ saved: 4, created: 1, updated: 0 });
     const card = people.card(maya.id)!;
     expect(card.youOwe.map((c) => [c.text, c.due_at])).toEqual([['send the slides', '2026-10-16']]);
     expect(card.interactions).toMatchObject([{ direction: 'inbound', source_app: 'slack.exe' }]);
@@ -136,8 +138,8 @@ describe('What did I promise', () => {
     const people = new PeopleRepo(store);
     const llm = new FakeLlm(() => ({
       commitments: [
-        { owner: 'me', person_name: 'Daniel', text: 'intro Daniel to legal', due_phrase: '', confidence: 0.8 },
-        { owner: 'them', person_name: 'Priya', text: 'send the budget', due_phrase: '', confidence: 0.8 },
+        { owner: 'me', person_name: 'Daniel', text: 'intro Daniel to legal', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
+        { owner: 'them', person_name: 'Priya', text: 'send the budget', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
       ],
     }));
     const detected = [
@@ -176,6 +178,81 @@ describe('What did I promise', () => {
     });
     const sam = people.list()[0]!;
     expect(people.card(sam.id)!.interactions).toMatchObject([{ direction: 'outbound' }]);
+  });
+});
+
+describe('Tasks and open tasks (decision 36)', () => {
+  const fromJordan: SelectionPayload = { ...selection, text: 'Here is the budget. Can we push the deck review to Monday?', context_before: 'Jordan Hale  9:41 AM\n' };
+
+  function seed() {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const jordan = people.create({ name: 'Jordan Hale' });
+    const budget = people.addCommitment({ person_id: jordan.id, owner: 'them', text: 'send the budget', due_at: '2026-10-13', source_interaction_id: null });
+    const deck = people.addCommitment({ person_id: jordan.id, owner: 'me', text: 'review the deck', due_at: '2026-10-15', source_interaction_id: null });
+    const intro = people.addCommitment({ person_id: jordan.id, owner: 'me', text: 'intro Jordan to Casey', due_at: null, source_interaction_id: null });
+    people.addCommitment({ person_id: null, owner: 'me', text: 'renew passport', due_at: null, source_interaction_id: null });
+    return { people, jordan, budget, deck, intro };
+  }
+  const author = { name: 'Jordan Hale', email: null, handle: null, role: 'author' as const, knownId: null };
+
+  it('sends the open tasks with the author, and turns the answer into done and moved rows plus the rest of the open list', async () => {
+    const { people, budget, deck, intro } = seed();
+    const llm = new FakeLlm(() => ({
+      commitments: [
+        { owner: 'them', person_name: 'Jordan Hale', text: 'send the budget', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't1' },
+        { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'Monday', confidence: 0.9, change: 'moved', open_task: 't2' },
+        // A second row about the same task is dropped.
+        { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck again', due_phrase: '', confidence: 0.9, change: 'same', open_task: 't2' },
+      ],
+    }));
+    const r = await extractPromises(llm, people, settings, { selection: fromJordan, author, authorIsMe: false, people: [author] }, undefined, now);
+    const prompt = llm.calls[0]!.prompt;
+    expect(prompt).toContain('## Open tasks with these people');
+    expect(prompt).toContain('t1: Jordan Hale owes the user: send the budget (due 2026-10-13)');
+    expect(prompt).not.toContain('renew passport');
+    expect(r.rows).toHaveLength(2);
+    expect(r.rows[0]).toMatchObject({ change: 'done', existing: { id: budget.id }, owner: 'them', text: 'send the budget', selected: true });
+    expect(r.rows[1]).toMatchObject({ change: 'moved', existing: { id: deck.id }, due_at: '2026-10-19', due_phrase: 'Monday', selected: true });
+    expect(r.open.map((t) => t.id)).toEqual([intro.id]);
+
+    const saved = savePromises(people, r.rows.map((row) => ({ change: row.change, existingId: row.existing!.id, owner: row.owner, text: row.text, due_at: row.due_at, person: null })), {
+      message: fromJordan.text,
+      sourceApp: 'slack.exe',
+      authorPersonId: null,
+      authorIsMe: false,
+    });
+    expect(saved).toEqual({ saved: 0, created: 0, updated: 2 });
+    expect(people.getCommitment(budget.id)!.status).toBe('done');
+    expect(people.getCommitment(deck.id)).toMatchObject({ status: 'open', due_at: '2026-10-19', notified_at: null });
+  });
+
+  it('treats a move without a readable new date as the same task, and an unknown key as new', async () => {
+    const { people, deck } = seed();
+    const llm = new FakeLlm(() => ({
+      commitments: [
+        { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'later', confidence: 0.9, change: 'moved', open_task: 't2' },
+        { owner: 'me', person_name: 'Jordan Hale', text: 'book the venue', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't9' },
+      ],
+    }));
+    // The schema's enum would refuse t9 from a real model; the fake skips validation of that, so code must cope.
+    llm.loose = true;
+    const r = await extractPromises(llm, people, settings, { selection: fromJordan, author, authorIsMe: false, people: [author] }, undefined, now);
+    expect(r.rows[0]).toMatchObject({ change: 'same', existing: { id: deck.id }, selected: false, due_at: '2026-10-15' });
+    expect(r.rows[1]).toMatchObject({ change: 'new', existing: null, text: 'book the venue' });
+  });
+
+  it('without a model, matches pattern rows to open tasks by their words', async () => {
+    const { people, deck } = seed();
+    const llm = new FakeLlm(() => {
+      throw new Error('no model call expected');
+    });
+    llm.usable = false;
+    const sel: SelectionPayload = { ...fromJordan, text: 'Can you review the deck by Friday? Can you also book the venue?' };
+    const r = await extractPromises(llm, people, settings, { selection: sel, author, authorIsMe: false, people: [author] }, undefined, now);
+    expect(r.rows[0]).toMatchObject({ change: 'moved', existing: { id: deck.id }, due_at: '2026-10-16', due_phrase: 'by Friday' });
+    expect(r.rows[1]).toMatchObject({ change: 'new', text: 'book the venue' });
+    expect(r.open.map((t) => t.text).sort()).toEqual(['intro Jordan to Casey', 'send the budget']);
   });
 });
 

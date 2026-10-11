@@ -136,11 +136,20 @@ export interface PersonSummary {
   last_seen: string | null;
 }
 
-// ---- What did I promise ----
+// ---- Tasks (formerly What did I promise) ----
 
 /** One candidate commitment, ready for the review list. */
+/**
+ * What a row found in the message does to the user's tasks (decision 36): a new task, the same
+ * as an open one (nothing to save), finishes an open one, or moves its due date.
+ */
+export type TaskChange = 'new' | 'same' | 'done' | 'moved';
+
 export interface PromiseRow {
   key: string;
+  change: TaskChange;
+  /** The open task a same, done, or moved row is about; null for a new one. */
+  existing: CommitmentView | null;
   owner: CommitmentOwner;
   text: string;
   /** As the model returned it, or null. */
@@ -167,6 +176,10 @@ export interface NewPersonDetails {
 
 /** A reviewed row to save. `person` is an existing record, a new one to create, or nobody. */
 export interface PromiseSaveRow {
+  /** Missing means "new". */
+  change?: TaskChange;
+  /** The open task to finish or move, for "done" and "moved". */
+  existingId?: string;
   owner: CommitmentOwner;
   text: string;
   due_at: string | null;

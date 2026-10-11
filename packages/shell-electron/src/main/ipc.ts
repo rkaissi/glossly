@@ -19,6 +19,7 @@ import {
   type ActionId,
   type AliasKind,
   type CommitmentStatus,
+  type TaskChange,
   type InvokeArgs,
   type InvokeChannel,
   type InvokeResult,
@@ -40,6 +41,9 @@ const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises',
 const TABS = ['profile', 'people', 'saved', 'keys', 'models', 'general', 'data', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
+const CHANGES: readonly TaskChange[] = ['new', 'same', 'done', 'moved'];
+/** A due date as tasks store it: a day, or a timestamp with an offset. */
+const DUE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/;
 const MAX_CLIPBOARD = 1_000_000;
 
 export interface IpcDeps {
@@ -223,7 +227,7 @@ export function registerIpc(deps: IpcDeps): void {
     return capture.insertPaste(num(a.sessionId), str(a.text, 20_000), pasteKind(a.kind), a.edited);
   });
 
-  // ---- What did I promise ----
+  // ---- Tasks (formerly What did I promise) ----
   handle('promises:extract', (a) => capture.extractPromises(num(a.sessionId)));
   handle('promises:save', (a) => {
     if (!Array.isArray(a.rows) || a.rows.length > 20) throw new Error('Invalid rows');
@@ -232,7 +236,10 @@ export function registerIpc(deps: IpcDeps): void {
       const owner = str(r.owner, 5);
       if (owner !== 'me' && owner !== 'them') throw new Error('Invalid owner');
       const due = r.due_at === null ? null : str(r.due_at, 40);
-      if (due !== null && !/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)?)?$/.test(due)) throw new Error('Invalid date');
+      if (due !== null && !DUE.test(due)) throw new Error('Invalid date');
+      const change = r.change === undefined ? 'new' : str(r.change, 10);
+      if (!CHANGES.includes(change as TaskChange)) throw new Error('Invalid change');
+      const existingId = change === 'new' ? undefined : str(r.existingId, 100);
       const p = r.person === null ? null : obj(r.person);
       const person: PromiseSaveRow['person'] =
         p === null
@@ -249,7 +256,7 @@ export function registerIpc(deps: IpcDeps): void {
                   relationship: p.relationship == null ? null : asRelationship(p.relationship),
                 }
               : null;
-      return { owner, text: str(r.text, 500), due_at: due, person };
+      return { change: change as TaskChange, existingId, owner, text: str(r.text, 500), due_at: due, person };
     });
     const r = capture.savePromises(num(a.sessionId), rows);
     broadcastPeople();
@@ -329,7 +336,24 @@ export function registerIpc(deps: IpcDeps): void {
   handle('commitments:list', (a) => {
     const status = optStr(a?.status, 10) as CommitmentStatus | undefined;
     if (status && !STATUSES.includes(status)) throw new Error('Invalid status');
-    return people.commitments(status ? { status } : {});
+    const personId = optStr(a?.personId, 100);
+    return people.commitments({ ...(status && { status }), ...(personId && { personId }) });
+  });
+  handle('commitments:update', (a) => {
+    const due = a.due_at === undefined ? undefined : a.due_at === null ? null : str(a.due_at, 40);
+    if (due && !DUE.test(due)) throw new Error('Invalid date');
+    people.updateCommitment(str(a.id, 100), { ...(a.text !== undefined && { text: str(a.text, 300) }), ...(due !== undefined && { due_at: due }) });
+    broadcastPeople();
+  });
+  handle('commitments:add', (a) => {
+    const due = a.due_at === null ? null : str(a.due_at, 40);
+    if (due && !DUE.test(due)) throw new Error('Invalid date');
+    people.addCommitment({ person_id: null, owner: 'me', text: str(a.text, 300), due_at: due, source_interaction_id: null });
+    broadcastPeople();
+  });
+  handle('commitments:delete', (a) => {
+    people.deleteCommitment(str(a.id, 100));
+    broadcastPeople();
   });
   handle('voice:list', () => people.voiceSamples());
   handle('voice:add', (a) => {

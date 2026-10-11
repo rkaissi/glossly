@@ -24,7 +24,7 @@ function LocalOnlyStatus({ view, onSetUp }: { view: SettingsView; onSetUp: () =>
     <div className="row">
       <p className="warn small grow">
         {baseUrl && !loopback ? 'Your local server is on another computer, so Local only does not use it. ' : 'No local model is set up. '}
-        Until one is, Glossly works without a model: Who is this and What did I promise read the text with simple patterns, Visualize charts tables in
+        Until one is, Glossly works without a model: Who is this and Tasks read the text with simple patterns, Visualize charts tables in
         code, Save skips finding people, and Ask, Reply, and the paste summary are off.
       </p>
       <button onClick={onSetUp}>Set up a local model</button>

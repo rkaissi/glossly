@@ -779,3 +779,86 @@ button.link {
   color: var(--fg-2);
   text-decoration: underline;
 }
+
+/* Tasks tab (decision 36). */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--pressed);
+}
+.segmented button {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+}
+.segmented button.selected {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+}
+.tasks .task {
+  align-items: flex-start;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.task .check {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin-top: 7px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--primary-fg);
+}
+.task .check.on {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.task-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.task-text {
+  height: 30px;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 6px;
+  margin-left: -6px;
+}
+.task-text:hover,
+.task-text:focus {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+.task.done .task-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.due-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  margin-top: 2px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 12px;
+  color: var(--fg-2);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.due-chip.overdue {
+  color: var(--danger);
+}
+.due-chip input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}

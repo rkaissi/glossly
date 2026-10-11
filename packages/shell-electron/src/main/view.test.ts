@@ -33,7 +33,7 @@ describe('slotsView', () => {
     expect(v.slot1).toMatchObject({ action: 'ask', label: 'Ask', available: true });
     expect(v.slot2).toMatchObject({ action: 'save', label: 'Save to Notes', collection: 'Notes', available: true });
     expect(v.slot3).toMatchObject({ action: 'reply', available: true, score: 0.9 });
-    expect(v.slot4).toMatchObject({ action: 'promises', label: 'What did I promise', available: true });
+    expect(v.slot4).toMatchObject({ action: 'promises', label: 'Tasks', available: true });
     expect(slotsView(route({ slot3: { action: 'visualize', score: 1 } }), 'rules').slot3).toMatchObject({ action: 'visualize', label: 'Visualize', available: true });
     expect(v.route_ms).toBe(3);
   });

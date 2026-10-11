@@ -262,7 +262,7 @@ export type PasteCompose =
     }
   | { ok: false; code: AskErrorEvent['code']; message: string };
 
-// ---- What did I promise ----
+// ---- Tasks (formerly What did I promise) ----
 
 export type PromisesResult =
   | {
@@ -274,6 +274,8 @@ export type PromisesResult =
       identitySet: boolean;
       /** Set when patterns found the rows because no model could be used (decision 34). */
       byRules: PromisesByRules;
+      /** Open tasks with the people involved that no row is about (decision 36). */
+      open: CommitmentView[];
     }
   | { ok: false; code: AskErrorEvent['code']; message: string };
 
@@ -367,7 +369,7 @@ export interface RoleSetArgs {
   fallback: ModelRef | null;
 }
 
-export type SettingsTab = 'profile' | 'people' | 'saved' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
+export type SettingsTab = 'profile' | 'people' | 'tasks' | 'saved' | 'keys' | 'models' | 'general' | 'data' | 'metrics';
 
 // ---- channel maps ----
 
@@ -420,7 +422,7 @@ export interface InvokeChannels {
   /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
   'promises:extract': { args: { sessionId: number }; result: PromisesResult };
   /** Saves the rows the user kept. New people are created; the message is stored with its author. */
-  'promises:save': { args: { sessionId: number; rows: PromiseSaveRow[] }; result: { saved: number; created: number } };
+  'promises:save': { args: { sessionId: number; rows: PromiseSaveRow[] }; result: { saved: number; created: number; updated: number } };
 
   /** The Recall cards for the session's selection (spec: Recall), without the ones dismissed. Local. */
   'recall:get': { args: { sessionId: number }; result: { hits: RecallHit[] } };
@@ -458,7 +460,12 @@ export interface InvokeChannels {
   /** Only after the user confirmed: folds dropId into keepId. */
   'people:merge': { args: { keepId: string; dropId: string }; result: PersonCard };
   'people:delete': { args: { personId: string }; result: void };
-  'commitments:list': { args: { status?: CommitmentStatus }; result: CommitmentView[] };
+  'commitments:list': { args: { status?: CommitmentStatus; personId?: string }; result: CommitmentView[] };
+  /** Edits a task's text or due date (a new date gets a new reminder). */
+  'commitments:update': { args: { id: string; text?: string; due_at?: string | null }; result: void };
+  'commitments:delete': { args: { id: string }; result: void };
+  /** A personal todo typed in the Tasks tab: owner "me", no person. */
+  'commitments:add': { args: { text: string; due_at: string | null }; result: void };
   /** Voice samples for Reply: pasted ones (at most 5) and the replies the user inserted. */
   'voice:list': { args: void; result: VoiceSample[] };
   'voice:add': { args: { text: string }; result: VoiceSample[] };

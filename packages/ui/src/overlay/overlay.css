@@ -987,6 +987,23 @@ html:not([data-material='acrylic']) .toast {
   font-size: 13px;
 }
 
+/* Tasks: rows about a task you already have, and the open tasks with the same people. */
+.promise-text.static {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.promise-text.static:hover {
+  border-color: transparent;
+  background: transparent;
+}
+.promise-meta .small.overdue {
+  color: var(--danger);
+}
+.open-tasks h4,
 .new-people h4 {
   margin: 4px 0 6px;
   font-size: 12px;

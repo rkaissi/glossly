@@ -9,7 +9,7 @@ const ACTION_NAMES: Record<string, string> = {
   save: 'Save',
   reply: 'Reply',
   who: 'Who is this',
-  promises: 'What did I promise',
+  promises: 'Tasks',
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',
@@ -146,7 +146,7 @@ function Features({ m }: { m: MetricsSummary }) {
     ['Reply copied / discarded / "None of these"', `${f.reply.copied} / ${f.reply.discarded} / ${f.reply.redo}`],
     ['Paste composed / pasted', `${f.paste.composed} / ${f.paste.inserted}`],
     ['Search results typed in', f.search.inserted],
-    ['Promises looked for / saved', `${f.promises.extracted} / ${f.promises.saved}`],
+    ['Tasks looked for / saved', `${f.promises.extracted} / ${f.promises.saved}`],
     ['Model calls that failed / switched to a fallback', `${f.errors} / ${f.fallbacks}`],
   ];
   return (

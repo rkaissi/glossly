@@ -57,6 +57,8 @@ export interface KnownPerson {
   id: string;
   name: string;
   aliases: string[];
+  /** Open tasks with them (decision 36). */
+  open?: number;
 }
 
 export interface DecisionInput {

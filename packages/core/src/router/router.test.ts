@@ -120,6 +120,16 @@ describe('slots', () => {
     expect(scoreActions(base, { ...f, knownPeople: ['p1'] }).who).toBe(1);
   });
 
+  it('offers Tasks on a message from someone you have open tasks with (decision 36)', () => {
+    const quiet = { ...base, content_type: 'single_message' as const, contains_commitment: 0.05 };
+    expect(scoreActions(quiet, f).promises).toBe(0.05);
+    expect(scoreActions(quiet, { ...f, peopleWithTasks: 1 }).promises).toBe(0.55);
+    // Not on an article that happens to name them.
+    expect(scoreActions({ ...quiet, content_type: 'article' }, { ...f, peopleWithTasks: 1 }).promises).toBe(0.05);
+    const people = [{ id: 'p1', name: 'Jordan Hale', aliases: [], open: 2 }, { id: 'p2', name: 'Casey Lin', aliases: [], open: 0 }];
+    expect(extractFeatures(ctx('Jordan Hale and Casey Lin said hi'), people).peopleWithTasks).toBe(1);
+  });
+
   it('offers Who on a contact card even when the model scores people low', () => {
     const card = 'Full Name: Jordan Hale\nRole: Backend\nEmail: jordan.hale@example.com\nPhone: +1 (555) 123-4567';
     const low = { ...base, content_type: 'contact_info' as const, mentions_people: 0.1 };

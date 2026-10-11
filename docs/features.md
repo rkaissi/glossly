@@ -2,7 +2,7 @@
 
 What each feature does today, where it lives, and how far it has been checked. "Live" means seen working in the real app on Rayan's machine; "unit" means only unit tests cover it. The live-check backlog in `docs/testing.md` lists everything still waiting for a live pass. Architecture is in `docs/architecture.md`; reasons are in `docs/decisions.md`.
 
-Spec phase mapping: Phase 0 is Capture; Phase 1 is the bar, Ask, Save, and Settings; Phase 2 is People, Who, What did I promise, and Reply; Phase 3 is Recall, Search, and Visualize; Phase 4 (Windows parts) is Metrics and the evals.
+Spec phase mapping: Phase 0 is Capture; Phase 1 is the bar, Ask, Save, and Settings; Phase 2 is People, Who, Tasks (formerly What did I promise), and Reply; Phase 3 is Recall, Search, and Visualize; Phase 4 (Windows parts) is Metrics and the evals.
 
 ## Capture (the pill, the dot, the hotkey)
 
@@ -64,11 +64,19 @@ Status: the earlier "Paste recent" list was live; the 16.12 rework, As saved, an
 
 Status: live (setup You step, Profile, Who with the model on the email fixture text, badge, People tab). Not live: the Discord fixture on a real page, real Outlook web, first-name matching, contact cards, shared-inbox and glued-domain fixes, caching, the badge collapse, relationship editing.
 
-## What did I promise
+## Tasks (formerly What did I promise)
 
-One Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) alongside Who's people read (shared and cached). The model returns due phrases as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates. The panel lists each candidate (keep or skip, editable task, You owe / They owe, the person, the due date with a date picker) and, for each new person, the same fields as Who's Create person (decision 33), prefilled from Who's read; they are created on save. Enter saves; the message is stored as an interaction. With no usable model (Local only without a local model, or no key) sentence patterns find promises and requests instead (`actions/promise-rules.ts`, decision 34) and a note says so. Reminders (`reminders.ts`): at `reminderHour` (9) on the due date, or at launch if missed, up to 3 per check; clicking opens Settings > People.
+One action and one list for promises, requests, and personal todos (decision 36). Internally the action id is still `promises` and the table `commitments`.
 
-Status: live (extraction, save, card). Not live: the shared reader and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 22 (packaging).
+- **From this message:** one Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) alongside Who's people read (shared and cached). Before the call, the author and the people the message names are matched to saved people (exact matches only), and their open tasks (up to 12) go into the prompt under keys (`t1`…). Each row comes back as `new`, or `same`, `done`, or `moved` with the key of an open task (`open_task` is an enum of the keys sent). Code keeps a row about an open task as that task (owner, person, text), drops a second row about the same task, and turns a `moved` without a readable new date into `same`. `same` rows start unchecked (nothing to save); `done` marks the task done and `moved` sets its new date on save. The model returns due phrases as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates.
+- **Already open with these people:** every other open task with the author, anyone named, Who's read, and the rows' people, whatever the message says; Done and the date apply at once (`commitments:set-status`, `commitments:update`).
+- New rows: keep or skip, editable task, You owe / They owe, the person, the due date with a date picker, and for each new person the same fields as Who's Create person (decision 33), prefilled from Who's read; they are created on save. Enter saves; the message is stored as an interaction with the people involved.
+- Without a usable model (Local only without a local model, or no key; decision 34): sentence patterns (`actions/promise-rules.ts`: promises, requests, "remember to", todo lines, deadlines) and `matchOpenTasks` (same owner and most of the words: `same`, or `moved` with a deadline). Patterns never mark a task done; the open list's Done covers that. A note says the rows came from patterns.
+- **Settings > Tasks** (`settings/Tasks.tsx`): Open and Done, filter by person, edit the text (on blur) and date, mark done or reopen, delete with a confirm, and "Add a todo" (owner me, no person; `commitments:add`). People links to it instead of listing open commitments.
+- Bar: label "Tasks"; the score is the text's commitment score, or 0.55 for a message naming someone with open tasks (`peopleWithTasks`); "remember to", "don't forget", "todo", and "reminder" count as commitment phrases.
+- Reminders (`reminders.ts`): at `reminderHour` (9) on the due date, or at launch if missed, up to 3 per check; clicking opens Settings > Tasks. A moved date gets a new reminder.
+
+Status: live (the Step 15.3 extraction, save, card). Not live: everything from Step 19.1 (open tasks, done and moved rows, the Tasks tab, todos), the shared reader, and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 22 (packaging).
 
 ## Reply
 
@@ -91,7 +99,7 @@ Status: the earlier version (model-written specs) was live after two fixes; the 
 
 ## Settings window and setup
 
-Tabs: Profile, People, Saved, Keys, Models, General, Data, Metrics (`settings/`). Setup (`#setup`) has five steps: Welcome, You, Keys, Models, Try it (decision 11). The Keys step ("Choose your models") opens with the privacy choice and the local model card; Next needs a working key or local server, or Local only (which works without either).
+Tabs: Profile, People, Tasks, Saved, Keys, Models, General, Data, Metrics (`settings/`). Setup (`#setup`) has five steps: Welcome, You, Keys, Models, Try it (decision 11). The Keys step ("Choose your models") opens with the privacy choice and the local model card; Next needs a working key or local server, or Local only (which works without either).
 
 - **Keys**: per provider (Groq, OpenAI, Anthropic), test and save (`listModels` doubles as the test and fills the catalog), Test again, Replace, Remove (confirm). **Local model** card: Connect to Ollama or LM Studio (presets) or any address; saved only when it lists chat models; Test again, Change, Remove; warns when the address isn't this computer (decision 34).
 - **Models**: model and fallback per role, the Local only model (when a local server is set up), capability tags and warnings, per-action overrides, the catalog with Refresh (local server included).

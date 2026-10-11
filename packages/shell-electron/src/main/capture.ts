@@ -141,7 +141,7 @@ interface Session {
   placement: Placement['side'] | null;
   obstacles: ObstacleDebug[];
   pill: PillTiming | null;
-  /** The running "What did I promise" extraction. */
+  /** The running Tasks extraction. */
   promisesCtl: AbortController | null;
   /** The running "Who is this" read. */
   whoCtl: AbortController | null;
@@ -1458,7 +1458,7 @@ ${s.selection.text}`;
     return this.insertText(s, body, 'paste', (how) => this.services.metrics.record('paste_inserted', { kind, how, edited, ms: ms(s.t0) }));
   }
 
-  /** What did I promise: one structured call for the commitments in the selected message, or patterns without a model. */
+  /** Tasks: one structured call for the tasks in the selected message, or patterns without a model. */
   async extractPromises(sessionId: number): Promise<PromisesResult> {
     const s = this.current(sessionId);
     if (!s?.selection) return { ok: false, code: 'no_selection', message: 'Nothing is selected.' };
@@ -1480,16 +1480,16 @@ ${s.selection.text}`;
         (r) => r.read.people,
         () => [],
       );
-      const { rows, byRules } = await extractPromises(
+      const { rows, open, byRules } = await extractPromises(
         this.services.llm,
         people,
         this.settings,
-        { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe },
+        { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe, people: det.people },
         ctl.signal,
         new Date(),
         found,
       );
-      this.services.metrics.record('promises_extracted', { count: rows.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), ...(byRules && { by_rules: byRules }) });
+      this.services.metrics.record('promises_extracted', { count: rows.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), open: open.length, changes: rows.filter((r) => r.change !== 'new').length, ...(byRules && { by_rules: byRules }) });
       return {
         ok: true,
         rows,
@@ -1497,6 +1497,7 @@ ${s.selection.text}`;
         authorIsMe: det.authorIsMe,
         identitySet: identity.name.trim().length > 0,
         byRules,
+        open,
       };
     } catch (e) {
       const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
@@ -1508,7 +1509,7 @@ ${s.selection.text}`;
     }
   }
 
-  savePromises(sessionId: number, rows: PromiseSaveRow[]): { saved: number; created: number } {
+  savePromises(sessionId: number, rows: PromiseSaveRow[]): { saved: number; created: number; updated: number } {
     const s = this.current(sessionId);
     if (!s?.selection) throw new Error('This selection is gone. Select the message again.');
     const r = savePromises(this.services.people, rows, {
@@ -1517,7 +1518,7 @@ ${s.selection.text}`;
       authorPersonId: s.author?.personId ?? null,
       authorIsMe: s.author?.isMe ?? false,
     });
-    this.services.metrics.record('promises_saved', { count: r.saved, created: r.created, offered: rows.length });
+    this.services.metrics.record('promises_saved', { count: r.saved, created: r.created, updated: r.updated, offered: rows.length });
     log.info('promises saved', r);
     return r;
   }

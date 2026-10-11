@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   });
   services.on('settings', refresh);
 
-  const reminders = new Reminders(services, () => settingsWindow.open('people'));
+  const reminders = new Reminders(services, () => settingsWindow.open('tasks'));
   reminders.start();
 
   if (services.embed.downloaded || services.settings.firstRunComplete) services.embed.start();

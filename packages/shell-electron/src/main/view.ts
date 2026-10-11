@@ -7,7 +7,7 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   save: 'Save',
   reply: 'Reply',
   who: 'Who is this',
-  promises: 'What did I promise',
+  promises: 'Tasks',
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',

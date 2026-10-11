@@ -318,9 +318,11 @@ export class Store {
 
   /** People with their name, handle, and email aliases, for the router's feature matching. */
   listKnownPeople(): KnownPerson[] {
-    const people = this.db.prepare('SELECT id, name FROM people ORDER BY name').all() as { id: string; name: string }[];
+    const people = this.db
+      .prepare("SELECT p.id, p.name, (SELECT COUNT(*) FROM commitments c WHERE c.person_id = p.id AND c.status = 'open') AS open FROM people p ORDER BY p.name")
+      .all() as { id: string; name: string; open: number }[];
     const aliases = this.db.prepare('SELECT person_id, value FROM person_aliases').all() as { person_id: string; value: string }[];
-    return people.map((p) => ({ id: p.id, name: p.name, aliases: aliases.filter((a) => a.person_id === p.id).map((a) => a.value) }));
+    return people.map((p) => ({ id: p.id, name: p.name, aliases: aliases.filter((a) => a.person_id === p.id).map((a) => a.value), open: Number(p.open) }));
   }
 
   /** The person whose name or name alias matches, compared in canonical form. */

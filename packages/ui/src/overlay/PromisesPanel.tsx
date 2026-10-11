@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ExternalLink, Info, RotateCcw } from 'lucide-react';
-import type { OverlayState, PromiseRow, PromiseSaveRow, PromisesByRules, PromisesResult } from '@glossly/core/api';
+import type { CommitmentView, OverlayState, PromiseRow, PromiseSaveRow, PromisesByRules, PromisesResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { formatDue } from '../dates';
 import { PersonFields } from '../people/PersonForm';
@@ -28,6 +28,7 @@ function draftForRow(r: PromiseRow): PersonDraft {
 
 /** A new person is created with the fields as the user left them in "New people" (the same fields as Who's Create person). */
 function toSave(d: Draft, people: Record<string, PersonDraft>): PromiseSaveRow {
+  if (d.existing) return { change: d.change, existingId: d.existing.id, owner: d.owner, text: d.text, due_at: d.due_at, person: null };
   let person: PromiseSaveRow['person'] = null;
   if (d.person === 'match' && d.match) person = { kind: 'existing', id: d.match.personId };
   else if (d.person === 'new' && d.person_name) {
@@ -43,7 +44,7 @@ function toSave(d: Draft, people: Record<string, PersonDraft>): PromiseSaveRow {
  */
 function NewPeople({ rows, people, onChange }: { rows: Draft[]; people: Record<string, PersonDraft>; onChange: (key: string, d: PersonDraft) => void }) {
   const seen = new Map<string, Draft>();
-  for (const r of rows) if (r.selected && r.person === 'new' && r.person_name && !seen.has(r.person_name)) seen.set(r.person_name, r);
+  for (const r of rows) if (r.selected && !r.existing && r.person === 'new' && r.person_name && !seen.has(r.person_name)) seen.set(r.person_name, r);
   if (seen.size === 0) return null;
   return (
     <div className="new-people">
@@ -67,7 +68,91 @@ type Phase =
   | { kind: 'error'; result: Extract<PromisesResult, { ok: false }> }
   | { kind: 'review' }
   | { kind: 'saving' }
-  | { kind: 'saved'; saved: number; created: number };
+  | { kind: 'saved'; saved: number; created: number; updated: number };
+
+const CHANGE_LABEL: Record<Exclude<PromiseRow['change'], 'new'>, string> = { same: 'Already open', done: 'Mark done', moved: 'New date' };
+
+/** "You owe Jordan", "Jordan owes you", or "Your todo". */
+function owesLabel(t: Pick<CommitmentView, 'owner' | 'person_name'>): string {
+  if (t.owner === 'them') return `${t.person_name ?? 'They'} owe${t.person_name ? 's' : ''} you`;
+  return t.person_name ? `You owe ${t.person_name}` : 'Your todo';
+}
+
+/** A row about a task you already have: finish it, move it, or (same) nothing to do. */
+function ExistingRow({ d, highlight, onChange, onFocusRow }: { d: Draft; highlight: boolean; onChange: (patch: Partial<Draft>) => void; onFocusRow: () => void }) {
+  const was = formatDue(d.existing!.due_at);
+  const now = formatDue(d.due_at);
+  const same = d.change === 'same';
+  return (
+    <li className={`promise existing${d.selected ? '' : ' off'}${highlight ? ' highlight' : ''}`} onFocus={onFocusRow}>
+      <button
+        className={`check${d.selected ? ' on' : ''}`}
+        role="checkbox"
+        aria-checked={d.selected}
+        aria-label={d.selected ? 'Leave it' : CHANGE_LABEL[d.change as 'done']}
+        tabIndex={-1}
+        disabled={same}
+        onClick={() => onChange({ selected: !d.selected })}
+      >
+        {d.selected && <Check size={12} strokeWidth={2.5} aria-hidden />}
+      </button>
+      <div className="promise-body">
+        <span className="promise-text static">{d.text}</span>
+        <div className="promise-meta">
+          <span className="tag">{CHANGE_LABEL[d.change as 'done']}</span>
+          <span className="muted small">{owesLabel(d)}</span>
+          <span className="spacer" />
+          {d.change === 'moved' ? (
+            <label className="due-edit" title={d.due_phrase ? `"${d.due_phrase}"` : undefined}>
+              <span>
+                {d.existing!.due_at ? `${was.label} → ` : ''}
+                {now.label}
+              </span>
+              <input type="date" aria-label="New due date" tabIndex={-1} value={d.due_at?.slice(0, 10) ?? ''} onChange={(e) => onChange({ due_at: e.target.value || null })} />
+            </label>
+          ) : (
+            d.existing!.due_at && <span className={`small${was.overdue ? ' overdue' : ' muted'}`}>{was.label}</span>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * Open tasks with the people in the message that the message doesn't touch (decision 36): what
+ * you already owe them and what they owe you. Done and a date change apply at once.
+ */
+function OpenTasks({ tasks, onDone, onDue }: { tasks: CommitmentView[]; onDone: (t: CommitmentView) => void; onDue: (t: CommitmentView, due: string | null) => void }) {
+  if (tasks.length === 0) return null;
+  const names = [...new Set(tasks.map((t) => t.person_name).filter((n): n is string => Boolean(n)))];
+  return (
+    <div className="open-tasks">
+      <h4>Already open with {names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} and ${names[1]}` : 'these people'}</h4>
+      <ul className="promise-list">
+        {tasks.map((t) => {
+          const due = formatDue(t.due_at);
+          return (
+            <li key={t.id} className="promise">
+              <button className="check" role="checkbox" aria-checked={false} aria-label="Mark done" title="Mark done" tabIndex={-1} onClick={() => onDone(t)} />
+              <div className="promise-body">
+                <span className="promise-text static">{t.text}</span>
+                <div className="promise-meta">
+                  <span className="muted small">{owesLabel(t)}</span>
+                  <span className="spacer" />
+                  <label className={`due-edit${due.overdue ? ' overdue' : ''}`}>
+                    <span>{t.due_at ? due.label : 'No date'}</span>
+                    <input type="date" aria-label="Due date" tabIndex={-1} value={t.due_at?.slice(0, 10) ?? ''} onChange={(e) => onDue(t, e.target.value || null)} />
+                  </label>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 function Row({
   d,
@@ -132,8 +217,9 @@ function Row({
 }
 
 /**
- * What did I promise: candidate commitments in both directions. The user toggles rows, fixes
- * a name or date if needed, and Enter saves the selected ones.
+ * Tasks (decision 36): what the message says (new tasks, and ones that finish or move a task you
+ * already have), then the other open tasks with the same people. The user toggles rows, fixes a
+ * name or date if needed, and Enter saves the selected ones.
  */
 export function PromisesPanel({ s }: { s: OverlayState }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
@@ -141,6 +227,8 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
   const [meta, setMeta] = useState<{ author: string | null; authorIsMe: boolean; identitySet: boolean; byRules: PromisesByRules } | null>(null);
   const [hl, setHl] = useState(0);
   const [people, setPeople] = useState<Record<string, PersonDraft>>({});
+  const [open, setOpen] = useState<CommitmentView[]>([]);
+  const [openError, setOpenError] = useState<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
 
   const extract = async () => {
@@ -154,6 +242,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
     }
     setRows(r.rows.map((row) => ({ ...row, person: initialChoice(row) })));
     setMeta({ author: r.author, authorIsMe: r.authorIsMe, identitySet: r.identitySet, byRules: r.byRules });
+    setOpen(r.open);
     setHl(0);
     setPhase({ kind: 'review' });
   };
@@ -182,6 +271,21 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
     }
   };
 
+  const markDone = (t: CommitmentView) => {
+    setOpenError(null);
+    glossly.invoke('commitments:set-status', { id: t.id, status: 'done' }).then(
+      () => setOpen((ts) => ts.filter((x) => x.id !== t.id)),
+      () => setOpenError("Couldn't mark it done."),
+    );
+  };
+  const changeDue = (t: CommitmentView, due_at: string | null) => {
+    setOpenError(null);
+    glossly.invoke('commitments:update', { id: t.id, due_at }).then(
+      () => setOpen((ts) => ts.map((x) => (x.id === t.id ? { ...x, due_at } : x))),
+      () => setOpenError("Couldn't change the date."),
+    );
+  };
+
   const switchToAllModels = async () => {
     const r = await glossly.invoke('settings:set', { key: 'privacy', value: 'all' });
     if (!r.error) await extract();
@@ -201,7 +305,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
     } else if (!typing && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && rows.length) {
       e.preventDefault();
       setHl((h) => (h + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
-    } else if (!typing && e.key === ' ' && rows[hl]) {
+    } else if (!typing && e.key === ' ' && rows[hl] && rows[hl]!.change !== 'same') {
       e.preventDefault();
       patch(hl, { selected: !rows[hl]!.selected });
     }
@@ -209,7 +313,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
   return (
     <div className="panel promises" tabIndex={-1} ref={panel} onKeyDown={onKeyDown}>
-      {phase.kind === 'loading' && <p className="thinking">Finding promises…</p>}
+      {phase.kind === 'loading' && <p className="thinking">Finding tasks…</p>}
 
       {phase.kind === 'error' && (
         <div className="answer-error">
@@ -247,27 +351,33 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
           {meta && !meta.identitySet && (
             <div className="inline-note">
               <Info size={14} strokeWidth={1.75} aria-hidden />
-              <span>Add your name so Glossly knows which promises are yours.</span>
+              <span>Add your name so Glossly knows which tasks are yours.</span>
               <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'profile' })}>
                 Add your name
               </button>
             </div>
           )}
           {rows.length === 0 ? (
-            <p className="muted">No promises or requests in this selection.</p>
+            <p className="muted">{open.length ? 'Nothing new in this message.' : 'No tasks in this selection.'}</p>
           ) : (
             <>
               <h2>
                 {meta?.authorIsMe ? 'From your message' : meta?.author ? `From ${meta.author}'s message` : 'Found in the selection'}
               </h2>
               <ul className="promise-list">
-                {rows.map((d, i) => (
-                  <Row key={d.key} d={d} highlight={s.keyboard && i === hl} onChange={(p) => patch(i, p)} onFocusRow={() => setHl(i)} />
-                ))}
+                {rows.map((d, i) =>
+                  d.existing ? (
+                    <ExistingRow key={d.key} d={d} highlight={s.keyboard && i === hl} onChange={(p) => patch(i, p)} onFocusRow={() => setHl(i)} />
+                  ) : (
+                    <Row key={d.key} d={d} highlight={s.keyboard && i === hl} onChange={(p) => patch(i, p)} onFocusRow={() => setHl(i)} />
+                  ),
+                )}
               </ul>
               <NewPeople rows={rows} people={people} onChange={(key, d) => setPeople((m) => ({ ...m, [key]: d }))} />
             </>
           )}
+          <OpenTasks tasks={open} onDone={markDone} onDue={changeDue} />
+          {openError && <p className="error small">{openError}</p>}
         </>
       )}
 
@@ -275,7 +385,8 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
         <h2 className="saved-line">
           <Check size={17} strokeWidth={2} aria-hidden />
           <span>
-            Saved {phase.saved} {phase.saved === 1 ? 'commitment' : 'commitments'}
+            {phase.saved > 0 ? `Saved ${phase.saved} ${phase.saved === 1 ? 'task' : 'tasks'}` : `Updated ${phase.updated} ${phase.updated === 1 ? 'task' : 'tasks'}`}
+            {phase.saved > 0 && phase.updated > 0 && <span className="muted"> · updated {phase.updated}</span>}
             {phase.created > 0 && <span className="muted"> · added {phase.created === 1 ? '1 person' : `${phase.created} people`}</span>}
           </span>
         </h2>
@@ -283,9 +394,9 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
       <div className="panel-foot">
         {phase.kind === 'saved' && (
-          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'people' })}>
+          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'tasks' })}>
             <ExternalLink size={14} strokeWidth={1.75} aria-hidden />
-            Open People
+            Open Tasks
           </button>
         )}
         <span className="spacer" />

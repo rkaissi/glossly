@@ -275,7 +275,7 @@ export function ProfileTab({ view }: { view: SettingsView }) {
       <h2>Profile</h2>
       <p className="muted">
         Glossly uses this to tell your own messages and promises from other people's, and to write replies as you. It stays on this computer and is
-        sent to a model provider only as part of a request you start (Ask, Reply, What did I promise).
+        sent to a model provider only as part of a request you start (Ask, Reply, Tasks).
       </p>
       <div className="field">
         <div className="field-label">

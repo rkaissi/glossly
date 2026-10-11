@@ -5,42 +5,18 @@ import { glossly } from '../bridge';
 import { formatDay } from '../dates';
 import { CommitmentList, PersonCardView } from '../people/PersonCard';
 import { useAction } from './useAction';
-
-/** Re-runs `load` now and whenever people or commitments change anywhere. Undefined while loading. */
-function useLive<T>(load: () => Promise<T>): T | undefined {
-  const [value, setValue] = useState<T | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    const run = () => void load().then((v) => live && setValue(v));
-    run();
-    const off = glossly.on('people:changed', run);
-    return () => {
-      live = false;
-      off();
-    };
-  }, [load]);
-  return value;
-}
+import { useLive } from './useLive';
 
 function PeopleList() {
   const [query, setQuery] = useState('');
   const people = useLive(useCallback(() => glossly.invoke('people:list', { query }), [query]));
-  const open = useLive(useCallback(() => glossly.invoke('commitments:list', { status: 'open' }), []));
   return (
     <section>
       <h2>People</h2>
       <p className="muted">
-        Everyone here was added by you, from "Who is this", a promise you saved, or a reply you inserted. Nothing is looked up online.
+        Everyone here was added by you, from "Who is this", a task you saved, or a reply you inserted. Nothing is looked up online. Open tasks are
+        in the <a href="#tasks">Tasks</a> tab.
       </p>
-
-      <h3>Open commitments</h3>
-      {open && open.length > 0 ? (
-        <div className="field">
-          <CommitmentList items={open} showPerson />
-        </div>
-      ) : (
-        <p className="muted small">{open ? 'Nothing open. Promises you save from "What did I promise" show up here.' : 'Loading…'}</p>
-      )}
 
       <h3>Everyone</h3>
       <div className="search">
