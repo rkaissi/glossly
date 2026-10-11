@@ -18,6 +18,12 @@ export function helperExists(): boolean {
   return existsSync(helperPath());
 }
 
+/** The Glass app icon (decision 41) for windows and the taskbar; packaging adds the installer's .ico (Step 22). */
+export function appIconPath(): string {
+  if (app.isPackaged) return join(process.resourcesPath, 'icon.png');
+  return resolve(app.getAppPath(), 'resources/icon.png');
+}
+
 export const preloadPath = () => join(outMain, '../preload/index.cjs');
 export const embedWorkerPath = () => join(outMain, 'embed-worker.js');
 

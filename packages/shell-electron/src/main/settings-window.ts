@@ -1,6 +1,6 @@
 import { BrowserWindow, nativeTheme, shell } from 'electron';
 import { logger } from './log';
-import { hasWindowMaterial, preloadPath, rendererUrl } from './paths';
+import { appIconPath, hasWindowMaterial, preloadPath, rendererUrl } from './paths';
 import { hwndFromBuffer } from './view';
 
 const log = logger('settings-window');
@@ -48,6 +48,7 @@ export class SettingsWindow {
       minHeight: 520,
       show: false,
       title: 'Glossly',
+      icon: appIconPath(),
       autoHideMenuBar: true,
       // Windows 11 mica behind the page (Step 13); a plain themed background otherwise.
       ...(mica ? { backgroundMaterial: 'mica' as const } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff' }),

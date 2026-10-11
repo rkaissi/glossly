@@ -259,6 +259,37 @@ export function BlockList({ view }: { view: SettingsView }) {
   );
 }
 
+/** When the bar shows its keys (decision 41). */
+function KeyHintsField({ view }: { view: SettingsView }) {
+  const { busy, error, set } = useSetting();
+  const v = view.settings.keyHints;
+  return (
+    <div className="field">
+      <div className="toggle">
+        <span>
+          <strong>Show keyboard shortcuts</strong>
+          <span className="muted small block">
+            {v === 'always' ? 'Every bar shows its keys.' : v === 'hotkey' ? 'A bar opened with the hotkey shows its keys.' : 'No key chips.'} The keys work whenever the bar has focus.
+          </span>
+        </span>
+        <Segmented
+          size="sm"
+          label="Show keyboard shortcuts"
+          disabled={busy}
+          value={v}
+          options={[
+            ['always', 'Always'],
+            ['hotkey', 'On hotkey'],
+            ['never', 'Never'],
+          ]}
+          onChange={(next) => void set('keyHints', next)}
+        />
+      </div>
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
 /** The calendar and date pickers start weeks on Monday (the default) or Sunday. */
 function WeekStartField({ view }: { view: SettingsView }) {
   const { busy, error, set } = useSetting();
@@ -291,6 +322,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
     <section>
       <h2>General</h2>
       <Hotkey view={view} />
+      <KeyHintsField view={view} />
       <SaveMode view={view} />
       <AppModes view={view} />
       <WeekStartField view={view} />

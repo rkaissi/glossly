@@ -152,6 +152,19 @@ button.trigger.cal-title-range .trigger-value > svg {
   display: flex;
   flex-direction: column;
 }
+/* A view switch: the new view settles from 97% on the soft spring. */
+.cal-body > * {
+  animation: view-in var(--spring-soft-ms) var(--spring-soft) both;
+}
+@keyframes view-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  35% {
+    opacity: 1;
+  }
+}
 
 /* ---- shared items ---- */
 .mitem,
@@ -414,14 +427,18 @@ button.more:hover:not(:disabled) {
   box-shadow:
     inset 3px 0 0 var(--edge),
     var(--rim);
-  transition: box-shadow var(--fade);
+  transition:
+    box-shadow var(--fade),
+    translate var(--spring-soft-ms) var(--spring-soft);
 }
+/* Hover lifts an event 2 px with a deeper shadow (translate, so it adds to any transform). */
 .wblock.ev:hover,
 .wblock.ev:focus-visible {
+  translate: 0 -2px;
   box-shadow:
     inset 3px 0 0 var(--edge),
     var(--rim),
-    0 6px 18px rgba(40, 60, 90, 0.12);
+    0 10px 24px rgba(40, 60, 90, 0.16);
 }
 .wblock .t {
   font-weight: 600;
@@ -462,6 +479,7 @@ button.more:hover:not(:disabled) {
 .wblock.moving {
   z-index: 3;
   opacity: 0.88;
+  scale: 1.02;
   box-shadow:
     inset 3px 0 0 var(--edge),
     0 8px 24px rgba(0, 0, 0, 0.18);

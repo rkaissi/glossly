@@ -170,6 +170,22 @@ code {
   max-width: 720px;
   margin: 0 auto;
 }
+/* A tab change (decision 41): the page rises in on the soft spring, its first blocks 40 ms apart. */
+.settings main > section > * {
+  animation: rise-in var(--spring-soft-ms) var(--spring-soft) both;
+}
+.settings main > section > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.settings main > section > :nth-child(3) {
+  animation-delay: 80ms;
+}
+.settings main > section > :nth-child(4) {
+  animation-delay: 120ms;
+}
+.settings main > section > :nth-child(n + 5) {
+  animation-delay: 160ms;
+}
 .settings section > p.muted:first-of-type {
   margin-bottom: 22px;
 }

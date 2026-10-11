@@ -21,7 +21,7 @@
   outline: none;
   color: var(--fg);
   font: 14px/1.45 var(--font);
-  animation: pop-in 140ms var(--ease-out);
+  animation: pop-in var(--spring-pop-ms) var(--spring-pop);
   transform-origin: top left;
 }
 .popover[data-align='end'] {
@@ -31,16 +31,23 @@
   transform-origin: bottom left;
   animation-name: pop-in-above;
 }
+/* From 92% at the anchor on the pop spring; opacity settles faster than the scale. */
 @keyframes pop-in {
-  from {
+  0% {
     opacity: 0;
-    transform: scale(0.97) translateY(-4px);
+    transform: scale(0.92) translateY(-4px);
+  }
+  30% {
+    opacity: 1;
   }
 }
 @keyframes pop-in-above {
-  from {
+  0% {
     opacity: 0;
-    transform: scale(0.97) translateY(4px);
+    transform: scale(0.92) translateY(4px);
+  }
+  30% {
+    opacity: 1;
   }
 }
 
@@ -403,7 +410,7 @@ button.range-trigger {
   box-shadow:
     0 0 0 1px var(--border),
     0 1px 3px rgba(0, 0, 0, 0.12);
-  transition: transform 220ms var(--ease-out);
+  transition: transform var(--spring-soft-ms) var(--spring-soft);
 }
 .seg button {
   position: relative;
@@ -454,16 +461,16 @@ button.cb {
 button.cb svg {
   color: var(--primary-fg);
   opacity: 0;
-  transform: scale(0.6);
+  transform: scale(0.5);
   transition:
     opacity 120ms,
-    transform 160ms var(--ease-out);
+    transform var(--spring-pop-ms) var(--spring-pop);
 }
 button.cb[aria-checked='true'],
 button.cb[aria-checked='mixed'] {
   background: var(--primary);
   box-shadow: none;
-  animation: tick-pop 220ms var(--ease-out);
+  animation: squash-pop 420ms both;
 }
 button.cb[aria-checked='true'] svg {
   opacity: 1;
@@ -513,7 +520,7 @@ button.tick:hover:not(:disabled) svg {
 button.tick[aria-checked='true'] {
   background: var(--primary);
   box-shadow: none;
-  animation: tick-pop 260ms var(--ease-out);
+  animation: squash-pop 420ms both;
 }
 button.tick[aria-checked='true'] svg {
   opacity: 1;
@@ -527,11 +534,7 @@ button.tick[aria-checked='true']:active:not(:disabled) {
   background: var(--toggle-on-hover);
   box-shadow: none;
 }
-@keyframes tick-pop {
-  40% {
-    transform: scale(1.18);
-  }
-}
+
 
 button.sw {
   position: relative;
@@ -555,7 +558,7 @@ button.sw::after {
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition:
-    transform 220ms var(--ease-out),
+    transform var(--spring-pop-ms) var(--spring-pop),
     width 160ms var(--ease-out);
 }
 button.sw[aria-checked='true'] {
@@ -599,8 +602,15 @@ button.choice {
   background: transparent;
   box-shadow: 0 0 0 1px var(--border-strong) inset;
 }
+button.choice {
+  transition:
+    background-color var(--fade),
+    box-shadow var(--fade),
+    transform var(--spring-soft-ms) var(--spring-soft);
+}
 button.choice:hover:not(:disabled) {
   background: var(--hover);
+  transform: translateY(-1px);
 }
 button.choice[aria-checked='true'],
 button.choice[aria-checked='true']:hover:not(:disabled) {

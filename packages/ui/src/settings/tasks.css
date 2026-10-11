@@ -154,19 +154,29 @@ button.collapse[aria-expanded='false'] svg {
 .task-row.confirming {
   background: color-mix(in srgb, var(--danger) 7%, transparent);
 }
+/* Rows rise in, a few at a time; checking one off pops the check, then the row slides out (ease-in, no bounce). */
+.task-row {
+  animation: rise-in var(--spring-soft-ms) var(--spring-soft) both;
+}
+.task-row:nth-child(2) {
+  animation-delay: 30ms;
+}
+.task-row:nth-child(3) {
+  animation-delay: 60ms;
+}
+.task-row:nth-child(n + 4) {
+  animation-delay: 90ms;
+}
 .task-row.leaving {
-  animation: task-leave 420ms var(--ease-out) forwards;
+  animation: task-leave 420ms var(--ease-in) 200ms forwards;
 }
 @keyframes task-leave {
   0% {
     background: var(--surface-2);
   }
-  60% {
-    opacity: 1;
-  }
   100% {
     opacity: 0;
-    transform: translateX(10px);
+    transform: translateX(16px);
   }
 }
 .task-title {
@@ -239,7 +249,7 @@ button.collapse[aria-expanded='false'] svg {
   box-shadow: var(--shadow-lg);
   font-size: 13px;
   transform: translateX(-50%);
-  animation: toast-in 200ms var(--ease-out);
+  animation: toast-in var(--spring-soft-ms) var(--spring-soft);
 }
 .toast-bar button {
   flex: none;
@@ -252,8 +262,11 @@ button.collapse[aria-expanded='false'] svg {
   background: color-mix(in srgb, var(--primary-fg) 12%, transparent);
 }
 @keyframes toast-in {
-  from {
+  0% {
     opacity: 0;
-    transform: translate(-50%, 6px);
+    transform: translate(-50%, 16px) scale(0.96);
+  }
+  30% {
+    opacity: 1;
   }
 }

@@ -62,7 +62,7 @@ function TaskRow({ t, today, showDue, onDone }: { t: CommitmentView; today: stri
         onChange={(on) => {
           // The check pops, the row slides out, then the list moves it (Completed or back).
           setLeaving(true);
-          setTimeout(() => onDone(t, on), 420);
+          setTimeout(() => onDone(t, on), 620);
         }}
       />
       <div className="task-title">

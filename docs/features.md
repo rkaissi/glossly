@@ -23,7 +23,7 @@ Status: live in Notepad, Chrome, and the settings window (pill 116 to 125 ms wit
 
 Glossly menu, Ask, Save to {collection}, slots 3 and 4, badges (person, "N related"). The window grows rightward from a left edge picked at first paint so the widest bar (`MAX_W` 680) fits on screen. Slots 3 and 4 stay empty while a model route is in flight, then fill once; a shown button never goes away. The menu holds More (other actions above 0.2), "Don't show here (site)", Settings, and Close.
 
-Keys (`overlay/keys.ts`): `1` to `4` run the Nth button by position (so the empty bar reads 1 Ask, 2 Search, 3 Paste snippets), `Enter` runs the highlighted one, `Tab` opens the menu with More's first item highlighted, arrows move, `Esc` closes the menu, then the panel, then the bar. Key hints show only on a focused bar.
+Keys (`overlay/keys.ts`): `1` to `4` run the Nth button by position (so the empty bar reads 1 Ask, 2 Search, 3 Paste snippets), `Enter` runs the highlighted one, `Tab` opens the menu with More's first item highlighted, arrows move, `Esc` closes the menu, then the panel, then the bar. Each action shows its key in a chip right of its label when General > Show keyboard shortcuts says so (Always, On hotkey (the default: a bar opened with the hotkey), or Never), decided once when the bar opens (decision 41); the keys work whenever the bar has focus.
 
 Status: live (Step 13 and 16 checks). Not live: numbering by position.
 
@@ -105,7 +105,7 @@ Tabs, in two groups (decisions 39 and 40): Tasks, Calendar, People, Saved, then 
 
 - **Models, providers** (formerly Keys): per provider (Groq, OpenAI, Anthropic), test and save (`listModels` doubles as the test and fills the catalog), Test again, Replace, Remove (confirm). **Local model** card: Connect to Ollama or LM Studio (presets) or any address; saved only when it lists chat models; Test again, Change, Remove; warns when the address isn't this computer (decision 34).
 - **Models, roles**: model and fallback per role, the Local only model (when a local server is set up), capability tags and warnings, per-action overrides, the catalog with Refresh (local server included), and the local embedding model (status and download).
-- **General**: hotkey recorder, Saving (decision 15), per-app modes, Week starts on (Monday or Sunday), Debug view (a switch).
+- **General**: hotkey recorder, Show keyboard shortcuts (Always, On hotkey, Never), Saving (decision 15), per-app modes, Week starts on (Monday or Sunday), Debug view (a switch).
 - **Saved**: every item, filter by collection, search (words, then meaning), move, copy, delete (confirm).
 - **Privacy and data**: Where model calls go (All models or Local only, with what Local only uses right now; decision 34), the block list, Export, Delete all data, Reset settings (decision 10). Destructive buttons are filled red and confirm inline.
 - **Metrics**: 7/30/90 days; totals, expand rate, per action clicks, click rate, median time to click; a Features table (saves by how, Related shown/opened/dismissed, Reply inserted unedited/edited/own/copied/discarded/redo, paste, search inserts, promises, failed calls and fallbacks); per day.

@@ -137,6 +137,8 @@ export interface OverlayState {
   placement: Placement | null;
   /** True on the hotkey path: the bar has keyboard focus and the keyboard map is live. */
   keyboard: boolean;
+  /** The `keyHints` setting; the bar decides from it, once when it opens, whether to show key chips. */
+  keyHints: 'always' | 'hotkey' | 'never';
   /** False for the "nothing selected" state (hotkey with no selection). */
   hasSelection: boolean;
   /** Word count only, for labels like "Ask about 42 words". */

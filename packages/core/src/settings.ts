@@ -163,6 +163,8 @@ export const SettingsSchema = z.object({
 
   /** Local hour when a commitment's due-date notification is shown (spec: 9:00). */
   reminderHour: z.number().int().min(0).max(23).default(9),
+  /** When the bar shows each action's key in a chip (decision 41): always, only on a bar opened with the hotkey (the default), or never. The keys work either way. */
+  keyHints: z.enum(['always', 'hotkey', 'never']).default('hotkey'),
   /** First day of the week in the calendar and date pickers: 1 Monday (the default), 0 Sunday. */
   weekStart: z.union([z.literal(0), z.literal(1)]).default(1),
   /** The Calendar tab's last view, which it opens on next time (Week at first). */

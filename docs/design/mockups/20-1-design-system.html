@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-accent="none">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Glossly 20.1 controls</title>
+<!-- The real tokens. Everything below is the proposed additions for theme.css. -->
+<link rel="stylesheet" href="../../../packages/ui/src/theme.css" />
+<style>
+/* ===== Proposed theme.css additions (20.1) ===== */
+:root {
+  /* 4 px grid */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;
+  /* control heights */
+  --h-sm: 28px; --h-md: 32px; --h-lg: 36px;
+  /* icons */
+  --icon-sm: 14px; --icon-md: 16px;
+  /* radii: xs for checkboxes and kbd, sm for controls, md for cards and popovers, lg for panels */
+  --radius-xs: 4px; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+  /* list rows, the same everywhere */
+  --row-h: 40px; --row-px: 12px; --row-gap: 10px;
+  --popover: rgba(252, 252, 252, 0.94);
+  --popover-blur: saturate(1.6) blur(28px);
+  --shadow-lg: 0 0 0 1px rgba(0,0,0,.06), 0 8px 16px rgba(0,0,0,.08), 0 24px 48px rgba(0,0,0,.12);
+  --danger-solid: #c2463a;
+  --danger-solid-hover: #b03e33;
+  --accent: var(--primary);
+  --accent-fg: var(--primary-fg);
+  --accent-soft: var(--pressed);
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --border-hover: rgba(0, 0, 0, 0.34);
+  --toggle-on-hover: #404040;
+}
+/* Mockup only: theme switch (the app follows the system via the media query in theme.css). */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --fg: #ececec; --fg-2: #c2c2c2; --muted: #949494; --faint: #6b6b6b;
+  --glass: rgba(28,28,28,.5); --surface: rgba(255,255,255,.055); --surface-2: rgba(255,255,255,.045);
+  --hover: rgba(255,255,255,.075); --pressed: rgba(255,255,255,.12); --border: rgba(255,255,255,.09);
+  --border-strong: rgba(255,255,255,.18); --primary: #ececec; --primary-fg: #0d0d0d; --primary-hover: #fff;
+  --ring: rgba(255,255,255,.5); --select: rgba(255,255,255,.16); --danger: #ff8a80; --ok: #7fd6a0; --warn: #e8c070;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --popover: rgba(40, 40, 40, 0.92);
+  --shadow-lg: 0 0 0 1px rgba(255,255,255,.08), 0 8px 16px rgba(0,0,0,.3), 0 24px 48px rgba(0,0,0,.4);
+  --border-hover: rgba(255, 255, 255, 0.4);
+  --toggle-on-hover: #c4c4c4;
+  --danger-solid: #c2463a; --danger-solid-hover: #b03e33;
+  --sidebar: transparent; --page: rgba(33,33,33,.78); --card: rgba(255,255,255,.045);
+}
+html[data-theme='light'] { color-scheme: light; --sidebar: transparent; --page: rgba(255,255,255,.82); --card: rgba(255,255,255,.9); }
+/* Accent options (20.3 decides; shown here so the controls can be judged with one) */
+html[data-accent='blue'] { --accent: #2563eb; --accent-fg: #fff; --accent-soft: rgba(37,99,235,.12); }
+html[data-accent='violet'] { --accent: #7c3aed; --accent-fg: #fff; --accent-soft: rgba(124,58,237,.12); }
+html[data-theme='dark'][data-accent='blue'] { --accent: #6b9bff; --accent-fg: #0b1220; --accent-soft: rgba(107,155,255,.18); }
+html[data-theme='dark'][data-accent='violet'] { --accent: #a98bff; --accent-fg: #140b24; --accent-soft: rgba(169,139,255,.18); }
+
+/* ===== Mockup scaffolding: a fake mica window on a wallpaper ===== */
+html, body { margin: 0; height: 100%; }
+body {
+  background: radial-gradient(1200px 700px at 15% 10%, #b9d3ee, transparent 60%),
+              radial-gradient(900px 700px at 90% 80%, #e8c8d8, transparent 60%), #d8dde6;
+  display: grid; place-items: center; padding: 24px; min-height: 100%;
+}
+html[data-theme='dark'] body {
+  background: radial-gradient(1200px 700px at 15% 10%, #1d2b44, transparent 60%),
+              radial-gradient(900px 700px at 90% 80%, #3a2233, transparent 60%), #15171c;
+}
+.window {
+  width: min(1180px, 100%); height: min(820px, calc(100vh - 48px));
+  display: flex; flex-direction: column; border-radius: 8px; overflow: hidden;
+  background: rgba(243,243,243,.72); backdrop-filter: blur(40px) saturate(1.4);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.12), 0 30px 80px rgba(0,0,0,.25);
+}
+html[data-theme='dark'] .window { background: rgba(32,32,32,.75); box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.6); }
+.titlebar { height: 32px; display: flex; align-items: center; padding-left: 14px; font-size: 12px; color: var(--muted); flex: none; }
+.titlebar .sp { flex: 1; }
+.titlebar i { font-family: 'Segoe Fluent Icons', 'Segoe MDL2 Assets'; font-size: 10px; width: 46px; height: 32px; display: grid; place-items: center; font-style: normal; }
+.shell { display: flex; flex: 1; min-height: 0; }
+nav { width: 220px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 6px 10px 14px; }
+nav .brand { display: flex; align-items: center; gap: 9px; font: 600 16px/1 var(--font-display); padding: 6px 10px 18px; }
+nav a { display: flex; align-items: center; gap: 10px; height: var(--h-lg); padding: 0 10px; border-radius: var(--radius-sm); color: var(--fg); text-decoration: none; }
+.nav-group { font-size: 12px; color: var(--muted); padding: var(--s-5) 10px var(--s-1); }
+nav a svg { width: var(--icon-md); height: var(--icon-md); color: var(--fg-2); }
+nav a:hover { background: var(--hover); }
+nav a.current { background: var(--pressed); font-weight: 600; }
+main { flex: 1; overflow-y: auto; padding: var(--s-6) 40px 56px; background: var(--page); border-left: 1px solid var(--border); border-top: 1px solid var(--border); border-top-left-radius: 8px; }
+section.page { max-width: 760px; margin: 0 auto; }
+h1 { font: 600 26px/1.25 var(--font-display); letter-spacing: -.01em; margin: 0 0 var(--s-1); }
+h2 { font: 600 15px/1.4 var(--font-display); margin: var(--s-6) 0 var(--s-3); display: flex; align-items: baseline; gap: var(--s-2); }
+h2 small { font: 400 12.5px var(--font); color: var(--muted); }
+.lede { color: var(--muted); margin: 0 0 var(--s-5); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: var(--s-4) var(--s-4); }
+.card + .card { margin-top: var(--s-3); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.stack { display: flex; flex-direction: column; gap: var(--s-3); }
+.label { font-size: 12.5px; color: var(--muted); }
+.field-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); min-height: var(--h-lg); }
+.field-row + .field-row { border-top: 1px solid var(--border); padding-top: var(--s-3); margin-top: var(--s-3); }
+.field-row .t { font-weight: 500; }
+.field-row .d { font-size: 12.5px; color: var(--muted); }
+.note { font-size: 12.5px; color: var(--muted); margin-top: var(--s-2); }
+
+/* Mockup toolbar */
+.tweaks { position: fixed; top: 12px; right: 12px; z-index: 50; display: flex; gap: 8px; padding: 6px; border-radius: 12px; background: var(--popover); backdrop-filter: var(--popover-blur); box-shadow: var(--shadow-lg); }
+
+/* ===== Scale swatches ===== */
+.scale { display: flex; align-items: flex-end; gap: var(--s-4); }
+.scale div { display: flex; flex-direction: column; align-items: center; gap: 6px; font: 11px var(--mono); color: var(--muted); }
+.scale span { display: block; background: var(--accent-soft); border: 1px dashed var(--border-strong); border-radius: 2px; }
+
+/* ===== Buttons ===== */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--h-md); padding: 0 var(--s-3); border-radius: var(--radius-sm); border: 1px solid transparent; font-weight: 500; background: var(--surface); box-shadow: 0 0 0 1px var(--border-strong) inset, var(--shadow-sm); transition: background-color var(--fade) ease, box-shadow var(--fade) ease, transform 80ms ease; }
+.btn:hover:not(:disabled) { background: var(--hover); }
+.btn:active:not(:disabled) { transform: translateY(.5px); background: var(--pressed); }
+.btn svg { width: var(--icon-md); height: var(--icon-md); }
+.btn.sm { height: var(--h-sm); padding: 0 10px; font-size: 13px; }
+.btn.sm svg { width: var(--icon-sm); height: var(--icon-sm); }
+.btn.lg { height: var(--h-lg); padding: 0 var(--s-4); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, var(--shadow-sm); }
+.btn.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.12); }
+html[data-accent='none'] .btn.primary:hover:not(:disabled) { background: var(--primary-hover); filter: none; }
+.btn.ghost { background: transparent; box-shadow: none; }
+.btn.ghost:hover:not(:disabled) { background: var(--hover); }
+.btn.danger { border-color: transparent; background: var(--danger-solid); color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, var(--shadow-sm); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-solid-hover); }
+.btn.icon { width: var(--h-md); padding: 0; background: transparent; box-shadow: none; color: var(--fg-2); }
+.btn.icon.sm { width: var(--h-sm); }
+.btn.icon:hover { background: var(--hover); color: var(--fg); }
+.btn.icon.danger-hover:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+/* ===== Text inputs ===== */
+.input { height: var(--h-md); padding: 0 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border-strong); outline: none; transition: border-color var(--fade), box-shadow var(--fade); min-width: 0; }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+html[data-accent='none'] .input:focus { border-color: var(--ring); box-shadow: 0 0 0 3px var(--hover); }
+/* in-row inputs: look like text until hovered or focused */
+.inline-input { height: 28px; padding: 0 6px; margin-left: -6px; border-radius: 6px; border: 1px solid transparent; background: transparent; outline: none; flex: 1; min-width: 0; transition: background-color var(--fade), border-color var(--fade); }
+.inline-input:hover { background: var(--hover); }
+.inline-input:focus { background: var(--surface); border-color: var(--border-strong); }
+
+/* ===== Select trigger (also used by date/time triggers) ===== */
+.trigger { display: inline-flex; align-items: center; gap: var(--s-2); height: var(--h-md); padding: 0 var(--s-2) 0 var(--s-3); border-radius: var(--radius-sm); background: var(--surface); box-shadow: 0 0 0 1px var(--border-strong) inset, var(--shadow-sm); border: none; min-width: 160px; justify-content: space-between; text-align: left; }
+.trigger:hover { background: var(--hover); }
+.trigger[aria-expanded='true'] { box-shadow: 0 0 0 1px var(--fg-2) inset; }
+.trigger .v { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; align-items: center; gap: var(--s-2); }
+.trigger .v svg { color: var(--muted); }
+.trigger > svg { width: var(--icon-sm); height: var(--icon-sm); color: var(--muted); transition: transform var(--fade) var(--ease-out); }
+.trigger[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.trigger svg { width: var(--icon-md); height: var(--icon-md); }
+.trigger.sm { height: var(--h-sm); font-size: 13px; min-width: 0; padding: 0 6px 0 10px; }
+.trigger .ph { color: var(--muted); }
+
+/* chip trigger (due chips in rows) */
+.chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 12.5px; background: transparent; box-shadow: 0 0 0 1px var(--border-strong) inset; color: var(--fg-2); border: none; }
+.chip svg { width: 13px; height: 13px; }
+.chip:hover { background: var(--hover); }
+.chip.overdue { color: var(--danger); box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent) inset; }
+.chip.today { color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent) inset; }
+html[data-accent='none'] .chip.today { color: var(--fg); font-weight: 600; }
+.chip.ghost { box-shadow: none; color: var(--muted); }
+
+/* ===== Popover primitive ===== */
+.popover { position: fixed; z-index: 100; min-width: 180px; padding: var(--s-1); border-radius: var(--radius-md); background: var(--popover); backdrop-filter: var(--popover-blur); box-shadow: var(--shadow-lg); transform-origin: var(--origin, top left); animation: pop-in 140ms var(--ease-out); outline: none; }
+.popover.closing { animation: pop-out 100ms ease-in forwards; }
+@keyframes pop-in { from { opacity: 0; transform: scale(.97) translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes pop-out { to { opacity: 0; transform: scale(.98); } }
+
+/* ===== Menu (select options and row actions) ===== */
+.menu { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+.menu .item { flex: none; display: flex; align-items: center; gap: var(--s-2); height: var(--h-md); padding: 0 var(--s-2); border-radius: 6px; cursor: default; white-space: nowrap; user-select: none; }
+.menu .item svg { width: var(--icon-md); height: var(--icon-md); color: var(--fg-2); flex: none; }
+.menu .item .check { width: var(--icon-md); visibility: hidden; color: var(--accent); }
+html[data-accent='none'] .menu .item .check { color: var(--fg); }
+.menu .item[aria-selected='true'] .check { visibility: visible; }
+.menu .item.active { background: var(--hover); }
+.menu .item .kbd { margin-left: auto; padding-left: var(--s-5); font-size: 12px; color: var(--muted); }
+.menu .item.danger, .menu .item.danger svg { color: var(--danger); }
+.menu .item.danger.active { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.menu .sep { height: 1px; margin: var(--s-1) calc(-1 * var(--s-1)); background: var(--border); }
+.menu .head { font-size: 11.5px; color: var(--muted); padding: 6px var(--s-2) 2px; }
+.menu .item .sub { color: var(--muted); font-size: 12.5px; margin-left: auto; padding-left: var(--s-4); }
+
+/* ===== Calendar (date + range) ===== */
+.cal { padding: var(--s-2); width: 252px; }
+.cal-head { display: flex; align-items: center; height: var(--h-md); margin-bottom: var(--s-1); }
+.cal-head .m { flex: 1; font-weight: 600; padding-left: var(--s-2); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 32px); gap: 2px 2px; justify-content: center; }
+.cal-grid .dow { height: 24px; display: grid; place-items: center; font-size: 11.5px; color: var(--muted); }
+.cal-grid button.d { all: unset; box-sizing: border-box; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 999px; font-size: 13px; cursor: default; font-variant-numeric: tabular-nums; position: relative; }
+.cal-grid button.d:hover { background: var(--hover); }
+.cal-grid button.d.out { color: var(--faint); }
+.cal-grid button.d.today { font-weight: 700; }
+.cal-grid button.d.today::after { content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 99px; background: var(--accent); }
+.cal-grid button.d.sel { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.cal-grid button.d.sel::after { background: var(--accent-fg); }
+.cal-grid button.d:focus-visible { outline: 2px solid var(--ring); }
+.cal-grid button.d.inrange { background: var(--accent-soft); border-radius: 0; }
+.cal-grid button.d.rs { border-radius: 999px 0 0 999px; background: var(--accent); color: var(--accent-fg); }
+.cal-grid button.d.re { border-radius: 0 999px 999px 0; background: var(--accent); color: var(--accent-fg); }
+.cal-grid button.d.rs.re { border-radius: 999px; }
+.shortcuts { margin: calc(-1 * var(--s-1)) calc(-1 * var(--s-1)) var(--s-2); padding-bottom: var(--s-1); border-bottom: 1px solid var(--border); }
+.range { display: flex; }
+.range .quick { width: 150px; border-right: 1px solid var(--border); padding: var(--s-1); }
+.range .months { display: flex; gap: var(--s-2); }
+.range .foot { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2); border-top: 1px solid var(--border); }
+
+/* ===== Time ===== */
+.time-field { display: inline-flex; align-items: center; gap: 6px; height: var(--h-md); padding: 0 10px; width: 112px; border-radius: var(--radius-sm); background: var(--surface); box-shadow: 0 0 0 1px var(--border-strong) inset, var(--shadow-sm); }
+.time-field svg { width: var(--icon-md); height: var(--icon-md); color: var(--muted); flex: none; }
+.time-field input { all: unset; width: 100%; font-variant-numeric: tabular-nums; }
+.time-field:focus-within { box-shadow: 0 0 0 1px var(--fg-2) inset; }
+.popover.time-pop { min-width: 0; padding: var(--s-1); }
+.time-list { max-height: 304px; scroll-padding: var(--s-1); }
+.time-list .item { height: 32px; justify-content: center; font-variant-numeric: tabular-nums; padding: 0; }
+.time-list .item .check { display: none; }
+.time-list .item[aria-selected='true'] { font-weight: 600; background: var(--pressed); }
+
+/* ===== Segmented ===== */
+.seg { display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; position: relative; padding: 2px; border-radius: var(--radius-sm); background: var(--surface-2); box-shadow: 0 0 0 1px var(--border) inset; height: var(--h-md); }
+.seg button { all: unset; white-space: nowrap; position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 var(--s-3); font-size: 13px; color: var(--fg-2); border-radius: 6px; cursor: default; }
+.seg button svg { width: var(--icon-sm); height: var(--icon-sm); }
+.seg button:hover:not(:disabled) { background: none; color: var(--fg); }
+.seg button[aria-pressed='true'] { color: var(--fg); font-weight: 600; }
+.seg button:focus-visible { outline: 2px solid var(--ring); }
+.seg .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / var(--n)); transform: translateX(calc(var(--i) * 100%)); border-radius: 6px; background: var(--card); box-shadow: 0 0 0 1px var(--border), 0 1px 3px rgba(0,0,0,.12); transition: transform 220ms var(--ease-out); }
+.seg { grid-template-columns: repeat(var(--n), var(--cell, auto)); }
+html[data-theme='dark'] .seg .thumb { background: rgba(255,255,255,.12); }
+.seg.sm { height: var(--h-sm); }
+
+/* ===== Checkbox, round check, switch ===== */
+.check-label { display: inline-flex; align-items: center; gap: 10px; cursor: default; user-select: none; }
+.cb { all: unset; box-sizing: border-box; width: 16px; height: 16px; flex: none; border-radius: var(--radius-xs); box-shadow: 0 0 0 1.5px var(--border-strong) inset; background: var(--surface); display: grid; place-items: center; transition: background-color 120ms, box-shadow 120ms; }
+.cb svg { width: 12px; height: 12px; color: var(--accent-fg); stroke-width: 3; opacity: 0; transform: scale(.6); transition: opacity 120ms, transform 160ms var(--ease-out); }
+.cb[aria-checked='true'] { background: var(--accent); box-shadow: none; }
+.cb[aria-checked='true'] svg { opacity: 1; transform: none; }
+.cb[aria-checked='mixed'] { background: var(--accent); box-shadow: none; }
+.cb[aria-checked='mixed'] svg { display: none; }
+.cb[aria-checked='mixed']::after { content: ''; width: 8px; height: 2px; border-radius: 2px; background: var(--accent-fg); }
+.cb:focus-visible, .tick:focus-visible, .sw:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.tick { all: unset; box-sizing: border-box; width: 18px; height: 18px; flex: none; border-radius: 999px; box-shadow: 0 0 0 1.5px var(--faint) inset; display: grid; place-items: center; transition: background-color 150ms, box-shadow 150ms; }
+.tick svg { width: 11px; height: 11px; stroke-width: 3; color: var(--muted); opacity: 0; }
+.tick:hover svg { opacity: .5; }
+.tick:hover:not(:disabled) { background: transparent; box-shadow: 0 0 0 1.5px var(--fg-2) inset; }
+.tick[aria-checked='true'] { background: var(--accent); box-shadow: none; animation: tick-pop 260ms var(--ease-out); }
+.tick[aria-checked='true'] svg { opacity: 1; color: var(--accent-fg); }
+/* Subtle hovers: the base button:hover in theme.css would repaint these grey. */
+.cb:hover:not(:disabled), .cb:active:not(:disabled) { background: var(--surface); box-shadow: 0 0 0 1.5px var(--border-hover) inset; }
+.cb[aria-checked='true']:hover:not(:disabled), .cb[aria-checked='mixed']:hover:not(:disabled),
+.tick[aria-checked='true']:hover:not(:disabled), .cb[aria-checked='true']:active:not(:disabled), .tick[aria-checked='true']:active:not(:disabled) { background: var(--toggle-on-hover); box-shadow: none; }
+.tick:active:not(:disabled) { background: transparent; }
+.sw:hover:not(:disabled), .sw:active:not(:disabled) { background: var(--border-hover); }
+.sw[aria-checked='true']:hover:not(:disabled), .sw[aria-checked='true']:active:not(:disabled) { background: var(--toggle-on-hover); }
+/* Small motion: checkbox pops like the task check, the switch knob stretches while pressed. */
+.cb[aria-checked='true'], .cb[aria-checked='mixed'] { animation: tick-pop 220ms var(--ease-out); }
+.sw::after { transition: transform 220ms var(--ease-out), width 160ms var(--ease-out); }
+.sw:active::after { width: 20px; }
+.sw[aria-checked='true']:active::after { transform: translateX(12px); }
+.lrow .inline-input { transition: color 250ms ease, background-color var(--fade), border-color var(--fade); }
+.lrow.done { animation: row-settle 400ms var(--ease-out); }
+@keyframes row-settle { 0% { background: var(--surface-2); } 100% { background: transparent; } }
+@keyframes tick-pop { 40% { transform: scale(1.18); } }
+.sw { all: unset; box-sizing: border-box; width: 36px; height: 20px; border-radius: 999px; background: var(--border-strong); position: relative; flex: none; transition: background-color 180ms; }
+.sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 999px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform 220ms var(--ease-out); }
+.sw[aria-checked='true'] { background: var(--accent); }
+.sw[aria-checked='true']::after { transform: translateX(16px); }
+html[data-theme='dark'][data-accent='none'] .sw[aria-checked='true']::after { background: #0d0d0d; }
+
+/* ===== Radio-as-cards (privacy choice) ===== */
+.choice { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.choice button { all: unset; box-sizing: border-box; padding: var(--s-3); border-radius: var(--radius-sm); box-shadow: 0 0 0 1px var(--border-strong) inset; display: flex; gap: 10px; align-items: flex-start; }
+.choice button:hover { background: var(--hover); }
+.choice button .dot { width: 16px; height: 16px; border-radius: 99px; box-shadow: 0 0 0 1.5px var(--border-strong) inset; flex: none; margin-top: 2px; display: grid; place-items: center; }
+.choice button[aria-checked='true'] { box-shadow: 0 0 0 1.5px var(--accent) inset; background: var(--accent-soft); }
+html[data-accent='none'] .choice button[aria-checked='true'] { box-shadow: 0 0 0 1.5px var(--fg) inset; background: var(--surface-2); }
+.choice button[aria-checked='true'] .dot { box-shadow: 0 0 0 5px var(--accent) inset; }
+.choice .t { font-weight: 600; }
+.choice .d { font-size: 12.5px; color: var(--muted); }
+
+/* ===== List rows ===== */
+.list { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.lrow { display: flex; align-items: center; gap: var(--row-gap); min-height: var(--row-h); padding: 0 var(--s-2) 0 var(--row-px); position: relative; }
+.lrow + .lrow { border-top: 1px solid var(--border); }
+.lrow:hover { background: var(--surface-2); }
+.lrow .who { font-size: 12.5px; color: var(--muted); text-decoration: none; white-space: nowrap; }
+.lrow .who:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.lrow .acts { display: flex; gap: 2px; opacity: 0; transition: opacity var(--fade); }
+.lrow:hover .acts, .lrow:focus-within .acts, .lrow .acts.open { opacity: 1; }
+.lrow.done .inline-input { color: var(--muted); text-decoration: line-through; }
+.lrow.confirming { background: color-mix(in srgb, var(--danger) 7%, transparent); }
+.confirm-inline { display: flex; align-items: center; gap: var(--s-2); font-size: 13px; }
+
+.before { opacity: .9; }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.compare .cap { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+.old-row { display: flex; gap: 8px; align-items: center; padding: 4px 6px 4px 12px; min-height: 42px; }
+.old-row + .old-row { border-top: 1px solid var(--border); }
+.old-row input[type='text'] { height: 34px; flex: 1; min-width: 0; }
+.old-row input[type='date'] { height: 34px; width: 128px; }
+.old-del { height: 32px; padding: 0 12px; border-radius: 8px; color: var(--danger); border: 1px solid var(--danger); background: transparent; }
+kbd { margin-left: 2px; }
+@media (max-width: 900px) {
+  body { padding: 8px; } .window { height: calc(100vh - 16px); }
+  nav { width: 56px; padding: 6px 8px; } nav a { font-size: 0; justify-content: center; padding: 0; gap: 0; } .nav-group { font-size: 0; padding: 0; height: 1px; margin: var(--s-3) 6px; background: var(--border); } nav .brand { font-size: 0; justify-content: center; padding: 6px 0 18px; }
+  main { padding: 24px 20px 48px; } .grid2, .compare { grid-template-columns: 1fr; }
+  .tweaks { top: auto; bottom: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="tweaks">
+  <div class="seg sm" data-seg="theme"><span class="thumb"></span><button aria-pressed="true" data-v="light">Light</button><button data-v="dark">Dark</button></div>
+  <div class="seg sm" data-seg="accent"><span class="thumb"></span><button aria-pressed="true" data-v="none">No accent</button><button data-v="blue">Blue</button><button data-v="violet">Violet</button></div>
+</div>
+
+<div class="window">
+  <div class="titlebar">Glossly<span class="sp"></span><i>&#xE921;</i><i>&#xE922;</i><i>&#xE8BB;</i></div>
+  <div class="shell">
+    <nav>
+      <div class="brand"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5v14M6 5h6M6 19h6"/><path d="M18 3.5Q18 8 22.5 8Q18 8 18 12.5Q18 8 13.5 8Q18 8 18 3.5Z" fill="currentColor" stroke="none"/></svg>Glossly</div>
+      <a href="#"><svg data-i="checkcircle"></svg>Tasks</a>
+      <a href="#"><svg data-i="calendar"></svg>Calendar</a>
+      <a href="#"><svg data-i="users"></svg>People</a>
+      <a href="#"><svg data-i="bookmark"></svg>Saved</a>
+      <div class="nav-group">Settings</div>
+      <a href="#"><svg data-i="user"></svg>Profile</a>
+      <a href="#"><svg data-i="cpu"></svg>Models</a>
+      <a href="#"><svg data-i="shield"></svg>Privacy &amp; data</a>
+      <a href="#" class="current"><svg data-i="sliders"></svg>General</a>
+      <a href="#"><svg data-i="activity"></svg>Metrics</a>
+    </nav>
+    <main>
+      <section class="page">
+        <h1>Design system</h1>
+        <p class="lede">Step 20.1 mockup. Every control below is ours, not Windows'. Try them: click, use the keyboard, press Esc.</p>
+
+        <h2>Scale <small>4 px grid, three control heights, two icon sizes</small></h2>
+        <div class="card stack">
+          <div class="scale">
+            <div><span style="width:4px;height:4px"></span>4</div>
+            <div><span style="width:8px;height:8px"></span>8</div>
+            <div><span style="width:12px;height:12px"></span>12</div>
+            <div><span style="width:16px;height:16px"></span>16</div>
+            <div><span style="width:24px;height:24px"></span>24</div>
+            <div><span style="width:32px;height:32px"></span>32</div>
+            <div style="margin-left:24px"><span style="width:56px;height:28px;border-radius:8px"></span>28 sm</div>
+            <div><span style="width:64px;height:32px;border-radius:8px"></span>32 md</div>
+            <div><span style="width:72px;height:36px;border-radius:8px"></span>36 lg</div>
+          </div>
+          <div class="note">Gaps inside a control 6–8, between controls 8, inside a card 16, between cards 12, between sections 32. Rows are 40 high with 12 at the left. Icons are 14 in rows and chips, 16 in buttons and nav.</div>
+        </div>
+
+        <h2>Buttons <small>primary, secondary, ghost, icon, destructive (filled red)</small></h2>
+        <div class="card stack">
+          <div class="row">
+            <button class="btn primary sm">Save</button>
+            <button class="btn primary">Save</button>
+            <button class="btn primary lg">Continue</button>
+            <span style="width:12px"></span>
+            <button class="btn sm"><svg data-i="plus"></svg>Add</button>
+            <button class="btn"><svg data-i="plus"></svg>Add person</button>
+            <button class="btn ghost">Cancel</button>
+            <button class="btn" disabled>Disabled</button>
+          </div>
+          <div class="row">
+            <button class="btn danger sm"><svg data-i="trash"></svg>Delete</button>
+            <button class="btn danger">Delete person</button>
+            <button class="btn danger">Delete all data</button>
+            <span style="width:12px"></span>
+            <button class="btn icon sm" title="Edit"><svg data-i="pencil" style="width:14px;height:14px"></svg></button>
+            <button class="btn icon" title="Edit"><svg data-i="pencil"></svg></button>
+            <button class="btn icon danger-hover" title="Delete"><svg data-i="trash"></svg></button>
+            <button class="btn icon" title="More" data-menu="row"><svg data-i="more"></svg></button>
+          </div>
+        </div>
+
+        <h2>Fields <small>select, date, time, text</small></h2>
+        <div class="grid2">
+          <div class="card stack">
+            <div class="stack" style="gap:6px"><span class="label">Select</span>
+              <button class="trigger" data-select="model"><span class="v">llama-3.3-70b-versatile</span><svg data-i="chev"></svg></button></div>
+            <div class="stack" style="gap:6px"><span class="label">Select with icons and groups</span>
+              <button class="trigger" data-select="person"><span class="v"><span class="ph">Anyone</span></span><svg data-i="chev"></svg></button></div>
+            <div class="stack" style="gap:6px"><span class="label">Text</span>
+              <input class="input" placeholder="Add a task… e.g. send Jordan the slides by Friday" /></div>
+          </div>
+          <div class="card stack">
+            <div class="stack" style="gap:6px"><span class="label">Date picker</span>
+              <button class="trigger" data-date="due"><span class="v"><svg data-i="calendar"></svg><span>Fri, Oct 17</span></span><svg data-i="chev"></svg></button></div>
+            <div class="stack" style="gap:6px"><span class="label">Date range</span>
+              <button class="trigger" data-range="r" style="min-width:240px"><span class="v"><svg data-i="calendar"></svg><span>Oct 13 – Oct 19</span></span><svg data-i="chev"></svg></button></div>
+            <div class="stack" style="gap:6px"><span class="label">Time (type "3pm" or "15:30", or pick)</span>
+              <div class="row"><label class="time-field" data-time="start"><svg data-i="clock"></svg><input value="9:00 AM" /></label><span class="muted">to</span><label class="time-field" data-time="end"><svg data-i="clock"></svg><input value="9:30 AM" /></label></div></div>
+          </div>
+        </div>
+
+        <h2>Choices <small>segmented, checkbox, switch, option cards</small></h2>
+        <div class="card">
+          <div class="field-row"><div><div class="t">Calendar view</div><div class="d">Segmented control: one of a few, all visible.</div></div>
+            <div class="seg" data-seg="view"><span class="thumb"></span><button aria-pressed="true">Month</button><button>Week</button><button>Agenda</button></div></div>
+          <div class="field-row"><div><div class="t">Show keyboard shortcuts</div><div class="d">The 20.3 setting, as a segmented control.</div></div>
+            <div class="seg" data-seg="kb"><span class="thumb"></span><button>Always</button><button aria-pressed="true">On hotkey</button><button>Never</button></div></div>
+          <div class="field-row"><div><div class="t">Start with Windows</div><div class="d">Switch: on or off, takes effect at once.</div></div>
+            <button class="sw" role="switch" aria-checked="true"></button></div>
+          <div class="field-row"><div><div class="t">Remind me before events</div><div class="d">Switch, off.</div></div>
+            <button class="sw" role="switch" aria-checked="false"></button></div>
+          <div class="field-row" style="align-items:flex-start"><div><div class="t">Checkboxes</div><div class="d">For lists of options and multi-select.</div></div>
+            <div class="stack" style="gap:10px">
+              <label class="check-label"><button class="cb" role="checkbox" aria-checked="true"><svg data-i="check"></svg></button>Save tasks from my own messages</label>
+              <label class="check-label"><button class="cb" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button>Include done tasks in Search</label>
+              <label class="check-label"><button class="cb" role="checkbox" aria-checked="mixed"><svg data-i="check"></svg></button>Some selected</label>
+            </div></div>
+          <div class="field-row" style="display:block"><div class="t" style="margin-bottom:8px">Privacy</div>
+            <div class="choice" role="radiogroup">
+              <button role="radio" aria-checked="true"><span class="dot"></span><span><div class="t">All models</div><div class="d">Use your keys for Groq, OpenAI, or Anthropic, and local models.</div></span></button>
+              <button role="radio" aria-checked="false"><span class="dot"></span><span><div class="t">Local only</div><div class="d">Nothing leaves this computer. Uses Ollama or LM Studio, or code.</div></span></button>
+            </div></div>
+        </div>
+
+        <h2>List rows <small>round check, in-place text, due chip, hover actions</small></h2>
+        <div class="list" id="tasks">
+          <div class="lrow"><button class="tick" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button><input class="inline-input" value="Send Jordan the Q3 slides" /><a class="who" href="#">Jordan Hale</a><button class="chip overdue" data-date="t1"><svg data-i="calendar"></svg><span>Yesterday</span></button><div class="acts"><button class="btn icon sm" title="More" data-menu="row"><svg data-i="more" style="width:14px;height:14px"></svg></button></div></div>
+          <div class="lrow"><button class="tick" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button><input class="inline-input" value="Review Casey's onboarding doc" /><a class="who" href="#">Casey Lin</a><button class="chip today" data-date="t2"><svg data-i="calendar"></svg><span>Today</span></button><div class="acts"><button class="btn icon sm" title="More" data-menu="row"><svg data-i="more" style="width:14px;height:14px"></svg></button></div></div>
+          <div class="lrow"><button class="tick" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button><input class="inline-input" value="Maya sends the signed contract" /><a class="who" href="#">Maya Chen · they owe</a><button class="chip" data-date="t3"><svg data-i="calendar"></svg><span>Mon, Oct 20</span></button><div class="acts"><button class="btn icon sm" title="More" data-menu="row"><svg data-i="more" style="width:14px;height:14px"></svg></button></div></div>
+          <div class="lrow"><button class="tick" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button><input class="inline-input" value="Renew passport" /><button class="chip ghost" data-date="t4"><svg data-i="calendar"></svg><span>Add date</span></button><div class="acts"><button class="btn icon sm" title="More" data-menu="row"><svg data-i="more" style="width:14px;height:14px"></svg></button></div></div>
+        </div>
+        <div class="note">Rows: 40 high, the title edits in place, delete lives in the "…" menu and asks inline in the row, with a filled red button.</div>
+
+        <h2>Before and after <small>today's Agenda row vs. the new row</small></h2>
+        <div class="compare">
+          <div><div class="cap">Now</div><div class="list before">
+            <div class="old-row"><input type="checkbox" style="accent-color:#0d0d0d;width:16px;height:16px" /><input type="text" class="input" value="Send Jordan the Q3 slides" /><input type="date" class="input" value="2026-10-10" /><button class="old-del">Delete</button></div>
+            <div class="old-row"><input type="checkbox" style="accent-color:#0d0d0d;width:16px;height:16px" /><input type="text" class="input" value="Renew passport" /><input type="date" class="input" /><button class="old-del">Delete</button></div>
+          </div></div>
+          <div><div class="cap">20.1</div><div class="list">
+            <div class="lrow"><button class="tick" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button><input class="inline-input" value="Send Jordan the Q3 slides" /><button class="chip overdue" data-date="t5"><svg data-i="calendar"></svg><span>Yesterday</span></button><div class="acts"><button class="btn icon sm" data-menu="row"><svg data-i="more" style="width:14px;height:14px"></svg></button></div></div>
+            <div class="lrow"><button class="tick" role="checkbox" aria-checked="false"><svg data-i="check"></svg></button><input class="inline-input" value="Renew passport" /><button class="chip ghost" data-date="t6"><svg data-i="calendar"></svg><span>Add date</span></button><div class="acts"><button class="btn icon sm" data-menu="row"><svg data-i="more" style="width:14px;height:14px"></svg></button></div></div>
+          </div></div>
+        </div>
+
+        <h2>Danger zone <small>Data tab, with the inline confirm</small></h2>
+        <div class="card">
+          <div class="field-row"><div><div class="t">Delete all data</div><div class="d">Saved items, people, tasks, and events. Keys and settings stay.</div></div>
+            <div id="dz"><button class="btn danger" id="dzb">Delete all data…</button></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+// ---- icons (lucide paths) ----
+const I = {
+  user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+  users: '<path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/>',
+  checkcircle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+  key: '<path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/>',
+  cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/>',
+  sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
+  db: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>',
+  trash: '<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.98-3.98L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
+  left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M6 21v-1a6 6 0 0 1 12 0v1"/>',
+  ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>', slash: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+};
+const svg = (n, s = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" ${s}>${I[n]}</svg>`;
+function paintIcons(root = document) {
+  root.querySelectorAll('svg[data-i]').forEach((el) => {
+    el.setAttribute('viewBox', '0 0 24 24'); el.setAttribute('fill', 'none'); el.setAttribute('stroke', 'currentColor');
+    el.setAttribute('stroke-width', el.closest('.cb,.tick') ? '3' : '1.75'); el.setAttribute('stroke-linecap', 'round'); el.setAttribute('stroke-linejoin', 'round');
+    el.innerHTML = I[el.dataset.i]; el.removeAttribute('data-i');
+  });
+}
+paintIcons();
+
+// ---- Popover primitive: position inside the window, flip, Esc and click-outside, focus return ----
+let open = null;
+function openPopover(anchor, content, { align = 'start', onClose } = {}) {
+  closePopover(true);
+  const p = document.createElement('div');
+  p.className = 'popover'; p.tabIndex = -1; p.append(content);
+  document.body.append(p);
+  anchor.setAttribute('aria-expanded', 'true');
+  open = { p, anchor, onClose, align };
+  placePopover();
+  return p;
+}
+// Below the anchor if it fits, else above, else on the roomier side with a scrolling cap.
+// Re-run on every scroll and resize so the popover stays attached to its field.
+function placePopover() {
+  if (!open) return;
+  const { p, anchor, align } = open, m = 8, gap = 6;
+  const a = anchor.getBoundingClientRect();
+  const clip = (anchor.closest('main') || document.body).getBoundingClientRect();
+  if (a.bottom < clip.top || a.top > clip.bottom) return closePopover(true, true);
+  p.style.maxHeight = ''; p.style.overflowY = '';
+  const h = p.scrollHeight, w = p.offsetWidth;
+  const below = innerHeight - m - (a.bottom + gap), above = a.top - gap - m;
+  let top, origin;
+  if (h <= below || below >= above) { top = a.bottom + gap; origin = 'top'; if (h > below) { p.style.maxHeight = below + 'px'; p.style.overflowY = 'auto'; } }
+  else { origin = 'bottom'; const ph = Math.min(h, above); if (h > above) { p.style.maxHeight = above + 'px'; p.style.overflowY = 'auto'; } top = a.top - gap - ph; }
+  let left = align === 'end' ? a.right - w : a.left;
+  left = Math.max(m, Math.min(left, innerWidth - w - m));
+  p.style.top = top + 'px'; p.style.left = left + 'px';
+  p.style.setProperty('--origin', `${origin} ${align === 'end' ? 'right' : 'left'}`);
+}
+addEventListener('scroll', placePopover, true);
+addEventListener('resize', placePopover);
+function closePopover(instant, keepFocus) {
+  if (!open) return;
+  const { p, anchor, onClose } = open; open = null;
+  anchor.setAttribute('aria-expanded', 'false');
+  onClose && onClose();
+  if (instant) p.remove(); else { p.classList.add('closing'); setTimeout(() => p.remove(), 100); }
+  if (!keepFocus) anchor.focus({ preventScroll: true });
+}
+document.addEventListener('mousedown', (e) => { if (open && !open.p.contains(e.target) && !open.anchor.contains(e.target)) closePopover(false, true); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && open) { e.preventDefault(); closePopover(); } });
+
+// ---- Menu: arrows, Home/End, Enter, type-ahead ----
+function buildMenu(items, { selected, onPick }) {
+  const m = document.createElement('div'); m.className = 'menu'; m.setAttribute('role', 'listbox');
+  const els = [];
+  for (const it of items) {
+    if (it.sep) { m.insertAdjacentHTML('beforeend', '<div class="sep"></div>'); continue; }
+    if (it.head) { m.insertAdjacentHTML('beforeend', `<div class="head">${it.head}</div>`); continue; }
+    const el = document.createElement('div');
+    el.className = 'item' + (it.danger ? ' danger' : ''); el.setAttribute('role', 'option');
+    el.innerHTML = (it.icon ? svg(it.icon) : selected !== undefined ? svg('check', 'class="check"') : '') + `<span>${it.label}</span>` + (it.sub ? `<span class="sub">${it.sub}</span>` : '') + (it.kbd ? `<span class="kbd">${it.kbd}</span>` : '');
+    if (selected !== undefined && it.label === selected) el.setAttribute('aria-selected', 'true');
+    el.onmousemove = () => setActive(els.indexOf(el));
+    el.onclick = () => onPick(it);
+    els.push(el); m.append(el);
+  }
+  let act = -1, typed = '', typedAt = 0;
+  function setActive(i) { els.forEach((e, j) => e.classList.toggle('active', j === i)); act = i; els[i] && els[i].scrollIntoView({ block: 'nearest' }); }
+  const real = items.filter((i) => !i.sep && !i.head);
+  m.handleKey = (e) => {
+    if (e.key === 'ArrowDown') { setActive((act + 1) % els.length); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { setActive((act - 1 + els.length) % els.length); e.preventDefault(); }
+    else if (e.key === 'Home') { setActive(0); e.preventDefault(); }
+    else if (e.key === 'End') { setActive(els.length - 1); e.preventDefault(); }
+    else if (e.key === 'Enter' || e.key === ' ') { if (act >= 0) onPick(real[act]); e.preventDefault(); }
+    else if (e.key.length === 1) {
+      const now = Date.now(); typed = now - typedAt > 600 ? e.key.toLowerCase() : typed + e.key.toLowerCase(); typedAt = now;
+      const i = real.findIndex((it) => it.label.toLowerCase().startsWith(typed)); if (i >= 0) setActive(i);
+    }
+  };
+  const si = real.findIndex((it) => it.label === selected); setActive(si >= 0 ? si : 0);
+  return m;
+}
+function showMenu(anchor, items, opts) {
+  const m = buildMenu(items, { ...opts, onPick: (it) => { closePopover(); opts.onPick(it); } });
+  const p = openPopover(anchor, m, opts);
+  p.addEventListener('keydown', m.handleKey); p.focus();
+}
+
+// ---- Select ----
+const SELECTS = {
+  model: { items: [{ head: 'Groq' }, { label: 'llama-3.3-70b-versatile', sub: 'Smart' }, { label: 'llama-3.1-8b-instant', sub: 'Fast' }, { label: 'qwen3-32b' }, { head: 'Local · Ollama' }, { label: 'qwen3:4b', sub: 'Local' }, { label: 'gemma3:4b', sub: 'Local' }] },
+  person: { items: [{ label: 'Anyone', icon: 'users' }, { sep: true }, { label: 'Alex Morgan', icon: 'person' }, { label: 'Casey Lin', icon: 'person' }, { label: 'Jordan Hale', icon: 'person' }, { label: 'Maya Chen', icon: 'person' }] },
+};
+document.querySelectorAll('[data-select]').forEach((b) => {
+  const cfg = SELECTS[b.dataset.select];
+  const pick = (it) => { b.querySelector('.v').innerHTML = it.label === 'Anyone' ? '<span class="ph">Anyone</span>' : (it.icon ? svg(it.icon) : '') + `<span>${it.label}</span>`; cfg.value = it.label; };
+  const opener = () => showMenu(b, cfg.items, { selected: cfg.value ?? b.textContent.trim(), onPick: pick });
+  b.onclick = opener;
+  b.onkeydown = (e) => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); opener(); } };
+});
+
+// ---- Row "…" menu with inline delete confirm ----
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-menu="row"]'); if (!b) return;
+  const row = b.closest('.lrow');
+  const acts = row && row.querySelector('.acts'); acts && acts.classList.add('open');
+  showMenu(b, [
+    { label: 'Change date', icon: 'calendar', kbd: 'D' }, { label: 'Open person', icon: 'ext' }, { label: 'Edit', icon: 'pencil', kbd: 'F2' },
+    { sep: true }, { label: 'Delete', icon: 'trash', danger: true, kbd: 'Del' },
+  ], { align: 'end', onClose: () => acts && acts.classList.remove('open'), onPick: (it) => {
+    if (!row) return;
+    if (it.label === 'Change date') row.querySelector('.chip').click();
+    if (it.label === 'Delete') confirmRow(row);
+  } });
+});
+function confirmRow(row) {
+  const saved = [...row.children]; row.classList.add('confirming');
+  row.innerHTML = `<div class="confirm-inline grow" style="flex:1">Delete “${saved[1].value}”?</div><button class="btn ghost sm">Cancel</button><button class="btn danger sm">${svg('trash')}Delete</button>`;
+  const [cancel, del] = row.querySelectorAll('button'); del.focus();
+  cancel.onclick = () => { row.classList.remove('confirming'); row.replaceChildren(...saved); };
+  del.onclick = () => { row.style.transition = 'opacity 150ms, transform 150ms'; row.style.opacity = 0; row.style.transform = 'translateX(8px)'; setTimeout(() => row.remove(), 150); };
+}
+
+// ---- Calendar helpers ----
+const TODAY = new Date(2026, 9, 11);
+const fmtDay = (d) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const fmtShort = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const same = (a, b) => a && b && a.toDateString() === b.toDateString();
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+function relLabel(d) { if (!d) return 'Add date'; const n = Math.round((d - TODAY) / 864e5); return n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n === -1 ? 'Yesterday' : n > 1 && n < 7 ? d.toLocaleDateString('en-US', { weekday: 'long' }) : fmtDay(d); }
+function monthGrid(month, { isSel, cls, onPick, onHover }) {
+  const g = document.createElement('div'); g.className = 'cal-grid'; g.setAttribute('role', 'grid');
+  'Mo Tu We Th Fr Sa Su'.split(' ').forEach((d) => g.insertAdjacentHTML('beforeend', `<div class="dow">${d}</div>`));
+  const first = new Date(month.getFullYear(), month.getMonth(), 1), start = addDays(first, -((first.getDay() + 6) % 7));
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(start, i), b = document.createElement('button');
+    b.className = 'd' + (d.getMonth() !== month.getMonth() ? ' out' : '') + (same(d, TODAY) ? ' today' : '') + (isSel && isSel(d) ? ' sel' : '') + (cls ? cls(d) : '');
+    b.textContent = d.getDate(); b.tabIndex = -1; b.dataset.t = +d;
+    b.onclick = () => onPick(d); if (onHover) b.onmouseenter = () => onHover(d);
+    g.append(b);
+  }
+  return g;
+}
+function calHead(month, onNav, showNav = [true, true]) {
+  const h = document.createElement('div'); h.className = 'cal-head';
+  h.innerHTML = `<span class="m">${month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>`;
+  if (showNav[0]) { const p = document.createElement('button'); p.className = 'btn icon sm'; p.innerHTML = svg('left', 'style="width:16px;height:16px"'); p.onclick = () => onNav(-1); h.append(p); }
+  if (showNav[1]) { const n = document.createElement('button'); n.className = 'btn icon sm'; n.innerHTML = svg('right', 'style="width:16px;height:16px"'); n.onclick = () => onNav(1); h.append(n); }
+  return h;
+}
+
+// ---- Date picker ----
+const dates = { due: new Date(2026, 9, 17), t1: addDays(TODAY, -1), t2: TODAY, t3: new Date(2026, 9, 20), t4: null, t5: addDays(TODAY, -1), t6: null };
+document.querySelectorAll('[data-date]').forEach((b) => {
+  const key = b.dataset.date, isChip = b.classList.contains('chip');
+  const render = () => {
+    const d = dates[key], label = isChip ? relLabel(d) : d ? fmtDay(d) : 'No date';
+    b.querySelector('span:last-child, .v span:last-child').textContent = label;
+    if (isChip) { const n = d ? Math.round((d - TODAY) / 864e5) : null; b.className = 'chip' + (d === null ? ' ghost' : n < 0 ? ' overdue' : n === 0 ? ' today' : ''); }
+  };
+  b.onclick = (e) => {
+    e.stopPropagation();
+    let month = new Date((dates[key] || TODAY).getFullYear(), (dates[key] || TODAY).getMonth(), 1), focus = dates[key] || TODAY;
+    const wrap = document.createElement('div'); wrap.className = 'cal';
+    const pick = (d) => { dates[key] = d; render(); closePopover(); };
+    const draw = () => {
+      wrap.innerHTML = '';
+      const wd = (d) => d.toLocaleDateString('en-US', { weekday: 'short' });
+      const nw = addDays(TODAY, 8 - ((TODAY.getDay() + 6) % 7) - 1);
+      const sc = buildMenu([
+        { label: 'Today', icon: 'calendar', sub: wd(TODAY) }, { label: 'Tomorrow', icon: 'sun', sub: wd(addDays(TODAY, 1)) },
+        { label: 'Next week', icon: 'arrow', sub: fmtDay(nw) }, { label: 'No date', icon: 'slash' },
+      ], { onPick: (it) => pick({ Today: TODAY, Tomorrow: addDays(TODAY, 1), 'Next week': nw, 'No date': null }[it.label]) });
+      sc.classList.add('shortcuts'); sc.querySelectorAll('.item').forEach((e) => e.classList.remove('active'));
+      wrap.append(sc, calHead(month, (n) => { month = new Date(month.getFullYear(), month.getMonth() + n, 1); draw(); }),
+        monthGrid(month, { isSel: (d) => same(d, dates[key]), onPick: pick }));
+      const f = wrap.querySelector(`[data-t="${+focus}"]`); f && (f.tabIndex = 0);
+    };
+    draw();
+    const p = openPopover(b, wrap, { align: isChip ? 'end' : 'start' });
+    p.addEventListener('keydown', (e) => {
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+      if (step) { e.preventDefault(); focus = addDays(focus, step); if (focus.getMonth() !== month.getMonth()) month = new Date(focus.getFullYear(), focus.getMonth(), 1); draw(); wrap.querySelector(`[data-t="${+focus}"]`).focus(); }
+      if (e.key === 'Enter' && document.activeElement.classList.contains('d')) { e.preventDefault(); pick(new Date(+document.activeElement.dataset.t)); }
+    });
+    (wrap.querySelector('.cal-grid [tabindex="0"]') || p).focus();
+  };
+  render();
+});
+
+// ---- Date range ----
+let range = { a: new Date(2026, 9, 13), b: new Date(2026, 9, 19) };
+document.querySelectorAll('[data-range]').forEach((b) => {
+  const render = () => { b.querySelector('.v span:last-child').textContent = range.b ? `${fmtShort(range.a)} – ${fmtShort(range.b)}` : fmtShort(range.a); };
+  b.onclick = () => {
+    let left = new Date(range.a.getFullYear(), range.a.getMonth(), 1), draft = { ...range }, hover = null, picking = false;
+    const wrap = document.createElement('div');
+    const mon = (d) => addDays(d, -((d.getDay() + 6) % 7));
+    const QUICK = [
+      ['Today', () => [TODAY, TODAY]], ['This week', () => [mon(TODAY), addDays(mon(TODAY), 6)]], ['Next 7 days', () => [TODAY, addDays(TODAY, 6)]],
+      ['Next week', () => [addDays(mon(TODAY), 7), addDays(mon(TODAY), 13)]], ['This month', () => [new Date(2026, 9, 1), new Date(2026, 9, 31)]],
+      ['Next 30 days', () => [TODAY, addDays(TODAY, 29)]], ['Last 7 days', () => [addDays(TODAY, -6), TODAY]],
+    ];
+    const draw = () => {
+      wrap.innerHTML = '';
+      const r = document.createElement('div'); r.className = 'range';
+      const cur = QUICK.find(([, f]) => { const [a, bb] = f(); return same(a, draft.a) && same(bb, draft.b); });
+      const q = buildMenu(QUICK.map(([l]) => ({ label: l })), { selected: cur ? cur[0] : '', onPick: (it) => { const [a, bb] = QUICK.find(([l]) => l === it.label)[1](); draft = { a, b: bb }; left = new Date(a.getFullYear(), a.getMonth(), 1); picking = false; draw(); } });
+      if (!cur) q.querySelectorAll('.item').forEach((e) => e.classList.remove('active'));
+      const qq = document.createElement('div'); qq.className = 'quick'; qq.append(q);
+      const months = document.createElement('div'); months.className = 'months';
+      const cls = (d) => {
+        const end = picking && hover ? hover : draft.b;
+        const lo = end && end < draft.a ? end : draft.a, hi = end && end < draft.a ? draft.a : end;
+        return (hi && d > lo && d < hi ? ' inrange' : '') + (same(d, lo) ? ' rs' : '') + (same(d, hi) || (!hi && same(d, lo)) ? ' re' : '');
+      };
+      const n = innerWidth >= 720 ? 2 : 1;
+      const f = document.createElement('div'); f.className = 'foot';
+      const info = document.createElement('span'); info.className = 'muted'; info.style.cssText = 'flex:1;font-size:12.5px';
+      const c = document.createElement('button'); c.className = 'btn ghost sm'; c.textContent = 'Cancel'; c.onclick = () => closePopover();
+      const ok = document.createElement('button'); ok.className = 'btn primary sm'; ok.textContent = 'Apply'; ok.onclick = () => { range = { ...draft }; render(); closePopover(); };
+      f.append(info, c, ok);
+      const paint = () => {
+        months.querySelectorAll('button.d').forEach((b) => { const d = new Date(+b.dataset.t); b.className = b.className.replace(/ (inrange|rs|re)/g, '') + cls(d); });
+        info.textContent = picking ? 'Pick the last day' : draft.b ? `${fmtDay(draft.a)} – ${fmtDay(draft.b)}` : '';
+        ok.disabled = picking;
+        const hit = QUICK.find(([, fn]) => { const [x, y] = fn(); return !picking && same(x, draft.a) && same(y, draft.b); });
+        q.querySelectorAll('.item').forEach((e) => { const on = !!hit && e.textContent === hit[0]; e.setAttribute('aria-selected', String(on)); if (!on) e.classList.remove('active'); });
+      };
+      [...Array(n).keys()].forEach((i) => {
+        const m = new Date(left.getFullYear(), left.getMonth() + i, 1), c = document.createElement('div'); c.className = 'cal';
+        c.append(calHead(m, (k) => { left = new Date(left.getFullYear(), left.getMonth() + k, 1); draw(); }, [i === 0, i === n - 1]),
+          monthGrid(m, { cls, onPick: (d) => { if (!picking) { draft = { a: d, b: null }; picking = true; } else { draft = d < draft.a ? { a: d, b: draft.a } : { a: draft.a, b: d }; picking = false; } hover = null; paint(); },
+            onHover: (d) => { if (picking) { hover = d; paint(); } } }));
+        months.append(c);
+      });
+      const right = document.createElement('div'); right.append(months, f);
+      paint();
+      r.append(qq, right); wrap.append(r);
+    };
+    draw();
+    openPopover(b, wrap).focus();
+  };
+});
+
+// ---- Time picker: type or pick, 15-minute steps ----
+function parseTime(s) {
+  const m = s.trim().toLowerCase().match(/^(\d{1,2})(?::?(\d{2}))?\s*(a|p|am|pm)?$/); if (!m) return null;
+  let h = +m[1], min = +(m[2] || 0); if (m[3]) { if (h === 12) h = 0; if (m[3][0] === 'p') h += 12; }
+  return h < 24 && min < 60 ? h * 60 + min : null;
+}
+const fmtTime = (t) => { const h = Math.floor(t / 60), m = t % 60; return `${(h + 11) % 12 + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+document.querySelectorAll('[data-time]').forEach((f) => {
+  const input = f.querySelector('input');
+  const commit = () => { const t = parseTime(input.value); input.value = t === null ? input.dataset.last : fmtTime(t); input.dataset.last = input.value; };
+  input.dataset.last = input.value;
+  const show = () => {
+    if (open && open.anchor === f) return;
+    const cur = parseTime(input.value) ?? 540, items = [];
+    for (let t = 0; t < 1440; t += 15) items.push({ label: fmtTime(t) });
+    const m = buildMenu(items, { selected: fmtTime(Math.round(cur / 15) * 15), onPick: (it) => { input.value = it.label; commit(); closePopover(true, true); input.blur(); } });
+    m.classList.add('time-list');
+    const p = openPopover(f, m);
+    p.classList.add('time-pop'); p.style.width = f.offsetWidth + 'px'; placePopover();
+    p.addEventListener('mousedown', (e) => e.preventDefault());
+    input.onkeydown = (e) => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) m.handleKey(e); else if (e.key === 'Enter') { e.preventDefault(); const a = m.querySelector('.item.active'); if (parseTime(input.value) !== null && input.value !== input.dataset.last) commit(); else if (a) input.value = a.textContent; commit(); closePopover(true, true); } };
+    m.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' });
+  };
+  input.onfocus = () => { input.select(); show(); };
+  input.onblur = () => { commit(); if (open && open.anchor === f) closePopover(false, true); };
+});
+
+// ---- Segmented ----
+document.querySelectorAll('.seg').forEach((s) => {
+  const btns = [...s.querySelectorAll('button')];
+  s.style.setProperty('--n', btns.length);
+  // Every option is as wide as the widest label in bold, so selecting never moves anything.
+  const size = () => { const cell = Math.max(...btns.map((b) => { const w0 = b.style.fontWeight; b.style.fontWeight = '600'; const w = b.scrollWidth; b.style.fontWeight = w0; return w; })); s.style.setProperty('--cell', Math.ceil(cell) + 'px'); };
+  size(); document.fonts && document.fonts.ready.then(size);
+  const place = () => s.style.setProperty('--i', Math.max(0, btns.findIndex((x) => x.getAttribute('aria-pressed') === 'true')));
+  btns.forEach((b, i) => {
+    b.dataset.label = b.textContent.trim();
+    b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') || 'false');
+    b.onclick = () => { btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); place(); s.dispatchEvent(new CustomEvent('change', { detail: b.dataset.v || b.textContent })); };
+    b.onkeydown = (e) => { const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (d) { const n = btns[(i + d + btns.length) % btns.length]; n.focus(); n.click(); } };
+  });
+  place();
+});
+document.querySelector('[data-seg="theme"]').addEventListener('change', (e) => { document.documentElement.dataset.theme = e.detail; });
+document.querySelector('[data-seg="accent"]').addEventListener('change', (e) => { document.documentElement.dataset.accent = e.detail; });
+
+// ---- Checkbox, tick, switch, radio cards ----
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.cb, .tick, .sw');
+  if (t) { t.setAttribute('aria-checked', String(t.getAttribute('aria-checked') !== 'true')); if (t.classList.contains('tick')) t.closest('.lrow')?.classList.toggle('done', t.getAttribute('aria-checked') === 'true'); return; }
+  const lab = e.target.closest('.check-label'); if (lab) lab.querySelector('.cb').click();
+  const r = e.target.closest('.choice [role=radio]'); if (r) r.parentElement.querySelectorAll('[role=radio]').forEach((x) => x.setAttribute('aria-checked', String(x === r)));
+});
+
+// ---- Danger zone inline confirm ----
+function askDeleteAll() {
+  const dz = document.getElementById('dz'), keep = dz.innerHTML;
+  dz.innerHTML = `<div class="row"><span style="font-size:13px">This can't be undone.</span><button class="btn ghost sm">Cancel</button><button class="btn danger sm">${svg('trash')}Delete everything</button></div>`;
+  dz.querySelector('.ghost').onclick = () => { dz.innerHTML = keep; document.getElementById('dzb').onclick = askDeleteAll; };
+}
+document.getElementById('dzb').onclick = askDeleteAll;
+</script>
+</body>
+</html>

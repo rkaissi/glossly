@@ -131,6 +131,8 @@ function Expanded({ s }: { s: OverlayState }) {
   const undoLeft = useSecondsLeft(s.saved?.undoUntil);
   const hl = Math.min(highlight, items.length - 1);
   const above = s.placement?.side === 'above';
+  // Key chips are decided once, when the bar opens, so nothing moves while it's open (decision 41).
+  const [hints] = useState(() => s.keyHints === 'always' || (s.keyHints === 'hotkey' && s.keyboard));
 
   // An open popover (a date or time picker) that doesn't fit asks for room; the content grows
   // to it, so the window does too, toward the side it grows on (decision 39).
@@ -220,9 +222,9 @@ function Expanded({ s }: { s: OverlayState }) {
         disabled={opts.disabled}
         onClick={() => !active && run(id, target)}
       >
-        {/* The number takes the icon's 16 px, so turning the keyboard map on moves nothing. */}
-        {s.keyboard ? <kbd>{slotKey(items, target.slot)}</kbd> : <ActionIcon action={view.action} />}
+        <ActionIcon action={view.action} />
         <span>{view.label}</span>
+        {hints && <kbd className="keychip">{slotKey(items, target.slot)}</kbd>}
       </button>
     );
   };
@@ -260,8 +262,9 @@ function Expanded({ s }: { s: OverlayState }) {
               disabled={undoLeft === 0}
               onClick={() => run(id, { slot: 2 })}
             >
-              {s.keyboard && undoLeft > 0 ? <kbd>{slotKey(items, 2)}</kbd> : undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
+              {undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
               <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : `Saved to ${s.saved.collection}`}</span>
+              {hints && undoLeft > 0 && <kbd className="keychip">{slotKey(items, 2)}</kbd>}
             </button>
           )}
           {slots?.slot3 && slotButton({ slot: 3 }, slots.slot3, { fresh: true })}
@@ -288,7 +291,7 @@ function Expanded({ s }: { s: OverlayState }) {
             {s.hasSelection && (
               <>
                 <div className="menu-label">
-                  More actions {s.keyboard && s.mode === 'bar' && <kbd>Tab</kbd>}
+                  More actions {hints && s.mode === 'bar' && <kbd>Tab</kbd>}
                 </div>
                 {more.length > 0 ? (
                   more.map((m) => (
@@ -341,7 +344,7 @@ function Expanded({ s }: { s: OverlayState }) {
             <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('bar:close', { sessionId: id })}>
               <X size={16} strokeWidth={1.75} aria-hidden />
               <span>Close</span>
-              {s.keyboard && <kbd>Esc</kbd>}
+              {hints && <kbd>Esc</kbd>}
             </button>
           </div>
         )}

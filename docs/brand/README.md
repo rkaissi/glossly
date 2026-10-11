@@ -19,3 +19,16 @@ Every mark here is a 24-unit line icon in the lucide style (`stroke="currentColo
 `review-round-2.html` and `review-round-3.html` are the comparison pages from the review: each candidate at 12, 16, 18, and 40 px, in the pill, and as the dot, light and dark. Open them in a browser.
 
 No product logo was found that copies any of these (a web search, Oct 10; not a trademark search). Do a proper trademark check before using one as a public logo.
+
+## App icon candidates (Step 20.3)
+
+The C1 mark on a Windows 11 style tile, 100-unit SVGs (shown at 256 px), from `docs/design/mockups/20-3-design-pass.html`. Rayan (Oct 11) picked **Glass**, with a slightly deeper tile and a faint darker rim so it holds on a light taskbar. The rest are kept as backups, **Aurora** first, then Rim. The tray keeps the plain mark either way.
+
+| File | Design |
+| --- | --- |
+| `app-icon-glass.svg` | The window background (sky to lilac to blush) as a glass tile, dark mark. **In use.** |
+| `app-icon-graphite.svg` | Dark tile, white caret, sparkle in the glass tint. Backup. |
+| `app-icon-frost.svg` | Light frosted tile, black caret, tinted sparkle. |
+| `app-icon-aurora.svg` | Graphite with the glass colors glowing from two corners, white mark. First backup. |
+| `app-icon-sky.svg` | The glass colors at full strength, white mark. |
+| `app-icon-rim.svg` | Light tile with a glass-tinted rim and mark. Backup. |

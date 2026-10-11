@@ -38,6 +38,7 @@ export const HIDDEN_STATE: OverlayState = {
   mode: 'hidden',
   placement: null,
   keyboard: false,
+  keyHints: 'hotkey',
   hasSelection: false,
   wordCount: 0,
   siteKey: null,
@@ -199,7 +200,11 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
   }
 
   /** Pushes new state; shows, moves, or hides the window to match. */
+  /** Reads the `keyHints` setting for every state sent (set once at startup). */
+  keyHints: () => OverlayState['keyHints'] = () => 'hotkey';
+
   update(state: OverlayState, rect?: Rect): void {
+    state = { ...state, keyHints: this.keyHints() };
     this.state = state;
     if (!this.win.isDestroyed()) this.win.webContents.send('overlay:state', state);
     if (state.mode === 'hidden') {

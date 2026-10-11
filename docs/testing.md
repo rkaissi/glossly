@@ -164,6 +164,11 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Glass events in light and dark, on mica and without it; General > Week starts on Sunday changes Week, Month, and the date pickers in settings.
 - [ ] Migration 6 on Rayan's database: done tasks show "Done" without a date; tasks done from now on show when.
 
+**Motion, key hints, app icon (Step 20.3)**
+- [ ] General > Show keyboard shortcuts: Always (a hovered bar shows chips), On hotkey (only a hotkey bar), Never (no chips; 1 to 4 still work on a hotkey bar). Chips sit right of the labels; a long Save label shortens before its chip; nothing moves while the bar is open; the bar stays within 680 px.
+- [ ] Motion: buttons squish on press; checks pop with their mark; settings tab changes and task rows rise in; the calendar view switch settles; events lift on hover; bar actions pop in on open and panels' parts rise in. With Windows' Animation effects off, none of it plays.
+- [ ] The settings window and its taskbar button show the Glass icon (light and dark taskbar); the tray keeps the plain mark.
+
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).
 - [ ] Phase 0 per-app table and toolbar overlap (`evals/capture.md`, Rayan's hand tests).
