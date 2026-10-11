@@ -170,21 +170,22 @@ code {
   max-width: 720px;
   margin: 0 auto;
 }
-/* A tab change (decision 41): the page rises in on the soft spring, its first blocks 40 ms apart. */
-.settings main > section > * {
-  animation: rise-in var(--spring-soft-ms) var(--spring-soft) both;
+/*
+ * A tab change (decision 45, replacing 41's staggered spring): the page fades in and rises 4 px in
+ * 160 ms, all at once, as settings apps do. Switching again within 400 ms (main.tsx `quick`) shows
+ * the page at once, so clicking through tabs never queues motion.
+ */
+.settings main > section {
+  animation: page-in 160ms var(--ease-out) both;
 }
-.settings main > section > :nth-child(2) {
-  animation-delay: 40ms;
+.settings main.quick > section {
+  animation: none;
 }
-.settings main > section > :nth-child(3) {
-  animation-delay: 80ms;
-}
-.settings main > section > :nth-child(4) {
-  animation-delay: 120ms;
-}
-.settings main > section > :nth-child(n + 5) {
-  animation-delay: 160ms;
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 /*
  * Page rhythm (Step 20.3 spacing check): title, one muted line, 24 px, then cards 16 px apart
@@ -318,7 +319,8 @@ kbd.hotkey {
   border-top: 1px solid var(--border);
 }
 
-.confirm {
+/* The block confirm (Delete all data, Reset settings); an inline one sits in its row with no outline. */
+.confirm:not(.inline) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;

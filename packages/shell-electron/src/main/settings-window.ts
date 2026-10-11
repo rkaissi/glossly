@@ -1,6 +1,6 @@
 import { BrowserWindow, nativeTheme, shell } from 'electron';
 import { logger } from './log';
-import { appIconPath, hasWindowMaterial, preloadPath, rendererUrl } from './paths';
+import { appIcoPath, appIconPath, hasWindowMaterial, preloadPath, rendererUrl } from './paths';
 import { hwndFromBuffer } from './view';
 
 const log = logger('settings-window');
@@ -60,6 +60,8 @@ export class SettingsWindow {
       },
     });
     win.setMenu(null);
+    // The taskbar button's icon comes from the relaunch icon, not the window's (paths.ts).
+    if (process.platform === 'win32') win.setAppDetails({ appId: 'com.glossly.app', appIconPath: appIcoPath(), appIconIndex: 0, relaunchDisplayName: 'Glossly' });
     win.once('ready-to-show', () => win.show());
     win.on('closed', () => {
       if (this.win === win) {

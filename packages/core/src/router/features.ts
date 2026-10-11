@@ -34,6 +34,8 @@ export interface Features {
   automated: boolean;
   /** The last chat header up to the end of the selection is the user's own. */
   authorIsMe: boolean;
+  /** The selection is in a text field (usually the user's own draft). */
+  inEditable: boolean;
 }
 
 const HANDLE = /(?:^|[\s(])@([A-Za-z0-9_][\w.-]{1,30})/g;
@@ -184,5 +186,6 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     ideaWords: IDEA.test(text),
     automated: AUTOMATED.test(text) || AUTOMATED.test(ctx.window_title) || (BROADCAST_GREETING.test(text) && BROADCAST_WORDS.test(text)),
     authorIsMe: me ? isMe(lastSpeaker(`${ctx.context_before}${text}`), me) : false,
+    inEditable: ctx.is_editable,
   };
 }

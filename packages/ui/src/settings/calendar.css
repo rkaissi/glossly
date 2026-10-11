@@ -152,8 +152,8 @@ button.trigger.cal-title-range .trigger-value > svg {
   display: flex;
   flex-direction: column;
 }
-/* A view switch: the new view settles from 97% on the soft spring. */
-.cal-body > * {
+/* A view switch (not the page opening, decision 45): the new view settles from 97% on the soft spring. */
+.cal-body.switched > * {
   animation: view-in var(--spring-soft-ms) var(--spring-soft) both;
 }
 @keyframes view-in {
@@ -339,10 +339,14 @@ button.more:hover:not(:disabled) {
   display: grid;
   grid-template-columns: 56px repeat(7, minmax(0, 1fr));
 }
+/* The hours scroll and their scrollbar takes width; the rows above reserve the same gutter so
+   every column lines up with the grid below. */
 .wk-head,
 .wk-all {
   flex: none;
   border-bottom: 1px solid var(--border);
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
 }
 .wk-head > div {
   display: flex;
@@ -386,6 +390,7 @@ button.more:hover:not(:disabled) {
 .wk-scroll {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   position: relative;
 }
 .wk-times div {

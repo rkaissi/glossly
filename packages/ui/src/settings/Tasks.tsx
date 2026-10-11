@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, ExternalLink, Plus, Trash2, UsersRound } from 'lucide-react';
 import type { CommitmentView } from '@glossly/core/api';
 import { glossly } from '../bridge';
@@ -33,7 +33,7 @@ function WhoLine({ t }: { t: CommitmentView }) {
   );
 }
 
-function TaskRow({ t, today, showDue, onDone }: { t: CommitmentView; today: string; showDue: boolean; onDone: (t: CommitmentView, done: boolean) => void }) {
+function TaskRow({ t, today, showDue, fresh, onDone }: { t: CommitmentView; today: string; showDue: boolean; fresh: boolean; onDone: (t: CommitmentView, done: boolean) => void }) {
   const [text, setText] = useState(t.text);
   const [confirming, setConfirming] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -54,7 +54,7 @@ function TaskRow({ t, today, showDue, onDone }: { t: CommitmentView; today: stri
       </li>
     );
   return (
-    <li className={`task-row${done ? ' done' : ''}${leaving ? ' leaving' : ''}`}>
+    <li className={`task-row${done ? ' done' : ''}${leaving ? ' leaving' : ''}${fresh ? ' fresh' : ''}`}>
       <TaskCheck
         checked={done || leaving}
         label={done ? 'Reopen' : 'Mark done'}
@@ -120,15 +120,27 @@ function QuickAdd({ today }: { today: string }) {
   const [auto, setAuto] = useState(true);
   const { busy, error, run } = useAction();
   const input = useRef<HTMLInputElement>(null);
+  const mirror = useRef<HTMLSpanElement>(null);
   const found = auto ? readDue(text, today, ws) : null;
+  // The words themselves, without the space the match starts with.
+  const mark = found && { from: found.index + (text.slice(found.index).length - text.slice(found.index).trimStart().length), to: found.index + found.length };
+  // A long title scrolls inside the input; the marks scroll with it.
+  const followScroll = () => {
+    if (mirror.current && input.current) mirror.current.style.transform = `translateX(${-input.current.scrollLeft}px)`;
+  };
+  useLayoutEffect(followScroll);
   const shownDue = auto ? (found?.day ?? null) : due;
 
   const add = async () => {
     const v = text.trim();
     if (!v) return;
     const title = found ? withoutDue(v, found) : v;
-    const r = await run(() => glossly.invoke('commitments:add', { text: title, due_at: shownDue }));
-    if (r === undefined) return;
+    // `run` gives undefined on failure; the call itself returns nothing, so say it worked.
+    const ok = await run(async () => {
+      await glossly.invoke('commitments:add', { text: title, due_at: shownDue });
+      return true;
+    });
+    if (!ok) return;
     setText('');
     setDue(null);
     setAuto(true);
@@ -143,7 +155,26 @@ function QuickAdd({ today }: { today: string }) {
       }}
     >
       <Plus size={16} strokeWidth={1.75} aria-hidden />
-      <input ref={input} value={text} placeholder="Add a task, e.g. Send Jordan the deck by Friday" aria-label="New task" maxLength={300} onChange={(e) => setText(e.target.value)} />
+      <span className="quick-field">
+        {/* The date words, marked under the input's own text (an input can't style part of it). */}
+        {mark && (
+          <span className="quick-mirror" aria-hidden ref={mirror}>
+            {text.slice(0, mark.from)}
+            <mark>{text.slice(mark.from, mark.to)}</mark>
+            {text.slice(mark.to)}
+          </span>
+        )}
+        <input
+          ref={input}
+          value={text}
+          placeholder="Add a task, e.g. Send Jordan the deck by Friday"
+          aria-label="New task"
+          maxLength={300}
+          onChange={(e) => setText(e.target.value)}
+          onScroll={followScroll}
+          onSelect={followScroll}
+        />
+      </span>
       <span className="quick-hint">Enter to add</span>
       <DatePicker
         variant="chip"
@@ -207,7 +238,17 @@ export function TasksTab() {
   );
   const finished = [...(done ?? [])].filter((t) => matchesFilter(t, filter)).sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''));
   const shown = s.overdue.length + s.today.length + s.days.length + s.noDate.length;
-  const row = (t: CommitmentView, showDue = false) => <TaskRow key={`${t.id}:${t.text}:${t.status}`} t={t} today={today} showDue={showDue} onDone={setStatus} />;
+  // Rows that arrive after the list first loaded (a task just added or reopened) rise in; the
+  // list itself appears with the page (decision 45).
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!open || !done) return;
+    seen.current ??= new Set();
+    for (const t of [...open, ...done]) seen.current.add(`${t.id}:${t.status}`);
+  });
+  const row = (t: CommitmentView, showDue = false) => (
+    <TaskRow key={`${t.id}:${t.text}:${t.status}`} t={t} today={today} showDue={showDue} fresh={seen.current !== null && !seen.current.has(`${t.id}:${t.status}`)} onDone={setStatus} />
+  );
 
   return (
     <section className="tasks-tab">

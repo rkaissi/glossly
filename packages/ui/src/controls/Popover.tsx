@@ -23,6 +23,22 @@ function scrollParent(el: HTMLElement): HTMLElement | null {
 const toRect = (r: DOMRect): Rect => ({ top: r.top, left: r.left, bottom: r.bottom, right: r.right });
 
 /**
+ * Callers close a popover by not rendering it, so it can't animate out itself. A copy of it, which
+ * takes no clicks, plays the exit and goes away (decision 45).
+ */
+function leave(el: HTMLElement): void {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const ghost = el.cloneNode(true) as HTMLElement;
+  ghost.removeAttribute('id');
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.classList.add('leaving');
+  document.body.append(ghost);
+  const done = () => ghost.remove();
+  ghost.addEventListener('animationend', done, { once: true });
+  setTimeout(done, 300);
+}
+
+/**
  * The one floating layer under every control (Step 20.1): placed below or above its anchor
  * inside the window, kept attached while anything scrolls or the window resizes, closed by
  * Esc (focus goes back to the anchor), a click outside, or the anchor scrolling out of view.
@@ -58,6 +74,14 @@ export function Popover({
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const id = useId();
+
+  // On close only (not when the anchor or options change).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    return () => {
+      if (el) leave(el);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     const el = ref.current;

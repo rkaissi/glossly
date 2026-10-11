@@ -67,4 +67,22 @@ describe('Reply scoring', () => {
     expect(scoreActions(model, f).reply).toBe(0);
     expect(scoreActions(model, extractFeatures(c)).reply).toBe(0.9);
   });
+
+  it("offers Reply and Who is this on someone else's chat message the model reads as a bare question (decision 45)", () => {
+    const me = { name: 'Alex Morgan', emails: [], handles: [] };
+    const c = ctx({
+      source_app: 'discord.exe',
+      window_title: 'Discord',
+      context_before: 'Alex\n8/31/26, 9:10 PM\nim in the city for work rn\nJordanZ2\nGEN2\n7:02 PM\n',
+      text: 'what kinda job are you doing currently?',
+    });
+    const f = extractFeatures(c, [], me);
+    const model: Decisions = { content_type: 'question', authored_by_other: 0.3, mentions_people: 0.05, contains_commitment: 0.05, best_collection: 'Notes', provider: 'llm_structured' };
+    const s = assignSlots(model, f, DEFAULT_SETTINGS.router);
+    expect([s.slot3?.action, s.slot4?.action]).toEqual(['reply', 'who']);
+    // Not in a text field (a draft), and not the user's own message.
+    expect(scoreActions(model, extractFeatures({ ...c, is_editable: true }, [], me)).reply).toBe(0);
+    const mine = extractFeatures({ ...c, context_before: 'Alex Morgan  9:41 AM\n' }, [], me);
+    expect(scoreActions({ ...model, content_type: 'single_message' }, mine).reply).toBe(0);
+  });
 });

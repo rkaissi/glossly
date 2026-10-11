@@ -1,7 +1,7 @@
 // The settings window: first-run setup (#setup) and the tabs, in two groups (Step 20.1): what you
 // keep (#tasks, #calendar, #people, #saved) and the settings (#profile, #models, #privacy, #general, #metrics).
 // Main changes the hash on an open window to switch tabs. #keys, #data, and #agenda are older names.
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Activity, Bookmark, CalendarDays, CircleCheck, Cpu, Shield, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
@@ -67,6 +67,9 @@ const splitHash = (h: string): [string, string | null] => {
 function App() {
   const [view, setView] = useState<SettingsView | null>(null);
   const [hash, setHash] = useState(readHash);
+  // Tabs switched within 400 ms of the last switch appear without the page animation (decision 45).
+  const [quick, setQuick] = useState(false);
+  const lastSwitch = useRef(0);
 
   useEffect(() => {
     let pushed = false;
@@ -76,7 +79,12 @@ function App() {
     });
     const offEmbed = glossly.on('embed:progress', (embed) => setView((v) => v && { ...v, embed }));
     void glossly.invoke('settings:get').then((v) => !pushed && setView(v));
-    const onHash = () => setHash(readHash());
+    const onHash = () => {
+      const now = performance.now();
+      setQuick(now - lastSwitch.current < 400);
+      lastSwitch.current = now;
+      setHash(readHash());
+    };
     window.addEventListener('hashchange', onHash);
     return () => {
       offView();
@@ -128,7 +136,7 @@ function App() {
             </a>
           )}
         </nav>
-        <main>
+        <main className={quick ? 'quick' : undefined}>
           {tab === 'profile' && <ProfileTab view={view} />}
           {tab === 'people' && <PeopleTab personId={personId} />}
           {tab === 'tasks' && <TasksTab />}

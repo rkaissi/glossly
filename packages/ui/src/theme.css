@@ -252,14 +252,12 @@ button.icon-btn.danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
+/* Sits in the row it confirms (which may tint red); the red button is the warning, no outline. */
 .confirm.inline {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 8px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-sm);
+  gap: var(--s-2);
 }
 button svg {
   flex: none;

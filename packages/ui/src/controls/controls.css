@@ -27,6 +27,18 @@
 .popover[data-align='end'] {
   transform-origin: top right;
 }
+/* The closing copy (Popover.tsx `leave`): fast, easing in, no bounce. */
+.popover.leaving,
+.popover.leaving[data-side='above'] {
+  pointer-events: none;
+  animation: pop-out 120ms var(--ease-in) forwards;
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
 .popover[data-side='above'] {
   transform-origin: bottom left;
   animation-name: pop-in-above;

@@ -202,14 +202,14 @@ function EventEditor({ anchor, draft: initial, onClose }: { anchor: HTMLElement;
         {error && <p className="error small">{error}</p>}
         <div className="ee-foot">
           {confirming ? (
+            // Where the trash button was, in the same order as every inline confirm.
             <>
-              <span className="grow small">Delete this event?</span>
-              <button type="button" className="ghost sm" onClick={() => setConfirming(false)}>
-                Cancel
-              </button>
+              <span className="small">Delete this event?</span>
               <button type="button" className="danger sm" onClick={() => void remove()}>
-                <Trash2 size={14} strokeWidth={1.75} aria-hidden />
                 Delete
+              </button>
+              <button type="button" className="sm" onClick={() => setConfirming(false)}>
+                Cancel
               </button>
             </>
           ) : (
@@ -620,6 +620,8 @@ export function CalendarTab({ view }: { view: SettingsView }) {
   const ws = useContext(WeekStartContext);
   const today = toDay(new Date());
   const [mode, setMode] = useState<CalendarView>(view.settings.calendarView);
+  /** The view was switched here (not just opened with the page), so it settles in (decision 45). */
+  const [switched, setSwitched] = useState(false);
   const [cursor, setCursor] = useState(today);
   const [range, setRange] = useState<DayRange>({ from: today, to: addDays(today, 13) });
   const [showTasks, setShowTasks] = useState(true);
@@ -638,6 +640,7 @@ export function CalendarTab({ view }: { view: SettingsView }) {
 
   const pickMode = (m: CalendarView) => {
     setMode(m);
+    setSwitched(true);
     void glossly.invoke('settings:set', { key: 'calendarView', value: m });
   };
   const step = (dir: -1 | 1) => {
@@ -697,7 +700,7 @@ export function CalendarTab({ view }: { view: SettingsView }) {
         </div>
       </div>
 
-      <div className="cal-body">
+      <div className={`cal-body${switched ? ' switched' : ''}`}>
         {mode === 'month' && (
           <MonthView
             cursor={cursor}

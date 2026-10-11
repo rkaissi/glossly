@@ -3,17 +3,25 @@ import type { Settings } from '../settings';
 import type { Features } from './features';
 import { CONTEXTUAL_ACTIONS, EMPTY_ACTIONS, type BarAction, type ContextualAction, type Decisions, type EmptyAction, type ScoredAction, type Slots } from './types';
 
+/** What a chat message can look like to the model (a signature or a pasted table is not one). */
+const CHAT_TYPES: readonly Decisions['content_type'][] = ['single_message', 'message_thread', 'question', 'other'];
+
 export function scoreActions(d: Decisions, f: Features): Record<ContextualAction, number> {
-  const isMessage = d.content_type === 'message_thread' || d.content_type === 'single_message';
+  // A short read-only selection in a chat app is someone's message, even when the model, seeing
+  // only "what kind of job is it?", calls it a question (decision 45).
+  const chat = f.messengerApp && !f.inEditable && f.wordCount <= 150 && CHAT_TYPES.includes(d.content_type);
+  const isMessage = d.content_type === 'message_thread' || d.content_type === 'single_message' || chat;
   // Applies to the model's answer too: no Reply for automated mail or the user's own message.
   const answerable = isMessage && !f.automated && !f.authorIsMe;
+  const theirs = chat && answerable;
   // A contact card, or a name next to a person's own address or phone, is someone to look up,
   // even when the model reads them as the sender rather than a third person and scores it low.
   const contact =
     d.content_type === 'contact_info' ? 0.9 : f.namePairs.length > 0 && (f.phones.length > 0 || f.emails.some((e) => !isRoleAddress(e))) ? 0.7 : 0;
   return {
-    reply: answerable ? d.authored_by_other : 0,
-    who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact),
+    reply: answerable ? Math.max(d.authored_by_other, theirs ? 0.7 : 0) : 0,
+    // Whoever wrote someone else's chat message is someone to look up.
+    who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact, theirs ? 0.55 : 0),
     // Tasks and events (decisions 36 and 37): what the text says, an event in it, or a message
     // involving someone you have open tasks with. Not on code or tables.
     promises: Math.max(

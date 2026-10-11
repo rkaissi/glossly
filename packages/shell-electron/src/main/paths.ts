@@ -24,6 +24,16 @@ export function appIconPath(): string {
   return resolve(app.getAppPath(), 'resources/icon.png');
 }
 
+/**
+ * The same icon as a multi-size .ico, for the taskbar. Windows takes a grouped window's taskbar
+ * icon from its relaunch icon (an .ico or .exe), not the window icon, so without it a dev build
+ * shows electron.exe's.
+ */
+export function appIcoPath(): string {
+  if (app.isPackaged) return join(process.resourcesPath, 'icon.ico');
+  return resolve(app.getAppPath(), 'resources/icon.ico');
+}
+
 export const preloadPath = () => join(outMain, '../preload/index.cjs');
 export const embedWorkerPath = () => join(outMain, 'embed-worker.js');
 
