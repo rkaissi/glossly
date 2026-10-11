@@ -1,5 +1,16 @@
 # Agent instructions
 
+## Never commit real people's information (most important rule)
+
+Nothing that identifies a real person goes into this repo: not in code, tests, fixtures, comments, prompts, docs (including `docs/HANDOFF.md`), commit messages, branch names, or eval results. That means real names, email addresses, usernames and handles, phone numbers, street addresses, company-internal names, chat or server names, window titles, and message text.
+
+- **Where real data comes from:** Rayan's screenshots and pasted text, his database and logs in `%APPDATA%\Glossly`, window titles and selections seen during live checks (Discord, Slack, Gmail, Outlook tabs), and anything a subagent reports back. Treat all of it as private. Describe the case in your own words and rebuild it with made-up data, never by copying it.
+- **Use fictional stand-ins:** people like Alex Morgan, Jordan Hale, Casey Lin, Maya Chen; addresses at `example.com`; companies like Acme or Northwind. Keep whatever matters for the test (a first name alone, a hyphenated surname, an unread count in a title) and change everything else.
+- **The only exception** is "Rayan", meaning the project owner, used in docs to say who decided or asked for something. Don't add his full name, email, or handles anywhere new.
+- **Check before every commit:** read the staged diff (`git diff --cached`) for names, emails, handles, and titles that came from real data. If you find one, already committed or not, replace it, run the tests, and tell Rayan.
+
+## Docs
+
 Start every session by reading `docs/HANDOFF.md`. It is the source of truth for the current state, what to do next, open questions, gotchas, and the environment quirks of this machine, and it links the other docs. Keep it updated as work lands, and keep it short: it says what changed and what's next, while the detail goes where it belongs:
 
 - a new or changed decision → `docs/decisions.md` (append; never renumber, code cites the numbers)
@@ -15,4 +26,5 @@ Start every session by reading `docs/HANDOFF.md`. It is the source of truth for 
 - Commit to `main` per chunk of work, update `docs/HANDOFF.md` in the same commit, and after each committed chunk stop and give Rayan the updated handoff.
 - Don't run `pnpm eval` unless Rayan asks (Groq free-tier rate limits). `pnpm test` runs unit tests only.
 - Never print or log API keys or selected text.
-- Never commit real people's names, email addresses, or handles. In `docs/HANDOFF.md` and other docs, use fictional people and example addresses (for example Alex Morgan, `alex.morgan@example.com`).
+- Never commit real people's information (see the first section).
+- Put one-off helper scripts (patch scripts, probes, scratch builds) in the session's scratchpad or `%TEMP%`, never in the repo, and delete them when the work is done.
