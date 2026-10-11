@@ -37,15 +37,15 @@ export interface WhoView {
 export const WhoPeopleSchema = z.object({
   people: z.array(
     z.object({
-      name: z.string(),
-      email: z.string(),
-      handle: z.string(),
-      role: z.string(),
-      about: z.string(),
-      relationship: z.enum(RELATIONSHIPS),
+      name: z.string().describe('Full name as written, or "" when only an email or handle identifies them.'),
+      email: z.string().describe('Their own address as written, up to the end of the domain, or "".'),
+      handle: z.string().describe('Their @handle without the @, or "".'),
+      role: z.string().describe('A few words, such as "recruiter at Northwind", or "".'),
+      about: z.string().describe('One line about them from the text, or "". Not the relationship.'),
+      relationship: z.enum(RELATIONSHIPS).describe('How the user most likely knows them; other when unclear.'),
       // Not bounded here: one row scored 85 would fail the whole call. acceptWhoRows reads it.
-      confidence: z.number(),
-      evidence: z.string(),
+      confidence: z.number().describe('0 to 1.'),
+      evidence: z.string().describe('A short quote copied exactly from the text.'),
     }),
   ),
 });

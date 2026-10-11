@@ -235,8 +235,8 @@ describe('LlmStructuredDecision', () => {
     };
   }
 
-  it('calls the decision role and keeps only known collections', async () => {
-    const llm = fakeLlm({ ...modelDecision, best_collection: 'reading' });
+  it('calls the decision role, and its schema allows only the known collections', async () => {
+    const llm = fakeLlm({ ...modelDecision, best_collection: 'Reading' });
     const c = ctx(ARTICLE);
     const input = { context: c, features: extractFeatures(c), collections };
     const d = await new LlmStructuredDecision(llm).decide(input);
@@ -244,8 +244,8 @@ describe('LlmStructuredDecision', () => {
     expect(d.provider).toBe('llm_structured');
     expect(llm.calls[0]).toMatchObject({ role: 'decision', action: 'router', temperature: 0 });
 
-    const unknown = await new LlmStructuredDecision(fakeLlm({ ...modelDecision, content_type: 'article', best_collection: 'Taxes' })).decide(input);
-    expect(unknown.best_collection).toBe('Reading');
+    // An enum of the user's collections: anything else fails the schema, and the router falls back to rules.
+    await expect(new LlmStructuredDecision(fakeLlm({ ...modelDecision, best_collection: 'Taxes' })).decide(input)).rejects.toThrow();
   });
 
   it('formats the prompt with clipped tier-1 context', () => {

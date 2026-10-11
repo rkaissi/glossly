@@ -11,7 +11,7 @@ import { contextWindow, type ContextWindow } from './context';
 export const EntityKindSchema = z.enum(['person', 'company', 'product', 'place', 'other']);
 
 export const ExtractedEntitiesSchema = z.object({
-  entities: z.array(z.object({ kind: EntityKindSchema, name: z.string() })),
+  entities: z.array(z.object({ kind: EntityKindSchema, name: z.string().describe('The name as written, with normal capitalization.') })),
 });
 export type ExtractedEntities = z.infer<typeof ExtractedEntitiesSchema>;
 

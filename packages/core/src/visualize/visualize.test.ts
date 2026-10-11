@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import type { ChatRequest, LlmProvider } from '../llm/types';
 import { LlmError } from '../llm/types';
 import { inferTypes, parseNumber, parseTable, safeColumns, splitDelimited, toCsv } from './table';
-import { prepareSpec, rulesSpec, visualize } from './visualize';
+import { isValidSpec, rulesSpec, specFromChoice, visualize, type ChartChoice } from './visualize';
 
 const TSV = 'Region\tQ1\tQ2\nNorth\t120\t140\nSouth\t90\t95\nWest\t70\t88';
 
@@ -39,38 +39,35 @@ describe('parseTable', () => {
   });
 });
 
-describe('prepareSpec', () => {
+describe('specFromChoice', () => {
   const table = parseTable(TSV)!;
-  const good = JSON.stringify({ data: { name: 'table' }, mark: { type: 'bar', tooltip: true }, encoding: { x: { field: 'Region', type: 'nominal' }, y: { field: 'Q1', type: 'quantitative' } } });
+  const types = inferTypes(table);
+  const pick = (over: Partial<ChartChoice>): ChartChoice => ({ chart: 'bar', x: 'Region', measures: ['Q1'], split_by: '', sort: 'data', ...over });
 
-  it('inlines the rows and passes the Vega-Lite schema', () => {
-    const r = prepareSpec(good, table);
-    expect(r.ok).toBe(true);
-    if (r.ok) expect((r.spec.data as { values: unknown[] }).values).toHaveLength(3);
+  it('writes a spec that passes the Vega-Lite schema, with the rows inlined', () => {
+    const spec = specFromChoice(pick({}), table, types)!;
+    expect(isValidSpec(spec)).toBe(true);
+    expect((spec.data as { values: unknown[] }).values).toHaveLength(3);
+    expect(spec.encoding).toMatchObject({ x: { field: 'Region', type: 'nominal' }, y: { field: 'Q1', type: 'quantitative' } });
   });
 
-  it('rejects remote data, unknown fields, image marks, and specs the schema refuses', () => {
-    const withUrl = JSON.stringify({ data: { url: 'https://example.com/x.csv' }, mark: 'bar', encoding: { href: { field: 'Region' } } });
-    expect(prepareSpec(withUrl, table)).toEqual({ ok: false, reason: 'forbidden_key' });
-    expect(prepareSpec(good.replace('"Q1"', '"Q9"'), table)).toEqual({ ok: false, reason: 'unknown_field' });
-    expect(prepareSpec(JSON.stringify({ mark: 'image', encoding: {} }), table)).toEqual({ ok: false, reason: 'image_mark' });
-    expect(prepareSpec(JSON.stringify({ mark: 'sparkle', encoding: {} }), table)).toEqual({ ok: false, reason: 'schema' });
-    expect(prepareSpec('not json', table)).toEqual({ ok: false, reason: 'not_json' });
+  it('folds several measures, sorts and turns bars, and draws a line with points', () => {
+    const grouped = specFromChoice(pick({ measures: ['Q1', 'Q2'] }), table, types)!;
+    expect(grouped.transform).toEqual([{ fold: ['Q1', 'Q2'], as: ['series', 'value'] }]);
+    expect(grouped.encoding).toMatchObject({ color: { field: 'series' }, xOffset: { field: 'series' } });
+    expect(isValidSpec(grouped)).toBe(true);
+    const ranked = specFromChoice(pick({ chart: 'horizontal_bar', sort: 'descending' }), table, types)!;
+    expect(ranked.encoding).toMatchObject({ y: { field: 'Region', sort: '-x' }, x: { field: 'Q1' } });
+    expect(isValidSpec(ranked)).toBe(true);
+    const line = specFromChoice(pick({ chart: 'line', sort: 'descending' }), table, types)!;
+    expect(line.mark).toEqual({ type: 'line', tooltip: true, point: true });
+    expect((line.encoding as { x: { sort: unknown } }).x.sort).toBeNull();
   });
 
-  it('drops a tooltip: true under encoding instead of refusing the whole spec', () => {
-    const slip = JSON.stringify({ data: { name: 'table' }, mark: { type: 'bar', tooltip: true }, encoding: { x: { field: 'Region', type: 'nominal' }, y: { field: 'Q1', type: 'quantitative' }, tooltip: true } });
-    expect(prepareSpec(slip, table).ok).toBe(true);
-  });
-
-  it('accepts fields a fold transform creates', () => {
-    const folded = JSON.stringify({
-      data: { name: 'table' },
-      transform: [{ fold: ['Q1', 'Q2'], as: ['series', 'value'] }],
-      mark: 'line',
-      encoding: { x: { field: 'Region', type: 'nominal' }, y: { field: 'value', type: 'quantitative' }, color: { field: 'series', type: 'nominal' } },
-    });
-    expect(prepareSpec(folded, table).ok).toBe(true);
+  it('drops what it cannot plot: none, a category as a measure, a scatter over categories', () => {
+    expect(specFromChoice(pick({ chart: 'none' }), table, types)).toBeNull();
+    expect(specFromChoice(pick({ measures: ['Region'] }), table, types)).toBeNull();
+    expect((specFromChoice(pick({ chart: 'point' }), table, types)!.mark as { type: string }).type).toBe('bar');
   });
 });
 
@@ -105,21 +102,24 @@ class FakeLlm implements LlmProvider {
 describe('visualize', () => {
   const settings = (localOnly = false) => () => ({ localOnly });
 
-  it('uses the model spec when it validates, without a table call for a parsed table', async () => {
-    const llm = new FakeLlm(() => ({ spec_json: JSON.stringify({ data: { name: 'table' }, mark: 'bar', encoding: { x: { field: 'Region', type: 'nominal' }, y: { field: 'Q2', type: 'quantitative' } } }) }));
+  it("draws the model's pick, without a table call for a parsed table", async () => {
+    const llm = new FakeLlm(() => ({ chart: 'bar', x: 'Region', measures: ['Q2'], split_by: '', sort: 'descending' }));
     const r = await visualize({ llm, settings: settings() }, TSV);
-    expect(r).toMatchObject({ ok: true, chartBy: 'model', note: null });
+    expect(r).toMatchObject({ ok: true, chartBy: 'model', note: null, spec: { encoding: { y: { field: 'Q2' } } } });
     expect(llm.calls.map((c) => c.action)).toEqual(['visualize_chart']);
   });
 
-  it('shows the table when the model spec fails, and asks the model for rows when the shape is unclear', async () => {
-    const bad = new FakeLlm(() => ({ spec_json: '{"mark":"bar","encoding":{"x":{"field":"Nope","type":"nominal"}}}' }));
+  it('shows the table when the pick names a column that is not there, and asks for rows when the shape is unclear', async () => {
+    // The schema's enums refuse the unknown column; the model layer would retry, then fail.
+    const bad = new FakeLlm(() => ({ chart: 'bar', x: 'Nope', measures: ['Q1'], split_by: '', sort: 'data' }));
     const r1 = await visualize({ llm: bad, settings: settings() }, TSV);
     expect(r1).toMatchObject({ ok: true, spec: null, chartBy: null });
     expect(r1.ok && r1.note).toMatch(/so here is the table/);
 
     const prose = new FakeLlm((req) =>
-      req.action === 'visualize_table' ? { columns: ['Quarter', 'Revenue'], rows: [['Q1', '$1.2M'], ['Q2', '$1.5M']] } : { spec_json: '' },
+      req.action === 'visualize_table'
+        ? { columns: ['Quarter', 'Revenue'], rows: [['Q1', '$1.2M'], ['Q2', '$1.5M']] }
+        : { chart: 'none', x: 'Quarter', measures: ['Revenue'], split_by: '', sort: 'data' },
     );
     const r2 = await visualize({ llm: prose, settings: settings() }, 'Revenue was $1.2M in Q1 and $1.5M in Q2.');
     expect(r2).toMatchObject({ ok: true, table: { source: 'model', rows: [['Q1', 1_200_000], ['Q2', 1_500_000]] }, spec: null });

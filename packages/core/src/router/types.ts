@@ -28,6 +28,21 @@ export const DecisionsSchema = z.object({
 });
 export type Decisions = z.infer<typeof DecisionsSchema>;
 
+/**
+ * What the model is asked for: the decisions without `provider` (code sets it), with
+ * `best_collection` as an enum of the user's collections so the answer is always one of them.
+ */
+export function decisionCallSchema(collections: string[]) {
+  const names = [...new Set(collections.map((c) => c.trim()).filter(Boolean))];
+  return z.object({
+    content_type: ContentTypeSchema,
+    authored_by_other: P,
+    mentions_people: P,
+    contains_commitment: P,
+    best_collection: names.length ? z.enum(names as [string, ...string[]]) : z.string(),
+  });
+}
+
 /** Tier-1 context: the router's only input. */
 export interface SelectionContext {
   text: string;

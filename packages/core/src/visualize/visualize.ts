@@ -1,6 +1,7 @@
 // Visualize (spec: Actions, Visualize): parse the table in code when its shape allows, else ask
-// the model for rows; then the model picks a chart as a Vega-Lite spec, which is validated
-// against the Vega-Lite JSON schema before it is shown; when it fails, the table is shown.
+// the model for rows; then the model picks a chart (the kind and the columns, as enums of the
+// table's own columns), code writes the Vega-Lite spec, and the spec is checked against the
+// Vega-Lite JSON schema before it is shown; when anything fails, the table is shown.
 // Local only, or no key: the table must parse in code, and code picks a plain chart.
 import Ajv, { type ValidateFunction } from 'ajv';
 import vegaLiteSchema from 'vega-lite/vega-lite-schema.json';
@@ -16,8 +17,42 @@ const MAX_PROMPT_CHARS = 6000;
 const SAMPLE_ROWS = 8;
 const CHART_SIZE = { width: 440, height: 220 };
 
-export const VisualizeTableSchema = z.object({ columns: z.array(z.string()), rows: z.array(z.array(z.string())) });
-export const VisualizeChartSchema = z.object({ spec_json: z.string() });
+export const VisualizeTableSchema = z.object({
+  columns: z.array(z.string()).describe('Short column names.'),
+  rows: z.array(z.array(z.string())).describe('One array per row, one string per column, in column order.'),
+});
+
+/** The charts the model can pick. Code writes the Vega-Lite spec for each. */
+export const CHART_KINDS = ['bar', 'horizontal_bar', 'line', 'area', 'point', 'none'] as const;
+export type ChartKind = (typeof CHART_KINDS)[number];
+export const CHART_SORTS = ['data', 'ascending', 'descending'] as const;
+
+export interface ChartChoice {
+  chart: ChartKind;
+  /** The category or time axis (for `point`, the first measure). */
+  x: string;
+  /** Numeric columns to plot; more than one become series. */
+  measures: string[];
+  /** A category column whose values become separate series, or "" for none. */
+  split_by: string;
+  sort: (typeof CHART_SORTS)[number];
+}
+
+const nonEmpty = (xs: string[]) => xs as [string, ...string[]];
+
+/**
+ * The model's chart pick for one table: the kind and the columns, each an enum of this table's
+ * own column names, so it can't name a field that isn't there. `measures` lists the numeric columns.
+ */
+export function chartChoiceSchema(columns: string[], measures: string[]) {
+  return z.object({
+    chart: z.enum(CHART_KINDS),
+    x: z.enum(nonEmpty(columns)).describe('The category or time column for the axis. For point, the first numeric column.'),
+    measures: z.array(z.enum(nonEmpty(measures))).describe('The numeric columns to plot, at least one.'),
+    split_by: z.enum(nonEmpty(['', ...columns])).describe('A category column whose values become separate series, or "" for none.'),
+    sort: z.enum(CHART_SORTS).describe('Bar order; data keeps the table order.'),
+  });
+}
 
 let validator: ValidateFunction | null = null;
 
@@ -28,100 +63,76 @@ function vegaLiteValidator(): ValidateFunction {
   return validator;
 }
 
+/** A last check on a spec code wrote: it has to pass the Vega-Lite JSON schema. */
+export const isValidSpec = (spec: Record<string, unknown>) => Boolean(vegaLiteValidator()(spec));
+
 const rowObjects = (t: ParsedTable) => t.rows.map((r) => Object.fromEntries(t.columns.map((c, i) => [c, r[i] ?? null])));
 
-/** Keys that could load or link anything outside the app. Not allowed anywhere in a spec. */
-const FORBIDDEN_KEYS = new Set(['url', 'href', 'usermeta', 'datasets']);
-
-function walk(v: unknown, visit: (key: string, value: unknown) => void): void {
-  if (Array.isArray(v)) v.forEach((x) => walk(x, visit));
-  else if (v && typeof v === 'object') {
-    for (const [k, x] of Object.entries(v)) {
-      visit(k, x);
-      walk(x, visit);
-    }
-  }
-}
-
 /**
- * Checks a model-written spec and fills in the rows. Valid when it parses, uses no forbidden
- * keys or image marks, references only the table's columns (or names its own transforms
- * create), and passes the Vega-Lite JSON schema.
+ * The Vega-Lite spec for a chart pick, written in code with the rows inlined. Fields that
+ * aren't numeric are dropped from the measures; a point chart needs a numeric x (else bars);
+ * several measures fold into "series" and "value" with a color per series (grouped bars, one
+ * line each). Null for "none" or nothing to plot.
  */
-export function prepareSpec(json: string, table: ParsedTable): { ok: true; spec: Record<string, unknown> } | { ok: false; reason: string } {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(json);
-  } catch {
-    return { ok: false, reason: 'not_json' };
-  }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, reason: 'not_object' };
-  const spec = { ...(raw as Record<string, unknown>) };
-  delete spec.config;
-  delete spec.data;
-  // A common slip: `"tooltip": true` under encoding, which the schema refuses. The mark's tooltip covers it.
-  const enc = spec.encoding as Record<string, unknown> | undefined;
-  if (enc && typeof enc === 'object' && enc.tooltip === true) {
-    const { tooltip: _drop, ...rest } = enc;
-    spec.encoding = rest;
-  }
-
-  let reason: string | null = null;
-  const fields = new Set<string>();
-  const created = new Set<string>();
-  walk(spec, (key, value) => {
-    if (FORBIDDEN_KEYS.has(key)) reason ??= 'forbidden_key';
-    if (key === 'mark' && (value === 'image' || (value as { type?: unknown })?.type === 'image')) reason ??= 'image_mark';
-    if (key === 'field' && typeof value === 'string') fields.add(value);
-    if (key === 'fold' && Array.isArray(value)) value.forEach((f) => typeof f === 'string' && fields.add(f));
-    if (key === 'as') (Array.isArray(value) ? value : [value]).forEach((a) => typeof a === 'string' && created.add(a));
-  });
-  if (reason) return { ok: false, reason };
-  const known = new Set([...table.columns, ...created]);
-  if ([...fields].some((f) => !known.has(f))) return { ok: false, reason: 'unknown_field' };
-
-  const full = { ...spec, data: { values: rowObjects(table) }, ...CHART_SIZE, autosize: { type: 'fit', contains: 'padding' } };
-  if (!vegaLiteValidator()(full)) return { ok: false, reason: 'schema' };
-  return { ok: true, spec: full };
-}
-
-/**
- * Code picks the chart when there is no model (Local only, no key): a line over dates, else
- * bars per category; several numeric columns fold into series. Null when nothing is numeric.
- */
-export function rulesSpec(table: ParsedTable, types: FieldType[]): Record<string, unknown> | null {
-  const xi = types.findIndex((t) => t !== 'quantitative');
-  const measures = table.columns.filter((_, i) => types[i] === 'quantitative' && i !== xi);
+export function specFromChoice(c: ChartChoice, table: ParsedTable, types: FieldType[]): Record<string, unknown> | null {
+  const typeOf = (f: string): FieldType => types[table.columns.indexOf(f)] ?? 'nominal';
+  if (c.chart === 'none' || !table.columns.includes(c.x)) return null;
+  let measures = [...new Set(c.measures)].filter((m) => m !== c.x && table.columns.includes(m) && typeOf(m) === 'quantitative');
   if (measures.length === 0) return null;
-  if (xi < 0) {
-    // Only numbers: the first two columns as a scatter.
-    if (measures.length < 2) return null;
-    return {
-      mark: { type: 'point', tooltip: true },
-      encoding: { x: { field: measures[0], type: 'quantitative' }, y: { field: measures[1], type: 'quantitative' } },
-      data: { values: rowObjects(table) },
-      ...CHART_SIZE,
-    };
-  }
-  const x = table.columns[xi]!;
-  const xType = types[xi]!;
-  const line = xType === 'temporal' || (xType === 'ordinal' && table.rows.length > 6);
+  let kind = c.chart;
+  if (kind === 'point' && typeOf(c.x) !== 'quantitative') kind = 'bar';
+  if (kind === 'point') measures = measures.slice(0, 1);
   const several = measures.length > 1;
-  const encoding: Record<string, unknown> = {
-    x: { field: x, type: xType, sort: null, ...(line ? {} : { axis: { labelAngle: 0 } }) },
-    y: { field: several ? 'value' : measures[0], type: 'quantitative', ...(several ? { title: null } : {}) },
-  };
-  if (several) {
-    encoding.color = { field: 'series', type: 'nominal', sort: measures };
-    if (!line) encoding.xOffset = { field: 'series', sort: measures };
+  const split =
+    !several && c.split_by && c.split_by !== c.x && !measures.includes(c.split_by) && table.columns.includes(c.split_by) && typeOf(c.split_by) !== 'quantitative'
+      ? c.split_by
+      : null;
+  const series = several ? 'series' : split;
+  const horizontal = kind === 'horizontal_bar';
+  const mark = horizontal ? 'bar' : kind;
+
+  let encoding: Record<string, unknown>;
+  if (kind === 'point') {
+    encoding = { x: { field: c.x, type: 'quantitative' }, y: { field: measures[0], type: 'quantitative' } };
+  } else {
+    const valueAxis = horizontal ? 'x' : 'y';
+    const sort = mark !== 'bar' || c.sort === 'data' ? null : c.sort === 'ascending' ? valueAxis : '-' + valueAxis;
+    const cat = { field: c.x, type: typeOf(c.x), sort, ...(mark === 'bar' && !horizontal && { axis: { labelAngle: 0 } }) };
+    const value = { field: several ? 'value' : measures[0], type: 'quantitative', ...(several && { title: null }) };
+    encoding = horizontal ? { y: cat, x: value } : { x: cat, y: value };
+  }
+  if (series) {
+    encoding.color = { field: series, type: 'nominal', ...(several && { sort: measures }) };
+    if (mark === 'bar') encoding[horizontal ? 'yOffset' : 'xOffset'] = { field: series, ...(several && { sort: measures }) };
   }
   return {
     ...(several && { transform: [{ fold: measures, as: ['series', 'value'] }] }),
-    mark: { type: line ? 'line' : 'bar', tooltip: true, ...(line && { point: true }) },
+    mark: { type: mark, tooltip: true, ...(mark === 'line' && { point: true }) },
     encoding,
     data: { values: rowObjects(table) },
     ...CHART_SIZE,
+    autosize: { type: 'fit', contains: 'padding' },
   };
+}
+
+/**
+ * Code's own pick when there is no model (Local only, no key): a line over dates or many
+ * ordered values, else bars per category; with only numbers, a scatter of the first two.
+ * Null when nothing is numeric.
+ */
+export function rulesChoice(table: ParsedTable, types: FieldType[]): ChartChoice | null {
+  const xi = types.findIndex((t) => t !== 'quantitative');
+  const measures = table.columns.filter((_, i) => types[i] === 'quantitative' && i !== xi);
+  if (measures.length === 0) return null;
+  if (xi < 0) return measures.length < 2 ? null : { chart: 'point', x: measures[0]!, measures: [measures[1]!], split_by: '', sort: 'data' };
+  const xType = types[xi]!;
+  const line = xType === 'temporal' || (xType === 'ordinal' && table.rows.length > 6);
+  return { chart: line ? 'line' : 'bar', x: table.columns[xi]!, measures, split_by: '', sort: 'data' };
+}
+
+export function rulesSpec(table: ParsedTable, types: FieldType[]): Record<string, unknown> | null {
+  const choice = rulesChoice(table, types);
+  return choice ? specFromChoice(choice, table, types) : null;
 }
 
 export function buildChartPrompt(table: ParsedTable, types: FieldType[]): string {
@@ -179,16 +190,18 @@ export async function visualize(deps: VisualizeDeps, text: string, signal?: Abor
 
   let note: string | null = null;
   let rejected: string | undefined;
+  const measures = table.columns.filter((_, i) => types[i] === 'quantitative');
+  if (measures.length === 0) return { ok: true, table, types, spec: null, chartBy: null, note: 'No numbers to chart, so here is the table.', csv };
   try {
-    const out = await deps.llm.structured(
-      { role: 'fast', action: 'visualize_chart', instructions: chartPrompt, prompt: buildChartPrompt(table, types), signal, temperature: 0, maxOutputTokens: 1200 },
-      VisualizeChartSchema,
+    const choice = await deps.llm.structured(
+      { role: 'fast', action: 'visualize_chart', instructions: chartPrompt, prompt: buildChartPrompt(table, types), signal, temperature: 0, maxOutputTokens: 400 },
+      chartChoiceSchema(table.columns, measures),
     );
-    if (out.spec_json.trim()) {
-      const prepared = prepareSpec(out.spec_json, table);
-      if (prepared.ok) return { ok: true, table, types, spec: prepared.spec, chartBy: 'model', note: null, csv };
+    const spec = specFromChoice(choice, table, types);
+    if (spec && isValidSpec(spec)) return { ok: true, table, types, spec, chartBy: 'model', note: null, csv };
+    if (spec) {
       note = "The model's chart didn't check out";
-      rejected = prepared.reason;
+      rejected = 'schema';
     } else note = 'The model found no chart that fits';
   } catch (e) {
     if (signal?.aborted) return failure(e, signal);

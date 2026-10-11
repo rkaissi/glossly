@@ -1,7 +1,7 @@
 import routerPrompt from '../../prompts/router-decision.md?raw';
 import type { LlmProvider } from '../llm/types';
 import { ruleCollection } from './rules';
-import { DecisionsSchema, type DecisionInput, type DecisionProvider, type Decisions } from './types';
+import { decisionCallSchema, type DecisionInput, type DecisionProvider, type Decisions } from './types';
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
 
@@ -41,7 +41,7 @@ export class LlmStructuredDecision implements DecisionProvider {
         temperature: 0,
         maxOutputTokens: 200,
       },
-      DecisionsSchema,
+      decisionCallSchema(input.collections),
     );
     const known = input.collections.find((c) => c.toLowerCase() === out.best_collection.trim().toLowerCase());
     return {

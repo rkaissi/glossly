@@ -586,6 +586,16 @@ Rayan's requests after the 16.8 commit. 420 unit tests pass; `pnpm typecheck` is
 - **The empty bar**: "Paste recent" is now "Paste snippets". While the user is writing (caret surroundings, something saved, a model), "Write it for here" takes slot 4 ahead of the list (`EmptyContext.writing`), even when nothing was saved in the last week. The panel says "Snippets that fit this email · 3", "Your recent snippets · 5", or "Written for this document · 2 of 5". Metrics: `paste_composed` gains `target`, `reason`, `offered`, `format`.
 - **Live check**: in a Gmail reply about a topic you saved a snippet on weeks ago, hotkey with nothing selected: slot 4 is Write it for here, and it writes sentences from only that snippet; in Google Docs under a bulleted list it writes bullets; in Slack, Paste snippets gives plain lines.
 
+### Step 16.13: prompts and structured outputs (Oct 10, night)
+
+Rayan asked for a prompt-engineering pass, structured output where it helps, and zod enums where options are fixed. 427 unit tests pass; `pnpm typecheck` is clean. Not run live, and no eval was run (Step 18 covers the router prompt).
+
+- **Visualize no longer asks for Vega-Lite as a JSON string.** The model returns a chart pick (`chartChoiceSchema`): `chart` from `CHART_KINDS` (bar, horizontal_bar, line, area, point, none), `x` and `split_by` as enums of this table's columns, `measures` as an enum of its numeric columns, and `sort` (data, ascending, descending). Code writes the spec (`specFromChoice`: folds several measures into series, grouped bars with an offset, ranked or horizontal bars, a line with points; drops what it can't plot) and it still has to pass the Vega-Lite JSON schema (`isValidSpec`). The rules chart is the same code with code's own pick (`rulesChoice`). `prepareSpec` and its forbidden-key walk are gone: nothing the model writes reaches the spec except enum values. `prompts/visualize-chart.md` rewritten for the pick; the call's output cap went from 1200 to 400 tokens.
+- **Router**: the model's schema is `decisionCallSchema(collections)`, with `best_collection` as an enum of the user's collections and no `provider` field (code sets it). A collection outside the list now fails the call (the router then falls back to rules, as for any failed call) instead of being swapped for the rules' pick; strict-schema models can't produce one. The prompt line for the collection says to pick by what the text is, not the app. Re-evaluate in Step 18.
+- **Field descriptions** (`.describe`, which reach the JSON schema the model sees) on Who, What did I promise, and entity extraction. Promise confidence is no longer bounded in the schema (like Who, a row scored 85 failed the whole call); it is read as 0.85 and clamped.
+- **Prompts rewritten**: `extract-entities.md` (fullest form once, no roles, dates, amounts, addresses, or the user) and `visualize-table.md` (label column first, prose figures become rows, no computed totals). With 16.9 to 16.12: `reply.md`, `style-notes.md`, `ask.md`, and `paste-compose.md` are new or rewritten. `who.md` and `extract-commitments.md` were already in good shape and kept.
+- **Still streamed as text**: Ask (an answer) and Reply (three drafts with checked tags; Groq doesn't stream strict structured output).
+
 ## Next steps, in order
 
 1. ~~Finish core~~ (done, see Step 3 above).

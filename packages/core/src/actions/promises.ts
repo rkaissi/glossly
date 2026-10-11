@@ -18,11 +18,12 @@ import { contextWindow } from './context';
 export const ExtractedCommitmentsSchema = z.object({
   commitments: z.array(
     z.object({
-      owner: z.enum(['me', 'them']),
-      person_name: z.string(),
-      text: z.string(),
-      due_phrase: z.string(),
-      confidence: z.number().min(0).max(1),
+      owner: z.enum(['me', 'them']).describe('me: the user has to do it. them: someone else has to.'),
+      person_name: z.string().describe('The other person, as written, or "". Never the user.'),
+      text: z.string().describe('The task, 3 to 12 words, starting with a verb, without the name or deadline.'),
+      due_phrase: z.string().describe('The deadline exactly as written, or "".'),
+      // Not bounded here, like Who: one row scored 85 would fail the whole call. Read as 0.85.
+      confidence: z.number().describe('0 to 1.'),
     }),
   ),
 });
@@ -88,14 +89,16 @@ export function toPromiseRows(out: ExtractedCommitments, people: PeopleRepo, sou
         if (p) match = { personId: p.id, name: p.name, kind: r.kind };
       }
     }
+    // A score out of 100 reads as a share; anything else is clamped to 0 to 1.
+    const confidence = Math.min(1, Math.max(0, c.confidence > 1 ? c.confidence / 100 : c.confidence));
     rows.push({
       key: `c${i}`,
       owner: c.owner,
       text: text.slice(0, 300),
       due_phrase,
       due_at: resolveDue(due_phrase, now),
-      confidence: c.confidence,
-      selected: c.confidence >= SELECT_CONFIDENCE,
+      confidence,
+      selected: confidence >= SELECT_CONFIDENCE,
       person_name: name,
       match,
     });
