@@ -34,7 +34,7 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; **next is Step 20, polish and UI upgrade**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish and the design pass, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; **next is Step 20, the design pass: 20.1 the design system and our own controls, then 20.2 the Tasks and Calendar tabs, then 20.3 the rest**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
 **Step 19: tasks and calendar, in the app first** (decision 36). What did I promise becomes **Tasks**: one action and one list for promises, requests, and personal todos. Internally the action id stays `promises` and the table stays `commitments` (metrics history and migrations keep working).
 
@@ -52,12 +52,26 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 *19.3 Google Calendar sync: parked (Rayan, Oct 11; see Parked below).*
 
 
-**Step 20: polish and UI upgrade.** Keep it quiet and native to Windows 11; no illustration pass, no second theme.
-- **Destructive buttons are filled red** (solid red background, white text), not red outlines, in both windows: Delete person, Delete all data, Reset settings, Merge, Remove key, alias, or sample, Delete saved item. The inline confirm stays.
+**Step 20: design pass and UI upgrade** (Rayan, Oct 11: "be a designer"). Modern, sleek, minimal, and glossy, native to Windows 11; no illustration pass, no second theme. **Design first, then implement:** each sub-step starts with a mockup (an HTML page in the scratchpad built from `theme.css`, opened in the built-in browser), then the code. Check the real windows with a Sonnet subagent and screenshots, but sparingly (AGENTS.md); screenshots only on fictional sample data (a throwaway profile), never Rayan's.
+
+*20.1 Design system and our own controls.*
+- **Spacing and sizing scale** in `theme.css`: a 4 px grid (4, 8, 12, 16, 24, 32), fixed control heights (28 compact, 32 default, 36 large), icon sizes (14 in rows and chips, 16 in buttons and nav), one radius scale, and row padding used the same way in every list. Today icon buttons and the red trash buttons are too big, rows are cramped, and margins differ from tab to tab.
+- **Replace every native Windows control** with our own glossy ones (built in-house, no shadcn unless ours can't look right; no new dependency without asking): a **Select** (button plus a floating menu with check marks, keyboard and type-ahead), a **Date picker** (a small month calendar in a popover, with Today, Tomorrow, Next week, and No date shortcuts), a **Date range picker** (two months, quick ranges such as This week, Next 7 days, This month), a **Time picker** (typed or picked in 15-minute steps), a **Segmented control**, a **Checkbox** and round task check, a **Switch**, and a **Menu** for row actions. One `Popover` primitive under all of them (positioning inside the window, Esc and click-outside to close, focus return). They replace every `<select>`, `<input type="date">` and `type="time"`, and checkbox in both windows (overlay panels included: Tasks and events, Reply, Save, Who, Models, General, Keys, People).
+- **Buttons:** primary, secondary, ghost, and icon sizes from the scale; **destructive buttons are filled red** (solid red, white text): Delete person, Delete all data, Reset settings, Merge, Remove key, alias, or sample, Delete saved item, Delete task, Delete event. The inline confirm stays. A row's delete moves into its hover actions or a "…" menu instead of a big red button on every row.
+- Inputs inside list rows look like text until hovered or focused (no permanent boxes around every task title).
+
+*20.2 Tasks and Calendar, redone as two tabs* (replacing Agenda; inspiration: Google Tasks, Google Calendar, Apple Reminders, Things, Todoist, Linear, Notion Calendar, Fantastical; look at their current versions first).
+- **Tasks tab:** a quick-add row (text, then a due chip with the date picker, Enter adds); sections Overdue, Today, Upcoming (by day), No date, and a collapsible Completed; filter chips (All, You owe, They owe, Todos) and a person filter (the custom Select); each row is the round check, the title (edits in place), the person as a quiet link, and a due chip, with hover actions (change date, open person, delete). Compact, even spacing; no boxes around every field.
+- **Calendar tab:** a real calendar view with **Month, Week, and Agenda (list)** modes, Today and previous/next buttons, and a **date range** for the Agenda list (the range picker). Events as colored blocks in Week (by time) and chips in Month; tasks with a due date shown on their day (as small checkable items, toggleable). Clicking an empty slot or day adds an event there (title, day, start and end with the time picker, place); clicking an event opens a small editor popover (title, day, times, all day, place, people, delete).
+- The overlay's Tasks and events panel uses the same row and chip styles and the new pickers.
+- If one tab works better after trying both, say so to Rayan before merging them back.
+
+*20.3 Everything else, through the same design pass.*
+- **Spacing and size audit of every tab and panel** (Profile, People, Saved, Keys, Models, General, Data, Metrics, and every overlay panel): consistent margins, smaller icons and icon buttons, more room between groups.
 - **Keyboard hints setting.** General gets "Show keyboard shortcuts": **Always**, **On hotkey** (today's behavior, the default), **Never**. Today the hint replaces the button's icon; instead keep the icon on the left of the label and put the key chip on the right (`overlay/main.tsx`, `overlay.css`, `keys.ts`). The keyboard map itself stays live whenever the bar has focus, whatever the setting. Mind the bar width (`MAX_W`, the 172 px slot cap) and the Step 13 rule that nothing moves when hints appear.
-- **Setup redesign.** Take cues from the onboarding in Raycast, Arc, and the ChatGPT and Claude desktop apps: one focused screen per step with a large heading and one short line, a clear primary button, progress dots, a live "try it" moment, and nothing on screen that the step doesn't need. Keep the steps' content (Welcome, You, Keys, Models, Try it), the privacy choice from Step 18, and the embedding download notice. Look at the current versions of those onboardings before designing.
+- **Setup redesign.** Take cues from the onboarding in Raycast, Arc, and the ChatGPT and Claude desktop apps: one focused screen per step with a large heading and one short line, a clear primary button, progress dots, a live "try it" moment, and nothing on screen that the step doesn't need. Keep the steps' content (Welcome, You, Keys, Models, Try it), the privacy choice and local model card from Step 18, and the embedding download notice. Look at the current versions of those onboardings before designing.
 - **App icon** for the window, tray, taskbar, and installer, built from the C1 mark (`docs/brand/`); replaces the code-drawn tray icon (`tray.ts`) and Electron's default window icon.
-- Motion on the bar and panels (the current fades are the floor) and one accent color on the glass (lifts the "no accent" part of decision 13).
+- Motion on the bar, panels, popovers, and tab changes (the current fades are the floor) and one accent color on the glass (lifts the "no accent" part of decision 13); the calendar's event colors come from the same palette.
 - **The small fixes:**
   - The dot sits 4 DIP right of the mouse-up point and can cover the next letter (`placement.ts`, `anchorX + 4`); a real fix needs the last line's rect from the helper.
   - Long Save labels truncate at the 172 px slot cap ("Save to People not…").
@@ -67,7 +81,6 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
   - Panels can extend past the source window onto whatever is below.
   - Notepad's taskbar button flashes after the tier-2 hand-off (a Windows refusal in `Focus.cs`; harmless, fix if cheap).
   - Items saved under Local only with no local model never get entities (decisions 12 and 34); offer a backfill when switching to All models or adding a local model, if it's cheap.
-  - The setup redesign should keep Step 18's privacy choice and local model card in the models step.
 
 **Step 21: testing and evals, all in one step.** Run when Rayan is away from the machine, through a subagent (AGENTS.md).
 - The whole live-check backlog in `docs/testing.md`, including everything Steps 18 to 20 added. Fix what it finds.
