@@ -68,35 +68,60 @@ export interface AppIdentity {
   title: string;
 }
 
-/** Title-suffix keys start with a dash ("- Google Docs") or a bar ("| Medium"). */
-const isTitleKey = (k: string) => /^[-—–|]/.test(k);
+/**
+ * Title keys: a suffix starting with a dash ("- Google Docs") or a bar ("| Medium"), or a
+ * prefix ending with a bar, for sites that put their name first ("Discord |").
+ */
+export const isTitleKey = (k: string) => /^[-—–|]/.test(k) || /\s\|$/.test(k);
+
+/** An unread count or dot a site puts in front of its title: "(214) Discord | ...", "• Slack". */
+const UNREAD_PREFIX = /^(?:\(\d+\+?\)|\[\d+\+?\]|[•●*])\s*/;
 
 /**
- * True if a key matches the app: process names match case-insensitively; keys starting with
- * "-", "—", or "|" are title suffixes, matched after stripping the browser's own suffix.
+ * True if a key matches the app: process names match case-insensitively; title keys match the
+ * title after stripping the browser's own suffix (and, for a prefix key, an unread count).
  */
 export function keyMatches(key: string, app: AppIdentity): boolean {
   const k = key.trim();
   if (!k) return false;
   if (isTitleKey(k)) {
     const title = stripBrowserSuffix(app.title).toLowerCase();
-    return title.endsWith(k.toLowerCase());
+    if (/^[-—–|]/.test(k)) return title.endsWith(k.toLowerCase());
+    const site = k.slice(0, -1).trim().toLowerCase();
+    const rest = title.replace(UNREAD_PREFIX, '');
+    return rest === site || rest.startsWith(`${site} |`);
   }
   return app.process_name.toLowerCase() === k.toLowerCase();
+}
+
+/** Sites that put their own name first in a bar-split title ("Discord | Tom, Nabil"). */
+const NAME_FIRST_SITES = /^(?:discord|whatsapp|messenger|instagram|telegram|signal|linkedin|facebook|reddit|x|twitter|threads|bluesky|teams)$/i;
+
+/** A part of a title that reads like a site's name: short, no commas, @, or #. */
+const brandLike = (p: string) => p.length <= 24 && !/[,#@/:]/.test(p) && p.split(/\s+/).length <= 3;
+
+/** The site's name in a bar-split title: first for sites that lead with it, else the last part, unless only the first looks like a name. */
+function barSiteKey(parts: string[]): string {
+  const first = parts[0]!;
+  const last = parts[parts.length - 1]!;
+  if (NAME_FIRST_SITES.test(first)) return `${first} |`;
+  if (NAME_FIRST_SITES.test(last) || brandLike(last)) return `| ${last}`;
+  if (brandLike(first)) return `${first} |`;
+  return `| ${last}`;
 }
 
 const BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe', 'arc.exe'];
 
 export const isBrowser = (app: Pick<AppIdentity, 'process_name'>) => BROWSERS.includes(app.process_name.toLowerCase());
 
-/** The key "Don't show here" would store for this app: the site suffix for browsers, else the process name. */
+/** The key "Don't show here" would store for this app: the site's part of the title for browsers, else the process name. */
 export function siteKeyFor(app: AppIdentity): string {
   if (isBrowser(app)) {
     const title = stripBrowserSuffix(app.title);
     const parts = title.split(/\s+[-—–]\s+/);
     if (parts.length > 1) return `- ${parts[parts.length - 1]}`;
-    const barParts = title.split(/\s+\|\s+/);
-    if (barParts.length > 1) return `| ${barParts[barParts.length - 1]}`;
+    const barParts = title.replace(UNREAD_PREFIX, '').split(/\s+\|\s+/);
+    if (barParts.length > 1) return barSiteKey(barParts);
   }
   return app.process_name.toLowerCase();
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ClipboardCheck, Copy, CornerDownLeft, Info, PenLine, Pencil, RotateCcw, UserRoundPlus } from 'lucide-react';
 import type { AskErrorEvent, OverlayState, Relationship, ReplyRedo, ReplyRedoAsk, ReplyStart } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { appName } from '../dates';
+import { siteLabel } from '../dates';
 import { RELATIONSHIP_OPTIONS } from '../people/relationship';
 import { parseDrafts } from './drafts';
 
@@ -221,7 +221,7 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
   };
 
   const to = start?.to;
-  const appLabel = s.siteKey ? (s.siteKey.endsWith('.exe') ? appName(s.siteKey) : s.siteKey.replace(/^[-|]\s*/, '')) : 'the app';
+  const appLabel = s.siteKey ? siteLabel(s.siteKey) : 'the app';
   const heading = to?.authorIsMe ? 'Follow up on your message' : to?.name ? `Reply to ${to.name}` : 'Reply';
   const known = Boolean(to?.personId || personId);
 

@@ -216,16 +216,18 @@ export class Lru<K, V> {
 const REPLY_KEY_BEFORE = 200;
 
 /**
- * Reply's cache key for one highlight: the site or app, the text just before the selection
- * (the speaker header and the messages above, which tell two conversations apart when the same
- * short message appears in both), and the selected text, hashed. The window title is left out,
- * since it changes with unread counts ("(3) #design | Acme - Slack"). Digits are dropped from
- * the text before, so timestamps that move ("2m ago", "9:41 AM") don't change the key.
+ * Reply's cache key for one highlight, hashed: the site or app, who wrote the message (their
+ * email, handle, or name as detected, or "me"), and the selected text. The author is what tells
+ * the same short "sounds good?" in two conversations apart, and unlike the page around the
+ * message it survives a reload (unread dividers, "NEW" markers, and lazily loaded messages
+ * change that). With no author found, the text just before the selection stands in for it, with
+ * digits dropped so moving timestamps ("2m ago", "9:41 AM") don't change the key. The window
+ * title is left out: unread counts change it ("(3) #design | Acme - Slack").
  */
-export function replyCacheKey(input: { place: string; before: string; text: string }): string {
+export function replyCacheKey(input: { place: string; author: string | null; before: string; text: string }): string {
   const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
-  const before = norm(input.before.slice(-REPLY_KEY_BEFORE).replace(/\d+/g, ''));
-  return createHash('sha256').update([input.place.toLowerCase(), before, norm(input.text)].join('\u0000')).digest('hex');
+  const who = input.author ? `by:${norm(input.author).toLowerCase()}` : `after:${norm(input.before.slice(-REPLY_KEY_BEFORE).replace(/\d+/g, ''))}`;
+  return createHash('sha256').update([input.place.toLowerCase(), who, norm(input.text)].join('\u0000')).digest('hex');
 }
 
 /** An Lru whose entries also expire, for model answers that go stale (Reply's drafts). */

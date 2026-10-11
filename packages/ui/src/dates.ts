@@ -55,5 +55,11 @@ export function appName(processName: string | null): string {
   return base ? base[0]!.toUpperCase() + base.slice(1) : '';
 }
 
+/** A site or app key as a name: "slack.exe" as "Slack", "- Google Docs" as "Google Docs", "Discord |" as "Discord". */
+export function siteLabel(key: string): string {
+  if (/\.exe$/i.test(key)) return appName(key);
+  return key.replace(/^[-—–|]\s*/, '').replace(/\s*\|$/, '');
+}
+
 /** The first word of a name, for "Is this the same Sam?". */
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;

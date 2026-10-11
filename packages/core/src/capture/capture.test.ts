@@ -32,6 +32,21 @@ describe('app matching', () => {
     expect(keyMatches('| Medium', medium)).toBe(true);
   });
 
+  it('keeps the site name when it comes first, past an unread count', () => {
+    const dm = { process_name: 'chrome.exe', title: '(214) Discord | Ted Marsh, Noah Ellis - Google Chrome' };
+    const server = { process_name: 'chrome.exe', title: 'Discord | #general | Acme Server - Google Chrome' };
+    expect(siteKeyFor(dm)).toBe('Discord |');
+    expect(siteKeyFor(server)).toBe('Discord |');
+    expect(keyMatches('Discord |', dm)).toBe(true);
+    expect(keyMatches('Discord |', server)).toBe(true);
+    expect(keyMatches('Discord |', { process_name: 'chrome.exe', title: 'Discord tips | Medium - Google Chrome' })).toBe(false);
+    // A name-like last part still wins for sites that put it last.
+    expect(siteKeyFor({ process_name: 'chrome.exe', title: 'How to ship faster | The Verge - Google Chrome' })).toBe('| The Verge');
+    // Only the first part reads like a name.
+    expect(siteKeyFor({ process_name: 'chrome.exe', title: 'Acme | Q3 planning, notes and actions - Google Chrome' })).toBe('Acme |');
+    expect(resolveAppMode(dm, { ...s, appModes: { 'Discord |': 'off' } }).mode).toBe('off');
+  });
+
   it('blocks password managers and lets user modes win over defaults', () => {
     expect(resolveAppMode({ process_name: '1Password.exe', title: '1Password' }, s)).toMatchObject({ blocked: true, mode: 'off' });
     expect(resolveAppMode({ process_name: 'chrome.exe', title: 'Vault - Bitwarden - Google Chrome' }, s).blocked).toBe(true);

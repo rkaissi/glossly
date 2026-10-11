@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { Check, EyeOff, History, Info, Settings, Undo2, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { siteLabel } from '../dates';
 import { ActionIcon, GlosslyMark } from '../icons';
 import '../theme.css';
 import './overlay.css';
@@ -294,7 +295,7 @@ function Expanded({ s }: { s: OverlayState }) {
               onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
             >
               <EyeOff size={16} strokeWidth={1.75} aria-hidden />
-              <span>Don't show here ({s.siteKey})</span>
+              <span>Don't show here ({siteLabel(s.siteKey)})</span>
             </button>
           )}
           <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('settings:open', {})}>

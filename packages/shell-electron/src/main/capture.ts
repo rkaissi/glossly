@@ -1064,7 +1064,13 @@ export class Capture {
       setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
       return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
     }
-    const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, before: s.selection.context_before, text: s.selection.text });
+    const container = (await s.container) ?? null;
+    const people = this.services.people;
+    const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
+    const a = det.author;
+    // Who wrote it identifies the conversation and survives a page reload; the text before it is the fallback.
+    const author = det.authorIsMe ? 'me' : (a?.email ?? (a?.handle ? `@${a.handle}` : null) ?? a?.name ?? null);
+    const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, author, before: s.selection.context_before, text: s.selection.text });
     // The panel was closed and opened again while the drafts were still being written: carry on
     // with that run. The text so far comes back with this answer; the rest streams under the same id.
     const running = s.reply;
@@ -1077,13 +1083,9 @@ export class Capture {
     const state: NonNullable<Session['reply']> = { requestId, ctl, personId: null, done: false, used: false, learned: false, key, raw: '', start: null };
     s.reply = state;
 
-    const container = (await s.container) ?? null;
-    const people = this.services.people;
-    const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
     const match = det.author ? resolvePerson(people, det.author, s.selection.source_app) : null;
     const person = match?.kind === 'exact' ? people.card(match.personId) : null;
     state.personId = person?.id ?? null;
-    const a = det.author;
     const to: ReplyTo = {
       name: person?.name ?? a?.name ?? a?.email ?? (a?.handle ? `@${a.handle}` : null),
       personId: state.personId,
@@ -1132,6 +1134,8 @@ export class Capture {
       return start;
     }
 
+    // No text: whether the key came from the author or the text before, so a miss can be traced.
+    log.info('reply drafts', { cached: false, redo: Boolean(redo), keyed_by: author ? 'author' : 'before' });
     void (async () => {
       const t = performance.now();
       let firstMs: number | null = null;

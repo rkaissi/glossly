@@ -1,5 +1,5 @@
 import type { Settings } from '../settings';
-import { isBrowser, keyMatches, siteKeyFor, type AppIdentity } from './apps';
+import { isBrowser, isTitleKey, keyMatches, siteKeyFor, type AppIdentity } from './apps';
 import type { ClassifiedObstacle } from './obstacles';
 
 /**
@@ -50,7 +50,7 @@ export function pillWait(app: AppIdentity, s: Pick<Settings, 'capture' | 'toolba
  */
 export function learnKeyFor(app: AppIdentity): string | null {
   const key = siteKeyFor(app);
-  return isBrowser(app) && !/^[-|]/.test(key) ? null : key;
+  return isBrowser(app) && !isTitleKey(key) ? null : key;
 }
 
 /**
