@@ -1184,7 +1184,7 @@ export class Capture {
       if (s.reply) s.reply.used = true;
       if (pick) this.learnFromReply(s, draft, pid, pick);
       if (pid) people.addInteraction({ person_id: pid, direction: 'outbound', text: draft, source_app: sourceApp });
-      this.services.metrics.record('reply_inserted', { how, edited, person: Boolean(pid), ms: ms(s.t0) });
+      this.services.metrics.record('reply_inserted', { how, edited, own: pick?.chosen === WROTE_OWN, person: Boolean(pid), ms: ms(s.t0) });
     };
     // The selected message is usually read-only, so the reply goes into the page's reply box.
     return this.insertText(s, draft, 'reply', record, { findField: true });

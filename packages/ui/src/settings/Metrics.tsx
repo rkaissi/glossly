@@ -4,7 +4,19 @@ import { glossly } from '../bridge';
 import { pct } from './format';
 import { useAction } from './useAction';
 
-const ACTION_NAMES: Record<string, string> = { ask: 'Ask', save: 'Save', reply: 'Reply', who: 'Who is this', promises: 'What did I promise', visualize: 'Visualize' };
+const ACTION_NAMES: Record<string, string> = {
+  ask: 'Ask',
+  save: 'Save',
+  reply: 'Reply',
+  who: 'Who is this',
+  promises: 'What did I promise',
+  visualize: 'Visualize',
+  search: 'Search',
+  recall: 'Related',
+  paste_list: 'Paste snippets',
+  paste_summary: 'Write it for here',
+};
+const SAVE_VIA: Record<string, string> = { panel: 'Save panel', hotkey: 'Save hotkey', autosave: 'Autosave', ask: 'Ask', visualize: 'Visualize' };
 const RANGES = [7, 30, 90];
 
 export function MetricsTab() {
@@ -75,6 +87,9 @@ export function MetricsTab() {
           )}
           <p className="muted small">Click rate is clicks divided by triggers (hotkey presses plus pills shown).</p>
 
+          <h3>Features</h3>
+          <Features m={m} />
+
           <h3>By day</h3>
           {activeDays.length === 0 ? (
             <p className="muted">No activity in this range.</p>
@@ -113,6 +128,38 @@ export function MetricsTab() {
         </>
       )}
     </section>
+  );
+}
+
+/** How the Phase 2 and 3 features were used: saves, Recall, Reply's outcomes, paste, promises, and model errors. */
+function Features({ m }: { m: MetricsSummary }) {
+  const f = m.features;
+  const saves = Object.entries(f.saves).sort(([, a], [, b]) => b - a);
+  const savedTotal = saves.reduce((n, [, c]) => n + c, 0);
+  const unedited = f.reply.inserted - f.reply.edited;
+  const rows: [string, string | number][] = [
+    ['Saved', savedTotal ? `${savedTotal} (${saves.map(([via, n]) => `${SAVE_VIA[via] ?? via} ${n}`).join(', ')})` : 0],
+    ['Undone right after saving', f.undone],
+    ['Related badge shown / opened / "Not related"', `${f.recall.shown} / ${f.recall.opened} / ${f.recall.dismissed}`],
+    ['Reply draft sets written', f.reply.drafts],
+    ['Reply inserted unedited / edited / own', `${unedited} / ${f.reply.edited - f.reply.own} / ${f.reply.own}`],
+    ['Reply copied / discarded / "None of these"', `${f.reply.copied} / ${f.reply.discarded} / ${f.reply.redo}`],
+    ['Paste composed / pasted', `${f.paste.composed} / ${f.paste.inserted}`],
+    ['Search results typed in', f.search.inserted],
+    ['Promises looked for / saved', `${f.promises.extracted} / ${f.promises.saved}`],
+    ['Model calls that failed / switched to a fallback', `${f.errors} / ${f.fallbacks}`],
+  ];
+  return (
+    <table>
+      <tbody>
+        {rows.map(([label, value]) => (
+          <tr key={label}>
+            <td>{label}</td>
+            <td className="num">{value}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

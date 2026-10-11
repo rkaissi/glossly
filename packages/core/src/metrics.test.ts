@@ -62,4 +62,37 @@ describe('Metrics', () => {
     expect(s.actions.ask).toEqual({ clicks: 3, click_rate: 1, median_ms: 600 });
     expect(s.actions.save).toEqual({ clicks: 1, click_rate: 1 / 3, median_ms: 500 });
   });
+
+  it('counts saves, Recall, Reply outcomes, paste, promises, and model errors', () => {
+    store = new Store(':memory:');
+    const now = new Date(2026, 9, 9, 12);
+    const m = new Metrics(store, () => now);
+    m.record('save_done', { via: 'panel' });
+    m.record('save_done', { via: 'autosave' });
+    m.record('save_done', { via: 'autosave' });
+    m.record('save_undone');
+    m.record('recall_shown', { count: 2 });
+    m.record('recall_opened', { count: 2 });
+    m.record('recall_dismissed', { reason: 'same_person' });
+    m.record('reply_drafts', { total_ms: 900 });
+    m.record('reply_drafts', { total_ms: 800 });
+    m.record('reply_drafts', { total_ms: 700 });
+    m.record('reply_inserted', { how: 'inserted', edited: false });
+    m.record('reply_inserted', { how: 'inserted', edited: true, own: true });
+    m.record('reply_discarded');
+    m.record('reply_redo', { asks: 'shorter' });
+    m.record('paste_composed', { kind: 'summary' });
+    m.record('paste_inserted', { kind: 'summary' });
+    m.record('ask_error', { code: 'provider' });
+    m.record('reply_error', { code: 'aborted' });
+    m.record('llm_fallback');
+    const f = m.summary(1).features;
+    expect(f.saves).toEqual({ panel: 1, autosave: 2 });
+    expect(f.undone).toBe(1);
+    expect(f.recall).toEqual({ shown: 1, opened: 1, dismissed: 1 });
+    expect(f.reply).toEqual({ drafts: 3, inserted: 2, edited: 1, own: 1, copied: 0, discarded: 1, redo: 1 });
+    expect(f.paste).toEqual({ composed: 1, inserted: 1 });
+    expect(f.errors).toBe(1);
+    expect(f.fallbacks).toBe(1);
+  });
 });
