@@ -25,7 +25,7 @@ export interface EmptyContext {
   editable: boolean | null;
   /** Saved items recent enough to paste. */
   recent: number;
-  /** A model is available for the summary (a key, and Local only off). */
+  /** A model is available for the summary (a key, or a local model under Local only). */
   summaryModel: boolean;
   /** The caret is in a field with text around it and something is saved, so older snippets may fit too. */
   writing?: boolean;

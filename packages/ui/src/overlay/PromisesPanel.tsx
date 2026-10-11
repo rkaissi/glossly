@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ExternalLink, Info, RotateCcw } from 'lucide-react';
-import type { OverlayState, PromiseRow, PromiseSaveRow, PromisesResult } from '@glossly/core/api';
+import type { OverlayState, PromiseRow, PromiseSaveRow, PromisesByRules, PromisesResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { formatDue } from '../dates';
 import { PersonFields } from '../people/PersonForm';
@@ -138,7 +138,7 @@ function Row({
 export function PromisesPanel({ s }: { s: OverlayState }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [rows, setRows] = useState<Draft[]>([]);
-  const [meta, setMeta] = useState<{ author: string | null; authorIsMe: boolean; identitySet: boolean } | null>(null);
+  const [meta, setMeta] = useState<{ author: string | null; authorIsMe: boolean; identitySet: boolean; byRules: PromisesByRules } | null>(null);
   const [hl, setHl] = useState(0);
   const [people, setPeople] = useState<Record<string, PersonDraft>>({});
   const panel = useRef<HTMLDivElement>(null);
@@ -153,7 +153,7 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
       return;
     }
     setRows(r.rows.map((row) => ({ ...row, person: initialChoice(row) })));
-    setMeta({ author: r.author, authorIsMe: r.authorIsMe, identitySet: r.identitySet });
+    setMeta({ author: r.author, authorIsMe: r.authorIsMe, identitySet: r.identitySet, byRules: r.byRules });
     setHl(0);
     setPhase({ kind: 'review' });
   };
@@ -182,8 +182,8 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
     }
   };
 
-  const turnOffLocalOnly = async () => {
-    const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
+  const switchToAllModels = async () => {
+    const r = await glossly.invoke('settings:set', { key: 'privacy', value: 'all' });
     if (!r.error) await extract();
   };
 
@@ -215,7 +215,12 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
         <div className="answer-error">
           <span className="error">{phase.result.message}</span>
           {phase.result.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
-          {phase.result.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and try again</button>}
+          {phase.result.code === 'local_only' && (
+            <>
+              <button onClick={() => void switchToAllModels()}>Use all models and try again</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+            </>
+          )}
           {phase.result.code !== 'no_model' && phase.result.code !== 'local_only' && (
             <button onClick={() => void extract()}>
               <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
@@ -227,6 +232,18 @@ export function PromisesPanel({ s }: { s: OverlayState }) {
 
       {(phase.kind === 'review' || phase.kind === 'saving') && (
         <>
+          {meta?.byRules && (
+            <div className="inline-note">
+              <Info size={14} strokeWidth={1.75} aria-hidden />
+              <span>
+                {meta.byRules === 'local_only' ? 'Local only is on with no local model' : 'No model is set up'}, so these were found by simple patterns. Check
+                each one.
+              </span>
+              <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>
+                {meta.byRules === 'local_only' ? 'Set up a local model' : 'Add a key'}
+              </button>
+            </div>
+          )}
           {meta && !meta.identitySet && (
             <div className="inline-note">
               <Info size={14} strokeWidth={1.75} aria-hidden />

@@ -1,13 +1,17 @@
 import { APICallError, generateText, NoObjectGeneratedError, Output, RetryError, streamText, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import type { ModelRef, RoleName, Settings } from '../settings';
-import { lookupCapabilities, parseRef } from './catalog';
+import { LOCAL_PROVIDER, lookupCapabilities, parseRef } from './catalog';
+import { isLoopbackUrl } from './providers';
 import { modelChain } from './roles';
 import { LlmError, type ChatRequest, type LlmProvider, type SpokenToolResult, type StreamResult } from './types';
 
 export interface AiSdkLlmDeps {
-  settings: () => Pick<Settings, 'roles' | 'actionModels' | 'localOnly'>;
-  /** Decrypted key for a provider, or null. Never logged. */
+  settings: () => Pick<Settings, 'roles' | 'actionModels' | 'privacy' | 'local'>;
+  /**
+   * Decrypted key for a provider, or null when it can't be used. A provider that needs no key
+   * (the local server, once set up) gives ''. Never logged.
+   */
   apiKey: (provider: string) => string | null;
   /** Builds a model from a ref. Defaults to the provider registry; tests pass mocks. */
   createModel: (ref: ModelRef, apiKey: string) => LanguageModel;
@@ -28,37 +32,55 @@ export function isFallbackError(e: unknown): boolean {
   return s === 429 || (s !== undefined && s >= 500);
 }
 
-function toLlmError(e: unknown): LlmError {
+function toLlmError(e: unknown, ref?: ModelRef): LlmError {
   if (e instanceof LlmError) return e;
   if ((e as Error)?.name === 'AbortError') return new LlmError('aborted', 'Cancelled');
   const status = statusOf(e);
   const inner = RetryError.isInstance(e) ? e.lastError : e;
+  // A call to a local server that got no HTTP answer: the server isn't running.
+  if (ref && isLocal(ref) && APICallError.isInstance(inner) && status === undefined) return new LlmError('provider', LOCAL_UNREACHABLE_MESSAGE);
   return new LlmError('provider', (inner as Error)?.message ?? 'Model call failed', status);
 }
 
-export const LOCAL_ONLY_MESSAGE = 'Local only is on, so nothing is sent to a model provider.';
+export const LOCAL_ONLY_MESSAGE = 'Local only is on and no local model is set up, so nothing is sent.';
+export const LOCAL_UNREACHABLE_MESSAGE = "Couldn't reach the local model. Check that Ollama or LM Studio is running.";
+
+const isLocal = (ref: ModelRef) => parseRef(ref).provider === LOCAL_PROVIDER;
+
+/**
+ * The models a call may use, in order, before keys are checked. Under Local only (decision 34)
+ * that is the local models in the role's chain, then the Local only model, and only while the
+ * server is on this computer; never a cloud model.
+ */
+export function privacyChain(settings: Pick<Settings, 'roles' | 'actionModels' | 'privacy' | 'local'>, role: RoleName, action?: string): ModelRef[] {
+  const chain = modelChain(role, settings, action);
+  if (settings.privacy === 'all') return chain;
+  if (!settings.local.baseUrl || !isLoopbackUrl(settings.local.baseUrl)) return [];
+  return [...new Set([...chain.filter(isLocal), ...(settings.local.model ? [settings.local.model] : [])])];
+}
 
 /**
  * LlmProvider on the Vercel AI SDK: role resolution, 429/5xx fallback, one structured retry.
  * Every model call goes through here, so this is the one place that enforces Local only: while
- * it is on, every call fails with `local_only` before anything is sent (every provider is a
- * cloud provider for now).
+ * it is on, a call goes only to a local model, and fails with `local_only` before anything is
+ * sent when there is none.
  */
 export class AiSdkLlm implements LlmProvider {
   constructor(private readonly deps: AiSdkLlmDeps) {}
 
-  private chain(role: RoleName, action?: string): { ref: ModelRef; model: LanguageModel }[] {
-    if (this.deps.settings().localOnly) throw new LlmError('local_only', LOCAL_ONLY_MESSAGE);
-    const out: { ref: ModelRef; model: LanguageModel }[] = [];
-    for (const ref of modelChain(role, this.deps.settings(), action)) {
-      const key = this.deps.apiKey(parseRef(ref).provider);
-      if (key) out.push({ ref, model: this.deps.createModel(ref, key) });
-    }
-    return out;
+  private resolve(role: RoleName, action?: string): ModelRef[] {
+    return privacyChain(this.deps.settings(), role, action).filter((ref) => this.deps.apiKey(parseRef(ref).provider) !== null);
   }
 
+  private chain(role: RoleName, action?: string): { ref: ModelRef; model: LanguageModel }[] {
+    const refs = this.resolve(role, action);
+    if (refs.length === 0 && this.deps.settings().privacy === 'local') throw new LlmError('local_only', LOCAL_ONLY_MESSAGE);
+    return refs.map((ref) => ({ ref, model: this.deps.createModel(ref, this.deps.apiKey(parseRef(ref).provider)!) }));
+  }
+
+  /** True if the role resolves to a usable model under the current privacy choice. */
   hasModel(role: RoleName): boolean {
-    return modelChain(role, this.deps.settings()).some((ref) => this.deps.apiKey(parseRef(ref).provider));
+    return this.resolve(role).length > 0;
   }
 
   stream(req: ChatRequest): StreamResult {
@@ -135,7 +157,7 @@ export class AiSdkLlm implements LlmProvider {
             deps.onFallback?.({ from: ref, to: next.ref, status: statusOf(e) });
             continue;
           }
-          const err = req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e);
+          const err = req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e, ref);
           rejectModel(err);
           throw err;
         }
@@ -158,7 +180,7 @@ export class AiSdkLlm implements LlmProvider {
           this.deps.onFallback?.({ from: ref, to: next.ref, status: statusOf(e) });
           continue;
         }
-        throw req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e);
+        throw req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e, ref);
       }
     }
     throw new LlmError('provider', 'Model call failed');

@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 11, 2026: roadmap reordered (features, then polish, then all testing and evals, then packaging, then the README; decision providers parked); plain-name per-app rules with a "Show here" toggle and one add-person form landed (decisions 32 and 33; not checked live). 434 unit tests pass; `pnpm typecheck` is clean; `main` is pushed.
+Last updated Oct 11, 2026: **Step 18 landed** (decision 34): the privacy choice (All models / Local only) replaces the checkbox, a local model server (Ollama, LM Studio) works in Keys, Models, and the model layer, and with no local model Local only falls back to code, including What did I promise by sentence patterns. Not checked live; never run against a real Ollama. 452 unit tests pass; `pnpm typecheck` is clean.
 
 ## Start here
 
@@ -26,19 +26,15 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 ## Where things stand
 
 - **Built:** spec Phases 0 to 3 (capture, the bar, Ask, Save, settings and setup, people and Who, What did I promise, Reply, Recall, Search, Visualize) plus everything Rayan added along the way: the glass redesign, Save modes, paste with nothing selected, Ask's remember tool, Reply that learns your style, the Saved tab, relationships. Of Phase 4, the metrics view is done (Step 17.1).
-- **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, and the fixes since, including Oct 11's) has unit tests only. `docs/testing.md` has the backlog as a checklist.
+- **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, 18, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
-- **Not started:** Steps 18 to 23 below. (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
+- **Step 18 (Oct 11):** built with unit tests only; its live checks are in the backlog under "Local models and privacy".
+- **Not started:** Steps 19 to 23 below. (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
-
-**Step 18: local models, and privacy as a choice.**
-- Replace the Local only checkbox with a choice (a segmented control or radio pair in General and in setup): **All models** (any configured provider) or **Local only** (nothing leaves this computer; today's decision 12 behavior). Either keep the `localOnly` setting underneath or migrate it to a `privacy` enum with a settings migration; every "Local only is on" message and button in the panels must follow the new wording.
-- Add a local provider (an OpenAI-compatible endpoint such as Ollama or LM Studio) to the catalog and roles. Under Local only, calls go to the local model when one is configured, else they're refused as today.
-- Leave room for a third choice later (the parked subscription).
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice) is done. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
 **Step 19: todos and calendar, in the app first.** A selection can become a todo or a calendar event, detected like commitments (one structured call, the user confirms, due phrases through `resolveDue`), stored locally, shown in Search and on a person's card, with reminders through the commitment notifier. Add the action ids to `CONTEXTUAL_ACTIONS` with a score (see "Routing and slots" in `docs/architecture.md`); `LaterPanel` covers an action whose panel isn't built yet. **Google Calendar and reminders sync is the second half**, only after the local list works.
 
@@ -56,7 +52,8 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
   - Visualize's x labels sometimes rotate 90°.
   - Panels can extend past the source window onto whatever is below.
   - Notepad's taskbar button flashes after the tier-2 hand-off (a Windows refusal in `Focus.cs`; harmless, fix if cheap).
-  - Items saved under Local only never get entities (decision 12); offer a backfill when switching to All models if it's cheap.
+  - Items saved under Local only with no local model never get entities (decisions 12 and 34); offer a backfill when switching to All models or adding a local model, if it's cheap.
+  - The setup redesign should keep Step 18's privacy choice and local model card in the models step.
 
 **Step 21: testing and evals, all in one step.** Run when Rayan is away from the machine, through a subagent (AGENTS.md).
 - The whole live-check backlog in `docs/testing.md`, including everything Steps 18 to 20 added. Fix what it finds.
@@ -77,6 +74,7 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 
 1. **Who is this and What did I promise:** keep them as two actions (they now share one people read), or merge them? Left separate pending his call.
 2. **Comparison evals in Step 21:** run them alongside the one eval run (about 300 more Groq calls), or skip?
+3. **Router under Local only:** slots 3 and 4 stay on rules even with a local model, since a local model rarely answers inside the 600 ms budget (decision 34). Keep that, or let a local Decision model try (with a longer budget only under Local only)?
 
 Everything else he was asked has been answered and is recorded in `docs/decisions.md`.
 
@@ -91,7 +89,7 @@ Everything else he was asked has been answered and is recorded in `docs/decision
 - No `pnpm eval` unless he asks (Groq free tier: 1,000 requests a day, 8,000 tokens a minute, per model).
 
 **Conventions in the code**
-- Every model call goes through `AiSdkLlm` with an `action` name and a prompt in `core/prompts/`, so Local only and fallbacks apply. Prefer structured output with `z.enum` where options are fixed (decision 22); streamed text only where streaming matters (decision 23).
+- Every model call goes through `AiSdkLlm` with an `action` name and a prompt in `core/prompts/`, so the privacy choice and fallbacks apply. To decide between a model path and a code path, ask `llm.hasModel(role)` (it already follows Local only), not `settings.privacy`; read `privacy` only to word the message (decision 34). Prefer structured output with `z.enum` where options are fixed (decision 22); streamed text only where streaming matters (decision 23).
 - New actions join `CONTEXTUAL_ACTIONS` or `EMPTY_ACTIONS` and get a score; never add a third visible slot.
 - Schema changes are new migrations; default changes to stored settings are new `SETTINGS_MIGRATIONS` entries. Never edit a shipped one.
 - Helper changes update `helpers/protocol.md`, `helpers/fixtures/`, and `core/src/helper/protocol.ts` together, plus a `--check` case when the command is deterministic.
@@ -101,6 +99,10 @@ Everything else he was asked has been answered and is recorded in `docs/decision
 - Nothing destructive without an inline confirm and a red control. People are never created or merged without a confirm.
 - Keep everything outside `helpers/windows` OS-neutral (macOS later).
 - Docs and tests use fictional people and `example.com` addresses only (AGENTS.md, first section). The current files are clean, but commits before `e03a177` still hold some real names, screenshot-derived addresses, and the personal commit email. Rayan chose (Oct 11) not to rewrite history for now; revisit before the repo goes public (a `git filter-repo` pass plus a force-push).
+
+**Local models (Step 18)**
+- `@ai-sdk/openai-compatible` 3.0.67 with `supportsStructuredOutputs: true`: Ollama and LM Studio both take `response_format: json_schema` (LM Studio rejects `json_object`). Local models get `tools: false`, so Ask's remember tool is not offered on them.
+- Neither Ollama nor LM Studio is known to be installed here; the Step 21 pass needs one with a small model pulled (for example `ollama pull qwen3:4b`).
 
 **Known platform limits**
 - WinForms (.NET Framework) text boxes expose no TextPattern; those apps need the hotkey's copy fallback. WPF counts `\r\n` as one character (handled).

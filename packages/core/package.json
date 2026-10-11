@@ -16,6 +16,7 @@
     "@ai-sdk/anthropic": "^4.0.78",
     "@ai-sdk/groq": "^4.0.59",
     "@ai-sdk/openai": "^4.0.91",
+    "@ai-sdk/openai-compatible": "^3.0.67",
     "@huggingface/transformers": "^4.3.1",
     "ai": "^7.0.137",
     "ajv": "^8.20.0",

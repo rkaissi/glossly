@@ -29,13 +29,13 @@ Status: live (Step 13 and 16 checks). Not live: numbering by position.
 
 ## Ask
 
-Streams an answer on the Chat role (`actions/ask.ts`, `prompts/ask.md`). The prompt has the asker's identity (so it doesn't treat the reader as a message's author), the selection, surrounding text with a `[SELECTION]` mark, and up to 3 saved notes from Recall ("From your note, Oct 10"). With nothing selected it uses the surroundings: "Around their cursor" with a `[CURSOR]` mark, or "What is on their screen". Asking to remember something calls the `remember` tool, which saves a note with Undo (decision 24). `Ctrl+C` copies the answer. Errors offer "Add a key" or "Turn off Local only and ask".
+Streams an answer on the Chat role (`actions/ask.ts`, `prompts/ask.md`). The prompt has the asker's identity (so it doesn't treat the reader as a message's author), the selection, surrounding text with a `[SELECTION]` mark, and up to 3 saved notes from Recall ("From your note, Oct 10"). With nothing selected it uses the surroundings: "Around their cursor" with a `[CURSOR]` mark, or "What is on their screen". Asking to remember something calls the `remember` tool, which saves a note with Undo (decision 24). `Ctrl+C` copies the answer. Errors offer "Add a key", or under Local only with no local model "Use all models and ask" and "Set up a local model".
 
 Status: live (first token about 0.7 s, remember and Undo, Local only). Not live: `Ctrl+C`, surroundings with nothing selected.
 
 ## Save and save modes
 
-`SaveService` (`actions/save.ts`) inserts at once, then in the background embeds text plus why and extracts entities (Fast role; skipped under Local only). Undo works for 10 s (`save.undoSeconds`) plus a grace. The panel: collection chips (Tab cycles), a why field, "Saved to Notes · just now", Undo. The label takes the route's `best_collection` once when it settles. Modes (decision 15): Manual, save hotkey (toast with Undo; the default falls back to `Ctrl+Alt+Shift+S` then `Ctrl+Shift+Alt+B` if taken), Autosave (pill shows "Saved", the bar's slot 2 is "Undo save (Ns)"; moves once to the route's collection). Autosave and the save hotkey cost a model call per save (entities, and the router for the hotkey), which can hit Groq free-tier limits; the item is still saved.
+`SaveService` (`actions/save.ts`) inserts at once, then in the background embeds text plus why and extracts entities (Fast role; skipped under Local only with no local model). Undo works for 10 s (`save.undoSeconds`) plus a grace. The panel: collection chips (Tab cycles), a why field, "Saved to Notes · just now", Undo. The label takes the route's `best_collection` once when it settles. Modes (decision 15): Manual, save hotkey (toast with Undo; the default falls back to `Ctrl+Alt+Shift+S` then `Ctrl+Shift+Alt+B` if taken), Autosave (pill shows "Saved", the bar's slot 2 is "Undo save (Ns)"; moves once to the route's collection). Autosave and the save hotkey cost a model call per save (entities, and the router for the hotkey), which can hit Groq free-tier limits; the item is still saved.
 
 Status: live (all three modes, Undo, embeddings and entities on real data).
 
@@ -66,7 +66,7 @@ Status: live (setup You step, Profile, Who with the model on the email fixture t
 
 ## What did I promise
 
-One Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) alongside Who's people read (shared and cached). The model returns due phrases as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates. The panel lists each candidate (keep or skip, editable task, You owe / They owe, the person, the due date with a date picker) and, for each new person, the same fields as Who's Create person (decision 33), prefilled from Who's read; they are created on save. Enter saves; the message is stored as an interaction. Reminders (`reminders.ts`): at `reminderHour` (9) on the due date, or at launch if missed, up to 3 per check; clicking opens Settings > People.
+One Fast structured call (`actions/promises.ts`, `prompts/extract-commitments.md`) alongside Who's people read (shared and cached). The model returns due phrases as written; `resolveDue` (`people/dates.ts`, 60 phrases tested) turns them into dates. The panel lists each candidate (keep or skip, editable task, You owe / They owe, the person, the due date with a date picker) and, for each new person, the same fields as Who's Create person (decision 33), prefilled from Who's read; they are created on save. Enter saves; the message is stored as an interaction. With no usable model (Local only without a local model, or no key) sentence patterns find promises and requests instead (`actions/promise-rules.ts`, decision 34) and a note says so. Reminders (`reminders.ts`): at `reminderHour` (9) on the due date, or at launch if missed, up to 3 per check; clicking opens Settings > People.
 
 Status: live (extraction, save, card). Not live: the shared reader and new-people details. **The reminder toast never appeared in the dev build** (logged `reminder shown`); likely needs the installer's Start Menu shortcut for the AppUserModelID, or Focus Assist hid it. Check in Step 22 (packaging).
 
@@ -84,20 +84,20 @@ Status: live in the Step 15 version (three drafts in under 9 s, Insert into a te
 ## Visualize
 
 1. **Table** (`visualize/table.ts`): Markdown, TSV, CSV, semicolons, pipes, or aligned columns are parsed in code (numbers with separators, currency, %, negatives in parentheses, k/M/B; column types). Otherwise one Fast call returns rows (`prompts/visualize-table.md`).
-2. **Chart** (`visualize/visualize.ts`, decision 22): one Fast call returns a chart pick (`prompts/visualize-chart.md`); `specFromChoice` writes the Vega-Lite spec, validated against the Vega-Lite schema with Ajv. Local only or no key: `rulesChoice` picks with code. Any failure shows the table with one line why.
+2. **Chart** (`visualize/visualize.ts`, decision 22): one Fast call returns a chart pick (`prompts/visualize-chart.md`); `specFromChoice` writes the Vega-Lite spec, validated against the Vega-Lite schema with Ajv. No model (Local only without a local model, or no key): `rulesChoice` picks with code. Any failure shows the table with one line why.
 3. **Panel** (`VisualizePanel.tsx`): `vega-embed` loaded on open (separate chunk), rendered with `vega-interpreter` because the CSP blocks `new Function`. One series in ink; several use a validated categorical palette. Chart/Table toggle, Copy as image (PNG 2x), Copy CSV, Save (a `chart` item with Undo). Results cached per text.
 
 Status: the earlier version (model-written specs) was live after two fixes; the chart-pick rewrite and the cache are not. Known: x labels can rotate 90°; a TSV from Notepad may arrive with tabs as spaces and go to the model.
 
 ## Settings window and setup
 
-Tabs: Profile, People, Saved, Keys, Models, General, Data, Metrics (`settings/`). Setup (`#setup`) has five steps: Welcome, You, Keys, Models, Try it (decision 11).
+Tabs: Profile, People, Saved, Keys, Models, General, Data, Metrics (`settings/`). Setup (`#setup`) has five steps: Welcome, You, Keys, Models, Try it (decision 11). The Keys step ("Choose your models") opens with the privacy choice and the local model card; Next needs a working key or local server, or Local only (which works without either).
 
-- **Keys**: per provider (Groq, OpenAI, Anthropic), test and save (`listModels` doubles as the test and fills the catalog), Test again, Replace, Remove (confirm).
-- **Models**: model and fallback per role, capability tags and warnings, per-action overrides, the catalog with Refresh.
-- **General**: hotkey recorder, Saving (decision 15), Local only, Debug view, per-app modes, block list.
+- **Keys**: per provider (Groq, OpenAI, Anthropic), test and save (`listModels` doubles as the test and fills the catalog), Test again, Replace, Remove (confirm). **Local model** card: Connect to Ollama or LM Studio (presets) or any address; saved only when it lists chat models; Test again, Change, Remove; warns when the address isn't this computer (decision 34).
+- **Models**: model and fallback per role, the Local only model (when a local server is set up), capability tags and warnings, per-action overrides, the catalog with Refresh (local server included).
+- **General**: hotkey recorder, Saving (decision 15), Where model calls go (All models or Local only, with what Local only uses right now; decision 34), Debug view, per-app modes, block list.
 - **Saved**: every item, filter by collection, search (words, then meaning), move, copy, delete (confirm).
 - **Data**: embeddings status and download, Export, Delete all data, Reset settings (decision 10). Destructive controls are red and confirm inline.
 - **Metrics**: 7/30/90 days; totals, expand rate, per action clicks, click rate, median time to click; a Features table (saves by how, Related shown/opened/dismissed, Reply inserted unedited/edited/own/copied/discarded/redo, paste, search inserts, promises, failed calls and fallbacks); per day.
 
-Status: live (setup end to end, Keys, Models, General, Data, Metrics, Profile, People; Delete all and Reset on a throwaway profile). Not live: Saved tab, Metrics Features table, changing the hotkey with the recorder, Export, catalog refresh errors.
+Status: live (setup end to end, Keys, Models, General, Data, Metrics, Profile, People; Delete all and Reset on a throwaway profile). Not live: the privacy choice, the local model card and Local only model, Saved tab, Metrics Features table, changing the hotkey with the recorder, Export, catalog refresh errors.

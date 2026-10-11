@@ -39,6 +39,9 @@ const file = capabilitiesFile as unknown as CapabilityFile;
 const exclude = file.exclude.map((p) => new RegExp(p, 'i'));
 const entries = file.models.map((m) => ({ ...m, re: new RegExp(m.pattern, 'i') }));
 
+/** Provider id of the local model server in model refs ("local:llama3.2:latest"). */
+export const LOCAL_PROVIDER = 'local';
+
 export const toRef = (provider: string, modelId: string): ModelRef => `${provider}:${modelId}`;
 
 export function parseRef(ref: ModelRef): { provider: string; modelId: string } {

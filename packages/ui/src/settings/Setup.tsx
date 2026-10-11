@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Identity, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { EmbedLine } from './Data';
-import { formatAccelerator, hasWorkingKey } from './format';
-import { KeyCard } from './Keys';
+import { formatAccelerator, hasWorkingModel } from './format';
+import { KeyCard, LocalCard } from './Keys';
+import { PrivacyChoice } from './Privacy';
 import { IdentityForm } from './Profile';
 import { RolePickers } from './Models';
 import { useAction } from './useAction';
@@ -35,7 +36,7 @@ function Welcome({ view }: { view: SettingsView }) {
           <li>It never records keystrokes; the hotkey is its only keyboard shortcut. Password fields and password managers are never read.</li>
           <li>
             Everything is stored on this computer. Selected text goes only to the provider whose key you add: when the bar opens, to pick actions, and
-            when you click Ask, Save, Reply, Who is this, or What did I promise. Turn on Local only in Settings and nothing is sent at all.
+            when you click Ask, Save, Reply, Who is this, or What did I promise. Choose Local only in the next steps and nothing leaves this computer.
           </li>
         </ul>
       </div>
@@ -66,16 +67,19 @@ function You({ identity, onChange }: { identity: Identity; onChange: (next: Iden
 }
 
 function Keys({ view }: { view: SettingsView }) {
+  const localOnly = view.settings.privacy === 'local';
   return (
     <>
-      <h1>Add a model key</h1>
+      <h1>Choose your models</h1>
       <p className="muted">
-        Glossly uses your own API keys and has no server. Groq has a free tier that needs no card, so it is the easiest place to start. You need at least
-        one working key.
+        Glossly uses your own API keys or a model on this computer, and has no server. Groq has a free tier that needs no card, so it is the easiest
+        place to start.
       </p>
-      {view.keys.map((k) => (
-        <KeyCard key={k.provider} k={k} />
-      ))}
+      <PrivacyChoice view={view} onSetUp={() => document.getElementById('local-card')?.scrollIntoView({ behavior: 'smooth' })} />
+      {!localOnly && view.keys.map((k) => <KeyCard key={k.provider} k={k} />)}
+      <div id="local-card">
+        <LocalCard local={view.local} />
+      </div>
     </>
   );
 }
@@ -128,7 +132,8 @@ export function Setup({ view, onDone }: { view: SettingsView; onDone: () => void
   const [identity, setIdentity] = useState<Identity>(view.settings.identity);
   const { busy, error, run } = useAction();
   const last = step === STEPS.length - 1;
-  const canNext = step === 1 ? identity.name.trim().length > 0 : step === 2 ? hasWorkingKey(view) : true;
+  // Local only works without any model (rules and patterns), so it needs neither a key nor a local server.
+  const canNext = step === 1 ? identity.name.trim().length > 0 : step === 2 ? view.settings.privacy === 'local' || hasWorkingModel(view) : true;
 
   const next = async () => {
     if (step === 1) {
@@ -182,7 +187,7 @@ export function Setup({ view, onDone }: { view: SettingsView; onDone: () => void
         )}
         <span className="spacer" />
         {step === 1 && !canNext && <span className="muted small">Type your name to continue.</span>}
-        {step === 2 && !canNext && <span className="muted small">Add a working key to continue.</span>}
+        {step === 2 && !canNext && <span className="muted small">Add a working key or a local model to continue.</span>}
         <button className="primary" disabled={!canNext || busy} onClick={() => void (last ? finish() : next())}>
           {last ? 'Finish' : 'Next'}
         </button>

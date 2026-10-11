@@ -3,6 +3,7 @@ import type { AppMode, Settings, SettingsKey, SettingsView } from '@glossly/core
 import { X } from 'lucide-react';
 import { glossly } from '../bridge';
 import { formatAccelerator, normalizeAppKey, toAccelerator } from './format';
+import { PrivacyChoice } from './Privacy';
 import { useAction } from './useAction';
 
 const MODE_LABELS: Record<AppMode, string> = { auto: 'Auto pill', hotkey: 'Hotkey only', off: 'Off' };
@@ -146,7 +147,7 @@ function SaveMode({ view }: { view: SettingsView }) {
   );
 }
 
-function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'localOnly' | 'debugView'; label: string; desc: string }) {
+function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'debugView'; label: string; desc: string }) {
   const { busy, error, set } = useSetting();
   return (
     <div className="field">
@@ -277,12 +278,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
       <h2>General</h2>
       <Hotkey view={view} />
       <SaveMode view={view} />
-      <Toggle
-        view={view}
-        k="localOnly"
-        label="Local only"
-        desc="While this is on, nothing is sent to a model provider. Slots 3 and 4 come from local rules, Save stores and embeds on this computer but skips finding people and companies, and Ask, Reply, and What did I promise are turned off. Who is this still lists people it can read from the text, without a model-written note."
-      />
+      <PrivacyChoice view={view} onSetUp={() => (location.hash = '#keys')} />
       <Toggle view={view} k="debugView" label="Debug view" desc="Shows capture method, timings, and routing details at the bottom of the bar." />
       <AppModes view={view} />
       <BlockList view={view} />

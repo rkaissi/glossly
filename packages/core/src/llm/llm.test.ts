@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type ModelRef, type Settings } from '../settings';
 import { isChatModel, lookupCapabilities, parseRef, pickDefault, toCatalogModel, toRef } from './catalog';
-import { AiSdkLlm, isFallbackError } from './llm';
-import { PROVIDERS, ProviderKeyError } from './providers';
-import { modelChain, updateRoles } from './roles';
+import { AiSdkLlm, isFallbackError, LOCAL_UNREACHABLE_MESSAGE, privacyChain } from './llm';
+import { isLoopbackUrl, LocalProvider, normalizeBaseUrl, PROVIDERS, ProviderKeyError } from './providers';
+import { modelChain, updateLocalModel, updateRoles } from './roles';
 import { LlmError } from './types';
 import { rememberTool } from '../actions/ask';
 
@@ -49,10 +49,10 @@ function jsonModel(...texts: string[]) {
   });
 }
 
-type LlmSettings = Pick<Settings, 'roles' | 'actionModels' | 'localOnly'>;
+type LlmSettings = Pick<Settings, 'roles' | 'actionModels' | 'privacy' | 'local'>;
 
 function roles(over: Partial<Settings['roles']>): LlmSettings {
-  return { roles: { ...DEFAULT_SETTINGS.roles, ...over }, actionModels: {}, localOnly: false };
+  return { roles: { ...DEFAULT_SETTINGS.roles, ...over }, actionModels: {}, privacy: 'all', local: DEFAULT_SETTINGS.local };
 }
 
 function llmWith(models: Record<ModelRef, MockLanguageModelV4>, settings: LlmSettings, keys = ['groq', 'openai', 'anthropic']) {
@@ -128,11 +128,11 @@ describe('AiSdkLlm.stream', () => {
 });
 
 describe('AiSdkLlm with Local only on', () => {
-  it('refuses streams and structured calls before building or calling any model', async () => {
+  it('with no local model, refuses streams and structured calls before building or calling any model', async () => {
     const chat = textModel(['never']);
     const fast = jsonModel('{"answer":"yes","n":1}');
     const built: string[] = [];
-    const settings = { ...roles({ chat: CHAT, fast: { model: 'openai:gpt-5-mini', fallback: null, manual: false } }), localOnly: true };
+    const settings: LlmSettings = { ...roles({ chat: CHAT, fast: { model: 'openai:gpt-5-mini', fallback: null, manual: false } }), privacy: 'local' };
     const llm = new AiSdkLlm({
       settings: () => settings,
       apiKey: () => 'k',
@@ -152,8 +152,125 @@ describe('AiSdkLlm with Local only on', () => {
     expect(fast.doGenerateCalls).toHaveLength(0);
 
     // Turning it off takes effect on the next call.
-    settings.localOnly = false;
+    settings.privacy = 'all';
     expect(await collect(llm.stream({ role: 'chat', instructions: 'i', prompt: 'p' }).textStream)).toBe('never');
+  });
+
+  const LOCAL = 'local:qwen3:8b';
+  const localKeys = (p: string) => (p === 'local' ? '' : 'k');
+
+  it('sends every role to the Local only model, never to a cloud one', async () => {
+    const local = textModel(['from local']);
+    const built: string[] = [];
+    const settings: LlmSettings = {
+      ...roles({ chat: CHAT, fast: { model: 'openai:gpt-5-mini', fallback: null, manual: false } }),
+      privacy: 'local',
+      local: { baseUrl: 'http://localhost:11434/v1', model: LOCAL, manual: false },
+    };
+    const llm = new AiSdkLlm({
+      settings: () => settings,
+      apiKey: localKeys,
+      createModel: (ref) => {
+        built.push(ref);
+        return local;
+      },
+    });
+    expect(llm.hasModel('chat')).toBe(true);
+    expect(llm.hasModel('decision')).toBe(true);
+    expect(await collect(llm.stream({ role: 'chat', instructions: 'i', prompt: 'p' }).textStream)).toBe('from local');
+    expect(built).toEqual([LOCAL]);
+  });
+
+  it('keeps a local model picked for a role, and skips its cloud fallback', () => {
+    const settings: LlmSettings = {
+      ...roles({ chat: { model: 'local:llama3.3:70b', fallback: 'groq:openai/gpt-oss-120b', manual: true } }),
+      privacy: 'local',
+      local: { baseUrl: 'http://127.0.0.1:1234/v1', model: LOCAL, manual: false },
+    };
+    expect(privacyChain(settings, 'chat')).toEqual(['local:llama3.3:70b', LOCAL]);
+    expect(privacyChain({ ...settings, privacy: 'all' }, 'chat')).toEqual(['local:llama3.3:70b', 'groq:openai/gpt-oss-120b']);
+  });
+
+  it('never uses a server on another machine under Local only', () => {
+    const settings: LlmSettings = { ...roles({}), privacy: 'local', local: { baseUrl: 'http://192.168.1.20:11434/v1', model: LOCAL, manual: false } };
+    const llm = new AiSdkLlm({ settings: () => settings, apiKey: localKeys, createModel: () => textModel(['x']) });
+    expect(llm.hasModel('fast')).toBe(false);
+    expect(privacyChain(settings, 'fast')).toEqual([]);
+    // Under All models the same server is just another provider.
+    const all: LlmSettings = { ...settings, privacy: 'all', roles: { ...settings.roles, fast: { model: LOCAL, fallback: null, manual: true } } };
+    expect(privacyChain(all, 'fast')).toEqual([LOCAL]);
+  });
+
+  it('says the local server is not running when a call to it gets no answer', async () => {
+    const down = new MockLanguageModelV4({
+      doGenerate: async () => {
+        throw new APICallError({ message: 'Cannot connect to API: fetch failed', url: 'http://localhost:11434/v1', requestBodyValues: {}, isRetryable: true });
+      },
+    });
+    const settings: LlmSettings = { ...roles({}), privacy: 'local', local: { baseUrl: 'http://localhost:11434/v1', model: LOCAL, manual: false } };
+    const llm = new AiSdkLlm({ settings: () => settings, apiKey: localKeys, createModel: () => down });
+    await expect(llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, z.object({ a: z.string() }))).rejects.toMatchObject({
+      code: 'provider',
+      message: LOCAL_UNREACHABLE_MESSAGE,
+    });
+  });
+});
+
+describe('local server', () => {
+  it('normalizes typed addresses', () => {
+    expect(normalizeBaseUrl('localhost:11434')).toBe('http://localhost:11434/v1');
+    expect(normalizeBaseUrl('http://localhost:1234/')).toBe('http://localhost:1234/v1');
+    expect(normalizeBaseUrl(' http://127.0.0.1:8080/api/v1/ ')).toBe('http://127.0.0.1:8080/api/v1');
+    expect(normalizeBaseUrl('ftp://example.com')).toBeNull();
+    expect(normalizeBaseUrl('')).toBeNull();
+  });
+
+  it('counts only this computer as local', () => {
+    expect(isLoopbackUrl('http://localhost:11434/v1')).toBe(true);
+    expect(isLoopbackUrl('http://127.0.0.1:1234/v1')).toBe(true);
+    expect(isLoopbackUrl('http://[::1]:1234/v1')).toBe(true);
+    expect(isLoopbackUrl('http://192.168.1.20:11434/v1')).toBe(false);
+    expect(isLoopbackUrl('https://llm.example.com/v1')).toBe(false);
+    expect(isLoopbackUrl('http://localhost.example.com/v1')).toBe(false);
+  });
+
+  it('lists the server chat models with the generic local capabilities', async () => {
+    const urls: string[] = [];
+    const fetchFn = (async (url: string) => {
+      urls.push(url);
+      return new Response(JSON.stringify({ object: 'list', data: [{ id: 'qwen3:8b' }, { id: 'nomic-embed-text:latest' }, { id: 'gemma3:4b' }] }));
+    }) as unknown as typeof fetch;
+    const models = await LocalProvider.listModels('http://localhost:11434/v1', fetchFn);
+    expect(urls).toEqual(['http://localhost:11434/v1/models']);
+    expect(models.map((m) => m.ref)).toEqual(['local:gemma3:4b', 'local:qwen3:8b']);
+    expect(models[0]!.capabilities).toMatchObject({ structured: 'json_schema', tools: false, speed: 'slow' });
+  });
+
+  it('reports a server that is not running', async () => {
+    const fetchFn = (async () => {
+      throw new TypeError('fetch failed');
+    }) as unknown as typeof fetch;
+    await expect(LocalProvider.listModels('http://localhost:11434/v1', fetchFn)).rejects.toMatchObject({ status: 0 });
+  });
+
+  it('fills the Local only model from the local catalog and keeps a hand pick', () => {
+    const models = [toCatalogModel('groq', 'qwen/qwen3.8-27b'), toCatalogModel('local', 'qwen3:8b'), toCatalogModel('local', 'gemma3:4b')];
+    const base = { baseUrl: 'http://localhost:11434/v1', model: null, manual: false };
+    expect(updateLocalModel(base, models).local.model).toBe('local:gemma3:4b');
+    expect(updateLocalModel({ ...base, model: 'local:qwen3:8b', manual: true }, models).changed).toBe(false);
+    const gone = updateLocalModel({ ...base, model: 'local:llama3:8b', manual: true }, models);
+    expect(gone.local).toMatchObject({ model: 'local:gemma3:4b', manual: false });
+    expect(gone.notices).toHaveLength(1);
+  });
+
+  it('never makes a local model the automatic fallback of a cloud one', () => {
+    const models = [toCatalogModel('groq', 'qwen/qwen3.8-27b'), toCatalogModel('local', 'qwen3:8b')];
+    const u = updateRoles(DEFAULT_SETTINGS.roles, models);
+    expect(u.roles.fast.model).toBe('groq:qwen/qwen3.8-27b');
+    expect(u.roles.fast.fallback).toBeNull();
+    expect(u.roles.chat.fallback).toBeNull();
+    // With only a local server, it fills the roles.
+    expect(updateRoles(DEFAULT_SETTINGS.roles, [models[1]!]).roles.chat.model).toBe('local:qwen3:8b');
   });
 });
 

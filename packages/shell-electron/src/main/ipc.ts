@@ -375,6 +375,7 @@ export function registerIpc(deps: IpcDeps): void {
   handle('settings:set', (a): SetSettingResult => {
     const key = str(a.key, 50) as SettingsKey;
     if (key === 'roles') throw new Error('Use roles:set');
+    if (key === 'local') throw new Error('Use local:connect, local:remove, or local:model');
     if (key === 'hotkey') {
       const value = str(a.value, 100);
       if (services.settings.saveMode === 'hotkey' && value === services.settings.saveHotkey) {
@@ -408,6 +409,24 @@ export function registerIpc(deps: IpcDeps): void {
   });
   handle('keys:remove', (a) => {
     services.removeKey(str(a.provider, 30));
+    broadcastSettings();
+  });
+  handle('local:connect', async (a) => {
+    const r = await services.connectLocal(str(a.baseUrl, 300));
+    broadcastSettings();
+    return r;
+  });
+  handle('local:test', async () => {
+    const r = await services.testLocal();
+    broadcastSettings();
+    return r;
+  });
+  handle('local:remove', () => {
+    services.removeLocal();
+    broadcastSettings();
+  });
+  handle('local:model', (a) => {
+    services.setLocalModel(str(a.model, 200));
     broadcastSettings();
   });
   handle('models:refresh', async () => {

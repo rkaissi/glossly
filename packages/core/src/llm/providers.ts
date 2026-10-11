@@ -1,8 +1,9 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGroq } from '@ai-sdk/groq';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
-import { isChatModel, toCatalogModel, type CatalogModel } from './catalog';
+import { isChatModel, LOCAL_PROVIDER, toCatalogModel, type CatalogModel } from './catalog';
 
 export type FetchFn = typeof fetch;
 
@@ -115,3 +116,61 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
 };
 
 export const PROVIDER_ORDER = ['groq', 'openai', 'anthropic'] as const;
+
+export const LOCAL_PRESETS = [
+  { label: 'Ollama', baseUrl: 'http://localhost:11434/v1' },
+  { label: 'LM Studio', baseUrl: 'http://localhost:1234/v1' },
+] as const;
+
+/**
+ * Cleans a typed server address: adds http:// when no scheme is given and /v1 when no path is
+ * (Ollama and LM Studio serve the OpenAI-compatible API there), and drops a trailing slash.
+ * Null when it isn't an http(s) URL.
+ */
+export function normalizeBaseUrl(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `http://${raw}`);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.pathname === '/' || url.pathname === '') url.pathname = '/v1';
+  url.search = '';
+  url.hash = '';
+  return url.toString().replace(/\/+$/, '');
+}
+
+/**
+ * True when the address is this computer (localhost, 127.0.0.0/8, ::1). Local only uses a
+ * local server only at such an address, so "nothing leaves this computer" holds (decision 34).
+ */
+export function isLoopbackUrl(baseUrl: string): boolean {
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return host === 'localhost' || host.endsWith('.localhost') || host === '[::1]' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+}
+
+/**
+ * A local model server speaking the OpenAI chat API (Ollama, LM Studio). No key. Both enforce
+ * a JSON Schema through `response_format: json_schema` (LM Studio rejects `json_object`), so
+ * structured output is on.
+ */
+export const LocalProvider = {
+  id: LOCAL_PROVIDER,
+  label: 'Local',
+  createModel: (baseUrl: string, modelId: string): LanguageModel =>
+    createOpenAICompatible({ name: LOCAL_PROVIDER, baseURL: baseUrl, supportsStructuredOutputs: true, includeUsage: true }).chatModel(modelId),
+  /** Lists the server's chat models. Also the connection test: throws ProviderKeyError when it can't be reached. */
+  async listModels(baseUrl: string, fetchFn: FetchFn = fetch, signal?: AbortSignal): Promise<CatalogModel[]> {
+    const j = (await getJson(fetchFn, 'the local server', `${baseUrl}/models`, {}, signal ?? AbortSignal.timeout(5_000))) as { data?: ListedModel[] };
+    if (!Array.isArray(j?.data)) throw new ProviderKeyError(LOCAL_PROVIDER, 0, 'That address answered, but not with a list of models.');
+    return toModels(LOCAL_PROVIDER, j.data);
+  },
+};

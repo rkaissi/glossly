@@ -1,5 +1,5 @@
 {
-  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). reasoning (optional): effort used for structured calls on reasoning models. Models matching nothing show as Untested and are never auto-assigned. Patterns are case-insensitive regexes over the provider's model ID.",
+  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Patterns are case-insensitive regexes over the provider's model ID.",
   "version": 1,
   "exclude": [
     "embed",
@@ -54,7 +54,9 @@
     { "provider": "anthropic", "pattern": "^claude-haiku-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "low", "speed": "fast", "tier": 2 },
     { "provider": "anthropic", "pattern": "^claude-sonnet-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "medium", "speed": "medium", "tier": 4 },
     { "provider": "anthropic", "pattern": "^claude-opus-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "high", "speed": "slow", "tier": 5 },
-    { "provider": "anthropic", "pattern": "^claude-3-5-haiku", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "low", "speed": "fast", "tier": 1 }
+    { "provider": "anthropic", "pattern": "^claude-3-5-haiku", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "low", "speed": "fast", "tier": 1 },
+
+    { "provider": "local", "pattern": ".", "structured": "json_schema", "streaming": true, "tools": false, "context": 8192, "cost": "low", "speed": "slow", "tier": 1 }
   ],
   "$preferences": "Default role picks. Fast: cheapest model with structured output, then fastest, then lowest tier. Chat: highest tier, then cheaper. Ties keep this file's order.",
   "preferences": {

@@ -16,6 +16,7 @@ import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './setti
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
 import type { PasteFormat, PasteTarget } from './actions/paste-types';
+import type { PromisesByRules } from './actions/promises';
 import type { LibraryQuery, LibraryResult, RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
@@ -30,9 +31,10 @@ export type * from './people/types';
 export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePreference } from './people/reply-style';
 export type { Relationship } from './people/relationship';
 export type { PasteFormat, PasteTarget } from './actions/paste-types';
+export type { PromisesByRules } from './actions/promises';
 export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
-export type { AppMode, Identity, ModelRef, RoleName, Settings, SettingsKey } from './settings';
+export type { AppMode, Identity, ModelRef, Privacy, RoleName, Settings, SettingsKey } from './settings';
 
 // ---- overlay state (main -> overlay renderer) ----
 
@@ -263,7 +265,16 @@ export type PasteCompose =
 // ---- What did I promise ----
 
 export type PromisesResult =
-  | { ok: true; rows: PromiseRow[]; /** Who wrote the message, as detected, or null. */ author: string | null; authorIsMe: boolean; identitySet: boolean }
+  | {
+      ok: true;
+      rows: PromiseRow[];
+      /** Who wrote the message, as detected, or null. */
+      author: string | null;
+      authorIsMe: boolean;
+      identitySet: boolean;
+      /** Set when patterns found the rows because no model could be used (decision 34). */
+      byRules: PromisesByRules;
+    }
   | { ok: false; code: AskErrorEvent['code']; message: string };
 
 // ---- Save ----
@@ -303,6 +314,17 @@ export interface KeyTestResult {
   at: string;
 }
 
+/** The local model server (Ollama, LM Studio), shown in the Keys tab. */
+export interface LocalStatus {
+  /** The server address, or null when none is set up. */
+  baseUrl: string | null;
+  /** The address is this computer, so Local only can use it (decision 34). */
+  loopback: boolean;
+  /** Result of the last connection test, if any. `models` counts its chat models. */
+  lastTest: KeyTestResult | null;
+  presets: readonly { label: string; baseUrl: string }[];
+}
+
 export interface EmbedStatus {
   model: string;
   dims: number;
@@ -317,6 +339,7 @@ export interface SettingsView {
   settings: Settings;
   collections: string[];
   keys: KeyStatus[];
+  local: LocalStatus;
   models: CatalogModel[];
   embed: EmbedStatus;
   platform: 'win32' | 'darwin' | 'linux';
@@ -454,6 +477,13 @@ export interface InvokeChannels {
   'keys:add': { args: { provider: string; key: string }; result: KeyTestResult };
   'keys:test': { args: { provider: string }; result: KeyTestResult };
   'keys:remove': { args: { provider: string }; result: void };
+  /** Lists the server's models; saves the address only if that works. */
+  'local:connect': { args: { baseUrl: string }; result: KeyTestResult };
+  'local:test': { args: void; result: KeyTestResult };
+  /** Forgets the server and its models. */
+  'local:remove': { args: void; result: void };
+  /** The model Local only uses (`local.model`). */
+  'local:model': { args: { model: ModelRef }; result: void };
   'models:refresh': { args: void; result: ModelsRefreshResult };
   'roles:set': { args: RoleSetArgs; result: Settings['roles'] };
   /** Shows a save dialog. Null when cancelled. */

@@ -175,8 +175,8 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
     setNote('Copied.');
   };
 
-  const turnOffLocalOnly = async () => {
-    const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
+  const switchToAllModels = async () => {
+    const r = await glossly.invoke('settings:set', { key: 'privacy', value: 'all' });
     if (!r.error) await run();
   };
 
@@ -386,7 +386,12 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
         <div className="answer-error">
           <span className="error">{stream.message}</span>
           {stream.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
-          {stream.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and write drafts</button>}
+          {stream.code === 'local_only' && (
+            <>
+              <button onClick={() => void switchToAllModels()}>Use all models and write drafts</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+            </>
+          )}
           {stream.code !== 'no_model' && stream.code !== 'local_only' && stream.code !== 'no_selection' && (
             <button onClick={() => void run()}>
               <RotateCcw size={14} strokeWidth={1.75} aria-hidden />

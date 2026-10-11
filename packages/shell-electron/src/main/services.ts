@@ -4,6 +4,9 @@ import {
   AiSdkLlm,
   DEFAULT_BLOCK_LIST,
   DEFAULT_HOTKEY_ONLY,
+  LOCAL_PRESETS,
+  LOCAL_PROVIDER,
+  LocalProvider,
   Metrics,
   PROVIDER_ORDER,
   PROVIDERS,
@@ -12,13 +15,18 @@ import {
   SaveService,
   SettingsSchema,
   Store,
+  isLoopbackUrl,
   isoNow,
+  normalizeBaseUrl,
   parseRef,
   toCatalogModel,
+  updateLocalModel,
   updateRoles,
   type CatalogModel,
   type KeyStatus,
   type KeyTestResult,
+  type LocalStatus,
+  type ModelRef,
   type ModelsRefreshResult,
   type RoleSetArgs,
   type Settings,
@@ -67,16 +75,19 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     this.metrics = new Metrics(store);
     this.keys = new KeyStore(userDataPath('keys'));
     this.settingsCache = store.getSettings();
-    for (const p of PROVIDER_ORDER) {
+    for (const p of [...PROVIDER_ORDER, LOCAL_PROVIDER]) {
       const test = JSON.parse(store.getMeta(`key_test:${p}`) ?? 'null') as KeyTestResult | null;
       if (test) this.lastTests.set(p, test);
     }
 
     this.llm = new AiSdkLlm({
       settings: () => this.settingsCache,
-      apiKey: (p) => this.keys.get(p),
+      // The local server needs no key; it is usable once an address is saved.
+      apiKey: (p) => (p === LOCAL_PROVIDER ? (this.settingsCache.local.baseUrl === null ? null : '') : this.keys.get(p)),
       createModel: (ref, key) => {
         const { provider, modelId } = parseRef(ref);
+        const baseUrl = this.settingsCache.local.baseUrl;
+        if (provider === LOCAL_PROVIDER && baseUrl) return LocalProvider.createModel(baseUrl, modelId);
         const info = PROVIDERS[provider];
         if (!info) throw new Error(`Unknown provider: ${provider}`);
         return info.createModel(key, modelId);
@@ -134,11 +145,17 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     });
   }
 
+  localStatus(): LocalStatus {
+    const { baseUrl } = this.settingsCache.local;
+    return { baseUrl, loopback: baseUrl !== null && isLoopbackUrl(baseUrl), lastTest: this.lastTests.get(LOCAL_PROVIDER) ?? null, presets: LOCAL_PRESETS };
+  }
+
   view(): SettingsView {
     return {
       settings: this.settingsCache,
       collections: this.collections(),
       keys: this.keyStatuses(),
+      local: this.localStatus(),
       models: this.catalog(),
       embed: this.embed.getStatus(),
       platform: process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : 'win32',
@@ -165,6 +182,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
       this.keys.remove(p);
       this.store.setMeta(`key_test:${p}`, 'null');
     }
+    this.store.setMeta(`key_test:${LOCAL_PROVIDER}`, 'null');
     this.lastTests.clear();
     this.store.clearModels();
     this.store.resetSettings();
@@ -227,11 +245,72 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     log.info('key removed', { provider });
   }
 
+  // ---- the local model server ----
+
+  /** Lists the server's models: the connection test. Stores them as the `local` catalog on success. */
+  private async testLocalAt(baseUrl: string): Promise<KeyTestResult> {
+    try {
+      const models = await LocalProvider.listModels(baseUrl);
+      if (models.length === 0) return { ok: false, models: 0, error: 'The server answered but has no chat models. Download one in Ollama or LM Studio first.', at: isoNow() };
+      this.store.replaceModels(
+        LOCAL_PROVIDER,
+        models.map((m) => ({ model_id: m.modelId, display_name: m.displayName, capabilities: (m.capabilities ?? {}) as Record<string, unknown> })),
+      );
+      return { ok: true, models: models.length, at: isoNow() };
+    } catch (e) {
+      if (e instanceof ProviderKeyError && e.status === 0) {
+        return { ok: false, models: 0, error: `Couldn't reach ${baseUrl}. Check that Ollama or LM Studio is running and serving there.`, at: isoNow() };
+      }
+      if (e instanceof ProviderKeyError) return { ok: false, models: 0, error: e.message, status: e.status, at: isoNow() };
+      return { ok: false, models: 0, error: 'The connection test failed unexpectedly.', at: isoNow() };
+    }
+  }
+
+  /** Saves the address only when it lists models. */
+  async connectLocal(input: string): Promise<KeyTestResult> {
+    const baseUrl = normalizeBaseUrl(input);
+    if (!baseUrl) return { ok: false, models: 0, error: 'Type an address such as http://localhost:11434/v1.', at: isoNow() };
+    const r = await this.testLocalAt(baseUrl);
+    if (r.ok) {
+      this.setSetting('local', { ...this.settingsCache.local, baseUrl });
+      this.applyRoleUpdate();
+      log.info('local server added', { models: r.models, loopback: isLoopbackUrl(baseUrl) });
+    }
+    return this.recordTest(LOCAL_PROVIDER, r);
+  }
+
+  async testLocal(): Promise<KeyTestResult> {
+    const { baseUrl } = this.settingsCache.local;
+    if (!baseUrl) return this.recordTest(LOCAL_PROVIDER, { ok: false, models: 0, error: 'No local server set up.', at: isoNow() });
+    const r = await this.testLocalAt(baseUrl);
+    this.applyRoleUpdate();
+    return this.recordTest(LOCAL_PROVIDER, r);
+  }
+
+  removeLocal(): void {
+    this.setSetting('local', { baseUrl: null, model: null, manual: false });
+    this.store.removeProviderModels(LOCAL_PROVIDER);
+    this.lastTests.delete(LOCAL_PROVIDER);
+    this.store.setMeta(`key_test:${LOCAL_PROVIDER}`, 'null');
+    this.applyRoleUpdate();
+    log.info('local server removed');
+  }
+
+  /** The model Local only uses. */
+  setLocalModel(model: ModelRef): void {
+    if (!this.catalog().some((m) => m.ref === model && m.provider === LOCAL_PROVIDER)) throw new Error('That local model is not available.');
+    this.setSetting('local', { ...this.settingsCache.local, model, manual: true });
+  }
+
   async refreshModels(): Promise<ModelsRefreshResult> {
     const errors: ModelsRefreshResult['errors'] = [];
     for (const provider of this.keys.providers()) {
       const r = await this.testKey(provider);
       if (!r.ok) errors.push({ provider, message: r.error ?? 'Failed' });
+    }
+    if (this.settingsCache.local.baseUrl) {
+      const r = await this.testLocal();
+      if (!r.ok) errors.push({ provider: LOCAL_PROVIDER, message: r.error ?? 'Failed' });
     }
     const notices = this.applyRoleUpdate();
     return { models: this.catalog(), notices, errors };
@@ -239,8 +318,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
 
   /** On launch: refresh the catalog when it is older than 24 hours. */
   async refreshIfStale(): Promise<void> {
-    const providers = this.keys.providers();
-    if (providers.length === 0) return;
+    if (this.keys.providers().length === 0 && !this.settingsCache.local.baseUrl) return;
     const fetched = this.store.listModels().map((m) => Date.parse(m.fetched_at));
     const oldest = fetched.length ? Math.min(...fetched) : 0;
     if (Date.now() - oldest < CATALOG_MAX_AGE_MS) return;
@@ -250,10 +328,14 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
 
   /** Re-fills roles from the catalog and queues any notice for the bar. */
   private applyRoleUpdate(): string[] {
-    const u = updateRoles(this.settingsCache.roles, this.catalog());
+    const catalog = this.catalog();
+    const u = updateRoles(this.settingsCache.roles, catalog);
     if (u.changed) this.setSetting('roles', u.roles);
-    if (u.notices.length > 0) this.setSetting('pendingNotice', u.notices.join(' '));
-    return u.notices;
+    const l = updateLocalModel(this.settingsCache.local, catalog);
+    if (l.changed) this.setSetting('local', l.local);
+    const notices = [...u.notices, ...l.notices];
+    if (notices.length > 0) this.setSetting('pendingNotice', notices.join(' '));
+    return notices;
   }
 
   setRole({ role, model, fallback }: RoleSetArgs): Settings['roles'] {

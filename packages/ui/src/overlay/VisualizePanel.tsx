@@ -156,8 +156,8 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
       setNote('Could not save. Try again.');
     }
   };
-  const turnOffLocalOnly = async () => {
-    const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
+  const switchToAllModels = async () => {
+    const r = await glossly.invoke('settings:set', { key: 'privacy', value: 'all' });
     if (!r.error) await run();
   };
 
@@ -181,7 +181,12 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
         <div className="answer-error">
           <span className={result.code === 'no_table' ? 'muted' : 'error'}>{result.message}</span>
           {result.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
-          {result.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and try</button>}
+          {result.code === 'local_only' && (
+            <>
+              <button onClick={() => void switchToAllModels()}>Use all models and try</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+            </>
+          )}
           {(result.code === 'provider' || result.code === 'timeout' || result.code === 'invalid_output') && (
             <button onClick={() => void run()}>
               <RotateCcw size={14} strokeWidth={1.75} aria-hidden />

@@ -86,7 +86,10 @@ describe('rulesSpec', () => {
 
 class FakeLlm implements LlmProvider {
   calls: ChatRequest[] = [];
-  constructor(private readonly answer: (req: ChatRequest) => unknown) {}
+  constructor(
+    private readonly answer: (req: ChatRequest) => unknown,
+    private readonly usable = true,
+  ) {}
   stream(): never {
     throw new Error('not used');
   }
@@ -95,12 +98,12 @@ class FakeLlm implements LlmProvider {
     return schema.parse(this.answer(req));
   }
   hasModel(): boolean {
-    return true;
+    return this.usable;
   }
 }
 
 describe('visualize', () => {
-  const settings = (localOnly = false) => () => ({ localOnly });
+  const settings = (localOnly = false) => () => ({ privacy: localOnly ? ('local' as const) : ('all' as const) });
 
   it("draws the model's pick, without a table call for a parsed table", async () => {
     const llm = new FakeLlm(() => ({ chart: 'bar', x: 'Region', measures: ['Q2'], split_by: '', sort: 'descending' }));
@@ -125,10 +128,10 @@ describe('visualize', () => {
     expect(r2).toMatchObject({ ok: true, table: { source: 'model', rows: [['Q1', 1_200_000], ['Q2', 1_500_000]] }, spec: null });
   });
 
-  it('with Local only, charts a parsed table by rules and makes no model call', async () => {
+  it('with Local only and no local model, charts a parsed table by rules and makes no model call', async () => {
     const llm = new FakeLlm(() => {
       throw new LlmError('local_only', 'Local only is on');
-    });
+    }, false);
     expect(await visualize({ llm, settings: settings(true) }, TSV)).toMatchObject({ ok: true, chartBy: 'rules' });
     expect(await visualize({ llm, settings: settings(true) }, 'Revenue was up a lot.')).toMatchObject({ ok: false, code: 'local_only' });
     expect(llm.calls).toEqual([]);

@@ -40,6 +40,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | — | Oct 10 | `e6a3c4d` … `0bca491` | Reply drafts cached per highlight; site keys keep a leading site name. |
 | — | Oct 11 | `e7949b1`, (next) | Real names in unit tests and a comment replaced with fictional ones; the owner's name in test identities, fixtures, and the ui-drive sample replaced with Alex Morgan; AGENTS.md rule on real people's information. |
 | — | Oct 11 | `0e7061f` | "Don't show here" stores plain names and toggles to "Show here"; one add-person form in Who, Reply, and What did I promise; Reply's unreadable Add button fixed. |
+| 18 | Oct 11 | (next) | Privacy choice (All models / Local only) with a settings migration; local model server (Ollama, LM Studio) in Keys, Models, and the model layer; What did I promise by patterns without a model (decision 34). |
 | — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
-Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 18 to 23 are planned in `HANDOFF.md` (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
+Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 19 to 23 are planned in `HANDOFF.md` (reordered Oct 11; the rest of Step 17, the decision providers, is parked).

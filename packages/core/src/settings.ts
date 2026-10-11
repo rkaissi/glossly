@@ -18,6 +18,9 @@ export const RoleAssignmentSchema = z.object({
 });
 export type RoleAssignment = z.infer<typeof RoleAssignmentSchema>;
 
+export const PrivacySchema = z.enum(['all', 'local']);
+export type Privacy = z.infer<typeof PrivacySchema>;
+
 const emptyRole: RoleAssignment = { model: null, fallback: null, manual: false };
 
 /**
@@ -48,7 +51,25 @@ export const SettingsSchema = z.object({
   saveMode: z.enum(['manual', 'hotkey', 'autosave']).default('manual'),
   /** Registered only in the "hotkey" Save mode. */
   saveHotkey: z.string().default('Control+Alt+S'),
-  localOnly: z.boolean().default(false),
+  /**
+   * Where model calls may go (decision 34). all: any configured provider, cloud or local.
+   * local: nothing leaves this computer; calls go to a local model on a loopback address, or
+   * are refused (decision 12). A third choice (a subscription) may join later.
+   */
+  privacy: PrivacySchema.default('all'),
+  /**
+   * The local model server (Ollama, LM Studio, or any OpenAI-compatible endpoint). baseUrl null
+   * means none is set up. `model` is what Local only uses for any call whose role model isn't
+   * local; filled from the local catalog, never overwritten while it stays available once
+   * picked by hand (`manual`).
+   */
+  local: z
+    .object({
+      baseUrl: z.string().url().nullable().default(null),
+      model: ModelRefSchema.nullable().default(null),
+      manual: z.boolean().default(false),
+    })
+    .prefault({}),
   /** Reply learns from the drafts the user picks and edits (Profile). Off: nothing is recorded or used. */
   replyLearning: z.boolean().default(true),
   debugView: z.boolean().default(true),
@@ -160,7 +181,12 @@ export const DEFAULT_COLLECTIONS = ['Notes', 'Reading', 'Ideas', 'People notes']
  * who still have the old default through one of these. Each returns the new value for its key,
  * or undefined to leave it.
  */
-export const SETTINGS_MIGRATIONS: { key: SettingsKey; migrate: (stored: unknown) => unknown }[] = [
+export const SETTINGS_MIGRATIONS: {
+  key: SettingsKey;
+  /** Read this stored key instead of `key`, write the result to `key`, and delete `from` (a renamed setting). */
+  from?: string;
+  migrate: (stored: unknown) => unknown;
+}[] = [
   // Oct 10: the router's decision budget went from 400 to 600 ms (400 timed out too often).
   {
     key: 'router',
@@ -193,6 +219,8 @@ export const SETTINGS_MIGRATIONS: { key: SettingsKey; migrate: (stored: unknown)
       return out;
     },
   },
+  // Oct 11: the Local only checkbox became a choice (decision 34): localOnly true → privacy "local".
+  { key: 'privacy', from: 'localOnly', migrate: (v) => (v === true ? 'local' : 'all') },
 ];
 
 /** Parses a partial or stale stored object, keeping valid keys and defaulting the rest. */

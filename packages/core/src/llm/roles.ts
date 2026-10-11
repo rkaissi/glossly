@@ -1,5 +1,5 @@
 import type { ModelRef, RoleAssignment, RoleName, Settings } from '../settings';
-import { parseRef, pickDefault, type CatalogModel } from './catalog';
+import { LOCAL_PROVIDER, parseRef, pickDefault, type CatalogModel } from './catalog';
 
 export interface RoleUpdate {
   roles: Settings['roles'];
@@ -10,10 +10,15 @@ export interface RoleUpdate {
 
 const ROLE_LABEL: Record<RoleName, string> = { fast: 'Fast', chat: 'Chat', decision: 'Decision' };
 
-/** Best default from a different provider than `primary`, so a provider outage has a way out. */
+/**
+ * Best default from a different provider than `primary`, so a provider outage has a way out.
+ * A cloud model never gets a local one as its automatic fallback: a local model is slow and
+ * loads the machine, so it is only a fallback when picked by hand.
+ */
 function pickFallback(role: 'fast' | 'chat', models: CatalogModel[], primary: ModelRef | null): ModelRef | null {
   if (!primary) return null;
   const { provider } = parseRef(primary);
+  if (provider !== LOCAL_PROVIDER) models = models.filter((m) => m.provider !== LOCAL_PROVIDER);
   const other = pickDefault(role, models.filter((m) => m.provider !== provider));
   if (other) return other.ref;
   const same = pickDefault(role, models.filter((m) => m.ref !== primary));
@@ -59,6 +64,34 @@ export function updateRoles(current: Settings['roles'], models: CatalogModel[]):
   if (d.fallback && !available.has(d.fallback)) d.fallback = null;
 
   return { roles, changed: JSON.stringify(roles) !== JSON.stringify(current), notices };
+}
+
+export interface LocalModelUpdate {
+  local: Settings['local'];
+  changed: boolean;
+  notices: string[];
+}
+
+/**
+ * Keeps the Local only model in step with the local catalog, like `updateRoles`: fills it when
+ * empty, keeps a hand pick while it is available, and switches a model that went away.
+ */
+export function updateLocalModel(current: Settings['local'], models: CatalogModel[]): LocalModelUpdate {
+  const local = { ...current };
+  const notices: string[] = [];
+  // Every local model has the same generic capabilities, so the pick is the first by name.
+  const mine = models.filter((m) => m.provider === LOCAL_PROVIDER).sort((a, b) => a.modelId.localeCompare(b.modelId));
+  if (local.model && !mine.some((m) => m.ref === local.model)) {
+    // Only a notice while a server is set up: removing the server clears the model quietly.
+    if (local.baseUrl && mine.length > 0) notices.push(`Local model ${parseRef(local.model).modelId} is no longer available. Switched to ${pickDefault('chat', mine)?.modelId}.`);
+    local.model = null;
+    local.manual = false;
+  }
+  if (!local.model) {
+    local.model = pickDefault('chat', mine)?.ref ?? null;
+    local.manual = false;
+  }
+  return { local, changed: JSON.stringify(local) !== JSON.stringify(current), notices };
 }
 
 /** The models to try for a call, in order: per-action override or role model, then fallback. */

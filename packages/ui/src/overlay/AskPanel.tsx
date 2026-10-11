@@ -83,8 +83,8 @@ export function AskPanel({ s }: { s: OverlayState }) {
     if (queued.length) setAnswer((a) => queued.reduce<Answer | null>(apply, a) as Answer);
   };
 
-  const turnOffLocalOnly = async () => {
-    const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
+  const switchToAllModels = async () => {
+    const r = await glossly.invoke('settings:set', { key: 'privacy', value: 'all' });
     if (!r.error) await submit();
   };
 
@@ -134,7 +134,12 @@ export function AskPanel({ s }: { s: OverlayState }) {
               {answer.code === 'no_model' && (
                 <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>
               )}
-              {answer.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and ask</button>}
+              {answer.code === 'local_only' && (
+                <>
+                  <button onClick={() => void switchToAllModels()}>Use all models and ask</button>
+                  <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+                </>
+              )}
             </div>
           )}
         </div>

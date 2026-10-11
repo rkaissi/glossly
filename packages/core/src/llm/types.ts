@@ -35,7 +35,7 @@ export interface StreamResult {
 export interface LlmProvider {
   stream(req: ChatRequest): StreamResult;
   structured<T>(req: ChatRequest, schema: z.ZodType<T>): Promise<T>;
-  /** True if the role resolves to a usable model. */
+  /** True if the role resolves to a usable model (under Local only, a local one). */
   hasModel(role: RoleName): boolean;
 }
 

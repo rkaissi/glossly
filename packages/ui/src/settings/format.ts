@@ -4,6 +4,9 @@ import type { CatalogModel, SettingsView } from '@glossly/core/api';
 // Component files export only components, so React Fast Refresh can hot-swap them.
 export const hasWorkingKey = (view: SettingsView) => view.keys.some((k) => k.hasKey && k.lastTest?.ok);
 
+/** A working key, or a local server that lists models. */
+export const hasWorkingModel = (view: SettingsView) => hasWorkingKey(view) || Boolean(view.local.baseUrl && view.local.lastTest?.ok);
+
 export interface ProviderGroup {
   provider: string;
   label: string;

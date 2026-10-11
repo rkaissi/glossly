@@ -208,7 +208,7 @@ describe('Router', () => {
     expect((await router(null).route(ctx(THREAD))).fallback).toBe('no_model');
     const called = { n: 0 };
     const counting: DecisionProvider = { id: 'llm_structured', decide: async () => (called.n++, modelDecision) };
-    expect((await router(counting, { localOnly: true }).route(ctx(THREAD))).fallback).toBe('local_only');
+    expect((await router(counting, { privacy: 'local' }).route(ctx(THREAD))).fallback).toBe('local_only');
     expect(called.n).toBe(0);
   });
 

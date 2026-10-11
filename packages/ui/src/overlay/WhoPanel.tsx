@@ -94,11 +94,11 @@ export function WhoPanel({ s }: { s: OverlayState }) {
     };
   }, [s.sessionId]);
 
-  const turnOffLocalOnly = () => {
+  const switchToAllModels = () => {
     setView(null);
     setFailed(false);
     void glossly
-      .invoke('settings:set', { key: 'localOnly', value: false })
+      .invoke('settings:set', { key: 'privacy', value: 'all' })
       .then(() => glossly.invoke('who:get', { sessionId: s.sessionId }))
       .then((v) => setView(v))
       .catch(() => setFailed(true));
@@ -163,9 +163,9 @@ export function WhoPanel({ s }: { s: OverlayState }) {
       {view?.local === 'local_only' && (
         <div className="inline-note">
           <Info size={14} strokeWidth={1.75} aria-hidden />
-          <span>Local only is on, so this list is from the text only.</span>
-          <button className="ghost" onClick={turnOffLocalOnly}>
-            Turn off Local only
+          <span>Local only is on with no local model, so this list is from the text only.</span>
+          <button className="ghost" onClick={switchToAllModels}>
+            Use all models
           </button>
         </div>
       )}

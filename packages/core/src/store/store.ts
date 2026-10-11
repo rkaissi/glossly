@@ -68,7 +68,8 @@ export class Store {
     if (done >= SETTINGS_MIGRATIONS.length) return;
     this.tx(() => {
       for (const m of SETTINGS_MIGRATIONS.slice(done)) {
-        const row = this.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(m.key) as { value_json: string } | undefined;
+        const source = m.from ?? m.key;
+        const row = this.db.prepare('SELECT value_json FROM settings WHERE key = ?').get(source) as { value_json: string } | undefined;
         if (!row) continue;
         let stored: unknown;
         try {
@@ -77,7 +78,12 @@ export class Store {
           continue;
         }
         const next = m.migrate(stored);
-        if (next !== undefined) this.db.prepare('UPDATE settings SET value_json = ? WHERE key = ?').run(JSON.stringify(next), m.key);
+        if (next !== undefined) {
+          this.db
+            .prepare('INSERT INTO settings (key, value_json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json')
+            .run(m.key, JSON.stringify(next));
+        }
+        if (m.from) this.db.prepare('DELETE FROM settings WHERE key = ?').run(m.from);
       }
       this.setMeta('settings_migrations', String(SETTINGS_MIGRATIONS.length));
     });

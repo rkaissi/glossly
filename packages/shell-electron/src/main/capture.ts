@@ -847,7 +847,7 @@ export class Capture {
       {
         editable: s.focusEditable,
         recent: recentSnippets(this.services.store, settings).length,
-        summaryModel: !settings.localOnly && this.services.llm.hasModel('chat'),
+        summaryModel: this.services.llm.hasModel('chat'),
         writing: s.surroundings?.source === 'caret' && s.surroundings.text.trim().length > 0 && this.services.store.collectionCounts().total > 0,
       },
       settings.router,
@@ -856,7 +856,7 @@ export class Capture {
 
   /** True when Router.route will spend a model call. Rules then wait instead of flashing. */
   private routeWillCallModel(): boolean {
-    return !this.settings.localOnly && this.services.llm.hasModel('decision');
+    return this.settings.privacy !== 'local' && this.services.llm.hasModel('decision');
   }
 
   private initialSlots(quick: RouteResult | null): ReturnType<typeof slotsView> | null {
@@ -1363,8 +1363,8 @@ export class Capture {
     const ctl = new AbortController();
     s.visualCtl = ctl;
     const t = performance.now();
-    // Local only draws a plain chart without the model, so it is a different answer for the same text.
-    const key = `${this.settings.localOnly ? 'local' : 'model'}
+    // Without a model (Local only with no local model, or no key) code draws a plain chart, so it is a different answer for the same text.
+    const key = `${this.services.llm.hasModel('fast') ? 'model' : 'code'}
 ${s.selection.text}`;
     const hit = this.visualCache.get(key);
     if (hit) {
@@ -1458,7 +1458,7 @@ ${s.selection.text}`;
     return this.insertText(s, body, 'paste', (how) => this.services.metrics.record('paste_inserted', { kind, how, edited, ms: ms(s.t0) }));
   }
 
-  /** What did I promise: one structured call for the commitments in the selected message. */
+  /** What did I promise: one structured call for the commitments in the selected message, or patterns without a model. */
   async extractPromises(sessionId: number): Promise<PromisesResult> {
     const s = this.current(sessionId);
     if (!s?.selection) return { ok: false, code: 'no_selection', message: 'Nothing is selected.' };
@@ -1480,7 +1480,7 @@ ${s.selection.text}`;
         (r) => r.read.people,
         () => [],
       );
-      const rows = await extractPromises(
+      const { rows, byRules } = await extractPromises(
         this.services.llm,
         people,
         this.settings,
@@ -1489,13 +1489,14 @@ ${s.selection.text}`;
         new Date(),
         found,
       );
-      this.services.metrics.record('promises_extracted', { count: rows.length, with_details: rows.filter((r) => r.details).length, ms: ms(t) });
+      this.services.metrics.record('promises_extracted', { count: rows.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), ...(byRules && { by_rules: byRules }) });
       return {
         ok: true,
         rows,
         author: det.authorIsMe ? null : (det.author?.name ?? det.author?.email ?? null),
         authorIsMe: det.authorIsMe,
         identitySet: identity.name.trim().length > 0,
+        byRules,
       };
     } catch (e) {
       const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';

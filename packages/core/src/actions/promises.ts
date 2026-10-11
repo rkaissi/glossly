@@ -14,6 +14,7 @@ import type { Settings } from '../settings';
 import type { PeopleRepo } from '../store/people';
 import { isoNow, type ContainerContext, type SelectionPayload } from '../types';
 import { contextWindow } from './context';
+import { rulesCommitments } from './promise-rules';
 
 export const ExtractedCommitmentsSchema = z.object({
   commitments: z.array(
@@ -135,19 +136,36 @@ export function toPromiseRows(out: ExtractedCommitments, people: PeopleRepo, sou
   return rows;
 }
 
+/** Why the rows came from patterns instead of a model: Local only with no local model, or no Fast model. */
+export type PromisesByRules = null | 'local_only' | 'no_model';
+
+export interface PromisesExtract {
+  rows: PromiseRow[];
+  byRules: PromisesByRules;
+}
+
 /**
- * One structured call on the Fast role (action "promises"). Local only refuses inside the LLM
- * layer. `detected` is the people reader's answer for the same text, which runs alongside.
+ * One structured call on the Fast role (action "promises"). With no usable model (Local only
+ * without a local model, or no key) sentence patterns find them instead (`rulesCommitments`).
+ * `detected` is the people reader's answer for the same text, which runs alongside.
  */
 export async function extractPromises(
   llm: LlmProvider,
   people: PeopleRepo,
-  settings: Pick<Settings, 'identity'>,
+  settings: Pick<Settings, 'identity' | 'privacy'>,
   input: PromisesInput,
   signal?: AbortSignal,
   now: Date = new Date(),
   detected: Promise<DetectedPerson[]> | DetectedPerson[] = [],
-): Promise<PromiseRow[]> {
+): Promise<PromisesExtract> {
+  if (!llm.hasModel('fast')) {
+    const author = { name: input.authorIsMe ? null : (input.author?.name ?? null), isMe: input.authorIsMe };
+    const found = await detected;
+    return {
+      rows: toPromiseRows(rulesCommitments(input.selection.text.slice(0, MAX_SELECTION), author, now), people, input.selection.source_app, now, found),
+      byRules: settings.privacy === 'local' ? 'local_only' : 'no_model',
+    };
+  }
   const call = llm.structured(
     {
       role: 'fast',
@@ -161,7 +179,7 @@ export async function extractPromises(
     ExtractedCommitmentsSchema,
   );
   const [out, found] = await Promise.all([call, detected]);
-  return toPromiseRows(out, people, input.selection.source_app, now, found);
+  return { rows: toPromiseRows(out, people, input.selection.source_app, now, found), byRules: null };
 }
 
 export interface PromiseSaveContext {

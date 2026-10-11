@@ -2,7 +2,7 @@
 // the model for rows; then the model picks a chart (the kind and the columns, as enums of the
 // table's own columns), code writes the Vega-Lite spec, and the spec is checked against the
 // Vega-Lite JSON schema before it is shown; when anything fails, the table is shown.
-// Local only, or no key: the table must parse in code, and code picks a plain chart.
+// No model (Local only without a local model, or no key): the table must parse in code, and code picks a plain chart.
 import Ajv, { type ValidateFunction } from 'ajv';
 import vegaLiteSchema from 'vega-lite/vega-lite-schema.json';
 import { z } from 'zod';
@@ -116,7 +116,7 @@ export function specFromChoice(c: ChartChoice, table: ParsedTable, types: FieldT
 }
 
 /**
- * Code's own pick when there is no model (Local only, no key): a line over dates or many
+ * Code's own pick when there is no model (Local only without a local model, no key): a line over dates or many
  * ordered values, else bars per category; with only numbers, a scatter of the first two.
  * Null when nothing is numeric.
  */
@@ -149,7 +149,7 @@ export function buildChartPrompt(table: ParsedTable, types: FieldType[]): string
 
 export interface VisualizeDeps {
   llm: LlmProvider;
-  settings: () => Pick<Settings, 'localOnly'>;
+  settings: () => Pick<Settings, 'privacy'>;
 }
 
 function failure(e: unknown, signal?: AbortSignal): Extract<VisualizeResult, { ok: false }> {
@@ -160,13 +160,13 @@ function failure(e: unknown, signal?: AbortSignal): Extract<VisualizeResult, { o
 /** Runs Visualize on the selected text. Never throws for a model failure; it falls back or reports it. */
 export async function visualize(deps: VisualizeDeps, text: string, signal?: AbortSignal): Promise<VisualizeResult> {
   if (!text.trim()) return { ok: false, code: 'no_selection', message: 'Nothing is selected.' };
-  const useModel = !deps.settings().localOnly && deps.llm.hasModel('fast');
+  const useModel = deps.llm.hasModel('fast');
 
   let table = parseTable(text);
   if (!table) {
     if (!useModel) {
-      return deps.settings().localOnly
-        ? { ok: false, code: 'local_only', message: "Local only is on, and this text isn't shaped like a table, so it can't be read without a model." }
+      return deps.settings().privacy === 'local'
+        ? { ok: false, code: 'local_only', message: "Local only is on with no local model, and this text isn't shaped like a table, so it can't be read without one." }
         : { ok: false, code: 'no_table', message: "This text isn't shaped like a table. Add a key so a model can read it." };
     }
     try {

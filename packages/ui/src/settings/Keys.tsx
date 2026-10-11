@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { KeyStatus, SettingsView } from '@glossly/core/api';
+import type { KeyStatus, LocalStatus, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { timeAgo } from './format';
@@ -110,6 +110,122 @@ export function KeyCard({ k }: { k: KeyStatus }) {
   );
 }
 
+/** The local model server: an address (with Ollama and LM Studio presets), Connect, and its status. */
+export function LocalCard({ local }: { local: LocalStatus }) {
+  const [value, setValue] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const { busy, error, setError, run } = useAction();
+  const test = local.lastTest;
+
+  const connect = async (baseUrl: string) => {
+    const r = await run(() => glossly.invoke('local:connect', { baseUrl }));
+    if (!r) return;
+    if (r.ok) {
+      setValue('');
+      setEditing(false);
+    } else setError(r.error ?? 'Could not connect.');
+  };
+
+  const showInput = !local.baseUrl || editing;
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3>Local model</h3>
+        <span className="tag accent">Free, stays on this computer</span>
+        <span className="spacer" />
+        <a href="https://ollama.com/download" target="_blank" rel="noreferrer">
+          Get Ollama
+        </a>
+      </div>
+      <p className="muted small">
+        Runs a model on this computer through Ollama or LM Studio, with no key. Slower than a cloud model, and Local only uses it for every call.
+      </p>
+
+      {local.baseUrl && (
+        <div className="row">
+          {test?.ok ? (
+            <span className="ok">
+              Working at <code>{local.baseUrl}</code>. {test.models} chat model{test.models === 1 ? '' : 's'}, tested {timeAgo(test.at)}.
+            </span>
+          ) : test ? (
+            <span className="error">Last test failed: {test.error ?? 'unknown error'}</span>
+          ) : (
+            <span className="muted">
+              Saved at <code>{local.baseUrl}</code>, not tested yet.
+            </span>
+          )}
+          <span className="spacer" />
+          <button disabled={busy} onClick={() => void run(() => glossly.invoke('local:test'))}>
+            Test again
+          </button>
+          {!editing && (
+            <button disabled={busy} onClick={() => setEditing(true)}>
+              Change
+            </button>
+          )}
+          {confirming ? (
+            <InlineConfirm
+              prompt="Forget the local server?"
+              confirm="Remove"
+              busy={busy}
+              onConfirm={() =>
+                void run(async () => {
+                  await glossly.invoke('local:remove');
+                  setConfirming(false);
+                })
+              }
+              onCancel={() => setConfirming(false)}
+            />
+          ) : (
+            <button className="danger" disabled={busy} onClick={() => setConfirming(true)}>
+              Remove
+            </button>
+          )}
+        </div>
+      )}
+      {local.baseUrl && !local.loopback && <p className="warn small">This address is on another computer, so Local only won't use it.</p>}
+
+      {showInput && (
+        <>
+          <div className="row">
+            {local.presets.map((p) => (
+              <button key={p.label} disabled={busy} onClick={() => void connect(p.baseUrl)}>
+                {busy ? 'Connecting…' : `Connect to ${p.label}`}
+              </button>
+            ))}
+          </div>
+          <form
+            className="row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void connect(value);
+            }}
+          >
+            <input
+              className="grow"
+              placeholder="Or another address, such as http://localhost:8080/v1"
+              aria-label="Local server address"
+              spellCheck={false}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+            <button type="submit" className="primary" disabled={busy || !value.trim()}>
+              {busy ? 'Connecting…' : 'Connect'}
+            </button>
+            {editing && (
+              <button type="button" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            )}
+          </form>
+        </>
+      )}
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
 export function KeysTab({ view }: { view: SettingsView }) {
   return (
     <section>
@@ -121,6 +237,7 @@ export function KeysTab({ view }: { view: SettingsView }) {
       {view.keys.map((k) => (
         <KeyCard key={k.provider} k={k} />
       ))}
+      <LocalCard local={view.local} />
     </section>
   );
 }

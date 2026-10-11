@@ -34,8 +34,8 @@ pnpm monorepo. `@glossly/core` ships TypeScript and is bundled into main by elec
 | `capture/` | `apps.ts` (block list, hotkey-only defaults, `siteKeyFor`, `keyMatches`, `resolveAppMode`), `gating.ts`, `placement.ts` (`placePill`, `placeBar`, `leftEdge`), `obstacles.ts` (baseline diff), `pill-wait.ts` (toolbar wait and learning), `clean.ts` (`cleanText`). |
 | `router/` | `features.ts` (`extractFeatures`, `chatSpeaker`), `rules.ts`, `llm-decision.ts` (`LlmStructuredDecision`), `slots.ts` (`scoreActions`, `scoreEmptyActions`, `rankSlots`), `router.ts` (`quick()` for the instant rules paint, `route()` racing the model against the budget). |
 | `store/` | `migrations.ts` (4 migrations, `PRAGMA user_version`), `store.ts` (`Store`: meta, settings, collections, items, entities, vectors, events, model catalog, export, delete-all, reset), `people.ts` (`PeopleRepo`: people, aliases, interactions, commitments, voice samples, style signals). |
-| `llm/` | `providers.ts` (Groq, OpenAI, Anthropic; `listModels` doubles as the key test), `catalog.ts` and `models/capabilities.json` (structured mode, reasoning effort, tools, cost/speed/tier, role preferences), `roles.ts` (`updateRoles`, `modelChain`), `llm.ts` (`AiSdkLlm`). |
-| `actions/` | `ask.ts`, `save.ts` (`SaveService`), `context.ts` (`contextWindow`), `who.ts`, `promises.ts`, `reply.ts`, `style-notes.ts`, `paste.ts`, `paste-types.ts`. |
+| `llm/` | `providers.ts` (Groq, OpenAI, Anthropic; `listModels` doubles as the key test; `LocalProvider` for an OpenAI-compatible local server, `normalizeBaseUrl`, `isLoopbackUrl`), `catalog.ts` and `models/capabilities.json` (structured mode, reasoning effort, tools, cost/speed/tier, role preferences), `roles.ts` (`updateRoles`, `updateLocalModel`, `modelChain`), `llm.ts` (`AiSdkLlm`, `privacyChain`). |
+| `actions/` | `ask.ts`, `save.ts` (`SaveService`), `context.ts` (`contextWindow`), `who.ts`, `promises.ts`, `promise-rules.ts` (commitments without a model), `reply.ts`, `style-notes.ts`, `paste.ts`, `paste-types.ts`. |
 | `people/` | `names.ts` (`canonicalize`, `jaroWinkler`, `isMe`), `detect.ts` (local detection), `resolve.ts`, `who-judge.ts`, `emails.ts`, `dates.ts` (`resolveDue`), `relationship.ts`, `reply-style.ts`, `types.ts`. |
 | `recall/` | `recall.ts`: Recall ranking, search, and the Saved tab's `library()`. |
 | `visualize/` | `table.ts` (parsing), `visualize.ts` (chart pick, `specFromChoice`, schema validation with Ajv). |
@@ -76,8 +76,8 @@ The bar is: Glossly menu, Ask (slot 1), Save (slot 2), then slots 3 and 4, then 
 
 ## LLM layer
 
-- **Roles**: `fast`, `chat`, `decision` (null = use Fast), each `{model, fallback, manual}`, model refs like `groq:qwen/qwen3.8-27b`. Per-action overrides in `actionModels`.
-- **`AiSdkLlm`**: `stream` and `structured`. Falls back to the role's fallback model on 429 or 5xx only before the first token. Structured calls retry once with the validation error appended. JSON mode (no native schema) puts the JSON Schema in the instructions. Reasoning effort per model from `capabilities.json`. Enforces Local only (decision 12). `ChatRequest.tools` passes tools for one step (Ask's `remember`). It builds every model in a role's chain up front.
+- **Roles**: `fast`, `chat`, `decision` (null = use Fast), each `{model, fallback, manual}`, model refs like `groq:qwen/qwen3.8-27b` or `local:qwen3:8b`. Per-action overrides in `actionModels`. `local` holds the local server's `baseUrl` and the Local only model (`model`, `manual`). Services gives the local provider an empty key once a `baseUrl` is saved; `local:connect`, `local:test`, `local:remove`, and `local:model` manage it.
+- **`AiSdkLlm`**: `stream` and `structured`. Falls back to the role's fallback model on 429 or 5xx only before the first token. Structured calls retry once with the validation error appended. JSON mode (no native schema) puts the JSON Schema in the instructions. Reasoning effort per model from `capabilities.json`. Enforces the privacy choice (decisions 12 and 34): under Local only `privacyChain` keeps only local models on a loopback address, and with none a call fails with `local_only` before anything is sent; `hasModel` answers under the same rule, which is how Who, Visualize, and What did I promise pick their code paths. A local call with no HTTP answer becomes "Couldn't reach the local model". `ChatRequest.tools` passes tools for one step (Ask's `remember`). It builds every model in a role's chain up front.
 - Every new model call goes through `AiSdkLlm`, with an `action` name (used for per-action overrides and metrics) and a prompt file in `core/prompts/`.
 
 ## Data
@@ -85,7 +85,7 @@ The bar is: Glossly menu, Ask (slot 1), Save (slot 2), then slots 3 and 4, then 
 `%APPDATA%\Glossly` (`productName: "Glossly"`): `glossly.db`, `keys\<provider>.bin` (`safeStorage`; the encryption key lives in the profile's `Local State`), `models\` (embedding model), `logs\main.log`.
 
 - **Schema migrations** (`store/migrations.ts`, tracked with `PRAGMA user_version`): 1 every spec table plus `meta`, `settings`, `models`; 2 `commitments.notified_at` and indexes; 3 voice-sample channel/person/draft columns, `style_signals`, `style_notes`, deleting unedited inserts; 4 `people.relationship` and "chat" → "messaging". Never edit a shipped migration; add a new one.
-- **Settings migrations** (`SETTINGS_MIGRATIONS` in `settings.ts`, applied by `Store.migrateSettings()`, count in meta `settings_migrations`): one-time changes to stored values when a default changes (router 400 → 600 ms, `minWords` 3 → 0). Never edit a shipped entry.
+- **Settings migrations** (`SETTINGS_MIGRATIONS` in `settings.ts`, applied by `Store.migrateSettings()`, count in meta `settings_migrations`): one-time changes to stored values when a default changes (router 400 → 600 ms, `minWords` 3 → 0, title keys → plain names, `localOnly` → `privacy`). An entry with `from` reads that key, writes its own, and deletes `from` (a rename). Never edit a shipped entry.
 - **Vectors**: `vec0` table with a cosine metric; `ensureVectorModel(model, dims)` recreates it and reports when everything needs re-embedding.
 - **Item kinds**: `selection` (with an excerpt `ContextWindow`), `note` (from Ask), `chart` (from Visualize; text is the CSV).
 - **Export** (`exportAll`): every table except vectors; never keys.
@@ -95,4 +95,4 @@ The bar is: Glossly menu, Ask (slot 1), Save (slot 2), then slots 3 and 4, then 
 - Logs (`log.ts`) and metrics (`sanitizePayload`) carry codes, counts, and timings only, never selected text or keys. Site keys are not logged either.
 - Password fields are refused by the helper for every read and copy command.
 - The keyboard is never hooked (decision 3).
-- Nothing goes to a provider under Local only (decision 12).
+- Nothing leaves this computer under Local only: only a local model on a loopback address, or code (decisions 12 and 34).

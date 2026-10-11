@@ -16,7 +16,7 @@ const ACTION_OVERRIDES: { action: string; label: string; role: RoleName }[] = [
   { action: 'router', label: 'Router decision', role: 'decision' },
 ];
 
-const providerOrder = (view: SettingsView) => view.keys.map((k) => ({ provider: k.provider, label: k.label }));
+const providerOrder = (view: SettingsView) => [...view.keys.map((k) => ({ provider: k.provider, label: k.label })), { provider: 'local', label: 'Local' }];
 
 function Badges({ m }: { m: CatalogModel }) {
   return (
@@ -120,12 +120,48 @@ function RoleRow({ view, role, label, desc }: { view: SettingsView; role: RoleNa
   );
 }
 
+/** The model Local only uses for every call whose role model isn't local. */
+function LocalOnlyRow({ view }: { view: SettingsView }) {
+  const { busy, error, run } = useAction();
+  const local = view.models.filter((m) => m.provider === 'local');
+  if (local.length === 0) return null;
+  const cur = view.settings.local;
+  return (
+    <div className="role">
+      <div className="role-name">
+        <strong>Local only</strong>
+        {cur.manual && <span className="tag">Picked by you</span>}
+      </div>
+      <p className="muted small">Used for every model call while Local only is on, unless a role above already uses a local model.</p>
+      <div className="role-pickers">
+        <label>
+          <span className="small muted">Model</span>
+          <select
+            aria-label="Local only model"
+            value={cur.model ?? ''}
+            disabled={busy}
+            onChange={(e) => void run(() => glossly.invoke('local:model', { model: e.target.value }))}
+          >
+            {local.map((m) => (
+              <option key={m.ref} value={m.ref}>
+                {m.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
 export function RolePickers({ view }: { view: SettingsView }) {
   return (
     <div className="roles">
       {ROLES.map((r) => (
         <RoleRow key={r.role} view={view} {...r} />
       ))}
+      <LocalOnlyRow view={view} />
     </div>
   );
 }

@@ -17,7 +17,7 @@ export interface RouteResult {
 export interface RouterDeps {
   /** The model-backed provider, or null when no key or model is configured. */
   decision: DecisionProvider | null;
-  settings: () => Pick<Settings, 'router' | 'localOnly'>;
+  settings: () => Pick<Settings, 'router' | 'privacy'>;
   collections: () => string[];
   people?: () => KnownPerson[];
   /** The user's identity, to tell their own messages apart. */
@@ -50,7 +50,8 @@ export class Router {
 
     let decisions: Decisions | null = null;
     let fallback: RouteResult['fallback'] = null;
-    if (settings.localOnly) fallback = 'local_only';
+    // Local only routes by rules even with a local model: one rarely answers inside the budget.
+    if (settings.privacy === 'local') fallback = 'local_only';
     else if (!this.deps.decision) fallback = 'no_model';
     else {
       const ctl = new AbortController();

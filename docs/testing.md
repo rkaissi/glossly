@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (432 tests on Oct 10)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (452 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -129,6 +129,14 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Visualize a table: the chart pick renders; switch to Ask and back: `visualized {"cached":true}`.
 - [ ] Settings > Saved: filter, search, move, copy, delete.
 - [ ] Metrics shows the Features table with real counts.
+
+**Local models and privacy (Step 18)**
+- [ ] First launch after the update: a stored Local only shows as Local only in General (settings migration), and `localOnly` is gone from the `settings` table.
+- [ ] Keys > Local model with Ollama running (pull a small model first): Connect to Ollama lists its models; the Models tab shows a Local only row and a Local group in the catalog. With Ollama stopped: Connect says it couldn't reach it; Test again on a saved server fails the same way; nothing is saved from a failed connect.
+- [ ] Local only with the local model: Ask streams from it, Save finds entities, Who writes notes, What did I promise uses it, Reply drafts; slots 3 and 4 still come from rules (`routed` with `fallback: local_only`). Stop Ollama mid-use: Ask says "Couldn't reach the local model".
+- [ ] Local only with no local server: Ask, Reply, and Paste's summary show "Use all models and…" and "Set up a local model" (opens Keys); What did I promise lists pattern rows with the "found by simple patterns" note; Who shows the text-only note with "Use all models"; Visualize charts a TSV.
+- [ ] A local server at a LAN address: Keys warns, General's Local only line says it isn't used, and Ask refuses under Local only.
+- [ ] Setup on a throwaway profile: choosing Local only enables Next with no key; All models needs a key or a local server.
 
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).

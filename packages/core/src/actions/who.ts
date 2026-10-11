@@ -110,17 +110,17 @@ export interface WhoRead {
 
 /**
  * Who opened. One Fast call (action "who") when a model is available; code then accepts the
- * rows. Local only, or no Fast model, reads the text only and leaves the note blank. Matching
+ * rows. Local only without a local model, or no Fast model, reads the text only and leaves the note blank. Matching
  * to saved people is `buildWho`, done fresh each time so a person added since shows up.
  */
 export async function readWho(
   llm: LlmProvider,
-  settings: Pick<Settings, 'identity' | 'localOnly'>,
+  settings: Pick<Settings, 'identity' | 'privacy'>,
   input: DetectInput,
   signal?: AbortSignal,
   onModelError?: (e: unknown) => void,
 ): Promise<WhoRead> {
-  const local: WhoLocal = settings.localOnly ? 'local_only' : llm.hasModel('fast') ? null : 'no_model';
+  const local: WhoLocal = llm.hasModel('fast') ? null : settings.privacy === 'local' ? 'local_only' : 'no_model';
   if (local !== null) return { people: localWho(input, settings.identity), local };
   let rows: z.infer<typeof WhoPeopleSchema>['people'];
   try {

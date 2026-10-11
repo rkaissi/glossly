@@ -75,8 +75,8 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
     setNote('Copied.');
   };
 
-  const turnOffLocalOnly = async () => {
-    const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
+  const switchToAllModels = async () => {
+    const r = await glossly.invoke('settings:set', { key: 'privacy', value: 'all' });
     if (!r.error) await compose();
   };
 
@@ -136,7 +136,12 @@ export function PastePanel({ s, kind }: { s: OverlayState; kind: PasteKind }) {
         <div className="answer-error">
           <span className={composed.code === 'no_selection' ? 'muted' : 'error'}>{composed.message}</span>
           {composed.code === 'no_model' && <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Add a key</button>}
-          {composed.code === 'local_only' && <button onClick={() => void turnOffLocalOnly()}>Turn off Local only and write it</button>}
+          {composed.code === 'local_only' && (
+            <>
+              <button onClick={() => void switchToAllModels()}>Use all models and write it</button>
+              <button onClick={() => void glossly.invoke('settings:open', { tab: 'keys' })}>Set up a local model</button>
+            </>
+          )}
           {(composed.code === 'provider' || composed.code === 'timeout' || composed.code === 'invalid_output') && (
             <button onClick={() => void compose()}>
               <RotateCcw size={14} strokeWidth={1.75} aria-hidden />

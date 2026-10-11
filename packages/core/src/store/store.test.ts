@@ -30,11 +30,11 @@ describe('Store', () => {
   it('round-trips settings with defaults for missing and corrupt keys', () => {
     store = new Store(':memory:');
     expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);
-    store.setSetting('localOnly', true);
+    store.setSetting('privacy', 'local');
     store.setSetting('appModes', { 'slack.exe': 'hotkey' });
     store.db.prepare("INSERT INTO settings (key, value_json) VALUES ('hotkey', '42')").run();
     const s = store.getSettings();
-    expect(s.localOnly).toBe(true);
+    expect(s.privacy).toBe('local');
     expect(s.appModes).toEqual({ 'slack.exe': 'hotkey' });
     expect(s.hotkey).toBe(DEFAULT_SETTINGS.hotkey);
   });
@@ -111,6 +111,23 @@ describe('Store', () => {
     }
   });
 
+  it('turns the old Local only checkbox into the privacy choice, once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glossly-store-'));
+    const path = join(dir, 'g.db');
+    try {
+      store = new Store(path);
+      store.db.prepare("INSERT INTO settings (key, value_json) VALUES ('localOnly', 'true')").run();
+      store.db.prepare("DELETE FROM meta WHERE key = 'settings_migrations'").run();
+      store.close();
+      store = new Store(path);
+      expect(store.getSettings().privacy).toBe('local');
+      expect(store.db.prepare("SELECT COUNT(*) AS n FROM settings WHERE key = 'localOnly'").get()).toEqual({ n: 0 });
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('stores items with entities and deletes orphans with the item', () => {
     store = new Store(':memory:');
     const notes = store.collectionByName('Notes')!;
@@ -158,7 +175,7 @@ describe('Store', () => {
     store.setVector(item.id, unit(4, 0));
     store.linkItemEntity(item.id, store.upsertEntity('person', 'Sam Lee'));
     store.insertEvent('hotkey', { ms: 3 });
-    store.setSetting('localOnly', true);
+    store.setSetting('privacy', 'local');
     store.setSetting('firstRunComplete', true);
     store.replaceModels('groq', [{ model_id: 'qwen/qwen3.8-27b', display_name: 'Qwen', capabilities: {} }]);
     store.setMeta('key_test:groq', '{"ok":true}');
@@ -184,7 +201,7 @@ describe('Store', () => {
     expect(store.db.prepare('SELECT COUNT(*) AS n FROM entities').get()).toEqual({ n: 0 });
     expect(store.searchVectors(unit(4, 0))).toHaveLength(0);
     expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
-    expect(store.getSettings()).toMatchObject({ localOnly: true, firstRunComplete: true });
+    expect(store.getSettings()).toMatchObject({ privacy: 'local', firstRunComplete: true });
     expect(store.listModels()).toHaveLength(1);
     expect(store.getMeta('key_test:groq')).toBe('{"ok":true}');
   });

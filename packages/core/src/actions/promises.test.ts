@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 import { LlmError, type ChatRequest, type LlmProvider } from '../llm/types';
-import { detectPeople } from '../people/detect';
+import { detectPeople, type DetectedPerson } from '../people/detect';
 import { DEFAULT_SETTINGS } from '../settings';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
@@ -24,8 +24,9 @@ class FakeLlm implements LlmProvider {
     this.calls.push(req);
     return schema.parse(this.answer());
   }
+  usable = true;
   hasModel() {
-    return true;
+    return this.usable;
   }
 }
 
@@ -69,7 +70,8 @@ describe('What did I promise', () => {
     const people = new PeopleRepo(store);
     const maya = people.create({ name: 'Maya Lin' });
     const llm = new FakeLlm(() => answer);
-    const rows = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now);
+    const { rows, byRules } = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now);
+    expect(byRules).toBeNull();
     expect(llm.calls[0]).toMatchObject({ role: 'fast', action: 'promises', temperature: 0 });
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({
@@ -89,6 +91,20 @@ describe('What did I promise', () => {
       throw new LlmError('local_only', 'Local only is on');
     });
     await expect(extractPromises(llm, new PeopleRepo(store), settings, { selection, author: null, authorIsMe: false })).rejects.toMatchObject({ code: 'local_only' });
+  });
+
+  it('without a usable model, finds promises and requests by patterns', async () => {
+    store = new Store(':memory:');
+    const llm = new FakeLlm(() => {
+      throw new Error('no model call expected');
+    });
+    llm.usable = false;
+    const r = await extractPromises(llm, new PeopleRepo(store), { ...settings, privacy: 'local' }, { selection, author: { name: 'Maya Lin' } as DetectedPerson, authorIsMe: false }, undefined, now);
+    expect(llm.calls).toEqual([]);
+    expect(r.byRules).toBe('local_only');
+    expect(r.rows).toHaveLength(2);
+    expect(r.rows[0]).toMatchObject({ owner: 'me', text: "send me the slides from Tuesday's review", due_phrase: 'before Friday', due_at: '2026-10-16', selected: true, person_name: 'Maya Lin' });
+    expect(r.rows[1]).toMatchObject({ owner: 'them', text: 'share them with Daniel Park so he can prep', due_phrase: null, selected: false });
   });
 
   it('saves rows, creates new people once, and stores the message with its author', () => {
@@ -129,7 +145,7 @@ describe('What did I promise', () => {
       { name: 'Priya Shah', email: null, handle: null, role: 'mentioned' as const, knownId: null, relationship: 'professional' as const },
       { name: 'Priya Rao', email: null, handle: null, role: 'mentioned' as const, knownId: null },
     ];
-    const rows = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now, Promise.resolve(detected));
+    const { rows } = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now, Promise.resolve(detected));
     expect(rows[0]).toMatchObject({
       person_name: 'Daniel Park',
       match: null,
