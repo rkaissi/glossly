@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ClipboardCheck, Copy, CornerDownLeft, Info, PenLine, Pencil, RotateCcw, UserRoundPlus } from 'lucide-react';
-import type { AskErrorEvent, OverlayState, Relationship, ReplyRedo, ReplyRedoAsk, ReplyStart } from '@glossly/core/api';
+import type { AskErrorEvent, OverlayState, ReplyRedo, ReplyRedoAsk, ReplyStart } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { siteLabel } from '../dates';
-import { RELATIONSHIP_OPTIONS } from '../people/relationship';
+import { CreatePerson } from '../people/PersonForm';
+import { draftFrom } from '../people/draft';
 import { parseDrafts } from './drafts';
 
 type Stream =
@@ -55,8 +56,8 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
   const [busy, setBusy] = useState(false);
   const [personId, setPersonId] = useState<string | undefined>(undefined);
   const [own, setOwn] = useState('');
-  // "Add to people" asks how the user knows them first; work chat suggests a colleague.
-  const [adding, setAdding] = useState<Relationship | null>(null);
+  // "Add to people" opens the same form as Who is this, prefilled; work chat suggests a colleague.
+  const [adding, setAdding] = useState(false);
   const [redoOpen, setRedoOpen] = useState(false);
   const [asks, setAsks] = useState<ReplyRedoAsk[]>([]);
   const [redoNote, setRedoNote] = useState('');
@@ -174,20 +175,14 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
     setNote('Copied.');
   };
 
-  const addPerson = async (relationship: Relationship) => {
-    const name = start?.to.name;
-    if (!name) return;
-    const card = await glossly.invoke('people:create', { name, relationship, ...(name.includes('@') && { email: name }) }).catch(() => null);
-    if (card) setPersonId(card.id);
-    setAdding(null);
-  };
-
   const turnOffLocalOnly = async () => {
     const r = await glossly.invoke('settings:set', { key: 'localOnly', value: false });
     if (!r.error) await run();
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
+    // The add-person form handles its own keys (Enter creates, Esc cancels); typing there is not a shortcut.
+    if (e.target instanceof HTMLElement && e.target.closest('.create-person')) return;
     const inEditor = e.target === editor.current || e.target === ownEditor.current;
     if (redoOpen && e.target instanceof HTMLElement && e.target.closest('.redo')) {
       if (e.key === 'Enter') {
@@ -233,28 +228,11 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
           <button
             className="ghost"
             title="Add them to your people, so replies and promises are kept with them"
-            onClick={() => setAdding(start?.channel === 'work_chat' ? 'colleague' : 'other')}
+            onClick={() => setAdding(true)}
           >
             <UserRoundPlus size={14} strokeWidth={1.75} aria-hidden />
             Add to people
           </button>
-        )}
-        {adding && !known && (
-          <span className="add-person">
-            <select value={adding} aria-label="Relationship" onChange={(e) => setAdding(e.target.value as Relationship)}>
-              {RELATIONSHIP_OPTIONS.map(([value, text]) => (
-                <option key={value} value={value}>
-                  {text}
-                </option>
-              ))}
-            </select>
-            <button className="primary" onClick={() => void addPerson(adding)}>
-              Add
-            </button>
-            <button className="ghost" onClick={() => setAdding(null)}>
-              Cancel
-            </button>
-          </span>
         )}
         {personId && (
           <span className="muted small-text">
@@ -262,6 +240,20 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
           </span>
         )}
       </div>
+      {adding && to?.name && !known && (
+        <CreatePerson
+          initial={draftFrom(
+            { name: to.name.includes('@') || to.name.startsWith('@') ? '' : to.name, email: to.email, handle: to.handle },
+            start?.channel === 'work_chat' ? 'colleague' : 'other',
+          )}
+          title={`Add ${to.name} to your people`}
+          onCreated={(card) => {
+            setPersonId(card.id);
+            setAdding(false);
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
       {start && !start.identitySet && (
         <div className="inline-note">
           <Info size={14} strokeWidth={1.75} aria-hidden />

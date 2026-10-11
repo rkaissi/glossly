@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 10, 2026, after `0bca491`. 432 unit tests pass; `pnpm typecheck` is clean.
+Last updated Oct 11, 2026: plain-name per-app rules with a "Show here" toggle, and one add-person form (decisions 32 and 33; not checked live). 434 unit tests pass; `pnpm typecheck` is clean.
 
 ## Start here
 
@@ -26,7 +26,7 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 ## Where things stand
 
 - **Built:** spec Phases 0 to 3 (capture, the bar, Ask, Save, settings and setup, people and Who, What did I promise, Reply, Recall, Search, Visualize) plus everything Rayan added along the way: the glass redesign, Save modes, paste with nothing selected, Ask's remember tool, Reply that learns your style, the Saved tab, relationships. Of Phase 4, the metrics view is done (Step 17.1).
-- **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (the evening and night of Oct 10: Steps 16.7 to 16.14, 17.1, and the fixes between) has unit tests only. `docs/testing.md` has the backlog as a checklist.
+- **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, and the fixes since, including Oct 11's) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
 - **Not started:** the rest of Step 17, the eval run, packaging, local models, todos and calendar, polish.
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).

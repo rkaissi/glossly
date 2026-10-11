@@ -113,16 +113,15 @@ export function formatAccelerator(acc: string): string {
 }
 
 /**
- * The key format appModes and blockList use: a process name ("slack.exe", lower-case, ".exe"
- * added if missing) or a window-title suffix starting with "-" ("- Google Docs").
+ * The key format appModes and blockList use: an app or site name as "Don't show here" stores it
+ * ("Slack" covers slack.exe and Slack in a browser; title markers like "- Google Docs" or
+ * "Discord |" are dropped), or a process name ending in ".exe" (lower-cased) for the app alone.
  */
 export function normalizeAppKey(raw: string): string | null {
   const s = raw.trim();
-  if (!s) return null;
-  const suffix = /^[-—–]\s*(.+)$/.exec(s);
-  if (suffix) return `- ${suffix[1]!.trim()}`;
-  const name = s.toLowerCase();
-  return /\.[a-z0-9]+$/.test(name) ? name : `${name}.exe`;
+  if (/\.exe$/i.test(s)) return s.toLowerCase();
+  const name = s.replace(/^[-—–|]\s*/, '').replace(/\s*\|$/, '').trim();
+  return name || null;
 }
 
 /** The message of an error thrown by ipcRenderer.invoke, without Electron's wrapper. */

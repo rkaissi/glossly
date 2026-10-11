@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
-import { keyMatches, resolveAppMode, siteKeyFor, stripBrowserSuffix } from './apps';
+import { keyMatches, placeNameFor, resolveAppMode, siteKeyFor, stripBrowserSuffix } from './apps';
 import { countWords, gateAutoSelection, mayCopyFallback } from './gating';
 import { classifyObstacles, type Popup } from './obstacles';
 import { foundAppToolbar, learnKeyFor, learnToolbarWait, pillWait, pollForToolbar, type PollOptions } from './pill-wait';
@@ -45,6 +45,26 @@ describe('app matching', () => {
     // Only the first part reads like a name.
     expect(siteKeyFor({ process_name: 'chrome.exe', title: 'Acme | Q3 planning, notes and actions - Google Chrome' })).toBe('Acme |');
     expect(resolveAppMode(dm, { ...s, appModes: { 'Discord |': 'off' } }).mode).toBe('off');
+  });
+
+  it("names the place plainly for Don't show here, and the name matches the app and the site", () => {
+    const dm = { process_name: 'chrome.exe', title: '(12) Discord | Casey Lin, Robin Diaz - Google Chrome' };
+    const discordApp = { process_name: 'Discord.exe', title: 'Discord' };
+    expect(placeNameFor(dm)).toBe('Discord');
+    expect(placeNameFor(docs)).toBe('Google Docs');
+    expect(placeNameFor(medium)).toBe('Medium');
+    expect(placeNameFor(slack)).toBe('Slack');
+    expect(placeNameFor({ process_name: 'chrome.exe', title: 'New Tab - Google Chrome' })).toBe('Chrome');
+    expect(keyMatches('Discord', dm)).toBe(true);
+    expect(keyMatches('discord', discordApp)).toBe(true);
+    expect(keyMatches('Discord', { process_name: 'chrome.exe', title: 'Discord - Google Chrome' })).toBe(true);
+    expect(keyMatches('Discord', { process_name: 'chrome.exe', title: 'Discord tips | Medium - Google Chrome' })).toBe(false);
+    expect(keyMatches('Google Docs', edgeDocs)).toBe(true);
+    expect(keyMatches('Google Docs', slack)).toBe(false);
+    expect(keyMatches('Slack', slack)).toBe(true);
+    // A site name beats the browser's process rule, and a name never matches another app's window title.
+    expect(resolveAppMode(dm, { ...s, appModes: { 'chrome.exe': 'off', Discord: 'hotkey' } }).mode).toBe('hotkey');
+    expect(keyMatches('Discord', { process_name: 'notepad.exe', title: 'Discord' })).toBe(false);
   });
 
   it('blocks password managers and lets user modes win over defaults', () => {

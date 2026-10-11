@@ -142,6 +142,11 @@ export function registerIpc(deps: IpcDeps): void {
     if (r) broadcastSettings();
     return r;
   });
+  handle('bar:show-here', (a) => {
+    const r = capture.showHere(num(a.sessionId));
+    if (r) broadcastSettings();
+    return r;
+  });
   handle('bar:back', (a) => capture.back(num(a.sessionId)));
   handle('bar:close', (a) => {
     if (num(a.sessionId) === capture.state.sessionId) capture.close('user');

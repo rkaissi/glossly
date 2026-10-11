@@ -38,6 +38,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 17.1 | Oct 10 | `631e3f0` | Metrics view covers Phases 2 and 3. |
 | — | Oct 10 | `1da0d66`, `6a7e68c` | Promises shares Who's people reader; comparison evals. |
 | — | Oct 10 | `e6a3c4d` … `0bca491` | Reply drafts cached per highlight; site keys keep a leading site name. |
-| — | Oct 10 | (this commit) | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
+| — | Oct 11 | (this commit) | "Don't show here" stores plain names and toggles to "Show here"; one add-person form in Who, Reply, and What did I promise; Reply's unreadable Add button fixed. |
+| — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
 Step 14 (Rayan's hand tests) has no commit yet. Steps 17 (rest) to 22 are planned in `HANDOFF.md`.

@@ -102,7 +102,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Hotkey with nothing selected shows `1 Ask`, `2 Search`, `3 Paste snippets`; `2` opens Search.
 - [ ] Hotkey bar in a text field, then click elsewhere in that app and in another app: the bar closes (look for `overlay was not in front` if blur didn't fire). A Promises date picker or a select dropdown opened from a panel stays open.
 - [ ] Select text with an emoji or image in Chrome or Slack and Save: no "OBJ" in Search.
-- [ ] Discord tab with an unread count: "Don't show here" offers "Discord", and the rule matches other Discord chats.
+- [ ] Discord tab with an unread count: "Don't show here (Discord)" stores "Discord" (General shows "Discord", no pipe), the rule covers other Discord chats and the Discord app; on the hotkey bar there the menu says "Show here (Discord)", which removes it. Rayan's old "Discord |" rule shows as "Discord" after the first launch (settings migration).
 - [ ] Change the hotkey with the recorder; Export.
 
 **Ask and paste**
@@ -116,7 +116,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] A saved "Jordan Hale" and a message from "Jordan": Who asks "Is this the same Jordan?".
 - [ ] A contact card (name, role, email, phone) offers Who.
 - [ ] Three known people in a selection: "Jordan +2 others" badge.
-- [ ] Relationship select on a person card; "Add to people" from Reply asks for a relationship; What did I promise lists new people with a prefilled relationship.
+- [ ] Relationship select on a person card. Reply's "Add to people" opens the Who-style form (readable Create person button, Enter creates, Esc cancels, typing "n" doesn't open None of these). What did I promise shows the same fields per new person and saves them.
 
 **Reply**
 - [ ] Select a message on the reply-test page with its auto-focus-on-blur removed: Insert lands in the reply box (`field search {"found":true}`). An email-like page with a search box above and no reply box below copies instead.

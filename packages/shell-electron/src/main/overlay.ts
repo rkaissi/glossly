@@ -41,6 +41,7 @@ export const HIDDEN_STATE: OverlayState = {
   hasSelection: false,
   wordCount: 0,
   siteKey: null,
+  hiddenHere: false,
   debug: null,
   slots: null,
   badges: [],

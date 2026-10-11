@@ -689,7 +689,8 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   align-items: center;
   gap: 8px;
 }
-.reply-head button {
+/* Secondary only: a primary button keeps its own text color (black on white was unreadable). */
+.reply-head button:not(.primary) {
   height: 26px;
   padding: 0 9px;
   gap: 6px;
@@ -977,14 +978,13 @@ html:not([data-material='acrylic']) .toast {
   border-bottom: none;
 }
 
-.reply-head .add-person {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.panel.reply .create-person {
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
 }
-.reply-head .add-person select {
-  height: 28px;
+.panel.reply .create-person h2 {
+  font-size: 13px;
 }
 
 .new-people h4 {
@@ -1002,18 +1002,9 @@ html:not([data-material='acrylic']) .toast {
   gap: 6px;
 }
 .new-people li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
 }
-.new-people select {
-  height: 28px;
-}
-.new-people .clip1 {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12.5px;
+.new-people li + li {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }

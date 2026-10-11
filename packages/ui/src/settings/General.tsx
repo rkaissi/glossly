@@ -175,7 +175,7 @@ function AddAppKey({ onAdd, children, busy }: { onAdd: (key: string) => void; ch
         setValue('');
       }}
     >
-      <input className="grow" placeholder='slack.exe, or "- Google Docs" for a site' value={value} onChange={(e) => setValue(e.target.value)} />
+      <input className="grow" placeholder="An app or site, such as Slack or Google Docs" value={value} onChange={(e) => setValue(e.target.value)} />
       {children}
       <button type="submit" disabled={busy || !key}>
         Add{key && key !== value.trim() ? ` ${key}` : ''}
@@ -204,8 +204,9 @@ function AppModes({ view }: { view: SettingsView }) {
       <div className="field-label">
         <strong>Per-app behavior</strong>
         <p className="muted small">
-          Auto pill shows the pill when you select text. Hotkey only waits for the hotkey. Off ignores the app, even on the hotkey. Keys are a process
-          name, or a window-title ending such as "- Google Docs" for one site in a browser.
+          Auto pill shows the pill when you select text. Hotkey only waits for the hotkey. Off ignores the app, even on the hotkey. Name an app or a
+          site, such as Slack, Discord, or Google Docs: a name covers the app and the site in a browser. A process name such as slack.exe covers
+          only the app.
         </p>
       </div>
       {entries.length > 0 && (

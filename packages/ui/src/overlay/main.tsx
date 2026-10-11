@@ -2,7 +2,7 @@
 // pushes OverlayState; this side only renders it and sends clicks and keys back.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Check, EyeOff, History, Info, Settings, Undo2, UserRound, X } from 'lucide-react';
+import { Check, Eye, EyeOff, History, Info, Settings, Undo2, UserRound, X } from 'lucide-react';
 import type { Badge, OverlayState, SlotView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { siteLabel } from '../dates';
@@ -287,17 +287,28 @@ function Expanded({ s }: { s: OverlayState }) {
               <div className="menu-sep" />
             </>
           )}
-          {s.siteKey && (
-            <button
-              role="menuitem"
-              className="menu-item"
-              title="Show the bar here only when you press the hotkey"
-              onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
-            >
-              <EyeOff size={16} strokeWidth={1.75} aria-hidden />
-              <span>Don't show here ({siteLabel(s.siteKey)})</span>
-            </button>
-          )}
+          {s.siteKey &&
+            (s.hiddenHere ? (
+              <button
+                role="menuitem"
+                className="menu-item"
+                title="Show the pill here again when you select text"
+                onClick={() => void glossly.invoke('bar:show-here', { sessionId: id })}
+              >
+                <Eye size={16} strokeWidth={1.75} aria-hidden />
+                <span>Show here ({siteLabel(s.siteKey)})</span>
+              </button>
+            ) : (
+              <button
+                role="menuitem"
+                className="menu-item"
+                title="Show the bar here only when you press the hotkey"
+                onClick={() => void glossly.invoke('bar:dont-show-here', { sessionId: id })}
+              >
+                <EyeOff size={16} strokeWidth={1.75} aria-hidden />
+                <span>Don't show here ({siteLabel(s.siteKey)})</span>
+              </button>
+            ))}
           <button role="menuitem" className="menu-item" onClick={() => void glossly.invoke('settings:open', {})}>
             <Settings size={16} strokeWidth={1.75} aria-hidden />
             <span>Settings</span>

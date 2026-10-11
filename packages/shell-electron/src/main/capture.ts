@@ -49,7 +49,9 @@ import {
   placeBar,
   placePill,
   pollForToolbar,
-  siteKeyFor,
+  placeNameFor,
+  keyMatches,
+  resolveAppMode,
   type ActionId,
   type AppMode,
   type AskErrorEvent,
@@ -293,7 +295,7 @@ export class Capture {
 
   /** The "Don't show here" key; none for Glossly's own Try-it window. */
   private siteKey(fg: Foreground): string | null {
-    return fg.handle === this.captureSource() ? null : siteKeyFor({ process_name: fg.process_name, title: fg.title });
+    return fg.handle === this.captureSource() ? null : placeNameFor({ process_name: fg.process_name, title: fg.title });
   }
 
   private current(id: number): Session | null {
@@ -501,6 +503,7 @@ export class Capture {
           hasSelection: true,
           wordCount: countWords(sel.text),
           siteKey: session.siteKey,
+          hiddenHere: this.hiddenHere(session),
           debug: this.debugFor(session),
         },
         placement.rect,
@@ -727,6 +730,7 @@ export class Capture {
       hasSelection: Boolean(selection),
       wordCount: selection ? countWords(selection.text) : 0,
       siteKey: session.siteKey,
+      hiddenHere: this.hiddenHere(session),
       debug: this.debugFor(session),
       badges: this.badgesFor(session),
       notice: notice ?? this.takeNotice(),
@@ -990,6 +994,30 @@ export class Capture {
     return { key, mode: 'hotkey' };
   }
 
+  /**
+   * "Show here", the menu item's other side when this app is hotkey-only: removes the user's
+   * rules that make it so (including older title keys like "Discord |"), and when a built-in
+   * default still does (Excel, terminals), stores an explicit "auto" for it.
+   */
+  showHere(sessionId: number): { key: string; mode: AppMode } | null {
+    const s = this.current(sessionId);
+    if (!s?.siteKey || !s.fg) return null;
+    const app = { process_name: s.fg.process_name, title: s.fg.title };
+    const modes = { ...this.settings.appModes };
+    for (const key of Object.keys(modes)) if (modes[key] === 'hotkey' && keyMatches(key, app)) delete modes[key];
+    if (resolveAppMode(app, { ...this.settings, appModes: modes }).mode === 'hotkey') modes[s.siteKey] = 'auto';
+    this.services.setSetting('appModes', modes);
+    this.close('show_here');
+    log.info('app set to show the pill');
+    return { key: s.siteKey, mode: 'auto' };
+  }
+
+  /** This app or site shows the bar only on the hotkey, so the menu offers "Show here". */
+  private hiddenHere(s: Session): boolean {
+    if (!s.siteKey || !s.fg) return false;
+    return resolveAppMode({ process_name: s.fg.process_name, title: s.fg.title }, this.settings).mode === 'hotkey';
+  }
+
   // ---- people ----
 
   /** "Who is this": one model read when one is available, then code keeps or drops each row. */
@@ -1062,7 +1090,7 @@ export class Capture {
     const s = this.current(sessionId);
     if (!s?.selection) {
       setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
-      return { requestId, to: { name: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
+      return { requestId, to: { name: null, email: null, handle: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
     }
     const container = (await s.container) ?? null;
     const people = this.services.people;
@@ -1087,6 +1115,8 @@ export class Capture {
     state.personId = person?.id ?? null;
     const to: ReplyTo = {
       name: person?.name ?? a?.name ?? a?.email ?? (a?.handle ? `@${a.handle}` : null),
+      email: a?.email ?? null,
+      handle: a?.handle ?? null,
       personId: state.personId,
       match: match?.kind ?? 'none',
       authorIsMe: det.authorIsMe,

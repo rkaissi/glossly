@@ -94,6 +94,23 @@ describe('Store', () => {
     }
   });
 
+  it('renames stored title keys in appModes to plain site names, once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glossly-store-'));
+    const path = join(dir, 'g.db');
+    try {
+      store = new Store(path);
+      store.setSetting('appModes', { 'Discord |': 'hotkey', '- Google Docs': 'off', '| Medium': 'hotkey', 'slack.exe': 'hotkey', Notion: 'auto', '- Notion': 'hotkey' });
+      store.db.prepare("DELETE FROM meta WHERE key = 'settings_migrations'").run();
+      store.close();
+      store = new Store(path);
+      // A name already present wins over a title key that maps to it.
+      expect(store.getSettings().appModes).toEqual({ Discord: 'hotkey', 'Google Docs': 'off', Medium: 'hotkey', 'slack.exe': 'hotkey', Notion: 'auto' });
+      store.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('stores items with entities and deletes orphans with the item', () => {
     store = new Store(':memory:');
     const notes = store.collectionByName('Notes')!;

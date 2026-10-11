@@ -77,13 +77,30 @@ export const isTitleKey = (k: string) => /^[-—–|]/.test(k) || /\s\|$/.test(k
 /** An unread count or dot a site puts in front of its title: "(214) Discord | ...", "• Slack". */
 const UNREAD_PREFIX = /^(?:\(\d+\+?\)|\[\d+\+?\]|[•●*])\s*/;
 
+/** A key naming a process ("slack.exe"): matched against the process name only. */
+export const isProcessKey = (k: string) => /\.exe$/i.test(k.trim());
+
+/** A title key as a plain name: "- Google Docs" as "Google Docs", "Discord |" as "Discord". */
+export const titleKeyName = (k: string) => k.trim().replace(/^[-—–|]\s*/, '').replace(/\s*\|$/, '');
+
+/** "discord.exe" as "Discord", "ms-teams.exe" as "Ms-teams". */
+export function appLabel(processName: string): string {
+  const base = processName.replace(/\.exe$/i, '');
+  return base ? base[0]!.toUpperCase() + base.slice(1) : processName;
+}
+
 /**
- * True if a key matches the app: process names match case-insensitively; title keys match the
- * title after stripping the browser's own suffix (and, for a prefix key, an unread count).
+ * True if a key matches the app. Three kinds:
+ * - a process name ("slack.exe"), matched case-insensitively;
+ * - a plain app or site name ("Discord", "Google Docs"), as "Don't show here" stores it: the
+ *   process name without ".exe", or in a browser, the site named in the title (or the whole title);
+ * - an older title key ("- Google Docs", "| Medium", "Discord |"), matched against the title after
+ *   stripping the browser's own suffix (and, for a prefix key, an unread count).
  */
 export function keyMatches(key: string, app: AppIdentity): boolean {
   const k = key.trim();
   if (!k) return false;
+  if (isProcessKey(k)) return app.process_name.toLowerCase() === k.toLowerCase();
   if (isTitleKey(k)) {
     const title = stripBrowserSuffix(app.title).toLowerCase();
     if (/^[-—–|]/.test(k)) return title.endsWith(k.toLowerCase());
@@ -91,10 +108,15 @@ export function keyMatches(key: string, app: AppIdentity): boolean {
     const rest = title.replace(UNREAD_PREFIX, '');
     return rest === site || rest.startsWith(`${site} |`);
   }
-  return app.process_name.toLowerCase() === k.toLowerCase();
+  const name = k.toLowerCase();
+  if (app.process_name.toLowerCase().replace(/\.exe$/, '') === name) return true;
+  if (!isBrowser(app)) return false;
+  const site = siteKeyFor(app);
+  if (isTitleKey(site) && titleKeyName(site).toLowerCase() === name) return true;
+  return stripBrowserSuffix(app.title).replace(UNREAD_PREFIX, '').trim().toLowerCase() === name;
 }
 
-/** Sites that put their own name first in a bar-split title ("Discord | Tom, Nabil"). */
+/** Sites that put their own name first in a bar-split title ("Discord | Casey, Robin"). */
 const NAME_FIRST_SITES = /^(?:discord|whatsapp|messenger|instagram|telegram|signal|linkedin|facebook|reddit|x|twitter|threads|bluesky|teams)$/i;
 
 /** A part of a title that reads like a site's name: short, no commas, @, or #. */
@@ -126,6 +148,15 @@ export function siteKeyFor(app: AppIdentity): string {
   return app.process_name.toLowerCase();
 }
 
+/**
+ * The name "Don't show here" stores and shows for this app: the site's name for a browser page
+ * ("Discord", "Google Docs"), else the app's ("Slack", or "Chrome" for a page with no site name).
+ */
+export function placeNameFor(app: AppIdentity): string {
+  const key = siteKeyFor(app);
+  return isTitleKey(key) ? titleKeyName(key) : appLabel(app.process_name);
+}
+
 export interface ResolvedMode {
   mode: AppMode;
   blocked: boolean;
@@ -137,8 +168,8 @@ export function resolveAppMode(app: AppIdentity, settings: Pick<Settings, 'appMo
   for (const key of [...DEFAULT_BLOCK_LIST, ...settings.blockList]) {
     if (keyMatches(key, app)) return { mode: 'off', blocked: true, matched: key };
   }
-  // Title-suffix keys are more specific than process names (a site inside a browser).
-  const userKeys = Object.keys(settings.appModes).sort((a, b) => Number(isTitleKey(b)) - Number(isTitleKey(a)));
+  // Site and title keys are more specific than process names (a site inside a browser).
+  const userKeys = Object.keys(settings.appModes).sort((a, b) => Number(isProcessKey(a)) - Number(isProcessKey(b)));
   for (const key of userKeys) {
     if (keyMatches(key, app)) return { mode: settings.appModes[key]!, blocked: false, matched: key };
   }

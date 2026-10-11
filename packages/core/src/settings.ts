@@ -173,6 +173,26 @@ export const SETTINGS_MIGRATIONS: { key: SettingsKey; migrate: (stored: unknown)
     migrate: (c) =>
       c && typeof c === 'object' && (c as { minWords?: unknown }).minWords === 3 ? { ...c, minWords: 0 } : undefined,
   },
+  // Oct 11: "Don't show here" stores the site's plain name ("Discord", "Google Docs") instead of a
+  // title key ("Discord |", "- Google Docs", "| Medium"). Rename stored title keys; a name already
+  // present wins. Process keys ("slack.exe") stay.
+  {
+    key: 'appModes',
+    migrate: (m) => {
+      if (!m || typeof m !== 'object') return undefined;
+      const entries = Object.entries(m as Record<string, unknown>);
+      const isTitle = (k: string) => /^[-—–|]/.test(k.trim()) || /\s\|$/.test(k.trim());
+      if (!entries.some(([k]) => isTitle(k))) return undefined;
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of entries) if (!isTitle(k)) out[k] = v;
+      for (const [k, v] of entries) {
+        if (!isTitle(k)) continue;
+        const name = k.trim().replace(/^[-—–|]\s*/, '').replace(/\s*\|$/, '');
+        if (name && !(name in out)) out[name] = v;
+      }
+      return out;
+    },
+  },
 ];
 
 /** Parses a partial or stale stored object, keeping valid keys and defaulting the rest. */

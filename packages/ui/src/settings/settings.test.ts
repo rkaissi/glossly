@@ -77,10 +77,12 @@ describe('formatting', () => {
     expect(formatAccelerator('Super+Return')).toBe('Win + Enter');
   });
   it('normalizes app keys', () => {
-    expect(normalizeAppKey('  Slack ')).toBe('slack.exe');
+    expect(normalizeAppKey('  Slack ')).toBe('Slack');
     expect(normalizeAppKey('Code.exe')).toBe('code.exe');
-    expect(normalizeAppKey('-Google Docs')).toBe('- Google Docs');
-    expect(normalizeAppKey('— Notion')).toBe('- Notion');
+    expect(normalizeAppKey('-Google Docs')).toBe('Google Docs');
+    expect(normalizeAppKey('— Notion')).toBe('Notion');
+    expect(normalizeAppKey('Discord |')).toBe('Discord');
+    expect(normalizeAppKey('|')).toBeNull();
     expect(normalizeAppKey('   ')).toBeNull();
   });
   it('strips Electron invoke wrappers from errors', () => {

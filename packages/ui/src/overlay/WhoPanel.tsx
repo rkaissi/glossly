@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Info, UserRoundPlus } from 'lucide-react';
 import type { DetectedPerson, OverlayState, PersonCard, WhoEntry, WhoView } from '@glossly/core/api';
-import type { Relationship } from '@glossly/core/api';
-import { RELATIONSHIP_OPTIONS } from '../people/relationship';
+import { CreatePerson } from '../people/PersonForm';
+import { draftFrom, noteFrom } from '../people/draft';
 import { glossly } from '../bridge';
 import { firstName } from '../dates';
 import { PersonCardView } from '../people/PersonCard';
@@ -70,64 +70,6 @@ function SameQuestion({ entry, onResolved }: { entry: WhoEntry; onResolved: (car
           }
         >
           Different person
-        </button>
-        {error && <span className="error">{error}</span>}
-      </div>
-    </div>
-  );
-}
-
-function noteFrom(detected: DetectedPerson | null): string {
-  return [detected?.detail, detected?.about].filter((s) => s && s.trim()).join('. ');
-}
-
-/** Spec: no match, so offer "Create person" with the detected name, email, handle, and note prefilled. */
-function CreatePerson({ detected, onCreated }: { detected: DetectedPerson | null; onCreated: (card: PersonCard) => void }) {
-  const [name, setName] = useState(detected?.name ?? '');
-  const [email, setEmail] = useState(detected?.email ?? '');
-  const [handle, setHandle] = useState(detected?.handle ?? '');
-  const [note, setNote] = useState(noteFrom(detected));
-  const [relationship, setRelationship] = useState<Relationship>(detected?.relationship ?? 'other');
-  const { busy, error, run } = useAction();
-  const create = () =>
-    void run(async () => {
-      if (!name.trim()) throw new Error('Type a name first.');
-      onCreated(
-        await glossly.invoke('people:create', {
-          name: name.trim(),
-          ...(email.trim() && { email: email.trim() }),
-          ...(handle.trim() && { handle: handle.trim().replace(/^@+/, '') }),
-          ...(note.trim() && { note: note.trim() }),
-          relationship,
-        }),
-      );
-    });
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      create();
-    }
-  };
-  return (
-    <div className="create-person" onKeyDown={onKeyDown}>
-      <h2>{detected ? `${label(detected)} isn't in your people yet` : 'Add a person'}</h2>
-      <div className="form-grid">
-        <input value={name} placeholder="Name" aria-label="Name" spellCheck={false} onChange={(e) => setName(e.target.value)} />
-        <input value={email} placeholder="Email (optional)" aria-label="Email" spellCheck={false} onChange={(e) => setEmail(e.target.value)} />
-        <input value={handle} placeholder="Handle (optional)" aria-label="Handle" spellCheck={false} onChange={(e) => setHandle(e.target.value)} />
-        <input className="wide" value={note} placeholder="About this person (optional)" aria-label="About" onChange={(e) => setNote(e.target.value)} />
-        <select value={relationship} aria-label="Relationship" onChange={(e) => setRelationship(e.target.value as Relationship)}>
-          {RELATIONSHIP_OPTIONS.map(([value, text]) => (
-            <option key={value} value={value}>
-              {text}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="row-tight">
-        <button className="primary" disabled={busy || !name.trim()} onClick={create}>
-          <UserRoundPlus size={15} strokeWidth={1.75} aria-hidden />
-          Create person
         </button>
         {error && <span className="error">{error}</span>}
       </div>
@@ -268,12 +210,12 @@ export function WhoPanel({ s }: { s: OverlayState }) {
         {view && entries.length === 0 && (
           <>
             <p className="muted">No names, emails, or handles found in this selection.</p>
-            <CreatePerson detected={null} onCreated={(card) => setView({ ...view, entries: [{ key: 'new', detected: { name: card.name, email: null, handle: null, role: 'mentioned', knownId: card.id }, match: 'exact', score: null, person: card }] })} />
+            <CreatePerson initial={draftFrom(null)} title="Add a person" onCreated={(card) => setView({ ...view, entries: [{ key: 'new', detected: { name: card.name, email: null, handle: null, role: 'mentioned', knownId: card.id }, match: 'exact', score: null, person: card }] })} />
           </>
         )}
         {entry?.match === 'exact' && entry.person && <PersonCardView compact card={entry.person} onChange={resolve} />}
         {entry?.match === 'fuzzy' && entry.person && <SameQuestion entry={entry} onResolved={resolve} />}
-        {entry?.match === 'none' && <CreatePerson detected={entry.detected} onCreated={resolve} />}
+        {entry?.match === 'none' && <CreatePerson key={entry.key} initial={draftFrom(entry.detected)} title={`${label(entry.detected)} isn't in your people yet`} onCreated={resolve} />}
       </div>
 
       {s.keyboard && (

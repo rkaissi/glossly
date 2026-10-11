@@ -137,8 +137,10 @@ export interface OverlayState {
   hasSelection: boolean;
   /** Word count only, for labels like "Ask about 42 words". */
   wordCount: number;
-  /** Key "Don't show here" would set to hotkey-only, e.g. "slack.exe" or "- Google Docs". */
+  /** The app or site name "Don't show here" stores and shows, e.g. "Slack", "Discord", or "Google Docs". */
   siteKey: string | null;
+  /** This app or site opens the bar only on the hotkey, so the menu offers "Show here" instead. */
+  hiddenHere: boolean;
   debug: SelectionDebug | null;
   slots: SlotsView | null;
   badges: Badge[];
@@ -187,6 +189,9 @@ export interface AskErrorEvent {
 /** Who the drafts answer: the detected author, and their person record when they resolved. */
 export interface ReplyTo {
   name: string | null;
+  /** What detection found next to the author, to prefill "Add to people". */
+  email: string | null;
+  handle: string | null;
   personId: string | null;
   match: 'exact' | 'fuzzy' | 'none';
   /** The user wrote the selected message; the drafts are follow-ups. */
@@ -353,6 +358,7 @@ export interface InvokeChannels {
   /** Runs the action in a slot (1 to 4) or by id (from "More"). Opens its panel. */
   'bar:run': { args: { sessionId: number; slot: 1 | 2 | 3 | 4 } | { sessionId: number; action: ActionId }; result: void };
   'bar:dont-show-here': { args: { sessionId: number }; result: { key: string; mode: AppMode } | null };
+  'bar:show-here': { args: { sessionId: number }; result: { key: string; mode: AppMode } | null };
   /** Esc in a panel: back to the bar. */
   'bar:back': { args: { sessionId: number }; result: void };
   'bar:close': { args: { sessionId: number }; result: void };
