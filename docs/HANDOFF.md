@@ -29,12 +29,12 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 16.14, 17.1, 18, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
 - **Steps 18, 19.1, and 19.2 (Oct 11):** built with unit tests only; their live checks are in the backlog under "Local models and privacy" and "Tasks and events".
-- **Not started:** Steps 19.3 to 23 below. (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
+- **Not started:** Steps 20 to 23 below. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data; his Notepad has a few unsaved sample tabs from earlier checks. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; **next is 19.3, Google Calendar sync**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; **next is Step 20, polish and UI upgrade**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
 **Step 19: tasks and calendar, in the app first** (decision 36). What did I promise becomes **Tasks**: one action and one list for promises, requests, and personal todos. Internally the action id stays `promises` and the table stays `commitments` (metrics history and migrations keep working).
 
@@ -49,7 +49,8 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 
 *19.2 Calendar events (done, Oct 11; decision 37).* Events come from the same call and panel as tasks: the action is **Tasks and events**, and Settings > **Agenda** lists both by day. Stored apart (`calendar_events`, migration 5) with their own reminders. **Fallback if one action works poorly:** two actions, Tasks and Add to calendar (a new `event` id), each with its own call and panel; the Agenda and storage stay (decision 37 has the details).
 
-*19.3 Google Calendar and reminders sync*, only after the local list works. Needs Rayan's input first: OAuth with a Google Cloud project (the app's own client ID, or the user's), which data syncs which way (events only, or tasks to Google Tasks too), and whether Local only blocks it (it should: Google is off this computer).
+*19.3 Google Calendar sync: parked (Rayan, Oct 11; see Parked below).*
+
 
 **Step 20: polish and UI upgrade.** Keep it quiet and native to Windows 11; no illustration pass, no second theme.
 - **Destructive buttons are filled red** (solid red background, white text), not red outlines, in both windows: Delete person, Delete all data, Reset settings, Merge, Remove key, alias, or sample, Delete saved item. The inline confirm stays.
@@ -80,6 +81,7 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 **Step 23: the public README.** Rewrite `README.md` as the repo's front page for when it goes public: what Glossly is in one or two lines, a short demo (GIF or video) and screenshots of the pill, the bar, a few panels, and settings in light and dark, the features (from `docs/features.md`, in plain words), privacy (what stays local, Local only, keys in `safeStorage`), install from GitHub Releases (with the SmartScreen note), requirements (Windows 11; a Groq, OpenAI, or Anthropic key, or a local model), building from source, the tech stack, project layout with links to `docs/`, the roadmap (macOS later), and the license (ask Rayan which). Capture screenshots and the demo with a subagent on fictional sample data only (AGENTS.md first section), never Rayan's real data. Keep `STATUS.md` and `docs/` as the contributor docs and link them.
 
 **Parked (Rayan: "way later" or not now):**
+- Google Calendar sync (was Step 19.3; parked Oct 11). Open questions for when it comes back: OAuth with a Google Cloud project (one client for Glossly, or each user's own), what syncs which way (events only, two-way, or tasks to Google Tasks too), and blocking it under Local only (Google is off this computer). The local Agenda (decision 37) stays the source either way.
 - A monthly subscription with a cap on Ask, as a third privacy choice beside All models and Local only, enforced in the model layer next to the Local only refusal. Not before packaging.
 - Optional decision providers for the router (the spec's Jev via OpenRouter and OpenAI Decisions, Phase 4): a `DecisionProvider` (`router/types.ts`) per API behind a setting in the Models tab. Scrapped from the plan on Oct 11; check their current docs first if it comes back, since both may have changed or no longer exist.
 

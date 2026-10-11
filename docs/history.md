@@ -45,4 +45,4 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 19.2 | Oct 11 | (next) | Calendar events from the same Tasks and events call, migration 5, the Agenda tab (tasks and events by day), events in Search, on person cards, and in reminders (decision 37). |
 | — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
-Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 19.3 to 23 are planned in `HANDOFF.md` (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
+Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 20 to 23 are planned in `HANDOFF.md`; Google Calendar sync (19.3) is parked (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
