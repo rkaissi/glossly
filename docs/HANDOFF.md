@@ -60,7 +60,7 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 - Export and Delete all data checked live (Delete all only on a throwaway profile).
 - Rayan's per-app hand tests in `evals/capture.md` (the Phase 0 sign-off, formerly Step 14). Fix what they turn up (apps where UIA reads nothing, pill placement next to real toolbars, additions to `DEFAULT_HOTKEY_ONLY`) and record results in `STATUS.md`.
 - Eval runners for every eval in the spec's table: commitments extraction, the date resolver (`resolveDue` has 60 unit cases; an eval adds model-in-the-loop phrases), Recall ranking, Visualize, the router (exists), and people extraction from the Who fixtures in `core/src/people/who-judge.test.ts`. Follow `evals/router.eval.ts`: skip without `GROQ_API_KEY`, retry on 429, fail on a high error rate, write to `evals/results/`, print with `print-results.mjs`.
-- Then **one** `pnpm eval` run (Rayan approved one; Groq free tier). Record every number in `STATUS.md` and `docs/testing.md`, including the re-tuned router prompt's slot match. Pre-agreed rule: if the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection` and compute the people and commitment scores from rules. Who's own model call stays.
+- Then **one** `pnpm eval` run (Rayan approved one; Groq free tier; no comparison evals, decision 35). Record every number in `STATUS.md` and `docs/testing.md`, including the re-tuned router prompt's slot match. Pre-agreed rule: if the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection` and compute the people and commitment scores from rules. Who's own model call stays.
 
 **Step 22: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon, and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
 
@@ -73,10 +73,8 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 ## Open questions for Rayan
 
 1. **Who is this and What did I promise:** keep them as two actions (they now share one people read), or merge them? Left separate pending his call.
-2. **Comparison evals in Step 21:** run them alongside the one eval run (about 300 more Groq calls), or skip?
-3. **Router under Local only:** slots 3 and 4 stay on rules even with a local model, since a local model rarely answers inside the 600 ms budget (decision 34). Keep that, or let a local Decision model try (with a longer budget only under Local only)?
 
-Everything else he was asked has been answered and is recorded in `docs/decisions.md`.
+Everything else he was asked has been answered and is recorded in `docs/decisions.md` (Oct 11: comparison evals skipped and the router on rules under Local only, decision 35).
 
 ## Things to remember
 
