@@ -18,6 +18,8 @@ import {
   buildWho,
   buildWhoPrompt,
   readWho,
+  authorFrom,
+  authorFirst,
   gateApp,
   gateAutoSelection,
   isoNow,
@@ -1053,7 +1055,7 @@ export class Capture {
       const { read, cached } = await this.readPeople(input, ctl.signal);
       // Matched against saved people every time, so someone added since shows as known.
       const view = buildWho(this.services.people, { people: read.people, author: null, authorIsMe: false }, s.selection.source_app, empty.identitySet, read.local);
-      log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', cached, ms: ms(t) });
+      log.info('who looked up', { count: view.entries.length, source: view.local ?? 'model', messages: read.messages?.length ?? 0, cached, ms: ms(t) });
       return view;
     } catch (e) {
       const code = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
@@ -1065,8 +1067,10 @@ export class Capture {
   }
 
   /**
-   * The people a captured text names: Who's model read, cached per text, so Who is this and What
-   * did I promise share one call. A text-only pass (Local only, no key, a failed call) isn't kept.
+   * The conversation read (Step 20.4): who wrote each message and who the text names, cached per
+   * text, so Who is this, Tasks, and Reply share one call per selection. The key is the read's
+   * prompt, so every caller builds the input with `detectInputFor` and the same container. A
+   * text-only pass (Local only, no key, a failed call) isn't kept.
    */
   private async readPeople(input: DetectInput, signal: AbortSignal): Promise<{ read: WhoRead; cached: boolean }> {
     const key = buildWhoPrompt(this.settings.identity, input);
@@ -1490,30 +1494,33 @@ ${s.selection.text}`;
       const people = this.services.people;
       const input = detectInputFor(s.selection, container);
       const det = detectPeople(input, identity, this.services.store.listKnownPeople());
-      const authorMatch = det.author ? resolvePerson(people, det.author, s.selection.source_app) : null;
-      s.author = { personId: authorMatch?.kind === 'exact' ? authorMatch.personId : null, isMe: det.authorIsMe };
-      // Who's people reader runs alongside (or comes from its cache), so a new person gets the
-      // same email, note, and relationship that Who is this would give them.
-      const found = this.readPeople(input, ctl.signal).then(
-        (r) => r.read.people,
-        () => [],
+      // The conversation read comes first (or from Who's cache): it says who wrote each message,
+      // so You owe and They owe follow the real authors, and a new person gets the same email,
+      // note, and relationship Who is this would give them. A failed read leaves the parser's author.
+      const read = await this.readPeople(input, ctl.signal).then(
+        (r) => r.read,
+        () => null,
       );
+      if (ctl.signal.aborted) throw new LlmError('aborted', 'Cancelled');
+      const { author, authorIsMe } = authorFrom(read, det);
+      const authorMatch = author ? resolvePerson(people, author, s.selection.source_app) : null;
+      s.author = { personId: authorMatch?.kind === 'exact' ? authorMatch.personId : null, isMe: authorIsMe };
       const { rows, open, events, sameDay, byRules } = await extractPromises(
         this.services.llm,
         people,
         this.settings,
-        { selection: s.selection, container, author: det.author, authorIsMe: det.authorIsMe, people: det.people },
+        { selection: s.selection, container, author, authorIsMe, people: authorFirst(det.people, author), messages: read?.messages ?? null },
         ctl.signal,
         new Date(),
-        found,
+        read?.people ?? [],
         this.services.calendar,
       );
       this.services.metrics.record('promises_extracted', { count: rows.length, events: events.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), open: open.length, changes: rows.filter((r) => r.change !== 'new').length, ...(byRules && { by_rules: byRules }) });
       return {
         ok: true,
         rows,
-        author: det.authorIsMe ? null : (det.author?.name ?? det.author?.email ?? null),
-        authorIsMe: det.authorIsMe,
+        author: authorIsMe ? null : (author?.name ?? author?.email ?? null),
+        authorIsMe,
         identitySet: identity.name.trim().length > 0,
         byRules,
         open,

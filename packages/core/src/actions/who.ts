@@ -7,6 +7,7 @@ import { type DetectedPerson, type DetectInput, type Detection } from '../people
 import { describeIdentity } from '../people/names';
 import { RELATIONSHIPS } from '../people/relationship';
 import { acceptWhoRows, localWho, whoCorpus } from '../people/who-judge';
+import { acceptMessages, authorFirst, readAuthor, type ReadMessage } from '../people/conversation';
 import { resolvePerson } from '../people/resolve';
 import type { PersonCard } from '../people/types';
 import type { Identity, Settings } from '../settings';
@@ -85,46 +86,88 @@ export function buildWho(repo: PeopleRepo, detection: Detection, sourceApp: stri
   return { entries, identitySet, local };
 }
 
-const WHO_CORPUS_CHARS = 8000;
+/** The read sees the selection and a little around it, not the whole thread (Step 20.4: fewer input tokens). */
+export const READ_BEFORE_CHARS = 1200;
+export const READ_AFTER_CHARS = 300;
+const READ_SELECTION_CHARS = 4000;
+/** Messages (about 15 tokens each, at most 8) plus a few people rows. A cut-off answer is retried, which costs more. */
+const READ_MAX_OUTPUT = 400;
 
-export function buildWhoPrompt(identity: Identity, input: DetectInput): string {
-  return [
-    '## The user',
-    describeIdentity(identity) ?? 'Unknown. Do not guess who the user is.',
-    '',
-    `## Captured text (from ${input.source_app})`,
-    input.window_title ? `Window: ${input.window_title}` : '',
-    '<text>',
-    whoCorpus(input).slice(0, WHO_CORPUS_CHARS),
-    '</text>',
-  ]
-    .filter((line) => line !== '')
-    .join('\n');
+/** The model reads who wrote each message in the selection and who the text names (Step 20.4). */
+export const WhoReadSchema = z.object({
+  messages: z.array(
+    z.object({
+      author: z.string().describe('Who wrote it, exactly as their name appears in the text.'),
+      user: z.boolean().describe('True when the user wrote it.'),
+      starts: z.string().describe("The message's first 5 words, copied exactly from the selection."),
+    }),
+  ),
+  people: WhoPeopleSchema.shape.people,
+});
+
+/** Cuts `s` to its last `n` characters, starting at a line where it can. */
+function lastLines(s: string, n: number): string {
+  if (s.length <= n) return s;
+  const cut = s.slice(-n);
+  const nl = cut.indexOf('\n');
+  return nl >= 0 && nl < cut.length - 1 ? cut.slice(nl + 1) : cut;
 }
 
-/** Who the text names, before matching to saved people. The shell caches it per input. */
+/** Cuts `s` to its first `n` characters, ending at a line where it can. */
+function firstLines(s: string, n: number): string {
+  if (s.length <= n) return s;
+  const cut = s.slice(0, n);
+  const nl = cut.lastIndexOf('\n');
+  return nl > 0 ? cut.slice(0, nl) : cut;
+}
+
+/** What the read sees: the selection with about 1,200 characters before it and 300 after. */
+export function readInput(input: DetectInput): DetectInput {
+  return { ...input, text: input.text.slice(0, READ_SELECTION_CHARS), before: lastLines(input.before, READ_BEFORE_CHARS), after: firstLines(input.after, READ_AFTER_CHARS) };
+}
+
+/**
+ * The read's prompt. It is also the cache key, so Who, Tasks, and Reply on one selection share
+ * one call: build it from `detectInputFor` with the same container every time.
+ */
+export function buildWhoPrompt(identity: Identity, raw: DetectInput): string {
+  const input = readInput(raw);
+  const parts = ['## The user', describeIdentity(identity) ?? 'Unknown. Do not guess who the user is.', '', `## App: ${input.source_app}`];
+  if (input.window_title) parts.push(`Window: ${input.window_title}`);
+  if (input.before.trim()) parts.push('', '<before>', input.before.trimEnd(), '</before>');
+  parts.push('', '<selection>', input.text, '</selection>');
+  if (input.after.trim()) parts.push('', '<after>', input.after.trimStart(), '</after>');
+  return parts.join('\n');
+}
+
+/** Who the text names, before matching to saved people, and who wrote what. The shell caches it per input. */
 export interface WhoRead {
   people: DetectedPerson[];
+  /** The selection's messages from the model, accepted by code; null means use the local parser. */
+  messages: ReadMessage[] | null;
   local: WhoLocal;
 }
 
 /**
- * Who opened. One Fast call (action "who") when a model is available; code then accepts the
- * rows. Local only without a local model, or no Fast model, reads the text only and leaves the note blank. Matching
- * to saved people is `buildWho`, done fresh each time so a person added since shows up.
+ * The conversation read (Step 20.4), shared by Who is this, Tasks, and Reply: one Fast call
+ * (action "who") when a model is available; code then accepts the people and the messages.
+ * Local only without a local model, or no Fast model, reads the text only (`messages` null) and
+ * leaves the note blank. Matching to saved people is `buildWho`, done fresh each time so a person
+ * added since shows up.
  */
 export async function readWho(
   llm: LlmProvider,
   settings: Pick<Settings, 'identity' | 'privacy'>,
-  input: DetectInput,
+  raw: DetectInput,
   signal?: AbortSignal,
   onModelError?: (e: unknown) => void,
 ): Promise<WhoRead> {
+  const input = readInput(raw);
   const local: WhoLocal = llm.hasModel('fast') ? null : settings.privacy === 'local' ? 'local_only' : 'no_model';
-  if (local !== null) return { people: localWho(input, settings.identity), local };
-  let rows: z.infer<typeof WhoPeopleSchema>['people'];
+  if (local !== null) return { people: localWho(input, settings.identity), messages: null, local };
+  let out: z.infer<typeof WhoReadSchema>;
   try {
-    const out = await llm.structured(
+    out = await llm.structured(
       {
         role: 'fast',
         action: 'who',
@@ -132,18 +175,29 @@ export async function readWho(
         prompt: buildWhoPrompt(settings.identity, input),
         signal,
         temperature: 0,
-        maxOutputTokens: 1000,
+        maxOutputTokens: READ_MAX_OUTPUT,
       },
-      WhoPeopleSchema,
+      WhoReadSchema,
     );
-    rows = out.people;
   } catch (e) {
     // A rate limit or a bad answer still leaves the people the text itself names.
     if (signal?.aborted) throw e;
     onModelError?.(e);
-    return { people: localWho(input, settings.identity), local: 'model_failed' };
+    return { people: localWho(input, settings.identity), messages: null, local: 'model_failed' };
   }
-  return { people: acceptWhoRows(rows, whoCorpus(input), settings.identity), local: null };
+  const people = acceptWhoRows(out.people, whoCorpus(input), settings.identity);
+  const messages = acceptMessages(out.messages, input, settings.identity);
+  const by = readAuthor(messages, people);
+  return { people: authorFirst(people, by?.author ?? null), messages, local: null };
+}
+
+/**
+ * Who wrote the selected message, from the read when it has an author, else the local parser's
+ * `detectPeople` (decision 47). Tasks and Reply use this so both name the same person.
+ */
+export function authorFrom(read: WhoRead | null, det: Detection): { author: DetectedPerson | null; authorIsMe: boolean } {
+  const by = read ? readAuthor(read.messages, read.people) : null;
+  return by ?? { author: det.author, authorIsMe: det.authorIsMe };
 }
 
 /**

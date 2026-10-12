@@ -1,4 +1,4 @@
-import { APICallError, generateText, NoObjectGeneratedError, Output, RetryError, streamText, type LanguageModel } from 'ai';
+import { APICallError, generateText, NoObjectGeneratedError, Output, RetryError, streamText, type LanguageModel, type LanguageModelUsage } from 'ai';
 import { z } from 'zod';
 import type { ModelRef, RoleName, Settings } from '../settings';
 import { LOCAL_PROVIDER, lookupCapabilities, parseRef } from './catalog';
@@ -17,6 +17,33 @@ export interface AiSdkLlmDeps {
   createModel: (ref: ModelRef, apiKey: string) => LanguageModel;
   /** Called on each fallback, with no text: for metrics. */
   onFallback?: (info: { from: ModelRef; to: ModelRef; status: number | undefined }) => void;
+  /** Token counts after each call that reached a model (each try of a structured call counts), for metrics. */
+  onUsage?: (usage: LlmUsage) => void;
+}
+
+/** One model call's token counts (Step 20.4). Codes and counts only. */
+export interface LlmUsage {
+  action: string;
+  role: RoleName;
+  provider: string;
+  input: number;
+  output: number;
+  /** Prompt tokens served from the provider's cache (they don't count toward Groq's limits). */
+  cached: number;
+  reasoning: number;
+}
+
+function usageOf(req: ChatRequest, ref: ModelRef, u: LanguageModelUsage | undefined): LlmUsage | null {
+  if (!u) return null;
+  return {
+    action: req.action ?? req.role,
+    role: req.role,
+    provider: parseRef(ref).provider,
+    input: u.inputTokens ?? 0,
+    output: u.outputTokens ?? 0,
+    cached: u.inputTokenDetails?.cacheReadTokens ?? 0,
+    reasoning: u.outputTokenDetails?.reasoningTokens ?? 0,
+  };
 }
 
 function statusOf(e: unknown): number | undefined {
@@ -150,6 +177,8 @@ export class AiSdkLlm implements LlmProvider {
             }
           }
           if (!started) resolveModel(ref);
+          const used = usageOf(req, ref, await Promise.resolve(result.usage).catch(() => undefined));
+          if (used) deps.onUsage?.(used);
           return;
         } catch (e) {
           const next = chain[i + 1];
@@ -206,7 +235,7 @@ export class AiSdkLlm implements LlmProvider {
     let prompt = req.prompt;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const { output } = await generateText({
+        const { output, usage } = await generateText({
           model,
           instructions,
           prompt,
@@ -217,8 +246,14 @@ export class AiSdkLlm implements LlmProvider {
           maxRetries: 0,
           providerOptions,
         });
+        const used = usageOf(req, ref, usage);
+        if (used) this.deps.onUsage?.(used);
         return output as T;
       } catch (e) {
+        if (NoObjectGeneratedError.isInstance(e)) {
+          const used = usageOf(req, ref, e.usage);
+          if (used) this.deps.onUsage?.(used);
+        }
         if (!NoObjectGeneratedError.isInstance(e) || attempt === 1) {
           if (NoObjectGeneratedError.isInstance(e)) throw new LlmError('invalid_output', 'The model returned invalid structured output');
           throw e;

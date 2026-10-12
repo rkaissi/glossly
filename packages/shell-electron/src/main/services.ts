@@ -96,6 +96,8 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
         return info.createModel(key, modelId);
       },
       onFallback: ({ status }) => this.metrics.record('llm_fallback', status ? { status } : null),
+      // Token counts per call (Step 20.4): codes and counts only.
+      onUsage: (u) => this.metrics.record('llm_tokens', { ...u }),
     });
 
     const { model, dims } = this.settingsCache.embeddings;

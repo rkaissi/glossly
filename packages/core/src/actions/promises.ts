@@ -6,6 +6,7 @@ import { z } from 'zod';
 import extractPrompt from '../../prompts/extract-commitments.md?raw';
 import type { LlmProvider } from '../llm/types';
 import { resolveDue } from '../people/dates';
+import { splitMessages, type ReadMessage } from '../people/conversation';
 import type { DetectedPerson } from '../people/detect';
 import { canonicalize, describeIdentity } from '../people/names';
 import { resolvePerson } from '../people/resolve';
@@ -82,6 +83,21 @@ export interface PromisesInput {
   authorIsMe: boolean;
   /** From detectPeople: everyone the message names, the author first. Their open tasks are checked. */
   people?: DetectedPerson[];
+  /** Who wrote each message in the selection, from the conversation read (Step 20.4). */
+  messages?: ReadMessage[] | null;
+}
+
+/**
+ * The selection with each message's author in brackets ("[Jordan Hale] can you send…",
+ * "[the user] sure, by Friday"), when the read found more than one writer; else null.
+ */
+export function markedSelection(text: string, messages: ReadMessage[] | null | undefined): string | null {
+  if (!messages || messages.length < 2) return null;
+  const who = (m: { author: string | null; user: boolean }) => (m.user ? 'the user' : (m.author ?? 'unknown'));
+  if (new Set(messages.map(who)).size < 2) return null;
+  return splitMessages(text, messages)
+    .map((m) => `[${who(m)}] ${m.text}`)
+    .join('\n');
 }
 
 function describeTask(t: CommitmentView): string {
@@ -94,7 +110,12 @@ export function buildPromisesPrompt(settings: Pick<Settings, 'identity'>, input:
   const { selection } = input;
   const win = contextWindow(selection, input.container, CONTEXT_CHARS);
   const surrounding = win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length);
-  const author = input.authorIsMe ? 'the user' : (input.author?.name ?? input.author?.email ?? 'unknown');
+  const marked = markedSelection(selection.text, input.messages);
+  const author = marked
+    ? 'Several people: each message in the selection starts with its author in brackets. The user wrote the ones marked [the user].'
+    : input.authorIsMe
+      ? 'the user'
+      : (input.author?.name ?? input.author?.email ?? 'unknown');
   const day = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const parts = [
     '## The user',
@@ -108,7 +129,7 @@ export function buildPromisesPrompt(settings: Pick<Settings, 'identity'>, input:
     '',
     `## Selected message (from ${selection.source_app})`,
     '<selection>',
-    selection.text.slice(0, MAX_SELECTION),
+    (marked ?? selection.text).slice(0, MAX_SELECTION),
     '</selection>',
   ];
   if (surrounding.trim() !== SELECTION_MARK) parts.push('', `## Context (${SELECTION_MARK} marks the selection)`, '<context>', surrounding, '</context>');

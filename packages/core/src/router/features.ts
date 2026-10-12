@@ -121,6 +121,11 @@ const TIME_LINE = /^(?:(?:today|yesterday)\s+at\s+|\d{1,2}\/\d{1,2}\/\d{2,4},?\s
 /** Chrome between a speaker and the time: Discord's "Server Tag: GEN2", a role, a short badge, an emoji. */
 const LABEL_LINE = /^(?:(?:server tag|role|tag|pronouns)\s*:.*|bot|app)$/i;
 const isBadge = (l: string) => LABEL_LINE.test(l) || /^(?:[A-Z0-9]{2,6}|[^\p{L}\p{N}]{1,4})$/u.test(l);
+/** A header's time, badge, or tag line ("7:34 PM", "GEN2", "Server Tag: GEN2"): never message text. */
+export const isHeaderChrome = (line: string): boolean => {
+  const l = line.trim();
+  return TIME_LINE.test(l) || (l.length > 0 && isBadge(l));
+};
 const LONE_NAME = /^[\p{L}][\p{L}\p{N}_.'-]{1,30}$/u;
 const NAME_WORD = /^[\p{L}][\p{L}\p{N}_.'-]{0,30}$/u;
 const TITLE_WORD = /^\p{Lu}[\p{L}.'-]*$/u;

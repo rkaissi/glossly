@@ -42,6 +42,13 @@ const NOT_PEOPLE = new Set([
   'reply reply',
   'more more',
 ]);
+/** Chrome that is never a message's author: buttons, Discord's "Server Tag" and its badges ("GEN2"), field labels. */
+const LABELS = /^(?:server tag|tag|role|pronouns|bot|app|new|edited|pinned|from|to|subject|date)$/i;
+export function isUiLabel(name: string): boolean {
+  const n = name.trim();
+  return NOT_PEOPLE.has(canonicalize(n)) || LABELS.test(n) || /^(?=.*\d)[A-Z0-9]{2,6}$/.test(n) || /^server tag:/i.test(n);
+}
+
 const NOT_NAMES = /^(?:thanks|thank you|thx|hi|hey|hello|dear|cc|bcc|to|from|ping|via|cheers|best|regards)$/i;
 const SIGN_OFF =
   /(?:^|\n)\s*(?:thanks|thank you|many thanks|best|best regards|kind regards|regards|cheers|sincerely|warmly|talk soon|all the best|thx)[,!.]?\s*\n+\s*([A-Z][\p{L}'’.-]+(?:\s+[A-Z][\p{L}'’.-]+)?)\s*$/iu;

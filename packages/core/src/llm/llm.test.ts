@@ -478,3 +478,24 @@ describe('AiSdkLlm.stream with a tool', () => {
     expect(model.doStreamCalls).toHaveLength(1);
   });
 });
+
+describe('token counts (Step 20.4)', () => {
+  it('reports each structured try and each finished stream, with the action', async () => {
+    const seen: unknown[] = [];
+    const m = jsonModel('{"answer":"yes"}', '{"answer":"yes","n":2}');
+    const llm = new AiSdkLlm({
+      settings: () => roles({ fast: { model: 'openai:gpt-5-mini', fallback: null, manual: false }, chat: CHAT }),
+      apiKey: () => 'k',
+      createModel: (ref) => (ref === 'openai:gpt-5-mini' ? m : textModel(['hi'])),
+      onUsage: (u) => seen.push(u),
+    });
+    await llm.structured({ role: 'fast', action: 'who', instructions: 'i', prompt: 'p' }, z.object({ answer: z.string(), n: z.number() }));
+    await collect(llm.stream({ role: 'chat', action: 'reply', instructions: 'i', prompt: 'p' }).textStream);
+    const row = { input: 10, output: 5, cached: 0, reasoning: 0 };
+    expect(seen).toEqual([
+      { action: 'who', role: 'fast', provider: 'openai', ...row },
+      { action: 'who', role: 'fast', provider: 'openai', ...row },
+      { action: 'reply', role: 'chat', provider: 'anthropic', ...row },
+    ]);
+  });
+});

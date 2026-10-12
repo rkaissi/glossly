@@ -27,6 +27,7 @@ export * from './store/store';
 export * from './people/names';
 export type * from './people/types';
 export * from './people/detect';
+export * from './people/conversation';
 export * from './people/resolve';
 export * from './people/dates';
 export * from './people/reply-style';

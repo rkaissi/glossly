@@ -73,6 +73,15 @@ export interface FeatureMetrics {
   /** Failed model calls across actions (rate limits, bad output, provider errors), and switches to a fallback model. */
   errors: number;
   fallbacks: number;
+  /** Model calls and their tokens by action ("who", "reply", ...), from `llm_tokens` (Step 20.4). */
+  tokens: Record<string, TokenTotals>;
+}
+
+export interface TokenTotals {
+  calls: number;
+  input: number;
+  output: number;
+  cached: number;
 }
 
 export interface MetricsSummary {
@@ -97,6 +106,7 @@ function emptyFeatures(): FeatureMetrics {
     search: { inserted: 0 },
     errors: 0,
     fallbacks: 0,
+    tokens: {},
   };
 }
 
@@ -155,6 +165,16 @@ function countFeature(f: FeatureMetrics, kind: string, p: Record<string, unknown
     case 'llm_fallback':
       f.fallbacks++;
       break;
+    case 'llm_tokens': {
+      const action = typeof p.action === 'string' ? p.action : 'other';
+      const t = (f.tokens[action] ??= { calls: 0, input: 0, output: 0, cached: 0 });
+      const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+      t.calls++;
+      t.input += n(p.input);
+      t.output += n(p.output);
+      t.cached += n(p.cached);
+      break;
+    }
     default:
       if (ERROR_KINDS.has(kind) && p.code !== 'aborted') f.errors++;
   }
