@@ -63,7 +63,7 @@ const rows = db
   .prepare(`SELECT * FROM llm_calls ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY at DESC, rowid DESC LIMIT ?`)
   .all(...params, n);
 
-if (rows.length === 0) console.log('No calls logged. Turn on Settings > Privacy and data > Keep a log of model calls.');
+if (rows.length === 0) console.log('No calls logged. Turn on Settings > Privacy > Keep a log of model calls.');
 for (const r of rows.reverse()) {
   const from = r.fallback_from ? ` (fallback from ${r.fallback_from})` : '';
   const tokens = `${r.input_tokens ?? '?'} in${r.cached_tokens ? ` (${r.cached_tokens} cached)` : ''}, ${r.output_tokens ?? '?'} out${r.reasoning_tokens ? ` (${r.reasoning_tokens} reasoning)` : ''}`;

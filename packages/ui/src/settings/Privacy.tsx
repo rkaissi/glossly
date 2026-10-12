@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import type { Privacy, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { InlineConfirm } from '../confirm';
 import { ChoiceCards, Switch } from '../controls/Toggles';
 import { canBackfill } from './format';
 import { useAction } from './useAction';
@@ -8,12 +10,12 @@ const CHOICES: { value: Privacy; label: string; desc: string }[] = [
   {
     value: 'all',
     label: 'All models',
-    desc: 'Glossly uses any provider you set up, cloud or local. Selected text goes to that provider when the bar opens and when you click an action.',
+    desc: 'Use any provider you set up. The text you select is sent to it when you use Glossly.',
   },
   {
     value: 'local',
     label: 'Local only',
-    desc: 'Nothing leaves this computer. Model calls go to your local model (Ollama or LM Studio), and slots 3 and 4 come from local rules.',
+    desc: 'Nothing leaves this computer. Glossly uses your local model, or works without one.',
   },
 ];
 
@@ -26,8 +28,7 @@ function LocalOnlyStatus({ view, onSetUp }: { view: SettingsView; onSetUp: () =>
     <div className="row">
       <p className="warn small grow">
         {baseUrl && !loopback ? 'Your local server is on another computer, so Local only does not use it. ' : 'No local model is set up. '}
-        Until one is, Glossly works without a model: Who is this and Tasks read the text with simple patterns, Visualize charts tables in
-        code, Save skips finding people, and Ask, Reply, and the paste summary are off.
+        Until one is, Ask and Reply are off and the other actions work in a simpler way.
       </p>
       <button onClick={onSetUp}>Set up a local model</button>
     </div>
@@ -50,8 +51,7 @@ function EntityBackfill({ view }: { view: SettingsView }) {
   return (
     <div className="row">
       <p className="muted small grow">
-        {n} saved item{n === 1 ? '' : 's'} from before a model was set up {n === 1 ? 'has' : 'have'} no people or places linked. Finding them takes one model call
-        each.
+        {n} saved item{n === 1 ? '' : 's'} from before a model was set up {n === 1 ? 'has' : 'have'} no people or places linked yet.
       </p>
       <button disabled={busy} onClick={go}>
         {busy ? 'Finding…' : 'Find them'}
@@ -61,7 +61,7 @@ function EntityBackfill({ view }: { view: SettingsView }) {
   );
 }
 
-/** The privacy choice (decision 34), in Privacy and data. */
+/** The privacy choice (decision 34), in Privacy. */
 export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: () => void }) {
   const { busy, error, run } = useAction();
   const current = view.settings.privacy;
@@ -85,29 +85,31 @@ export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: 
 
 /**
  * The model call log (decision 61): every call's prompt (with the selected text), answer, model,
- * and timing, kept 30 days in the local database to see what the models saw. Off deletes it.
+ * and timing, kept 30 days in the local database to see what the models saw. Turning it off
+ * deletes it, so that asks first.
  */
 export function CallLog({ view }: { view: SettingsView }) {
   const { busy, error, run } = useAction();
+  const [confirming, setConfirming] = useState(false);
   const on = view.settings.callLog;
-  const toggle = (value: boolean) =>
+  const set = (value: boolean) =>
     void run(async () => {
       const r = await glossly.invoke('settings:set', { key: 'callLog', value });
       if (r.error) throw new Error(r.error);
+      setConfirming(false);
     });
   return (
     <div className="field">
       <div className="toggle">
         <span>
           <strong>Keep a log of model calls</strong>
-          <span className="muted small block">
-            Keeps each model call for 30 days: what was sent (including the text you selected), the answer, the model, whether it fell back, and how
-            long it took. It stays on this computer, isn't exported, and is for finding out why a model got something wrong. Turning it off deletes
-            the log.
-          </span>
+          <span className="muted small block">Saves what each model call sent and got back, for 30 days, to help find out why an answer was wrong.</span>
         </span>
-        <Switch label="Keep a log of model calls" checked={on} disabled={busy} onChange={toggle} />
+        <Switch label="Keep a log of model calls" checked={on && !confirming} disabled={busy} onChange={(v) => (v ? set(true) : setConfirming(true))} />
       </div>
+      {confirming && (
+        <InlineConfirm prompt="Turning this off deletes the log." confirm="Turn off and delete" busy={busy} onConfirm={() => set(false)} onCancel={() => setConfirming(false)} />
+      )}
       {error && <p className="error small">{error}</p>}
     </div>
   );

@@ -8,9 +8,9 @@ import { capabilityBadges, groupByProvider, roleWarning } from './format';
 import { useAction } from './useAction';
 
 const ROLES: { role: RoleName; label: string; desc: string }[] = [
-  { role: 'fast', label: 'Fast', desc: 'Who is this, Tasks, Visualize, and finding people and dates when you save. Needs structured output. Kept off the Decision model, so the two have separate rate limits.' },
-  { role: 'chat', label: 'Chat', desc: 'Writes Ask answers, Reply drafts, and paste summaries. Pick the strongest writer you have.' },
-  { role: 'decision', label: 'Decision', desc: 'Picks the extra actions in slots 3 and 4 each time the bar opens, so it should be the fastest small model. Rules take over if it is slower than {timeout} ms ({fallback} ms while its fallback answers).' },
+  { role: 'chat', label: 'Chat', desc: 'Ask, Reply, and summaries. Use your best writer.' },
+  { role: 'fast', label: 'Fast', desc: 'Who is this, Tasks, Visualize, and saving.' },
+  { role: 'decision', label: 'Decision', desc: 'Suggests actions when the bar opens. Use a small, quick model.' },
 ];
 
 const ACTION_OVERRIDES: { action: string; label: string; role: RoleName }[] = [
@@ -74,7 +74,7 @@ function RoleRow({ view, role, label, desc }: { view: SettingsView; role: RoleNa
         <strong>{label}</strong>
         {cur.manual && <span className="tag">Picked by you</span>}
       </div>
-      <p className="muted small">{desc.replace('{timeout}', String(view.settings.router.decisionTimeoutMs)).replace('{fallback}', String(view.settings.router.fallbackTimeoutMs))}</p>
+      <p className="muted small">{desc}</p>
       <div className="role-pickers">
         <label>
           <span className="small muted">Model</span>
@@ -89,7 +89,7 @@ function RoleRow({ view, role, label, desc }: { view: SettingsView; role: RoleNa
         </label>
         {!usesFast && (
           <label>
-            <span className="small muted">Fallback on rate limits or outages</span>
+            <span className="small muted">Fallback</span>
             <ModelSelect
               view={view}
               label={`${label} fallback`}
@@ -101,7 +101,6 @@ function RoleRow({ view, role, label, desc }: { view: SettingsView; role: RoleNa
           </label>
         )}
       </div>
-      {chosen && <Badges m={chosen} />}
       {warning && <p className="warn small">{warning}</p>}
       {error && <p className="error small">{error}</p>}
     </div>
@@ -120,7 +119,7 @@ function LocalOnlyRow({ view }: { view: SettingsView }) {
         <strong>Local only</strong>
         {cur.manual && <span className="tag">Picked by you</span>}
       </div>
-      <p className="muted small">Used for every model call while Local only is on, unless a role above already uses a local model.</p>
+      <p className="muted small">Used for everything while Local only is on.</p>
       <div className="role-pickers">
         <label>
           <span className="small muted">Model</span>
@@ -162,7 +161,7 @@ function ActionOverrides({ view }: { view: SettingsView }) {
   };
   return (
     <details className="advanced">
-      <summary>Advanced: a different model for one action</summary>
+      <summary>Use a different model for one action</summary>
       <div className="overrides">
         {ACTION_OVERRIDES.map((o) => (
           <label key={o.action} className="override">
@@ -199,7 +198,7 @@ function Catalog({ view }: { view: SettingsView }) {
   return (
     <>
       <div className="row">
-        <h3 className="grow">Available models</h3>
+        <span className="grow" />
         <button disabled={busy} onClick={() => void refresh()}>
           {busy ? 'Refreshing…' : 'Refresh'}
         </button>
@@ -247,22 +246,22 @@ export function ModelsTab({ view }: { view: SettingsView }) {
   return (
     <section>
       <h2>Models</h2>
-      <p className="muted">
-        Glossly has no server. Your keys are encrypted on this computer and sent only to their own provider. Each key is tested by listing the
-        provider's models.
-      </p>
+      <p className="muted">Your keys are encrypted on this computer and only go to their own provider.</p>
       <h3>Providers</h3>
       {view.keys.map((k) => (
         <KeyCard key={k.provider} k={k} />
       ))}
       <LocalCard local={view.local} />
       <h3>Which model does what</h3>
-      <p className="muted small">Every model call belongs to a role. Defaults fill in when keys change; a model you pick by hand is never replaced.</p>
+      <p className="muted small">Glossly picks these for you. A model you choose stays.</p>
       <RolePickers view={view} />
       <ActionOverrides view={view} />
       <h3>On this computer</h3>
       <Embeddings view={view} />
-      <Catalog view={view} />
+      <details className="advanced">
+        <summary>All available models ({view.models.length})</summary>
+        <Catalog view={view} />
+      </details>
     </section>
   );
 }

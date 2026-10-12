@@ -139,7 +139,7 @@ export function LocalCard({ local }: { local: LocalStatus }) {
         </a>
       </div>
       <p className="muted small">
-        Runs a model on this computer through Ollama or LM Studio, with no key. Slower than a cloud model, and Local only uses it for every call.
+        Run a model on this computer with Ollama or LM Studio. No key needed, but slower.
       </p>
 
       {local.baseUrl && (

@@ -31,7 +31,7 @@ const TABS = [
   { id: 'saved', label: 'Saved', group: 'mine' },
   { id: 'profile', label: 'Profile', group: 'settings' },
   { id: 'models', label: 'Models', group: 'settings' },
-  { id: 'privacy', label: 'Privacy and data', group: 'settings' },
+  { id: 'privacy', label: 'Privacy', group: 'settings' },
   { id: 'general', label: 'General', group: 'settings' },
   { id: 'metrics', label: 'Metrics', group: 'settings' },
 ] as const;
@@ -39,7 +39,7 @@ type Tab = (typeof TABS)[number]['id'];
 
 const TAB_ICONS: Record<Tab, LucideIcon> = { tasks: CircleCheck, calendar: CalendarDays, people: UsersRound, saved: Bookmark, profile: UserRound, models: Cpu, privacy: Shield, general: SlidersHorizontal, metrics: Activity };
 
-/** Tabs that moved: Keys is part of Models and Data of Privacy and data (Step 20.1); Agenda became Tasks and Calendar (Step 20.2). */
+/** Tabs that moved: Keys is part of Models and Data of Privacy (Step 20.1); Agenda became Tasks and Calendar (Step 20.2). */
 const MOVED: Record<string, Tab> = { keys: 'models', data: 'privacy', agenda: 'tasks' };
 
 /** Open tasks due today or earlier, beside Tasks in the sidebar. */

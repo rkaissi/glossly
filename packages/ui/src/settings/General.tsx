@@ -79,7 +79,7 @@ function Hotkey({ view }: { view: SettingsView }) {
     <div className="field">
       <div className="field-label">
         <strong>Hotkey</strong>
-        <p className="muted small">Opens the bar for the current selection, in any app. With nothing selected, it opens search.</p>
+        <p className="muted small">Opens Glossly on what you've selected, or search when nothing is.</p>
       </div>
       <ShortcutRecorder
         value={view.settings.hotkey}
@@ -96,9 +96,9 @@ function Hotkey({ view }: { view: SettingsView }) {
 }
 
 const SAVE_MODES: { mode: Settings['saveMode']; label: string; desc: string }[] = [
-  { mode: 'manual', label: 'Manual', desc: 'The bar shows Save to the collection Glossly picks. Click it to choose and save.' },
-  { mode: 'hotkey', label: 'Manual, plus a save hotkey', desc: 'Save stays in the bar, and a second shortcut saves the selection straight away, with Undo.' },
-  { mode: 'autosave', label: 'Autosave on highlight', desc: 'Every highlight that shows the pill is saved as you make it. The bar offers Undo instead of Save.' },
+  { mode: 'manual', label: 'Manual', desc: 'Click Save in the bar.' },
+  { mode: 'hotkey', label: 'Manual, plus a save hotkey', desc: 'Click Save, or press a second shortcut to save at once.' },
+  { mode: 'autosave', label: 'Autosave on highlight', desc: 'Everything you highlight is saved, with Undo in the bar.' },
 ];
 
 /** Save mode (decision 15), next to the main hotkey. */
@@ -109,7 +109,7 @@ function SaveMode({ view }: { view: SettingsView }) {
     <div className="field">
       <div className="field-label">
         <strong>Saving</strong>
-        <p className="muted small">Every save goes to the collection Glossly picks for the selection, and can be undone for {view.settings.save.undoSeconds} seconds.</p>
+        <p className="muted small">Glossly picks the collection, and you can undo any save.</p>
       </div>
       <ChoiceCards
         className="stacked"
@@ -133,7 +133,7 @@ function SaveMode({ view }: { view: SettingsView }) {
           }}
         />
       )}
-      {mode === 'autosave' && <p className="muted small">Passwords and empty selections are never saved, and the same text is not saved twice while it stays selected.</p>}
+      {mode === 'autosave' && <p className="muted small">Passwords are never saved.</p>}
       {error && <p className="error small">{error}</p>}
     </div>
   );
@@ -190,11 +190,7 @@ function AppModes({ view }: { view: SettingsView }) {
     <div className="field">
       <div className="field-label">
         <strong>Per-app behavior</strong>
-        <p className="muted small">
-          Auto pill shows the pill when you select text. Hotkey only waits for the hotkey. Off ignores the app, even on the hotkey. Name an app or a
-          site, such as Slack, Discord, or Google Docs: a name covers the app and the site in a browser. A process name such as slack.exe covers
-          only the app.
-        </p>
+        <p className="muted small">Show the pill when you select, wait for the hotkey, or turn Glossly off in an app or site.</p>
       </div>
       {entries.length > 0 && (
         <ul className="list">
@@ -227,15 +223,15 @@ function AppModes({ view }: { view: SettingsView }) {
   );
 }
 
-/** Apps Glossly never reads from (shown in Privacy and data). */
+/** Apps Glossly never reads from (shown in Privacy). */
 export function BlockList({ view }: { view: SettingsView }) {
   const { busy, error, set } = useSetting();
   const list = view.settings.blockList;
   return (
     <div className="field">
       <div className="field-label">
-        <strong>Block list</strong>
-        <p className="muted small">Glossly never reads from these apps, on any trigger.</p>
+        <strong>Blocked apps</strong>
+        <p className="muted small">Glossly never reads text from these apps.</p>
       </div>
       {list.length > 0 && (
         <ul className="list">
@@ -269,7 +265,7 @@ function KeyHintsField({ view }: { view: SettingsView }) {
         <span>
           <strong>Show keyboard shortcuts</strong>
           <span className="muted small block">
-            {v === 'always' ? 'Every bar shows its keys.' : v === 'hotkey' ? 'A bar opened with the hotkey shows its keys.' : 'No key chips.'} The keys work whenever the bar has focus.
+            Key hints on the bar's buttons.
           </span>
         </span>
         <Segmented
@@ -321,13 +317,12 @@ export function GeneralTab({ view }: { view: SettingsView }) {
   return (
     <section>
       <h2>General</h2>
-      <p className="muted">How Glossly opens, saves, and shows dates.</p>
       <Hotkey view={view} />
       <KeyHintsField view={view} />
       <SaveMode view={view} />
       <AppModes view={view} />
       <WeekStartField view={view} />
-      <Toggle view={view} k="debugView" label="Debug view" desc="Shows capture method, timings, and routing details at the bottom of the bar." />
+      <Toggle view={view} k="debugView" label="Debug view" desc="Technical details at the bottom of the bar." />
     </section>
   );
 }

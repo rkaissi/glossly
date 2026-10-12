@@ -262,7 +262,7 @@ export class SaveService {
         } else this.deps.metrics?.record('save_enrich_error', { stage: 'entities', code: errorCode(e) });
       }
     } else {
-      // No model can look yet; Privacy and data offers to find them once one can (decision 44).
+      // No model can look yet; Privacy offers to find them once one can (decision 44).
       this.deps.store.setEntitiesPending(item.id, true);
     }
     return { ...result, cancelled: !alive() };

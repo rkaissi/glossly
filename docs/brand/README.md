@@ -1,8 +1,8 @@
 # Glossly mark
 
-The mark in use is **C1, caret + sparkle** (chosen Oct 10): a text cursor (the selection) and a sparkle (the action). It is `GlosslyMark` in `packages/ui/src/icons.tsx` (the pill and bar's menu button, the dot, the settings sidebar), and the tray icon draws the same shape in code (`onMark` in `packages/shell-electron/src/main/tray.ts`, with heavier strokes and a larger sparkle so it holds at tray size).
+The mark in use is **C1, caret + sparkle** (chosen Oct 10): a text cursor (the selection) and a sparkle (the action). It is `GlosslyMark` in `packages/ui/src/icons.tsx` (the pill and bar's menu button, the dot, the settings sidebar).
 
-Every mark here is a 24-unit line icon in the lucide style (`stroke="currentColor"`, width 2, round caps), so it can replace the paths in `GlosslyMark` directly. If the tray changes too, update `onMark` to match.
+Every mark here is a 24-unit line icon in the lucide style (`stroke="currentColor"`, width 2, round caps), so it can replace the paths in `GlosslyMark` directly.
 
 | File | Design | Rayan's notes (Oct 10) |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ No product logo was found that copies any of these (a web search, Oct 10; not a 
 
 ## App icon candidates (Step 20.3)
 
-The C1 mark on a Windows 11 style tile, 100-unit SVGs (shown at 256 px), from `docs/design/mockups/20-3-design-pass.html`. Rayan (Oct 11) picked **Glass**, with a slightly deeper tile and a faint darker rim so it holds on a light taskbar. The rest are kept as backups, **Aurora** first, then Rim. The tray keeps the plain mark either way.
+The C1 mark on a Windows 11 style tile, 100-unit SVGs (shown at 256 px), from `docs/design/mockups/20-3-design-pass.html`. Rayan (Oct 11) picked **Glass**, with a slightly deeper tile and a faint darker rim so it holds on a light taskbar. The rest are kept as backups, **Aurora** first, then Rim. The tray and the helper exe use it too (Rayan, Oct 12, decision 62; until then the tray drew the plain mark).
 
 | File | Design |
 | --- | --- |

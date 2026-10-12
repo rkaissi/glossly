@@ -178,10 +178,7 @@ function VoiceSamples() {
       <div className="field-label">
         <strong>How you write</strong>
         <p className="muted small">
-          Paste up to 5 messages you wrote, so Reply drafts sound like you, and say where you wrote each: Reply copies length, greetings, and
-          sign-offs only from samples on the same platform. Replies you change before inserting are added on their own (the last
-          20 are kept); a draft you take as written is not, since the model wrote it. Samples are sent to your model provider only inside a Reply
-          request.
+          Paste a few messages you wrote, and say where, so replies sound like you. Replies you edit are added on their own.
         </p>
       </div>
       {pasted.length > 0 && <ul className="list">{pasted.map(sample)}</ul>}
@@ -257,9 +254,7 @@ function LearnedStyle({ learning }: { learning: boolean }) {
         <span>
           <strong>Learn from the drafts I pick and edit</strong>
           <span className="muted small block">
-            Reply notes which draft you take (its length, tone, and what it does) and how you edit it, per person, per
-            relationship (friends, colleagues, ...) on each kind of platform, and per kind of platform (email, messaging apps, work chat). A habit shows up here once your recent picks agree on it. Every 5 edited replies, your model reads your edits
-            and updates its notes on how you write, or leaves them as they are. All of it stays on this computer and goes to your model provider only inside a Reply request.
+            Reply learns your habits from the drafts you choose and the edits you make. What it learned shows here.
           </span>
         </span>
         <Switch label="Learn from the drafts I pick and edit" checked={learning} disabled={busy} onChange={toggle} />
@@ -301,8 +296,7 @@ export function ProfileTab({ view }: { view: SettingsView }) {
     <section>
       <h2>Profile</h2>
       <p className="muted">
-        Glossly uses this to tell your own messages and promises from other people's, and to write replies as you. It stays on this computer and is
-        sent to a model provider only as part of a request you start (Ask, Reply, Tasks).
+        Lets Glossly tell your messages from other people's and write replies as you. It stays on this computer.
       </p>
       <div className="field">
         <div className="field-label">

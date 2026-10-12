@@ -33,10 +33,8 @@ export function Embeddings({ view }: { view: SettingsView }) {
   return (
     <div className="field">
       <div className="field-label">
-        <strong>Local embeddings</strong>
-        <p className="muted small">
-          {e.model} ({e.dims} dimensions), about 23 MB, runs on this computer. Saved items are embedded so related notes can be found later.
-        </p>
+        <strong>Search model</strong>
+        <p className="muted small">Finds related notes in what you save. A small download that runs on this computer.</p>
       </div>
       <div className="row">
         <EmbedLine embed={e} />
@@ -68,7 +66,7 @@ function Export() {
     <div className="field">
       <div className="field-label">
         <strong>Export</strong>
-        <p className="muted small">Everything Glossly stores, as one JSON file: saved items, collections, people, settings, and usage metrics. Keys are not included.</p>
+        <p className="muted small">Download everything Glossly keeps as a file. Keys aren't included.</p>
       </div>
       <div className="row">
         <button disabled={busy} onClick={() => void go()}>
@@ -146,7 +144,7 @@ function DeleteAll() {
   return (
     <Destructive
       title="Delete all data"
-      description="Removes saved items, collections, people, and usage metrics from this computer. Your API keys, settings, model list, and the embedding model stay."
+      description="Erase saved items, people, tasks, and history. Keys and settings stay."
       warning="This cannot be undone. Export first if you want a copy."
       button="Delete all data…"
       confirm="Delete all data"
@@ -160,7 +158,7 @@ function ResetSettings() {
   return (
     <Destructive
       title="Reset settings"
-      description="Removes your saved API keys and puts every setting back to its default, including the hotkey, models, and per-app choices. Saved items stay. Setup starts again afterwards."
+      description="Remove your keys and put every setting back to its default. Saved items stay, and setup runs again."
       warning="You will need to add a key again."
       button="Reset settings…"
       confirm="Reset settings"
@@ -177,8 +175,8 @@ function ResetSettings() {
 export function PrivacyDataTab({ view }: { view: SettingsView }) {
   return (
     <section>
-      <h2>Privacy and data</h2>
-      <p className="muted">Everything stays on this computer in one database. Nothing is sent anywhere except the model calls you trigger.</p>
+      <h2>Privacy</h2>
+      <p className="muted">Everything Glossly keeps stays on this computer. Only model calls leave it.</p>
       <PrivacyChoice view={view} onSetUp={() => (location.hash = 'models')} />
       <BlockList view={view} />
       <CallLog view={view} />

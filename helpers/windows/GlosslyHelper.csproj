@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- The Glass app icon, so Task Manager shows Glossly's icon for the helper too. -->
+    <ApplicationIcon>..\..\packages\shell-electron\resources\icon.ico</ApplicationIcon>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
