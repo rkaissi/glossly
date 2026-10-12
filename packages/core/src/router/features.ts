@@ -34,6 +34,8 @@ export interface Features {
   automated: boolean;
   /** The last chat header up to the end of the selection is the user's own. */
   authorIsMe: boolean;
+  /** A chat header was found up to the end of the selection, so the author is known either way. */
+  speakerFound: boolean;
   /** The selection is in a text field (usually the user's own draft). */
   inEditable: boolean;
 }
@@ -69,7 +71,7 @@ const MESSENGER_TITLES = /(?:- Gmail|- Outlook|Outlook$|- Slack|Discord|WhatsApp
 const CODE_EDITORS = ['code.exe', 'cursor.exe', 'devenv.exe', 'idea64.exe', 'pycharm64.exe', 'webstorm64.exe', 'rider64.exe', 'sublime_text.exe', 'notepad++.exe', 'zed.exe'];
 
 const COMMITMENT =
-  /\b(?:I'll|I will|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|remember to|don't forget|do not forget|to-?do|reminder|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you)\b/gi;
+  /\b(?:I'll|I will|send me|let's|need you to|make sure|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|remember to|don't forget|do not forget|to-?do|reminder|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you)\b/gi;
 const DATE_WORD =
   /\b(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|end of (?:day|week|month)|eod|eow|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{1,2}(?::\d{2})?\s?[ap]m)\b/i;
 const AUTOMATED =
@@ -236,6 +238,18 @@ function unique(xs: Iterable<string>): string[] {
   return [...new Set(xs)];
 }
 
+/** Whose message the selection ends in, from the headers up to its end. */
+function author(upToEnd: string, people: KnownPerson[], me?: Identity): { authorIsMe: boolean; speakerFound: boolean } {
+  const speaker = lastSpeaker(upToEnd, knownName(me, people));
+  return { authorIsMe: me ? isMe(speaker, me) : false, speakerFound: speaker !== null };
+}
+
+/**
+ * A short chat selection with no header in the text around it: the router can't tell whether
+ * it's the user's own message (decision 51). The shell then reads more of the conversation.
+ */
+export const authorUnknown = (f: Features): boolean => f.messengerApp && !f.inEditable && f.wordCount <= 150 && !f.speakerFound && !f.automated;
+
 /** Whoever wrote the last message in `text` (the last header in it), or null. */
 export function lastSpeaker(text: string, known?: KnownName): string | null {
   return speakers(text, known).at(-1) ?? null;
@@ -286,7 +300,7 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     codeScore,
     ideaWords: IDEA.test(text),
     automated: AUTOMATED.test(text) || AUTOMATED.test(ctx.window_title) || (BROADCAST_GREETING.test(text) && BROADCAST_WORDS.test(text)),
-    authorIsMe: me ? isMe(lastSpeaker(`${ctx.context_before}${text}`, knownName(me, people)), me) : false,
+    ...author(`${ctx.context_before}${text}`, people, me),
     inEditable: ctx.is_editable,
   };
 }

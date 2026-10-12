@@ -19,6 +19,7 @@ import {
   buildWhoPrompt,
   readWho,
   authorFrom,
+  authorUnknown,
   authorFirst,
   gateApp,
   gateAutoSelection,
@@ -230,6 +231,18 @@ const toContext = (s: SelectionPayload): SelectionContext => ({
   window_title: s.window_title,
   is_editable: s.is_editable,
 });
+
+/** How long the slots wait for tier 2 after the route, when tier 1 couldn't say whose message it is (decision 51). */
+const AUTHOR_WAIT_MS = 300;
+/** Tier-2 text around the selection used to find its author: enough for a few messages back. */
+const AUTHOR_BEFORE = 3000;
+
+/** The selection with tier-2 text around it, for re-reading whose message it is. */
+function withContainer(s: SelectionPayload, c: ContainerContext): SelectionContext {
+  const start = Math.max(0, c.selection_start);
+  const end = start + Math.max(0, c.selection_length);
+  return { ...toContext(s), context_before: c.text.slice(Math.max(0, start - AUTHOR_BEFORE), start), context_after: c.text.slice(end, end + 500) };
+}
 
 /**
  * The selection session: the auto pill and hotkey paths, expand and routing, action clicks
@@ -900,9 +913,26 @@ export class Capture {
     if (!s.selection) return;
     const ctl = new AbortController();
     s.routeCtl = ctl;
+    // A chat message with no header around it in tier 1 may be the user's own: read tier 2 while
+    // the router runs (it's read on the first click anyway) and score again with it before slots
+    // 3 and 4 show (decision 51). Not on the hotkey path, where the read would move focus.
+    const tier2 =
+      s.route && authorUnknown(s.route.features) && !this.overlay.hasFocus && s.selection.method !== 'copy'
+        ? this.readTier2(s).then(() => s.container)
+        : null;
     try {
-      const r = await this.router().route(toContext(s.selection), ctl.signal);
+      const router = this.router();
+      let r = await router.route(toContext(s.selection), ctl.signal);
       if (!this.current(s.id) || ctl.signal.aborted) return;
+      let author: 'tier1' | 'tier2' | 'unknown' = 'tier1';
+      if (tier2) {
+        const c = await Promise.race([tier2, new Promise<null>((res) => setTimeout(() => res(null), AUTHOR_WAIT_MS))]);
+        if (!this.current(s.id) || ctl.signal.aborted) return;
+        if (c?.source === 'container' && c.text && s.selection) {
+          r = router.rescore(r, withContainer(s.selection, c));
+          author = r.features.speakerFound ? 'tier2' : 'unknown';
+        } else author = 'unknown';
+      }
       s.route = r;
       s.timings.route = Math.round(r.ms);
       const prev = this.state.slots;
@@ -915,6 +945,8 @@ export class Capture {
         fallback: r.fallback ?? 'none',
         ms: Math.round(r.ms),
         budget_ms: this.settings.router.decisionTimeoutMs,
+        author,
+        mine: r.features.authorIsMe,
       };
       this.services.metrics.record('router_done', { ...routed, content_type: r.decisions.content_type });
       log.info('routed', routed);

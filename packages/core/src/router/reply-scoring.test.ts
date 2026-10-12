@@ -3,7 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_COLLECTIONS, DEFAULT_SETTINGS } from '../settings';
-import { extractFeatures } from './features';
+import { authorUnknown, extractFeatures } from './features';
+import { Router } from './router';
 import { decideByRules } from './rules';
 import { assignSlots, scoreActions } from './slots';
 import type { Decisions, SelectionContext } from './types';
@@ -84,5 +85,37 @@ describe('Reply scoring', () => {
     expect(scoreActions(model, extractFeatures({ ...c, is_editable: true }, [], me)).reply).toBe(0);
     const mine = extractFeatures({ ...c, context_before: 'Alex Morgan  9:41 AM\n' }, [], me);
     expect(scoreActions({ ...model, content_type: 'single_message' }, mine).reply).toBe(0);
+  });
+});
+
+describe('slots on a chat question (decision 51)', () => {
+  const me = { name: 'Alex Morgan', emails: [], handles: [] };
+  // The user's own question in a fictional Discord DM.
+  const text = 'haha nice\nwhat do you work on there\nis it more lab work or office stuff?';
+  const question: Decisions = { content_type: 'question', authored_by_other: 0.3, mentions_people: 0.1, contains_commitment: 0.6, best_collection: 'Notes', provider: 'llm_structured' };
+
+  it('keeps Tasks out of the slots when nothing in the text backs the model’s commitment score', () => {
+    const f = extractFeatures(ctx({ source_app: 'discord.exe', window_title: 'Discord', context_before: 'Jordan\n9:38 PM\nstarted at a lab supply startup\n', text }), [], me);
+    const s = assignSlots(question, f, DEFAULT_SETTINGS.router);
+    expect([s.slot3?.action, s.slot4?.action]).not.toContain('promises');
+    expect(s.more.map((m) => m.action)).toContain('promises');
+    // A request or a date in the text still counts in full.
+    const ask = extractFeatures(ctx({ source_app: 'discord.exe', window_title: 'Discord', context_before: 'Jordan\n9:38 PM\n', text: 'can you send me the forms before friday?' }), [], me);
+    expect([assignSlots(question, ask, DEFAULT_SETTINGS.router).slot3?.action, assignSlots(question, ask, DEFAULT_SETTINGS.router).slot4?.action]).toContain('promises');
+  });
+
+  it('knows when tier 1 shows no header, and drops Reply once more of the conversation shows the user wrote it', () => {
+    const router = new Router({ decision: null, settings: () => DEFAULT_SETTINGS, collections: () => [...DEFAULT_COLLECTIONS], identity: () => me });
+    const bare = ctx({ source_app: 'discord.exe', window_title: 'Discord', context_before: 'started at a lab supply startup\n', text });
+    const r = router.quick(bare);
+    expect(authorUnknown(r.features)).toBe(true);
+    expect([r.slots.slot3?.action, r.slots.slot4?.action]).toContain('reply');
+    const mine = router.rescore(r, { ...bare, context_before: 'Jordan\n9:38 PM\nstarted at a lab supply startup\nAlex\n9:40 PM\n' });
+    expect(mine.features).toMatchObject({ authorIsMe: true, speakerFound: true });
+    expect([mine.slots.slot3?.action, mine.slots.slot4?.action]).not.toContain('reply');
+    // Someone else's message stays answerable.
+    const theirs = router.rescore(r, { ...bare, context_before: 'Alex\n9:37 PM\nhow is the new job?\nJordan\n9:38 PM\n' });
+    expect([theirs.slots.slot3?.action, theirs.slots.slot4?.action]).toContain('reply');
+    expect(authorUnknown(theirs.features)).toBe(false);
   });
 });

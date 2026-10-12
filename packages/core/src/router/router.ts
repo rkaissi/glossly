@@ -85,6 +85,15 @@ export class Router {
     };
   }
 
+  /**
+   * The same decisions with features read from another context: more of the conversation from
+   * tier 2, when tier 1 had no header to say whose message it is (decision 51). No model call.
+   */
+  rescore(r: RouteResult, context: SelectionContext): RouteResult {
+    const features = extractFeatures(context, this.deps.people?.() ?? [], this.deps.identity?.());
+    return { ...r, features, slots: assignSlots(r.decisions, features, this.deps.settings().router) };
+  }
+
   private now(): number {
     return (this.deps.now ?? performance.now.bind(performance))();
   }

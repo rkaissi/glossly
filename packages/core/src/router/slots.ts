@@ -6,6 +6,9 @@ import { CONTEXTUAL_ACTIONS, EMPTY_ACTIONS, type BarAction, type ContextualActio
 /** What a chat message can look like to the model (a signature or a pasted table is not one). */
 const CHAT_TYPES: readonly Decisions['content_type'][] = ['single_message', 'message_thread', 'question', 'other'];
 
+/** The most a commitment score with nothing in the text to back it can be: below slotThreshold's default, above More's. */
+const UNBACKED_COMMITMENT = 0.45;
+
 export function scoreActions(d: Decisions, f: Features): Record<ContextualAction, number> {
   // A short read-only selection in a chat app is someone's message, even when the model, seeing
   // only "what kind of job is it?", calls it a question (decision 45).
@@ -24,8 +27,10 @@ export function scoreActions(d: Decisions, f: Features): Record<ContextualAction
     who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact, theirs ? 0.55 : 0),
     // Tasks and events (decisions 36 and 37): what the text says, an event in it, or a message
     // involving someone you have open tasks with. Not on code or tables.
+    // The model's commitment score counts in full only with something in the text to back it: a
+    // commitment phrase, a date, or an event. Else it stays under More (decision 51).
     promises: Math.max(
-      d.contains_commitment,
+      f.commitmentPhrases.length > 0 || f.hasDateWord || f.eventSentences > 0 ? d.contains_commitment : Math.min(d.contains_commitment, UNBACKED_COMMITMENT),
       isMessage && f.peopleWithTasks > 0 ? 0.55 : 0,
       f.eventSentences > 0 && d.content_type !== 'code' && d.content_type !== 'table_or_numbers' ? 0.7 : 0,
     ),

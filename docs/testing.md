@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (601 tests on Oct 12)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (603 tests on Oct 12)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -175,6 +175,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Reply (decision 47), on a fictional Discord DM with a server tag (a test server, not a real conversation): select the other person's last message after one of yours; the panel says "Reply to" their name (never "Server Tag"), and no draft answers your message; select your message and theirs together and the drafts still answer only theirs; drafts pick up a detail from their message and offer nothing you didn't.
 - [ ] Header parser fixes (Step 20.4 chunk 1), same fictional Discord server: a member with a short badge (no "Server Tag:" label) and a display name with a space; select their question, your answer, and their reply together: the panel says "Reply to" their display name (never the badge), and the drafts answer only their reply. Hover a continuation line while selecting so its timestamp is copied; the author is unchanged.
 - [ ] Conversation read (Step 20.4 chunk 2), same fictional server: open Who is this, then Tasks and events on the same selection; `main.log` shows one `who looked up` with `messages` above 0 and Tasks adds no second `who` call (`llm_tokens` events: one `who`, one `promises`). Tasks on "[their] can you send the deck by Friday? / [you] sure, I'll send it Thursday" offers You owe Thursday's deck to them. Under Local only with no local model, Who and Tasks still work from the parser.
+- [ ] Slots on chat messages (decision 51), a fictional Discord DM: select only the lines of your own question (not its header) and hover the pill: the bar offers no Reply and no Tasks and events (`routed` logs `author: tier2`, `mine: true`, or `author: unknown` if Discord's tier 2 lacks the header too: then note it here). Their message still gets Reply; "can you send me the forms before friday?" still gets Tasks.
 - [ ] Overlay dropdowns (decision 50): Who is this → Create person near the bottom of a short source window: the relationship list opens on the larger side and scrolls, and the overlay doesn't grow; a date picker in Tasks and events in a short bar still grows the overlay to fit.
 - [ ] Style learning (decision 49), throwaway profile: after migration 8, Profile > How you write shows no contractions line; pick short chat drafts without emoji five times and no "Avoids emoji" line appears; edit five chat drafts to lowercase slang ("im", "dont", "gonna"): a style note "in messaging apps" says something casual, never formal, and an email reply's prompt doesn't get it. A run with nothing new logs `style notes written` with `kept: true`.
 - [ ] Conversation read in a Slack thread (decision 48), a fictional workspace or a test channel: "Casey Lin  9:41 AM" style headers with two other people and one of yours; select the last three messages: Who lists the last writer first, Tasks marks each message's author, and Reply answers only what came after your message ("Reply to" the last writer).
