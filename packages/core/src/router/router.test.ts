@@ -111,13 +111,16 @@ describe('slots', () => {
     best_collection: 'Notes',
     provider: 'rules',
   };
-  const f = extractFeatures(ctx('x'));
+  // Someone other than the user is named, so the model's people score counts in full (decision 53).
+  const f = { ...extractFeatures(ctx('x')), someoneNamed: true };
 
   it('scores contextual actions per the spec', () => {
     expect(scoreActions(base, f)).toEqual({ reply: 0.9, who: 0.6, promises: 0.3, visualize: 0 });
     expect(scoreActions({ ...base, content_type: 'article' }, f).reply).toBe(0);
     expect(scoreActions({ ...base, content_type: 'table_or_numbers' }, f).visualize).toBe(1);
     expect(scoreActions(base, { ...f, knownPeople: ['p1'] }).who).toBe(1);
+    // Nobody named: the model's people score stays under More (decision 53).
+    expect(scoreActions(base, { ...f, someoneNamed: false }).who).toBe(0.45);
   });
 
   it('offers Tasks and events on an invitation, but not on code (decision 37)', () => {

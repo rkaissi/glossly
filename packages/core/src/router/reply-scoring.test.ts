@@ -119,3 +119,24 @@ describe('slots on a chat question (decision 51)', () => {
     expect(authorUnknown(theirs.features)).toBe(false);
   });
 });
+
+describe('evidence for Who and Tasks (decision 53)', () => {
+  const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: [] };
+  const email = (text: string) => extractFeatures(ctx({ source_app: 'chrome.exe', window_title: 'Mail - Alex Morgan - Outlook - Google Chrome', text }), [], me);
+
+  it('needs someone other than the user named before Who takes a slot', () => {
+    const welcome = email('Hi Alex,\nWelcome to Northwind! We are excited to have you join as a Software Engineer Intern. The People Team will follow up.');
+    expect(welcome.namePairs).toEqual([]);
+    expect(welcome.someoneNamed).toBe(false);
+    const d: Decisions = { content_type: 'article', authored_by_other: 0.6, mentions_people: 0.6, contains_commitment: 0.1, best_collection: 'Notes', provider: 'llm_structured' };
+    expect(scoreActions(d, welcome).who).toBe(0.45);
+    expect(email('Casey Lin will join the call; her address is casey@example.com').someoneNamed).toBe(true);
+    expect(email('Write to me at alex@example.com or to support@example.com').someoneNamed).toBe(false);
+  });
+
+  it('does not back a task with "please" alone', () => {
+    const d: Decisions = { content_type: 'article', authored_by_other: 0.6, mentions_people: 0.1, contains_commitment: 0.7, best_collection: 'Notes', provider: 'llm_structured' };
+    expect(scoreActions(d, email('Please share the news with your friends and family!')).promises).toBe(0.45);
+    expect(scoreActions(d, email('Please send me the signed forms.')).promises).toBe(0.7);
+  });
+});

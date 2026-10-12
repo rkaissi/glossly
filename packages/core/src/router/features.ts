@@ -1,6 +1,6 @@
 import { isEventSentence } from '../calendar/events';
 import { countWords } from '../capture/gating';
-import { findEmails } from '../people/emails';
+import { findEmails, isRoleAddress } from '../people/emails';
 import { isMe } from '../people/names';
 import type { Identity } from '../settings';
 import type { KnownPerson, SelectionContext } from './types';
@@ -14,6 +14,8 @@ export interface Features {
   handles: string[];
   phones: string[];
   namePairs: string[];
+  /** Someone other than the user is named: a name pair, a personal address, or a handle that isn't theirs (decision 53). */
+  someoneNamed: boolean;
   /** IDs of known people whose name or alias appears. */
   knownPeople: string[];
   /** Known people in the text who have open tasks with the user. */
@@ -44,9 +46,11 @@ const HANDLE = /(?:^|[\s(])@([A-Za-z0-9_][\w.-]{1,30})/g;
 const PHONE = /(?:\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}\b/g;
 const NAME_PAIR = /\b([A-Z][a-z]{1,15})\s([A-Z][a-z]{1,20})\b/g;
 const NOT_FIRST_NAMES = new Set(
-  'The This That These Those There Then When Where What Which While With From Into Over Under About After Before Hello Hi Hey Thanks Thank Cheers Regards Please Sorry Congrats Yes Yeah Sure Okay Dear Best Good Happy New Next Last Senior Junior Head Chief Monday Tuesday Wednesday Thursday Friday Saturday Sunday January February March April May June July August September October November December Google Microsoft Apple United North South East West Read More Sign Log Open Save Learn See Click'.split(
-    ' ',
-  ),
+  // Job titles and teams aren't names either ("Software Engineer", "People Team"; decision 53).
+  (
+    'Software Engineer Engineering Intern Internship Developer Designer Design Manager Director Analyst Officer Lead Product Program Project Team People Department Support Sales Marketing Customer Service Services Account Office Group Company University College School Welcome Congratulations Forward Deployed Associate Assistant Specialist Coordinator Recruiter Recruiting Talent Human Resources Operations Finance Legal ' +
+  'The This That These Those There Then When Where What Which While With From Into Over Under About After Before Hello Hi Hey Thanks Thank Cheers Regards Please Sorry Congrats Yes Yeah Sure Okay Dear Best Good Happy New Next Last Senior Junior Head Chief Monday Tuesday Wednesday Thursday Friday Saturday Sunday January February March April May June July August September October November December Google Microsoft Apple United North South East West Read More Sign Log Open Save Learn See Click'
+  ).split(' '),
 );
 
 // "Sam Lee  10:42 AM", "[10:42] Sam:", "Sam — Today at 10:42", "Priya 3:05 PM"
@@ -286,6 +290,10 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     handles,
     phones,
     namePairs,
+    someoneNamed:
+      namePairs.some((n) => !(me && isMe(n, me))) ||
+      emails.some((e) => !isRoleAddress(e) && !(me && isMe(e, me))) ||
+      handles.some((h) => !(me && isMe(`@${h}`, me))),
     knownPeople,
     peopleWithTasks: known.filter((p) => (p.open ?? 0) > 0).length,
     eventSentences: text.split(/(?<=[.!?])\s+|\n+/).filter(isEventSentence).length,

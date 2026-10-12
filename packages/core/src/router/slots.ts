@@ -6,8 +6,10 @@ import { CONTEXTUAL_ACTIONS, EMPTY_ACTIONS, type BarAction, type ContextualActio
 /** What a chat message can look like to the model (a signature or a pasted table is not one). */
 const CHAT_TYPES: readonly Decisions['content_type'][] = ['single_message', 'message_thread', 'question', 'other'];
 
-/** The most a commitment score with nothing in the text to back it can be: below slotThreshold's default, above More's. */
-const UNBACKED_COMMITMENT = 0.45;
+/** The most a model score with nothing in the text to back it can be: below slotThreshold's default, above More's (decisions 51, 53). */
+const UNBACKED = 0.45;
+/** Phrases too common in newsletters and notices to back a task on their own (decision 53). */
+const WEAK_PHRASES = new Set(['please', 'reminder', 'due']);
 
 export function scoreActions(d: Decisions, f: Features): Record<ContextualAction, number> {
   // A short read-only selection in a chat app is someone's message, even when the model, seeing
@@ -23,14 +25,15 @@ export function scoreActions(d: Decisions, f: Features): Record<ContextualAction
     d.content_type === 'contact_info' ? 0.9 : f.namePairs.length > 0 && (f.phones.length > 0 || f.emails.some((e) => !isRoleAddress(e))) ? 0.7 : 0;
   return {
     reply: answerable ? Math.max(d.authored_by_other, theirs ? 0.7 : 0) : 0,
-    // Whoever wrote someone else's chat message is someone to look up.
-    who: f.knownPeople.length > 0 ? 1 : Math.max(d.mentions_people, contact, theirs ? 0.55 : 0),
+    // Whoever wrote someone else's chat message is someone to look up. The model's score counts
+    // in full only when someone other than the user is named in the text (decision 53).
+    who: f.knownPeople.length > 0 ? 1 : Math.max(f.someoneNamed ? d.mentions_people : Math.min(d.mentions_people, UNBACKED), contact, theirs ? 0.55 : 0),
     // Tasks and events (decisions 36 and 37): what the text says, an event in it, or a message
     // involving someone you have open tasks with. Not on code or tables.
     // The model's commitment score counts in full only with something in the text to back it: a
     // commitment phrase, a date, or an event. Else it stays under More (decision 51).
     promises: Math.max(
-      f.commitmentPhrases.length > 0 || f.hasDateWord || f.eventSentences > 0 ? d.contains_commitment : Math.min(d.contains_commitment, UNBACKED_COMMITMENT),
+      f.commitmentPhrases.some((p) => !WEAK_PHRASES.has(p)) || f.hasDateWord || f.eventSentences > 0 ? d.contains_commitment : Math.min(d.contains_commitment, UNBACKED),
       isMessage && f.peopleWithTasks > 0 ? 0.55 : 0,
       f.eventSentences > 0 && d.content_type !== 'code' && d.content_type !== 'table_or_numbers' ? 0.7 : 0,
     ),
