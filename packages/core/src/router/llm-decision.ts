@@ -1,4 +1,5 @@
 import routerPrompt from '../../prompts/router-decision.md?raw';
+import { describeSource } from '../people/reply-style';
 import type { LlmProvider } from '../llm/types';
 import { ruleCollection } from './rules';
 import { decisionCallSchema, type DecisionInput, type DecisionProvider, type Decisions } from './types';
@@ -7,8 +8,7 @@ const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
 
 export function formatDecisionPrompt({ context, collections }: DecisionInput): string {
   return [
-    `App: ${context.source_app}`,
-    `Window title: ${clip(context.window_title, 200)}`,
+    `App: ${describeSource(context.source_app, context.window_title)}`,
     `In an editable field: ${context.is_editable ? 'yes' : 'no'}`,
     `Collections: ${collections.join(', ')}`,
     '',

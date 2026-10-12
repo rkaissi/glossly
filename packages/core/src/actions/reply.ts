@@ -6,7 +6,7 @@ import type { ReadMessage } from '../people/conversation';
 import type { DetectedPerson } from '../people/detect';
 import { describeIdentity, isMe } from '../people/names';
 import { headers, isHeaderChrome, knownName, lastSpeaker, type KnownName } from '../router/features';
-import type { ReplyChannel, ReplyRedo, ReplyRedoAsk } from '../people/reply-style';
+import { describeSource, type ReplyChannel, type ReplyRedo, type ReplyRedoAsk } from '../people/reply-style';
 import type { PersonCard } from '../people/types';
 import type { Identity, Settings } from '../settings';
 import type { ContainerContext, SelectionPayload } from '../types';
@@ -208,7 +208,7 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     to,
     '',
     '## App',
-    `${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''}`,
+    describeSource(selection.source_app, selection.window_title),
     '',
     '## Today',
     now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),

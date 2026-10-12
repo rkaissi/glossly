@@ -3,6 +3,7 @@ import { z } from 'zod';
 import askPrompt from '../../prompts/ask.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import { describeIdentity } from '../people/names';
+import { describeSource } from '../people/reply-style';
 import type { Settings } from '../settings';
 import type { ContainerContext, Item, SelectionPayload, Surroundings } from '../types';
 import { contextWindow } from './context';
@@ -11,6 +12,8 @@ export interface AskInput {
   selection: SelectionPayload;
   /** Tier-2 context, when it was read. Falls back to tier 1. */
   container?: ContainerContext | null;
+  /** For the prompt's date; now when left out. */
+  now?: Date;
   /** Empty or missing means settings.ask.defaultQuestion. */
   question?: string;
   /** Top recall results, or the cards picked with "Ask about these". */
@@ -103,8 +106,12 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
     '## The person asking',
     me ? `${me}. They are reading the selection; they did not write it unless it is signed by or attributed to them.` : 'Unknown. They are reading the selection and most likely did not write it.',
     '',
+    // For "when is that?" and "how long ago" (decision 54).
+    '## Today',
+    (input.now ?? new Date()).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+    '',
   ];
-  const where = `${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''}`;
+  const where = describeSource(selection.source_app, selection.window_title);
   const around = input.surroundings;
   if (!selection.text.trim()) {
     // Nothing selected: the question is about what is on screen, or a general one.

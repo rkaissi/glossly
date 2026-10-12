@@ -108,6 +108,19 @@ const WORK_TITLES = /(?:- Slack|Slack \||Microsoft Teams|Google Chat|Mattermost)
 const MESSAGING_TITLES = /(?:Discord|WhatsApp|Messenger|Telegram|Instagram|Snapchat)\b/i;
 
 /** The kind of platform: register differs a lot between them, so each learns on its own. */
+const PLATFORM_WORDS: Partial<Record<ReplyChannel, string>> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat' };
+
+/**
+ * Where text came from, for a model prompt: the app, the window title, and the kind of platform
+ * when it's known ('chrome.exe, "Mail - Outlook" (email)'). Every call that reads captured text
+ * gets it, so a model can tell an email from a chat (decision 54).
+ */
+export function describeSource(app: string, title: string): string {
+  const kind = PLATFORM_WORDS[replyChannel(app, title)];
+  const t = title.trim();
+  return `${app || 'unknown app'}${t ? `, "${t.length > 200 ? `${t.slice(0, 200)}…` : t}"` : ''}${kind ? ` (${kind})` : ''}`;
+}
+
 export function replyChannel(app: string, title: string): ReplyChannel {
   const p = app.toLowerCase();
   if (EMAIL_PROCESSES.includes(p) || EMAIL_TITLES.test(title)) return 'email';

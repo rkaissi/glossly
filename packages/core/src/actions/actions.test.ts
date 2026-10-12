@@ -123,6 +123,11 @@ describe('Ask', () => {
     expect(prompt).not.toContain('Saved notes');
   });
 
+  it('knows today and where the text came from (decision 54)', () => {
+    const { prompt } = buildAskPrompt(DEFAULT_SETTINGS, { selection: selection(), now: new Date(2026, 9, 14, 10, 0) });
+    expect(prompt).toContain('## Today\nWednesday, October 14, 2026');
+  });
+
   it('prefers tier-2 context and cites saved notes by label', () => {
     const container = { text: 'Thread start. Sam said the Acme launch moves to Friday. Thread end.', selection_start: 14, selection_length: 41, source: 'container' as const };
     const { prompt } = buildAskPrompt(DEFAULT_SETTINGS, {

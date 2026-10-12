@@ -20,6 +20,7 @@ import { ExtractedEventSchema, rulesEvents, toEventRows, type ExtractedEvent } f
 import type { CalendarEvent, EventCandidate } from '../calendar/types';
 import type { CalendarRepo } from '../store/calendar';
 import { contextWindow } from './context';
+import { describeSource } from '../people/reply-style';
 import { matchOpenTasks, rulesCommitments } from './promise-rules';
 
 /** An open task shown to the model under a short key ("t1"), so its answer can point at it. */
@@ -127,7 +128,7 @@ export function buildPromisesPrompt(settings: Pick<Settings, 'identity'>, input:
     '## Today',
     `${day} (for context only; return due phrases as written)`,
     '',
-    `## Selected message (from ${selection.source_app})`,
+    `## Selected message (from ${describeSource(selection.source_app, selection.window_title)})`,
     '<selection>',
     (marked ?? selection.text).slice(0, MAX_SELECTION),
     '</selection>',

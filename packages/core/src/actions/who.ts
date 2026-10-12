@@ -5,6 +5,7 @@ import whoPrompt from '../../prompts/who.md?raw';
 import type { LlmProvider } from '../llm/types';
 import { type DetectedPerson, type DetectInput, type Detection } from '../people/detect';
 import { describeIdentity } from '../people/names';
+import { describeSource } from '../people/reply-style';
 import { RELATIONSHIPS } from '../people/relationship';
 import { acceptWhoRows, localWho, whoCorpus } from '../people/who-judge';
 import { acceptMessages, authorFirst, readAuthor, type ReadMessage } from '../people/conversation';
@@ -132,8 +133,7 @@ export function readInput(input: DetectInput): DetectInput {
  */
 export function buildWhoPrompt(identity: Identity, raw: DetectInput): string {
   const input = readInput(raw);
-  const parts = ['## The user', describeIdentity(identity) ?? 'Unknown. Do not guess who the user is.', '', `## App: ${input.source_app}`];
-  if (input.window_title) parts.push(`Window: ${input.window_title}`);
+  const parts = ['## The user', describeIdentity(identity) ?? 'Unknown. Do not guess who the user is.', '', `## App: ${describeSource(input.source_app, input.window_title)}`];
   if (input.before.trim()) parts.push('', '<before>', input.before.trimEnd(), '</before>');
   parts.push('', '<selection>', input.text, '</selection>');
   if (input.after.trim()) parts.push('', '<after>', input.after.trimStart(), '</after>');

@@ -315,3 +315,10 @@ describe('what Reply is told to answer (decision 52)', () => {
     expect(own).toContain("## The user's message (write a follow-up)\n<message>");
   });
 });
+
+describe('context in the prompt (decision 54)', () => {
+  it('tells Reply the kind of platform, so an email gets an email', () => {
+    const p = buildReplyPrompt(settings, { selection: { ...selection, source_app: 'chrome.exe', window_title: 'Mail - Alex Morgan - Outlook - Google Chrome' }, author, authorIsMe: false, person: null, voice: [] }, now);
+    expect(p).toContain('## App\nchrome.exe, "Mail - Alex Morgan - Outlook - Google Chrome" (email)');
+  });
+});

@@ -12,6 +12,7 @@ import {
   replyChannel,
   type StyleSignal,
   type StyleSignalRow,
+  describeSource,
 } from './reply-style';
 
 const short = 'Sounds good, see you Friday.';
@@ -206,5 +207,14 @@ describe('preferencesFor', () => {
       'group:colleague:longer',
       'person:c1:longer',
     ]);
+  });
+});
+
+describe('describeSource (decision 54)', () => {
+  it('names the app, the window, and the kind of platform when it is known', () => {
+    expect(describeSource('chrome.exe', 'Mail - Alex Morgan - Outlook - Google Chrome')).toBe('chrome.exe, "Mail - Alex Morgan - Outlook - Google Chrome" (email)');
+    expect(describeSource('discord.exe', 'Discord')).toBe('discord.exe, "Discord" (messaging app)');
+    expect(describeSource('notepad.exe', 'notes.txt - Notepad')).toBe('notepad.exe, "notes.txt - Notepad"');
+    expect(describeSource('', '')).toBe('unknown app');
   });
 });

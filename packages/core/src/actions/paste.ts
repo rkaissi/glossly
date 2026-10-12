@@ -8,7 +8,7 @@ import pastePrompt from '../../prompts/paste-compose.md?raw';
 import { cleanText } from '../capture/clean';
 import type { Embedder } from '../embed/types';
 import type { LlmProvider } from '../llm/types';
-import { replyChannel } from '../people/reply-style';
+import { describeSource, replyChannel } from '../people/reply-style';
 import type { Settings } from '../settings';
 import type { Store } from '../store/store';
 import { isoNow, type Item, type Surroundings } from '../types';
@@ -150,7 +150,7 @@ export interface PasteComposeInput {
 export function buildPastePrompt(input: PasteComposeInput): string {
   const parts = [
     '## Where the text goes',
-    `${TARGET_WORDS[input.target]}: ${input.app || 'unknown app'}${input.title ? `, "${clip(input.title, 200)}"` : ''}`,
+    `${TARGET_WORDS[input.target]}: ${describeSource(input.app, input.title)}`,
     '',
   ];
   const s = input.surroundings;
