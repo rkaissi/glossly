@@ -1,6 +1,6 @@
 import { useContext, useId, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { anchorHidden, placePopover, roomNeeded, type Rect } from './logic';
+import { anchorHidden, LIST_MIN_H, placePopover, roomNeeded, type Rect } from './logic';
 import { RoomContext } from './room';
 
 let nextRoomId = 1;
@@ -50,6 +50,7 @@ export function Popover({
   align = 'start',
   matchWidth = false,
   focus = true,
+  scrolls = false,
   className,
   label,
   children,
@@ -63,6 +64,8 @@ export function Popover({
   matchWidth?: boolean;
   /** Move focus into the popover on open (to `[data-autofocus]`, else the popover itself). */
   focus?: boolean;
+  /** A list that may scroll: it grows the overlay only when neither side shows four rows (decision 50). */
+  scrolls?: boolean;
   className?: string;
   label?: string;
   children: ReactNode;
@@ -101,7 +104,7 @@ export function Popover({
       const size = { w: el.offsetWidth, h: el.scrollHeight };
       // Ask once for the room it lacks and keep it while open, so the window doesn't flap.
       if (requestRoom && !asked) {
-        const need = roomNeeded(toRect(ar), size.h, view.h);
+        const need = roomNeeded(toRect(ar), size.h, view.h, scrolls ? LIST_MIN_H : size.h);
         if (need) {
           asked = true;
           requestRoom(roomId.current, need);
@@ -144,7 +147,7 @@ export function Popover({
       stack.splice(stack.indexOf(el), 1);
       requestRoom?.(roomId.current, null);
     };
-  }, [anchor, align, matchWidth, focus, requestRoom]);
+  }, [anchor, align, matchWidth, focus, scrolls, requestRoom]);
 
   return createPortal(
     <div

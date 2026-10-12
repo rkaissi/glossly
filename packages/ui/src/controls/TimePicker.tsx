@@ -103,7 +103,7 @@ export function TimePicker({
         />
       </label>
       {open && (
-        <Popover anchor={field} onClose={close} focus={false} matchWidth className="time-pop" label={label}>
+        <Popover anchor={field} onClose={close} focus={false} matchWidth className="time-pop" label={label} scrolls>
           <div className="pop-menu time-list" role="listbox" aria-label={label} ref={list} onMouseDown={(e) => e.preventDefault()}>
             {TIME_STEPS.map((t, i) => (
               <div

@@ -18,6 +18,7 @@ import {
   rangeLabel,
   rangeRole,
   roomNeeded,
+  LIST_MIN_H,
   TIME_STEPS,
   typeAhead,
   weekdayNames,
@@ -60,6 +61,15 @@ describe('placePopover', () => {
     expect(roomNeeded(rect(100, 0), 300, 600)).toBeNull(); // fits below
     expect(roomNeeded(rect(500, 0), 300, 600)).toBeNull(); // fits above
     expect(roomNeeded(rect(100, 0), 300, 200)).toEqual({ below: 132 + 6 + 300 + 8, above: 200 - 100 + 6 + 300 + 8 });
+  });
+
+  it('lets a list scroll in place when one side shows four rows, and grows only when neither does (decision 50)', () => {
+    // A 280 px list under an anchor at 241 in a 480 px window: 233 px above, 193 below.
+    expect(roomNeeded(rect(241, 0), 280, 480)).not.toBeNull(); // a calendar needs all of it
+    expect(roomNeeded(rect(241, 0), 280, 480, LIST_MIN_H)).toBeNull(); // a list scrolls above
+    expect(placePopover(rect(241, 0), { w: 200, h: 280 }, { w: 600, h: 480 })).toMatchObject({ side: 'above', maxHeight: 241 - 6 - 8 });
+    // A tiny window with no room either side still grows.
+    expect(roomNeeded(rect(60, 0), 280, 200, LIST_MIN_H)).toEqual({ below: 92 + 6 + 280 + 8, above: 200 - 60 + 6 + 280 + 8 });
     expect(anchorHidden(rect(10, 0), { top: 50, bottom: 400, left: 0, right: 0 })).toBe(true);
     expect(anchorHidden(rect(30, 0), { top: 50, bottom: 400, left: 0, right: 0 })).toBe(false);
     expect(anchorHidden(rect(401, 0), { top: 50, bottom: 400, left: 0, right: 0 })).toBe(true);

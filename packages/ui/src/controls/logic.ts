@@ -64,11 +64,21 @@ function placeBeside(anchor: Rect, size: { w: number; h: number }, viewport: { w
  * growing downward) or above it (growing upward, when the bar sits above the selection). The
  * overlay grows to the one that matches its direction. Null when it already fits.
  */
-export function roomNeeded(anchor: Rect, h: number, viewportH: number): { below: number; above: number } | null {
-  const below = Math.ceil(anchor.bottom + GAP + h + MARGIN);
-  const above = Math.ceil(viewportH - anchor.top + GAP + h + MARGIN);
-  if (below <= viewportH || anchor.top - GAP - MARGIN >= h) return null;
-  return { below, above };
+/** A list that scrolls is usable once this much of it shows (about four rows). */
+export const LIST_MIN_H = 168;
+
+/**
+ * The window height a popover needs when it fits on neither side of its anchor, or null.
+ * `usable` is how much of it must show: all of it for a calendar, which can't scroll; for a
+ * list, LIST_MIN_H is enough, so a short list scrolls in place instead of growing the window
+ * (decision 50).
+ */
+export function roomNeeded(anchor: Rect, h: number, viewportH: number, usable = h): { below: number; above: number } | null {
+  const need = Math.min(h, usable);
+  const roomBelow = viewportH - MARGIN - (anchor.bottom + GAP);
+  const roomAbove = anchor.top - GAP - MARGIN;
+  if (roomBelow >= need || roomAbove >= need) return null;
+  return { below: Math.ceil(anchor.bottom + GAP + h + MARGIN), above: Math.ceil(viewportH - anchor.top + GAP + h + MARGIN) };
 }
 
 /** True when the anchor has scrolled out of the area that clips it (the popover then closes). */

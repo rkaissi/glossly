@@ -128,7 +128,7 @@ export function ActionMenu<T>({ items, label = 'More', onPick, size = 'sm' }: { 
         <MoreHorizontal size={size === 'sm' ? 14 : 16} strokeWidth={1.75} aria-hidden />
       </button>
       {open && (
-        <Popover anchor={ref} align="end" onClose={close} label={label}>
+        <Popover anchor={ref} align="end" onClose={close} label={label} scrolls>
           <MenuList
             items={items}
             label={label}

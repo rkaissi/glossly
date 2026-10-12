@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| 20.5b | Oct 12 | (this commit) | Overlay lists scroll in place instead of growing the window (`scrolls`, `LIST_MIN_H`; decision 50). |
 | 20.5a | Oct 12 | `6b91395` | Style learning without guessing from absence: picks vote only where every draft must choose, contractions no longer counted (migration 8 deletes the votes), style notes per platform with keep (decision 49). |
 | 20.4d | Oct 11 | `6abbc1d` | Step 20.4 done: decision 48, live checks for Slack and email threads, the conversation-read eval planned for Step 21, code comments cite decision 48. |
 | 20.4c | Oct 11 | `2042895` | Reply on the read: author and target from it, the reading state, the thread trimmed and marked (`[REPLY TO THIS]`), 3 voice samples of 300 characters, stable parts first, output cap by channel with low reasoning. |

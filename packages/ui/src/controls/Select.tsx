@@ -63,7 +63,7 @@ export function Select<T extends string>({
         <ChevronDown className="trigger-chevron" size={14} strokeWidth={1.75} aria-hidden />
       </button>
       {open && (
-        <Popover anchor={ref} onClose={close} label={label} className="select-pop">
+        <Popover anchor={ref} onClose={close} label={label} className="select-pop" scrolls>
           <MenuList
             items={options}
             selected={value ?? undefined}
