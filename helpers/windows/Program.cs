@@ -103,7 +103,7 @@ internal static class Program
     private static object SetInputWatch(bool enabled)
     {
         MouseHook.SetInputWatch(enabled);
-        return new { Enabled = enabled };
+        return new { Enabled = enabled, Touch = MouseHook.TouchWatched };
     }
 
     // ---- argument parsing ----

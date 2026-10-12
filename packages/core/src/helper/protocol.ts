@@ -126,7 +126,7 @@ export const Commands = {
     result: z.object({ pasted: z.literal(true) }),
   },
   mouse_hook: { args: Enabled, result: Enabled },
-  input_watch: { args: Enabled, result: Enabled },
+  input_watch: { args: Enabled, result: Enabled.extend({ touch: z.boolean().optional() }) },
 } as const;
 
 export type CommandName = keyof typeof Commands;

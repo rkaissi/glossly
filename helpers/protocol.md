@@ -220,7 +220,7 @@ Turns `mouse_down`, `mouse_up`, and `wheel` events on or off. Result: `{"enabled
 | --- | --- |
 | `enabled` | Required bool |
 
-While on, the helper emits `keyboard_activity` when the system's last-input time moves without a matching mouse event. There is no keyboard hook: the helper never sees which keys were pressed. The app turns this on only while the pill is visible. Result: `{"enabled": bool}`.
+While on, the helper emits `keyboard_activity` when the system's last-input time moves without a matching mouse event. Touchpad, touchscreen, and pen input counts as the mouse: the helper registers them with Raw Input (a message-only window, `RIDEV_INPUTSINK`) and keeps only when they sent something, never what (decision 56). There is no keyboard hook: the helper never sees which keys were pressed. The app turns this on only while the pill is visible. Result: `{"enabled": bool, "touch": bool}`; `touch` is false when Raw Input couldn't be registered, and touch input then reads as keyboard activity as before.
 
 ## Events
 

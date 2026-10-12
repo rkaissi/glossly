@@ -88,6 +88,18 @@ internal static class Win32
     [DllImport("user32.dll")] public static extern bool UnhookWindowsHookEx(IntPtr hhk);
     [DllImport("user32.dll")] public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern int GetMessage(out MSG lpMsg, IntPtr hWnd, uint min, uint max);
+    [DllImport("user32.dll")] public static extern IntPtr DispatchMessage(ref MSG lpMsg);
+
+    // Raw Input, for touch: which device sent input, never what it was (decision 56).
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RAWINPUTDEVICE { public ushort usUsagePage; public ushort usUsage; public uint dwFlags; public IntPtr hwndTarget; }
+    public const uint WM_INPUT = 0x00FF, RIDEV_INPUTSINK = 0x00000100;
+    public const ushort HID_USAGE_PAGE_DIGITIZER = 0x0D, HID_USAGE_PEN = 0x02, HID_USAGE_TOUCH_SCREEN = 0x04, HID_USAGE_TOUCH_PAD = 0x05;
+    public static readonly IntPtr HWND_MESSAGE = new(-3);
+    [DllImport("user32.dll", SetLastError = true)] public static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] devices, uint count, uint size);
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr CreateWindowEx(uint exStyle, string className, string? windowName, uint style, int x, int y, int w, int h, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
+    [DllImport("user32.dll")] public static extern bool DestroyWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool PostThreadMessage(uint idThread, uint msg, UIntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern uint GetDoubleClickTime();
     [DllImport("user32.dll")] public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);

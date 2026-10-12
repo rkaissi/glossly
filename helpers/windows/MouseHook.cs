@@ -6,7 +6,10 @@ namespace Glossly.Helper;
 /// <summary>
 /// Mouse-only low-level hook, plus a keyboard-activity signal derived from GetLastInputInfo.
 /// There is deliberately no keyboard hook: the app learns that "some non-mouse input happened",
-/// never which keys were pressed.
+/// never which keys were pressed. Touchpad, touchscreen, and pen input move the last-input time
+/// without a mouse event (a resting finger, a two-finger scroll), so Raw Input tells the helper
+/// when those devices sent something, and they count as the mouse (decision 56). Raw Input says
+/// which device, never what it reported.
 /// </summary>
 internal static class MouseHook
 {
@@ -23,6 +26,7 @@ internal static class MouseHook
     private static readonly WinEventProc ForegroundProc = OnForeground;
     private static Thread? _thread;
     private static uint _threadId;
+    private static IntPtr _touch; // the Raw Input window, made and destroyed on the hook thread
 
     private static volatile bool _emitMouse;
     private static volatile bool _watchInput;
@@ -60,6 +64,9 @@ internal static class MouseHook
 
     public static (bool Mouse, bool InputWatch) State => (_emitMouse, _watchInput);
 
+    /// <summary>Touch, pen, and touchpad input is registered with Raw Input and counts as the mouse.</summary>
+    public static bool TouchWatched => _touch != IntPtr.Zero;
+
     // The hook runs while either feature is on: input_watch needs mouse timestamps to tell
     // mouse input apart from keyboard input.
     private static void UpdateHook()
@@ -78,6 +85,7 @@ internal static class MouseHook
             _threadId = GetCurrentThreadId();
             var hook = SetWindowsHookEx(WH_MOUSE_LL, Proc, GetModuleHandle(null), 0);
             if (hook == IntPtr.Zero) error = $"SetWindowsHookEx failed ({Marshal.GetLastWin32Error()})";
+            else _touch = WatchTouch();
             ready.Set();
             if (hook == IntPtr.Zero) return;
             // Foreground changes arrive on this thread's message loop too (out of context).
@@ -85,10 +93,17 @@ internal static class MouseHook
                 WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
             try
             {
-                while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { }
+                while (GetMessage(out var msg, IntPtr.Zero, 0, 0) > 0)
+                {
+                    // Touch counts as the mouse: only the time is kept.
+                    if (msg.message == WM_INPUT) Interlocked.Exchange(ref _lastMouseTick, (uint)Environment.TickCount);
+                    DispatchMessage(ref msg);
+                }
             }
             finally
             {
+                if (_touch != IntPtr.Zero) DestroyWindow(_touch);
+                _touch = IntPtr.Zero;
                 if (fgHook != IntPtr.Zero) UnhookWinEvent(fgHook);
                 UnhookWindowsHookEx(hook);
             }
@@ -97,6 +112,26 @@ internal static class MouseHook
         ready.Wait();
         if (error != null) throw new HelperException("hook_failed", error);
         _thread = t;
+    }
+
+    /// <summary>
+    /// A message-only window that receives Raw Input from touchpads, touchscreens, and pens, even
+    /// in the background. Zero when it can't be made: the old behavior stays (touch reads as
+    /// keyboard activity), which is no worse than before.
+    /// </summary>
+    private static IntPtr WatchTouch()
+    {
+        var hwnd = CreateWindowEx(0, "Message", null, 0, 0, 0, 0, 0, HWND_MESSAGE, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        if (hwnd == IntPtr.Zero) return IntPtr.Zero;
+        var devices = new[] { HID_USAGE_TOUCH_PAD, HID_USAGE_TOUCH_SCREEN, HID_USAGE_PEN }
+            .Select(u => new RAWINPUTDEVICE { usUsagePage = HID_USAGE_PAGE_DIGITIZER, usUsage = u, dwFlags = RIDEV_INPUTSINK, hwndTarget = hwnd })
+            .ToArray();
+        if (!RegisterRawInputDevices(devices, (uint)devices.Length, (uint)Marshal.SizeOf<RAWINPUTDEVICE>()))
+        {
+            DestroyWindow(hwnd);
+            return IntPtr.Zero;
+        }
+        return hwnd;
     }
 
     private static void StopHook()

@@ -261,6 +261,7 @@ export class Capture {
   private watchTimer: ReturnType<typeof setInterval> | null = null;
   /** A keyboard-activity hide waiting out its grace (KEY_HIDE_GRACE_MS). */
   private keyHideTimer: ReturnType<typeof setTimeout> | null = null;
+  private touchLogged = false;
   private inputWatch = false;
   /** Set while focus is handed to the source app to read tier 2 on the hotkey path. */
   private bouncing = false;
@@ -2076,7 +2077,12 @@ ${s.selection.text}`;
     if (this.inputWatch === enabled || !this.helper.isReady) return;
     this.inputWatch = enabled;
     try {
-      await this.helper.request('input_watch', { enabled });
+      const r = await this.helper.request('input_watch', { enabled });
+      // Once per helper: whether touch input is told apart from typing (decision 56).
+      if (enabled && !this.touchLogged) {
+        this.touchLogged = true;
+        log.info('input watch', { touch: r.touch ?? false });
+      }
     } catch {
       this.inputWatch = !enabled;
     }
