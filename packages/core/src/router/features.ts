@@ -110,8 +110,43 @@ function numericDensity(text: string): number {
 
 /** Labels that look like "Name: text" lines but aren't speakers. */
 const NOT_SPEAKERS = new Set(
-  'from to cc bcc subject re fwd fw date sent note notes ps update edit q a step warning error todo tip question answer summary reminder agenda action'.split(' '),
+  [
+    ...'from to cc bcc subject re fwd fw date sent note notes ps update edit q a step warning error todo tip question answer summary reminder agenda action role pronouns'.split(' '),
+    'server tag',
+  ],
 );
+
+/** A header's time on its own line: "3:12 PM", "Today at 3:12 PM", "8/31/26, 2:18 AM". */
+const TIME_LINE = /^(?:(?:today|yesterday)\s+at\s+|\d{1,2}\/\d{1,2}\/\d{2,4},?\s+)?\d{1,2}:\d{2}(?:\s?[AP]M)?$/i;
+/** Chrome between a speaker and the time: Discord's "Server Tag: GEN2", a role, a short badge, an emoji. */
+const LABEL_LINE = /^(?:(?:server tag|role|tag|pronouns)\s*:.*|bot|app)$/i;
+const isBadge = (l: string) => LABEL_LINE.test(l) || /^(?:[A-Z0-9]{2,6}|[^\p{L}\p{N}]{1,4})$/u.test(l);
+const LONE_NAME = /^[\p{L}][\p{L}\p{N}_.'-]{1,30}$/u;
+
+/**
+ * Every message header in order: "Sam Lee  10:42 AM", "Sam: hi", and a name alone on its line
+ * with the time on a following one, perhaps after a server tag or badge (Discord's layout,
+ * decision 47). A label like "Server Tag: GEN2" is never a speaker. `line` is the header's index.
+ */
+export function headers(text: string): { line: number; name: string }[] {
+  const lines = text.split(/\r?\n/).map((l) => l.replace(/\s*server tag:\s*\S+/i, '').trim());
+  const out: { line: number; name: string }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const s = chatSpeaker(line);
+    if (s) {
+      out.push({ line: i, name: s });
+      continue;
+    }
+    if (!LONE_NAME.test(line) || NOT_SPEAKERS.has(line.toLowerCase())) continue;
+    let j = i + 1;
+    while (j < lines.length && j <= i + 3 && (isBadge(lines[j]!) || !lines[j])) j++;
+    if (j < lines.length && TIME_LINE.test(lines[j]!)) out.push({ line: i, name: line });
+  }
+  return out;
+}
+
+export const speakers = (text: string): string[] => headers(text).map((h) => h.name);
 
 /** The speaker of a chat header line ("Sam Lee  10:42 AM", "[10:42] sam:", "Sam: hi"), or null. */
 export function chatSpeaker(line: string): string | null {
@@ -134,10 +169,9 @@ function unique(xs: Iterable<string>): string[] {
   return [...new Set(xs)];
 }
 
-function lastSpeaker(text: string): string | null {
-  let speaker: string | null = null;
-  for (const line of text.split(/\r?\n/)) speaker = chatSpeaker(line) ?? speaker;
-  return speaker;
+/** Whoever wrote the last message in `text` (the last header in it), or null. */
+export function lastSpeaker(text: string): string | null {
+  return speakers(text).at(-1) ?? null;
 }
 
 export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [], me?: Identity): Features {

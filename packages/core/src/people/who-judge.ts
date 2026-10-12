@@ -1,6 +1,6 @@
 // Code's half of Who is this. The model proposes rows; this file keeps or drops them.
 // With no model, a strict local pass keeps only addresses, handles, headers, sign-offs, and speakers.
-import { chatSpeaker } from '../router/features';
+import { speakers } from '../router/features';
 import type { Identity } from '../settings';
 import type { DetectedPerson, DetectInput } from './detect';
 import { findEmails, isRoleAddress } from './emails';
@@ -257,20 +257,6 @@ function addLocal(found: Map<string, WhoCandidate>, row: WhoCandidate, me: Ident
   else found.set(key, { ...row });
 }
 
-const TIME_LINE = /^(?:(?:today|yesterday)\s+at\s+)?\d{1,2}:\d{2}(?:\s?[AP]M)?$/i;
-
-/** Speakers on their own line, with the time on the next line ("quinn" / "3:12 PM"). */
-function loneSpeakers(corpus: string): string[] {
-  const lines = corpus.split(/\r?\n/);
-  const out: string[] = [];
-  for (let i = 0; i < lines.length - 1; i++) {
-    const name = lines[i]!.trim();
-    const next = lines[i + 1]!.trim();
-    if (/^[\p{L}][\p{L}\p{N}_.'-]{1,30}$/u.test(name) && TIME_LINE.test(next)) out.push(name);
-  }
-  return out;
-}
-
 /**
  * No model. Emails, @handles (including the window title), From/To/Cc, sign-offs, and real
  * speakers only. A bare capitalized pair is not a person, and no role is invented.
@@ -284,11 +270,7 @@ export function localWho(input: DetectInput, me: Identity): DetectedPerson[] {
   }
   const sign = SIGN_OFF.exec(input.text.trimEnd());
   if (sign) addLocal(found, { name: sign[1]!, email: '', handle: '', evidence: sign[1]!, ...blank }, me);
-  for (const line of corpus.split(/\r?\n/)) {
-    const speaker = chatSpeaker(line);
-    if (speaker) addLocal(found, { name: speaker, email: '', handle: '', evidence: speaker, ...blank }, me);
-  }
-  for (const name of loneSpeakers(corpus)) addLocal(found, { name, email: '', handle: '', evidence: name, ...blank }, me);
+  for (const name of speakers(corpus)) addLocal(found, { name, email: '', handle: '', evidence: name, ...blank }, me);
   const people = acceptWhoRows([...found.values()], corpus, me).map((p) => ({ ...p, detail: null, about: null, relationship: null }));
   return people.slice(0, WHO_MAX_PEOPLE);
 }

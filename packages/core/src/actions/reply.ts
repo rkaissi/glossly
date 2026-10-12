@@ -3,10 +3,11 @@
 import replyPrompt from '../../prompts/reply.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import type { DetectedPerson } from '../people/detect';
-import { describeIdentity } from '../people/names';
+import { describeIdentity, isMe } from '../people/names';
+import { headers, lastSpeaker } from '../router/features';
 import type { ReplyRedo, ReplyRedoAsk } from '../people/reply-style';
 import type { PersonCard } from '../people/types';
-import type { Settings } from '../settings';
+import type { Identity, Settings } from '../settings';
 import type { ContainerContext, SelectionPayload } from '../types';
 import { contextWindow } from './context';
 
@@ -62,10 +63,34 @@ function personSection(p: PersonCard): string[] {
   return out;
 }
 
+/**
+ * The part of the selection to answer: its messages minus the user's own (decision 47). Lines
+ * before the selection's first header belong to whoever spoke last before it. Null when every
+ * message in it is the user's.
+ */
+export function messagesToAnswer(text: string, before: string, me: Identity): { text: string; droppedOwn: boolean } | null {
+  const lines = text.split(/\r?\n/);
+  const hs = headers(text);
+  const blocks: { speaker: string | null; lines: string[] }[] = [{ speaker: lastSpeaker(before), lines: lines.slice(0, hs[0]?.line ?? lines.length) }];
+  hs.forEach((h, i) => blocks.push({ speaker: h.name, lines: lines.slice(h.line, hs[i + 1]?.line ?? lines.length) }));
+  const used = blocks.filter((b) => b.lines.some((l) => l.trim()));
+  const theirs = used.filter((b) => !isMe(b.speaker, me));
+  if (theirs.length === 0) return null;
+  return { text: theirs.map((b) => b.lines.join('\n').trim()).join('\n'), droppedOwn: theirs.length < used.length };
+}
+
+/** The thread with each of the user's own message headers marked "(the user)", so the model never answers them. */
+export function markOwnHeaders(thread: string, me: Identity): string {
+  const lines = thread.split(/\r?\n/);
+  for (const h of headers(thread)) if (isMe(h.name, me)) lines[h.line] = `${lines[h.line]}  (the user)`;
+  return lines.join('\n');
+}
+
 export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: ReplyInput, now: Date = new Date()): string {
   const { selection } = input;
   const win = contextWindow(selection, input.container, THREAD_CHARS);
-  const thread = win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length);
+  const thread = markOwnHeaders(win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length), settings.identity);
+  const answer = input.authorIsMe ? null : messagesToAnswer(selection.text, selection.context_before, settings.identity);
   const a = input.author;
   const to = input.authorIsMe
     ? 'The user wrote the selected message; draft a follow-up to the other people in the thread.'
@@ -88,11 +113,12 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     '## Today',
     now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
     '',
-    '## Selected message',
-    '<selection>',
-    clip(selection.text, MAX_SELECTION),
-    '</selection>',
+    '## The message to answer',
+    '<message>',
+    clip(answer?.text ?? selection.text, MAX_SELECTION),
+    '</message>',
   );
+  if (answer?.droppedOwn) parts.push('The selection also held messages the user wrote; they are in the thread as context and are not to be answered.');
   if (thread.trim() !== SELECTION_MARK) parts.push('', `## Thread (${SELECTION_MARK} marks the selected message)`, '<thread>', thread, '</thread>');
   const redo = input.redo;
   if (redo && (redo.passedOn.length || redo.asks.length || redo.note?.trim())) {

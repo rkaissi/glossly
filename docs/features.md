@@ -95,6 +95,8 @@ Three drafts streamed on the Chat role (`actions/reply.ts`, `prompts/reply.md`),
 - **Learning** (decisions 27, 28; `people/reply-style.ts`, `actions/style-notes.ts`): traits measured in code (length, greeting, sign-off, exclamation marks, emoji, contractions, capitals, final period, apostrophes, dashes, ellipses, line breaks, sentence and word length, punctuation, plus kind and tone from the tags). Kinds of platform (`replyChannel`): email, work chat, messaging, other. Profile > How you write lists samples, preferences, and notes, each with Forget, and a switch for learning (`replyLearning`).
 - **Cache** (decision 29): finished drafts per highlight for 30 minutes; closing the panel mid-stream lets the run finish, and reopening resumes it. Edits and the picked draft are not kept.
 
+The drafts answer only the other person's messages: the selection is trimmed to them, the user's headers in the thread are marked "(the user)", and chat headers are read past server tags and badges (Discord), so the recipient is the sender, not a label (decision 47).
+
 Status: live in the Step 15 version (three drafts in under 9 s, Insert into a test page's reply box, sample and interaction stored). Not live: `focus_field`, all learning (16.7 to 16.9), Write my own, None of these, the cache.
 
 ## Visualize

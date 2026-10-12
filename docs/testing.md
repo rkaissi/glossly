@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (562 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (566 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -170,6 +170,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Spacing (decision 43): every overlay panel (Ask, Save, Who, Tasks and events, Reply, Related, Search, Paste, Visualize) in light and dark: 14 and 16 px icons, the quiet row buttons one height, nothing clipped by the window after the size changes.
 - [ ] Small fixes (decision 44): with toolbars above and below a two-line selection whose last line is shorter, the dot sits just past the last selected character (helper `last_line`); a collection like "Client research" shows alone in the Save slot with a "Save to …" tooltip; Esc from a panel with nothing selected shows the "Nothing selected" strip only on the bare bar; an Ask answer with "10 a.m." reads with spaces; Visualize over a 12-month table leans its labels; a panel opened from a selection near the bottom of a window that isn't maximized stops at the window's edge and scrolls (room at least 320 DIP); Notepad's taskbar button doesn't flash after Ask; under Local only with no local model, save two items, switch to All models, and Privacy and data offers "Find them" for 2 (then remove the test items).
 - [ ] Review fixes (decision 45): in a chat app, selecting someone else's one-line question shows Reply and Who is this (not on your own message or in the message box); switching settings pages quickly doesn't replay motion, and a single switch is one short fade; a date picker or the event editor fades out on close; deleting a task shows the confirm with no red outline; quick add marks "tomorrow" and clears after Enter; the week view's header and all-day columns line up with the hours; the settings window's taskbar button shows the Glass icon (Windows may cache the old icon until Explorer restarts); the event editor's trash button grows into the red Delete in place and Cancel stays put (decision 46); hovering a pill turns it into the bar with Ask and Save staying still, only slots 3 and 4 popping in.
+- [ ] Reply (decision 47), on a fictional Discord DM with a server tag (a test server, not a real conversation): select the other person's last message after one of yours; the panel says "Reply to" their name (never "Server Tag"), and no draft answers your message; select your message and theirs together and the drafts still answer only theirs; drafts pick up a detail from their message and offer nothing you didn't.
 
 **Setup redesign (Step 20.3)** (throwaway profile)
 - [ ] Every step on mica, light and dark: dots, the slide from the right going on and from the left going back, the Welcome demo looping, nothing re-animating when a card or tab is picked.

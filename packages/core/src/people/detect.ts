@@ -1,7 +1,7 @@
 // Finds the people in a selection without a model call: the author of the selected message
 // (chat header, "From:" line, sign-off, or a DM window title) and the people it mentions
 // (name pairs, emails, handles, and known people). The user's own names are left out.
-import { chatSpeaker, extractFeatures } from '../router/features';
+import { extractFeatures, lastSpeaker } from '../router/features';
 import type { KnownPerson } from '../router/types';
 import type { Identity } from '../settings';
 import { isRoleAddress } from './emails';
@@ -58,8 +58,7 @@ function parseFrom(value: string): { name: string | null; email: string | null }
 function findAuthor(input: DetectInput): { name: string | null; email: string | null } | null {
   const upToEnd = `${input.before}${input.text}`;
   // The last chat header up to the end of the selection is whoever wrote the last message in it.
-  let speaker: string | null = null;
-  for (const line of upToEnd.split(/\r?\n/)) speaker = chatSpeaker(line) ?? speaker;
+  const speaker = lastSpeaker(upToEnd);
   if (speaker) return { name: speaker, email: null };
 
   const froms = [...upToEnd.matchAll(FROM_LINE)];
