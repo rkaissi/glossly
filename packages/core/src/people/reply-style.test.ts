@@ -10,6 +10,7 @@ import {
   preferenceLine,
   preferencesFor,
   replyChannel,
+  suggestVoicePlatform,
   type StyleSignal,
   type StyleSignalRow,
   describeSource,
@@ -216,5 +217,34 @@ describe('describeSource (decision 54)', () => {
     expect(describeSource('discord.exe', 'Discord')).toBe('discord.exe, "Discord" (messaging app)');
     expect(describeSource('notepad.exe', 'notes.txt - Notepad')).toBe('notepad.exe, "notes.txt - Notepad"');
     expect(describeSource('', '')).toBe('unknown app');
+  });
+});
+
+describe('suggestVoicePlatform (decision 59)', () => {
+  it('reads a greeting on its own line, or a sign-off after paragraphs, as email', () => {
+    expect(suggestVoicePlatform('Hi Jordan,\n\nThanks for the draft. I left a few comments.\n\nBest,\nAlex')).toBe('email');
+    expect(suggestVoicePlatform('Hello Sam,\nI would like to follow up on the invoice from last week.')).toBe('email');
+    expect(suggestVoicePlatform('Good morning team\nThe build is green.\nRelease notes are in the doc.')).toBe('email');
+    expect(suggestVoicePlatform('Thanks for the call today.\n\nI will send the numbers by Friday.\n\nCheers,\nAlex')).toBe('email');
+    expect(suggestVoicePlatform('Hi Casey,\r\nSee attached.')).toBe('email');
+  });
+
+  it('reads a greeting that runs on into the message as work chat', () => {
+    expect(suggestVoicePlatform('Hello Sam, can you review the PR before standup?')).toBe('work_chat');
+    expect(suggestVoicePlatform('Hi all! Quick update: the deploy moved to 3pm.')).toBe('work_chat');
+    expect(suggestVoicePlatform('Hey Maya, the numbers look off on slide 4. Can we fix them before the client sees it?')).toBe('work_chat');
+  });
+
+  it('reads one short line as a messaging app', () => {
+    expect(suggestVoicePlatform('haha yeah im down, see u at 7')).toBe('messaging');
+    expect(suggestVoicePlatform('hey, wanna grab food later?')).toBe('messaging');
+    expect(suggestVoicePlatform('Sounds good!')).toBe('messaging');
+    expect(suggestVoicePlatform('Hey there Jordan how are you doing, long time no see')).toBe('messaging');
+  });
+
+  it('leaves everything else to any platform', () => {
+    expect(suggestVoicePlatform('hey\nyou up?')).toBeNull();
+    expect(suggestVoicePlatform('Sounds good to me.\nI can take the first half.')).toBeNull();
+    expect(suggestVoicePlatform('a'.repeat(121))).toBeNull();
   });
 });

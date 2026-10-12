@@ -64,7 +64,7 @@ export interface VoiceSample {
   text: string;
   origin: VoiceOrigin;
   created_at: string;
-  /** Where an edited reply was written (email, chat, other); null for pasted samples. */
+  /** Where it was written: for a reply, the app's kind of platform; for a pasted sample, the user's label (null: any platform, decision 59). */
   channel: ReplyChannel | null;
   /** Who it was written to, when they are in the user's people. */
   person_id: string | null;

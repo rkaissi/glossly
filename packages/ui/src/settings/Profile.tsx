@@ -1,8 +1,9 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import type { Identity, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
+import type { Identity, ReplyChannel, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
+import { Select } from '../controls/Select';
 import { Switch } from '../controls/Toggles';
 import { parseEmail, parseHandle } from './format';
 import { useAction } from './useAction';
@@ -115,6 +116,15 @@ function IdentityForm({ value, onChange, autoFocus }: { value: Identity; onChang
 
 const same = (a: Identity, b: Identity) => JSON.stringify(a) === JSON.stringify(b);
 
+/** Where a pasted sample was written (decision 59); Any is null, a sample for every platform. */
+type VoicePlatform = ReplyChannel | 'any';
+const VOICE_PLATFORMS: { value: VoicePlatform; label: string }[] = [
+  { value: 'email', label: 'Email' },
+  { value: 'messaging', label: 'Messaging app' },
+  { value: 'work_chat', label: 'Work chat' },
+  { value: 'any', label: 'Any' },
+];
+
 /** Reply's voice samples: up to 5 pasted here, plus replies you edited before inserting or copying. */
 function VoiceSamples() {
   const [samples, setSamples] = useState<VoiceSample[] | null>(null);
@@ -136,9 +146,24 @@ function VoiceSamples() {
       setSamples(await glossly.invoke('voice:add', { text }));
       setText('');
     });
+  const label = (id: string, platform: VoicePlatform) =>
+    void run(async () => {
+      setSamples(await glossly.invoke('voice:label', { id, channel: platform === 'any' ? null : platform }));
+    });
   const sample = (v: VoiceSample) => (
     <li key={v.id}>
       <span className="grow voice-text">{v.text}</span>
+      {v.origin === 'pasted' && pendingId !== v.id && (
+        <Select<VoicePlatform>
+          size="sm"
+          className="voice-platform"
+          label="Where you wrote this"
+          value={v.channel ?? 'any'}
+          disabled={busy}
+          onChange={(p) => label(v.id, p)}
+          options={VOICE_PLATFORMS}
+        />
+      )}
       {pendingId === v.id ? (
         <InlineConfirm prompt="Remove this sample?" confirm="Remove" busy={busy} onConfirm={() => remove(v.id)} onCancel={() => setPendingId(null)} />
       ) : (
@@ -153,7 +178,8 @@ function VoiceSamples() {
       <div className="field-label">
         <strong>How you write</strong>
         <p className="muted small">
-          Paste up to 5 messages you wrote, so Reply drafts sound like you. Replies you change before inserting are added on their own (the last
+          Paste up to 5 messages you wrote, so Reply drafts sound like you, and say where you wrote each: Reply copies length, greetings, and
+          sign-offs only from samples on the same platform. Replies you change before inserting are added on their own (the last
           20 are kept); a draft you take as written is not, since the model wrote it. Samples are sent to your model provider only inside a Reply
           request.
         </p>

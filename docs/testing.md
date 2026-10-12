@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (612 tests on Oct 12)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (618 tests on Oct 12)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -191,6 +191,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Conversation read in a Slack thread (decision 48), a fictional workspace or a test channel: "Casey Lin  9:41 AM" style headers with two other people and one of yours; select the last three messages: Who lists the last writer first, Tasks marks each message's author, and Reply answers only what came after your message ("Reply to" the last writer).
 - [ ] Conversation read in an email thread (decision 48), Outlook or Gmail with fictional test messages between two of your own accounts or example addresses: select a quoted reply chain ("On Tue, Jordan Hale wrote:"); Reply goes to the latest sender, never to you, the drafts are full emails within 900 tokens, and Who lists the sender first with their address.
 - [ ] Reply on the read (Step 20.4 chunk 3), same fictional server: on a fresh selection (no Who first), Reply shows "Reading the conversation…" then "Reply to" the sender; after Who, it skips straight to "Writing drafts…" (`reply drafts` log: `read_cached: true`). Select their question, your answer, and their reply: the drafts answer only the reply. Chat drafts are never cut off at 450 tokens (check `llm_tokens` for `reply`: output under 450, reasoning low on gpt-oss); an email thread in Outlook or Gmail gets full emails within 900.
+- [ ] Pasted voice sample labels (decision 59), on a throwaway profile or with the samples removed afterwards: on first start, `main.log` has `pasted voice samples labeled` once (not on the next start); in Profile > How you write, pasting "Hi Jordan," then a line suggests Email, "Hello Sam, can you check this?" Work chat, a short one-liner Messaging app; changing a Select survives reopening Settings; Reply in Outlook gets no sample labeled Messaging app (in the Reply prompt or by draft length), and Reply in Discord gets the Messaging app ones.
 
 **Setup redesign (Step 20.3)** (throwaway profile)
 - [ ] Every step on mica, light and dark: dots, the slide from the right going on and from the left going back, the Welcome demo looping, nothing re-animating when a card or tab is picked.

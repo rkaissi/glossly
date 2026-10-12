@@ -1,7 +1,7 @@
 import { uuidv7 } from 'uuidv7';
 import { canonicalize, normalizeEmail, normalizeHandle } from '../people/names';
 import type { Relationship } from '../people/relationship';
-import type { ReplyChannel, StyleDimension, StyleSignal, StyleSignalRow } from '../people/reply-style';
+import { suggestVoicePlatform, type ReplyChannel, type StyleDimension, type StyleSignal, type StyleSignalRow } from '../people/reply-style';
 import type {
   AliasKind,
   Commitment,
@@ -468,7 +468,10 @@ export class PeopleRepo {
 
   // ---- voice samples ----
 
-  /** A sample: pasted in Profile, or a reply the user edited (with where it was written and the draft it came from). */
+  /**
+   * A sample: pasted in Profile (labeled with the platform code suggests, decision 59), or a reply
+   * the user edited (with where it was written and the draft it came from).
+   */
   addVoice(text: string, origin: VoiceOrigin, from: { channel?: ReplyChannel; personId?: string | null; original?: string } = {}): VoiceSample {
     const t = clip(text.trim(), MAX_TEXT);
     if (!t) throw new Error('Paste a sample first.');
@@ -477,7 +480,7 @@ export class PeopleRepo {
       text: t,
       origin,
       created_at: this.now(),
-      channel: from.channel ?? null,
+      channel: from.channel ?? (origin === 'pasted' ? suggestVoicePlatform(t) : null),
       person_id: from.personId ?? null,
       original: from.original ? clip(from.original.trim(), MAX_TEXT) : null,
     };
@@ -505,12 +508,37 @@ export class PeopleRepo {
     this.db.prepare('DELETE FROM voice_samples WHERE id = ?').run(id);
   }
 
+  /** Where a pasted sample was written, as the user set it in Profile (null: any platform). Other samples keep the platform they were written on. */
+  setVoiceChannel(id: string, channel: ReplyChannel | null): void {
+    this.db.prepare("UPDATE voice_samples SET channel = ? WHERE id = ? AND origin = 'pasted'").run(channel, id);
+  }
+
   /**
-   * Up to `n` samples for a Reply prompt, each with the kind of platform it was written on (null
-   * for pasted ones). With a platform given, replies written on another platform are left out: a
-   * chat reply says little about how the user writes an email (decision 57). Replies from this
-   * platform come first, ranked by the same person, then the same relationship; pasted samples
-   * follow. Newest first among equals.
+   * Labels the samples pasted before decision 59 with the suggested platform, once: afterwards a
+   * null channel is the user's "Any", which must stay. Returns how many were labeled.
+   */
+  labelPastedVoice(): number {
+    if (this.store.getMeta('pasted_voice_labeled')) return 0;
+    return this.store.tx(() => {
+      let n = 0;
+      const rows = this.db.prepare("SELECT id, text FROM voice_samples WHERE origin = 'pasted' AND channel IS NULL").all() as { id: string; text: string }[];
+      for (const r of rows) {
+        const channel = suggestVoicePlatform(r.text);
+        if (!channel) continue;
+        this.db.prepare('UPDATE voice_samples SET channel = ? WHERE id = ?').run(channel, r.id);
+        n++;
+      }
+      this.store.setMeta('pasted_voice_labeled', '1');
+      return n;
+    });
+  }
+
+  /**
+   * Up to `n` samples for a Reply prompt, each with the kind of platform it was written on (null:
+   * any). With a platform given, samples from another platform are left out: a chat reply says
+   * little about how the user writes an email (decision 57). Then, newest first among equals:
+   * this platform's replies to the same person or relationship, the samples the user pasted for
+   * this platform (decision 59), this platform's other replies, and pasted samples for any platform.
    */
   voiceForPrompt(n = 5, to: { channel?: ReplyChannel; personId?: string | null; relationship?: Relationship | null } = {}): VoiceForPrompt[] {
     const all = this.voiceSamples();
@@ -528,7 +556,14 @@ export class PeopleRepo {
       .map((v, i) => ({ v, i }))
       .sort((a, b) => rank(b.v) - rank(a.v) || a.i - b.i)
       .map(({ v }) => v);
-    const ordered = to.channel ? [...edited, ...pasted] : [...pasted, ...edited];
+    const ordered = to.channel
+      ? [
+          ...edited.filter((v) => rank(v) >= 2),
+          ...pasted.filter((v) => v.channel === to.channel),
+          ...edited.filter((v) => rank(v) < 2),
+          ...pasted.filter((v) => !v.channel),
+        ]
+      : [...pasted, ...edited];
     return ordered.slice(0, n).map((v) => ({ text: v.text, from: (v.channel as ReplyChannel | null) ?? null }));
   }
 

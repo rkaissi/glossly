@@ -101,10 +101,10 @@ describe('PeopleRepo', () => {
   it('keeps pasted voice samples first, caps edited ones, and prefers the same person and kind of app', () => {
     const r = repo();
     for (let i = 0; i < 25; i++) r.addVoice(`reply ${i}`, 'inserted_edited', { channel: 'messaging', original: `draft ${i}` });
-    r.addVoice('my pasted sample', 'pasted');
+    r.addVoice('my pasted sample\nfor any platform', 'pasted');
     expect(r.voiceSamples().filter((v) => v.origin === 'inserted_edited')).toHaveLength(20);
     const texts = (vs: { text: string }[]) => vs.map((v) => v.text);
-    expect(texts(r.voiceForPrompt(3))).toEqual(['my pasted sample', 'reply 24', 'reply 23']);
+    expect(texts(r.voiceForPrompt(3))).toEqual(['my pasted sample\nfor any platform', 'reply 24', 'reply 23']);
     const p = r.create({ name: 'Jordan Hale' });
     r.addVoice('to jordan by email', 'inserted_edited', { channel: 'email', personId: p.id });
     r.addVoice('newest, in email', 'inserted_edited', { channel: 'email' });
@@ -112,10 +112,52 @@ describe('PeopleRepo', () => {
     expect(r.voiceForPrompt(3, { channel: 'email', personId: p.id })).toEqual([
       { text: 'to jordan by email', from: 'email' },
       { text: 'newest, in email', from: 'email' },
-      { text: 'my pasted sample', from: null },
+      { text: 'my pasted sample\nfor any platform', from: null },
     ]);
     expect(texts(r.voiceForPrompt(2, { channel: 'messaging' }))).toEqual(['reply 24', 'reply 23']);
     expect(r.editedPairs(3).map((x) => x.original)).toEqual(['draft 24', 'draft 23', 'draft 22']);
+  });
+
+  it('labels pasted samples with a platform and ranks them by it (decision 59)', () => {
+    const r = repo();
+    const p = r.create({ name: 'Jordan Hale' });
+    const email = r.addVoice('Hi Jordan,\nThanks, the draft looks good.', 'pasted');
+    const chat = r.addVoice('lol ok see u there', 'pasted');
+    const any = r.addVoice('Sounds good to me.\nI can take the first half.', 'pasted');
+    expect([email.channel, chat.channel, any.channel]).toEqual(['email', 'messaging', null]);
+    r.addVoice('older email reply', 'inserted_edited', { channel: 'email' });
+    r.addVoice('to jordan by email', 'inserted_edited', { channel: 'email', personId: p.id });
+    r.addVoice('in work chat', 'inserted_edited', { channel: 'work_chat' });
+    const texts = (vs: { text: string }[]) => vs.map((v) => v.text);
+    // Email: replies to the person, the samples pasted for email, other email replies, then Any; never the chat sample.
+    expect(r.voiceForPrompt(5, { channel: 'email', personId: p.id })).toEqual([
+      { text: 'to jordan by email', from: 'email' },
+      { text: 'Hi Jordan,\nThanks, the draft looks good.', from: 'email' },
+      { text: 'older email reply', from: 'email' },
+      { text: 'Sounds good to me.\nI can take the first half.', from: null },
+    ]);
+    expect(texts(r.voiceForPrompt(5, { channel: 'messaging' }))).toEqual(['lol ok see u there', 'Sounds good to me.\nI can take the first half.']);
+    // The user's label wins; Any (null) takes the sample everywhere; a reply's platform can't be changed.
+    r.setVoiceChannel(chat.id, null);
+    r.setVoiceChannel(any.id, 'work_chat');
+    const workChat = r.voiceSamples().find((v) => v.text === 'in work chat')!;
+    r.setVoiceChannel(workChat.id, null);
+    expect(texts(r.voiceForPrompt(5, { channel: 'work_chat' }))).toEqual([
+      'Sounds good to me.\nI can take the first half.',
+      'in work chat',
+      'lol ok see u there',
+    ]);
+  });
+
+  it('labels samples pasted before decision 59 once, and keeps a later Any', () => {
+    const r = repo();
+    store.db.exec("INSERT INTO voice_samples (id, text, origin, created_at) VALUES ('a', 'brb 5 min', 'pasted', '2026-10-01T10:00:00Z')");
+    store.db.exec("INSERT INTO voice_samples (id, text, origin, created_at) VALUES ('b', 'Line one.\nLine two.', 'pasted', '2026-10-01T10:00:00Z')");
+    expect(r.labelPastedVoice()).toBe(1);
+    expect(r.voiceSamples().map((v) => [v.id, v.channel])).toEqual([['b', null], ['a', 'messaging']]);
+    r.setVoiceChannel('a', null);
+    expect(r.labelPastedVoice()).toBe(0);
+    expect(r.voiceSamples().find((v) => v.id === 'a')!.channel).toBeNull();
   });
 
   it('stores what Reply learned, forgets one habit, and remembers removed notes', () => {

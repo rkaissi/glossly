@@ -497,6 +497,7 @@ export interface InvokeChannels {
   'voice:list': { args: void; result: VoiceSample[] };
   'voice:add': { args: { text: string }; result: VoiceSample[] };
   'voice:remove': { args: { id: string }; result: VoiceSample[] };
+  'voice:label': { args: { id: string; channel: ReplyChannel | null }; result: VoiceSample[] };
   /** What Reply learned from picks and edits, and the style notes. */
   'style:get': { args: void; result: StyleView };
   /** Forgets one learned preference (it can be learned again). */

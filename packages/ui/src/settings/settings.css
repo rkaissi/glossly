@@ -600,6 +600,11 @@ th {
   font-size: 13px;
   padding: 6px 0;
 }
+/* Where a pasted sample was written; one width so the column lines up. */
+.voice-platform {
+  width: 136px;
+  flex: none;
+}
 .voice-add {
   display: flex;
   flex-direction: column;

@@ -74,6 +74,9 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     }
     this.store = store;
     this.people = new PeopleRepo(store);
+    // Samples pasted before decision 59 get a suggested platform, once.
+    const labeled = this.people.labelPastedVoice();
+    if (labeled) log.info('pasted voice samples labeled', { count: labeled });
     this.calendar = new CalendarRepo(store);
     this.metrics = new Metrics(store);
     this.keys = new KeyStore(userDataPath('keys'));

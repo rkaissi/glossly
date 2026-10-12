@@ -524,3 +524,24 @@ export function preferenceScope(p: Pick<StylePreference, 'scope' | 'channel' | '
 export function preferenceLine(p: StylePreference, personName?: string | null): string {
   return `${preferenceLabel(p)} (${p.agree} of the last ${p.of} picks ${preferenceScope(p, personName)})`;
 }
+
+/**
+ * Where a sample pasted in Profile was most likely written (decision 59), in code: the user sees
+ * it and can change it. A greeting on its own line ("Hello Sam," then the message) or a sign-off
+ * after several paragraphs is email; a greeting that runs on into the message ("Hello Sam, can
+ * you ...") is work chat; one short line is a messaging app; anything else is null (any platform).
+ */
+export function suggestVoicePlatform(text: string): ReplyChannel | null {
+  const t = text.replace(/\r\n?/g, '\n').trim();
+  const filled = t.split('\n').map((l) => l.trim()).filter(Boolean);
+  const first = filled[0] ?? '';
+  const greeting = GREETING.test(first);
+  // "Hello Sam," on its own line; without the comma ("Hey" then "you up?") it needs more than one line after it.
+  if (greeting && filled.length > 1 && first.split(/\s+/).length <= 4 && (first.endsWith(',') || filled.length > 2)) return 'email';
+  const paragraphs = t.split(/\n\s*\n/).filter((p) => p.trim()).length;
+  if (paragraphs >= 2 && filled.slice(-2).some((l) => SIGNOFF.test(l))) return 'email';
+  // A capitalized greeting of up to 4 words ("Hello Sam,", "Hi all!"), then the message on the same line; "hey, wanna eat" stays casual.
+  if (greeting && /^\p{Lu}/u.test(first) && /^\S+(?:\s+\S+){0,3}[,!]\s*\S/u.test(first)) return 'work_chat';
+  if (filled.length === 1 && t.length <= 120) return 'messaging';
+  return null;
+}

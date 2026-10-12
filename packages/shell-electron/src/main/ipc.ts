@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
+  REPLY_CHANNELS,
   REPLY_REDO_ASKS,
   STYLE_DIMENSIONS,
   channelWords,
@@ -435,6 +436,12 @@ export function registerIpc(deps: IpcDeps): void {
   });
   handle('voice:remove', (a) => {
     people.deleteVoice(str(a.id, 100));
+    return people.voiceSamples();
+  });
+  handle('voice:label', (a) => {
+    const channel = a.channel === null ? null : str(a.channel, 20);
+    if (channel !== null && !(REPLY_CHANNELS as readonly string[]).includes(channel)) throw new Error('Unknown platform.');
+    people.setVoiceChannel(str(a.id, 100), channel as ReplyChannel | null);
     return people.voiceSamples();
   });
 
