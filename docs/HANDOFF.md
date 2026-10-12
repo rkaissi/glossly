@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 11, 2026: **Step 20 is done, plus Rayan's review fixes** (decisions 45 to 47). Latest (47): Reply answers only the other person: one header parser that understands Discord's layout and never takes "Server Tag" for a speaker, the selection trimmed to the other person's messages, the user's headers marked "(the user)" in the thread, and a stricter, more specific prompt. Before it: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms, the event delete that grows in place, quick add's date mark and clearing, week view alignment, the taskbar icon, and the pill turning into the bar without replaying (45, 46); in 20.3: small fixes (44), spacing (43), setup (42), motion, hints, and the icon (41). Nothing from Steps 18 to 20 is checked in the real app yet; the helper changed, so run `pnpm helper:build` (or `pnpm dev`) before the next live run. 566 unit tests pass; `pnpm typecheck` is clean.
+Last updated Oct 11, 2026: **Step 20 is done, plus Rayan's review fixes** (decisions 45 to 47). **Next: Step 20.4, the conversation read** (one shared model read of who wrote what for Reply, Tasks, and Who, with fewer tokens; planned under Next steps). Latest (47): Reply answers only the other person: one header parser that understands Discord's layout and never takes "Server Tag" for a speaker, the selection trimmed to the other person's messages, the user's headers marked "(the user)" in the thread, and a stricter, more specific prompt. Before it: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms, the event delete that grows in place, quick add's date mark and clearing, week view alignment, the taskbar icon, and the pill turning into the bar without replaying (45, 46); in 20.3: small fixes (44), spacing (43), setup (42), motion, hints, and the icon (41). Nothing from Steps 18 to 20 is checked in the real app yet; the helper changed, so run `pnpm helper:build` (or `pnpm dev`) before the next live run. 566 unit tests pass; `pnpm typecheck` is clean.
 
 ## Start here
 
@@ -30,12 +30,12 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Seen working live:** most of Phases 0 to 3 as of the Step 16 live check. Everything built after it (Steps 16.7 to 20.3's first chunk, and the fixes since) has unit tests only. `docs/testing.md` has the backlog as a checklist.
 - **Not signed off:** Phase 0's per-app checks and toolbar overlap (Rayan's hand tests, `evals/capture.md`); only Notepad, Chrome, and the settings window have been tested.
 - **Steps 18 to 20.3's setup (Oct 11):** built with unit tests only (the settings side of 20.1 to 20.3 also previewed in the browser with fictional data); their live checks are in the backlog under "Local models and privacy", "Tasks and events", "Design system and controls", "Tasks and Calendar", "Motion, key hints, app icon", and "Setup redesign". The overlay side of Step 20 (the panel's pickers and its window growing for them, key chips, the overlay's motion) has never been seen running.
-- **Not started:** Steps 21 to 23 below. Step 20 is complete. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
+- **Not started:** Step 20.4 (the conversation read, planned below) and Steps 21 to 23. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
 - **On Rayan's machine (last known):** an older build than `HEAD` is running against his real data, from `packages/shell-electron/out`; his Notepad has a few unsaved sample tabs from earlier checks. When it next starts from a fresh build, migration 6 (`commitments.completed_at`) runs on his database and the new settings (`weekStart`, `calendarView`, `keyHints`) take their defaults. Check before assuming anything (see "Before you drive the desktop" in `docs/testing.md`).
 
 ## Next steps, in order
 
-Rayan reset this order on Oct 11 (decision 30): finish the features, then polish and the design pass, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; Steps 20.1 and 20.2 and Step 20 is done (20.3 in four chunks: motion, hints, icon; setup; spacing; small fixes); **next is Step 21, testing and evals**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
+Rayan reset this order on Oct 11 (decision 30): finish the features, then polish and the design pass, then one combined testing and evals step, then packaging, then the public README. Step 18 (local models and the privacy choice), 19.1 (Tasks), and 19.2 (events and the Agenda) are done; Google Calendar sync (19.3) is parked; Step 20 is done (20.1, 20.2, and 20.3 with Rayan's review fixes, decisions 41 to 47); **next is Step 20.4, the conversation read (below), then Step 21, testing and evals**. Each step is one or more commits; stop and hand off after each. Until Step 21, rely on unit tests and add new items to the live-check backlog in `docs/testing.md` instead of running live checks.
 
 **Step 19: tasks and calendar, in the app first** (decision 36). What did I promise becomes **Tasks**: one action and one list for promises, requests, and personal todos. Internally the action id stays `promises` and the table stays `commitments` (metrics history and migrations keep working).
 
@@ -65,6 +65,62 @@ Rayan reset this order on Oct 11 (decision 30): finish the features, then polish
 - ~~Setup redesign~~: done (second chunk, decision 42). `settings/Setup.tsx`, `setup-logic.ts`, `setup.css`; the `setup:tried` push from `Capture` (`index.ts` wires it to the settings window).
 - ~~The small fixes~~: done (fourth chunk, decision 44): the dot, long Save labels, the strip, Ask's spaces, Visualize's labels, panels inside the source window, the taskbar flash, the entities backfill. Their live checks are in `docs/testing.md` under "Motion, key hints, app icon".
 
+**Step 20.4: the conversation read (next; planned with Rayan, Oct 11).** Why: Reply's local header parsing breaks across apps (decision 47, then a review found more):
+- On Discord's `name / badge / time` layout, the badge line (`GEN2`) is still recorded as a speaker, so the author becomes "GEN2".
+- A display name with a space alone on its line ("Alex Morgan" / "7:34 PM") isn't a header.
+- A weekday line above a time ("Friday" / "3:00 PM") becomes a speaker.
+- Discord's hover timestamp before a continuation line can turn a short message line ("lol") into a speaker.
+- `messagesToAnswer` keeps all of the other person's messages in the selection, including earlier ones the user already answered.
+
+Rayan's direction:
+- **Use the model to read the conversation** (who wrote what, who to reply to) instead of more app-specific parsing.
+- Keep the local parser as the fallback.
+- **Keep model calls, input tokens, and output tokens as low as possible** (latency, cost, Groq free tier).
+
+*The flow after this step*
+1. Select: the pill shows, nothing is sent. Bar opens: the router call as today. The router keeps the local parser (fixed), its 600 ms budget, and its own call.
+2. Click Reply, Tasks, or Who is this: **one shared conversation read**. It extends the existing Who people call (`readWho`, `prompts/who.md`, cached per input in `Capture.readPeople` with `whoPending` dedupe), so Who, Tasks, and Reply share one Fast call per selection and none adds a second. Output (structured, compact):
+   - `messages`: the messages in the selection, in order, at most 8. Each is `{ author, user: boolean, starts }`, where `starts` is the message's first 5 or so words copied exactly. No full quotes in the output (output tokens are the slow part); code cuts the selection at those starts.
+   - `people`: the existing Who list, unchanged.
+3. Code accepts it (decision 22's rule: the model reads, code accepts):
+   - every `starts` must be found in the selection, in order;
+   - every author must appear in the captured text or the window title, and is never a UI label (the existing chrome filter);
+   - `user` is double-checked with `isMe`.
+   Anything that fails falls back to the local parser for that part only.
+4. Reply:
+   - The message to answer is the other person's messages after the user's last message in the selection. If only theirs are selected, it's all of them; if only the user's, it's a follow-up, as now.
+   - Its author goes through `resolvePerson`, so the panel says "Reply to {name}" from the start. It shows a short "Reading the conversation…" while the read runs, skipped when Who or Tasks already read this selection.
+   - The Chat call gets the target quoted exactly under "The message to answer", and the thread with the user's headers marked "(the user)" and the target marked "(reply to this)".
+   - Decision 47's prompt rules stay.
+5. Tasks: the same read gives real authors for You owe / They owe (today it's `det.author` from the parser). Who: the same read, author first.
+6. No model (Local only without a local model) or a failed read: the local parser, fixed:
+   - a line skipped as a badge is never a speaker;
+   - names can be up to 3 words when Title Case or already seen (a speaker, a saved person, the user);
+   - weekdays, months, Today/Yesterday, and dates are never names;
+   - a time line that isn't followed by a message, or sits inside one, makes no header.
+
+*Fewer calls and tokens (Rayan: as few model calls and tokens as possible)*
+- **Calls per selection:** the router (bar open) + at most one read (shared by Who, Tasks, Reply) + the action's own call (Reply's drafts, Tasks' extraction, Ask). Never a second read: the cache key must not change between actions on the same selection.
+- **Read input:** the selection plus about 1,200 characters before it and 300 after, not the 6,000-character thread. No voice, preferences, or person records. Output cap about 250 tokens.
+- **Reply input:**
+  - the thread cut from 6,000 to about 2,500 characters, mostly before the selection;
+  - voice samples cut to 3 of at most 300 characters (now 5 of 600);
+  - stable parts first (instructions, the user, voice, preferences, notes) and per-message parts last (app, today, message, thread), so Groq's prompt caching can reuse the prefix (cached tokens don't count toward rate limits).
+- **Reply output cap by channel:** about 450 tokens for chat, 900 for email (now 1,200 for everything).
+- **Consider later, with numbers from Step 21:** skip the read when the local parse is unambiguous (one header, Slack-style same-line, a known person). Not now: Discord looked unambiguous too.
+
+*Groq free tier (checked Oct 11 from published figures; Rayan's console has the exact numbers):*
+- Per model, for the whole organisation: `openai/gpt-oss-120b` allows 30 requests a minute, 1,000 a day, 8,000 tokens a minute, and 200,000 tokens a day. Other models are similar or tighter on tokens.
+- Budget per Reply after this step: the read is about 900 tokens in and 250 out on the Fast model; the drafts about 2,000 in and 450 out on the Chat model. That's roughly 3 Replies a minute before a model hits 8,000 TPM.
+- Fast and Chat are different models with separate buckets (decision 25), which is why spreading roles helps.
+- Log prompt and completion token counts per action in metrics (codes and counts only), so Step 21 can check real usage.
+
+*Build order (one commit each, docs and the HANDOFF updated in the same commit, stop after each):*
+1. Local parser fixes, with the review's cases as tests: the bare badge line, names with spaces, weekday lines, hover timestamps, and their question → the user's answer → their reply. Build them from the fictional Discord fixtures in `router/reply-scoring.test.ts` and `people/who-judge.test.ts`.
+2. The conversation read: prompt and schema (extend `who.md` and `readWho`), code acceptance and fallback, Who and Tasks switched to it, token caps, and tests with a fake model.
+3. Reply on the read: the target, the marked thread, "Reply to" from the read with the reading state, the token trims above, and tests that assert the recipient and the target (not just the prompt text).
+4. Decision 48 in `docs/decisions.md`; live checks in `docs/testing.md` (a fictional Discord DM with a server tag, a Slack thread, an email thread); and a conversation-read eval added to Step 21's list.
+
 **Step 21: testing and evals, all in one step.** Run when Rayan is away from the machine, through a subagent (AGENTS.md).
 - The whole live-check backlog in `docs/testing.md`, including everything Steps 18 to 20 added. Fix what it finds.
 - Export and Delete all data checked live (Delete all only on a throwaway profile).
@@ -93,7 +149,7 @@ None right now. Everything he was asked has been answered and is recorded in `do
 - Desktop and end-to-end testing goes through a subagent (Composer or Grok in Cursor; Sonnet in Claude Code). See `docs/testing.md` for how to brief it and the `ui-drive.ps1` quirks.
 - His debug view is off; diagnose pills from `main.log` (`pill shown`, `pill obstacles`, `overlay closed`, `routed`) and the `events` table.
 - His Windows theme is apps light, system dark (`1,0`). Restore it after dark-mode checks.
-- No `pnpm eval` unless he asks (Groq free tier: 1,000 requests a day, 8,000 tokens a minute, per model).
+- No `pnpm eval` unless he asks (Groq free tier, per model for the whole organisation: about 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day; cached prompt tokens don't count).
 
 **Conventions in the code**
 - Every model call goes through `AiSdkLlm` with an `action` name and a prompt in `core/prompts/`, so the privacy choice and fallbacks apply. To decide between a model path and a code path, ask `llm.hasModel(role)` (it already follows Local only), not `settings.privacy`; read `privacy` only to word the message (decision 34). Prefer structured output with `z.enum` where options are fixed (decision 22); streamed text only where streaming matters (decision 23).
