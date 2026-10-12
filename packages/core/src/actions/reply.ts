@@ -26,7 +26,7 @@ export interface ReplyInput {
   notes?: string[];
   /** "None of these": the drafts the user passed on and what they asked for instead. */
   redo?: ReplyRedo | null;
-  /** Who wrote each message in the selection, from the conversation read; null uses the header parser (Step 20.4). */
+  /** Who wrote each message in the selection, from the conversation read; null uses the header parser (decision 48). */
   messages?: ReadMessage[] | null;
   /** The kind of platform, for the output cap; email gets room for full emails. */
   channel?: ReplyChannel;
@@ -41,7 +41,7 @@ const REDO_LINES: Record<ReplyRedoAsk, string> = {
 };
 
 const MAX_SELECTION = 6000;
-/** The thread around the selection (Step 20.4: about 2,500 characters, mostly before it). */
+/** The thread around the selection (decision 48: about 2,500 characters, mostly before it). */
 const THREAD_BEFORE = 2000;
 const THREAD_AFTER = 300;
 const MAX_VOICE = 3;
@@ -83,7 +83,7 @@ export interface ReplyTarget {
 
 /**
  * The part of the selection to answer: the other person's messages after the user's last one
- * (decision 47, Step 20.4), so neither the user's messages nor ones the user already answered
+ * (decisions 47 and 48), so neither the user's messages nor ones the user already answered
  * are answered again. From the conversation read when it has messages, else the header parser,
  * where lines before the selection's first header belong to whoever spoke last before it. Null
  * when the selection ends with the user's own message.
@@ -182,7 +182,7 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
       ? [a.name, a.email, a.handle && `@${a.handle}`].filter(Boolean).join(', ')
       : 'Unknown: whoever wrote the selected message.';
   // Stable parts first (the user, voice, preferences, notes), so Groq's prompt cache reuses them;
-  // the person, then this message's parts, last (Step 20.4).
+  // the person, then this message's parts, last (decision 48).
   const parts = ['## The user', describeIdentity(settings.identity) ?? 'Unknown.', ''];
   const voice = input.voice.slice(0, MAX_VOICE);
   parts.push('## Voice samples (how the user writes)');

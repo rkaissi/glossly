@@ -83,7 +83,7 @@ export interface PromisesInput {
   authorIsMe: boolean;
   /** From detectPeople: everyone the message names, the author first. Their open tasks are checked. */
   people?: DetectedPerson[];
-  /** Who wrote each message in the selection, from the conversation read (Step 20.4). */
+  /** Who wrote each message in the selection, from the conversation read (decision 48). */
   messages?: ReadMessage[] | null;
 }
 

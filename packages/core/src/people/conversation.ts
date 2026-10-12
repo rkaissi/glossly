@@ -1,4 +1,4 @@
-// Code's half of the conversation read (Step 20.4): the model says who wrote each message in the
+// Code's half of the conversation read (decision 48): the model says who wrote each message in the
 // selection and where it starts; code keeps only what it can find in the text (decision 22's
 // rule) and falls back to the local header parser for anything it can't.
 import { isHeaderChrome, knownName, lastSpeaker } from '../router/features';

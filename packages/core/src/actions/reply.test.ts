@@ -114,7 +114,7 @@ describe('Reply', () => {
     expect(calls[0]!.instructions).toContain('Follow every line in all three drafts');
     expect(calls[0]!.instructions).not.toContain('deliberately differs');
     expect(calls[0]!.instructions).toContain('Answer only "The message to answer"');
-    // Output cap by channel, with low reasoning so a reasoning model doesn't spend it (Step 20.4).
+    // Output cap by channel, with low reasoning so a reasoning model doesn't spend it (decision 48).
     expect(calls[0]).toMatchObject({ maxOutputTokens: 900, reasoning: 'low' });
     reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [], channel: 'work_chat' });
     reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [], channel: 'email' });
@@ -173,7 +173,7 @@ describe('Reply answers only the other person (decision 47)', () => {
     expect(messagesToAnswer('working too', before.replace(/Alex\n7:34 PM[\s\S]*$/, ''), me)?.droppedEarlier).toBe(false);
   });
 
-  it('answers only what they wrote after the user’s last message (Step 20.4)', () => {
+  it('answers only what they wrote after the user’s last message (decision 48)', () => {
     // Their question, the user's answer, their reply: only the reply is answered.
     const convo = ['JordanZ2', 'GEN2', '7:02 PM', 'what kind of job are you doing now?', 'Alex Morgan', '7:34 PM', 'another internship, this time in the city', theirs].join('\n');
     const r = messagesToAnswer(convo, '', me);
@@ -206,7 +206,7 @@ describe('Reply’s author on Discord (decision 47)', () => {
   });
 });
 
-describe('Reply on the conversation read (Step 20.4)', () => {
+describe('Reply on the conversation read (decision 48)', () => {
   const me = { name: 'Alex Morgan', emails: [], handles: [] };
   const s2 = { ...DEFAULT_SETTINGS, identity: me };
   // Their question, the user's answer, their reply: all selected in a fictional Discord DM.

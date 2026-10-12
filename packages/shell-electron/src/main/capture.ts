@@ -1067,7 +1067,7 @@ export class Capture {
   }
 
   /**
-   * The conversation read (Step 20.4): who wrote each message and who the text names, cached per
+   * The conversation read (decision 48): who wrote each message and who the text names, cached per
    * text, so Who is this, Tasks, and Reply share one call per selection. The key is the read's
    * prompt, so every caller builds the input with `detectInputFor` and the same container. A
    * text-only pass (Local only, no key, a failed call) isn't kept.
@@ -1118,7 +1118,7 @@ export class Capture {
     const people = this.services.people;
     const readInput = detectInputFor(s.selection, container);
     const det = detectPeople(readInput, identity, this.services.store.listKnownPeople());
-    // The conversation read (Step 20.4): who wrote what, shared with Who and Tasks (often cached
+    // The conversation read (decision 48): who wrote what, shared with Who and Tasks (often cached
     // by now). The panel says "Reading the conversation…" until this answers. A failed read leaves the parser's.
     const tRead = performance.now();
     const got = await this.readPeople(readInput, new AbortController().signal).catch(() => null);

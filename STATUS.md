@@ -73,6 +73,8 @@ After the Step 16 live check (not checked live yet): Reply learning your style f
 
 Also in Step 16: Save mode (Manual, a save hotkey, or autosave on highlight; 16.3), Ask saving a note when asked to remember something (16.4), and one slot rule for every action (16.5).
 
+Step 20.4 (Oct 11, unit tests only, decision 48): Reply, Tasks, and Who is this share one model read of who wrote each message in a selection, so Reply answers only the other person's newest messages and names the right person on Discord, Slack, and email threads; without a model, a fixed local parser does the same job. Reply's prompt is smaller (shorter thread and voice samples, output capped by channel), and every model call's token counts are kept in local metrics.
+
 ## Eval numbers
 
 Router eval on the 60 hand-written fixtures in `fixtures/`. The spec's target is 85% type accuracy.

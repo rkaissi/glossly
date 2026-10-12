@@ -73,7 +73,7 @@ export interface FeatureMetrics {
   /** Failed model calls across actions (rate limits, bad output, provider errors), and switches to a fallback model. */
   errors: number;
   fallbacks: number;
-  /** Model calls and their tokens by action ("who", "reply", ...), from `llm_tokens` (Step 20.4). */
+  /** Model calls and their tokens by action ("who", "reply", ...), from `llm_tokens` (decision 48). */
   tokens: Record<string, TokenTotals>;
 }
 

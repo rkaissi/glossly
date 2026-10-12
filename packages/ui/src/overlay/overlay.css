@@ -444,7 +444,7 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .answer .thinking {
   color: var(--muted);
 }
-/* A wait that is usually instant: shown only when it lasts (Reply's conversation read, Step 20.4). */
+/* A wait that is usually instant: shown only when it lasts (Reply's conversation read, decision 48). */
 .thinking.delayed {
   animation: fade-in 160ms var(--ease-out) 250ms both;
 }

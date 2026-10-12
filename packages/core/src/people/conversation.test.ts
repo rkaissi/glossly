@@ -1,4 +1,4 @@
-// The conversation read (Step 20.4): code's acceptance of the model's messages, the shared read
+// The conversation read (decision 48): code's acceptance of the model's messages, the shared read
 // with a fake model, and Tasks' per-message authors. Fictional people only.
 import { describe, expect, it } from 'vitest';
 import { authorFrom, buildWhoPrompt, readWho, READ_BEFORE_CHARS, type WhoRead } from '../actions/who';

@@ -86,14 +86,14 @@ export function buildWho(repo: PeopleRepo, detection: Detection, sourceApp: stri
   return { entries, identitySet, local };
 }
 
-/** The read sees the selection and a little around it, not the whole thread (Step 20.4: fewer input tokens). */
+/** The read sees the selection and a little around it, not the whole thread (decision 48: fewer input tokens). */
 export const READ_BEFORE_CHARS = 1200;
 export const READ_AFTER_CHARS = 300;
 const READ_SELECTION_CHARS = 4000;
 /** Messages (about 15 tokens each, at most 8) plus a few people rows. A cut-off answer is retried, which costs more. */
 const READ_MAX_OUTPUT = 400;
 
-/** The model reads who wrote each message in the selection and who the text names (Step 20.4). */
+/** The model reads who wrote each message in the selection and who the text names (decision 48). */
 export const WhoReadSchema = z.object({
   messages: z.array(
     z.object({
@@ -149,7 +149,7 @@ export interface WhoRead {
 }
 
 /**
- * The conversation read (Step 20.4), shared by Who is this, Tasks, and Reply: one Fast call
+ * The conversation read (decision 48), shared by Who is this, Tasks, and Reply: one Fast call
  * (action "who") when a model is available; code then accepts the people and the messages.
  * Local only without a local model, or no Fast model, reads the text only (`messages` null) and
  * leaves the note blank. Matching to saved people is `buildWho`, done fresh each time so a person

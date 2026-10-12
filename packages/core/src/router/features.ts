@@ -160,7 +160,7 @@ export function knownName(me?: Identity | null, people: Pick<KnownPerson, 'name'
 const isDateName = (s: string) => DATE_LINE.test(s.trim());
 
 /**
- * A line alone above a header's time that can be a speaker (Step 20.4): one word, or up to 3
+ * A line alone above a header's time that can be a speaker (decision 48): one word, or up to 3
  * when Title Case or already seen; never a label, a day or date, or a short chat word like "lol".
  */
 function isNameLine(line: string, seen: KnownName): boolean {
@@ -176,7 +176,7 @@ function isNameLine(line: string, seen: KnownName): boolean {
  * Every message header in order: "Sam Lee  10:42 AM", "Sam: hi", and a name alone on its line
  * with the time on a following one, perhaps after a server tag or badge (Discord's layout,
  * decision 47). A label like "Server Tag: GEN2" is never a speaker, and neither is a line skipped
- * as a badge, a day ("Friday" / "3:00 PM"), or a short line above a hover timestamp (Step 20.4).
+ * as a badge, a day ("Friday" / "3:00 PM"), or a short line above a hover timestamp (decision 48).
  * `known` marks names seen elsewhere (`knownName`), which may be lowercase or several words.
  * `line` is the header's index.
  */

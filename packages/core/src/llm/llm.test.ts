@@ -479,7 +479,7 @@ describe('AiSdkLlm.stream with a tool', () => {
   });
 });
 
-describe('token counts (Step 20.4)', () => {
+describe('token counts (decision 48)', () => {
   it('reports each structured try and each finished stream, with the action', async () => {
     const seen: unknown[] = [];
     const m = jsonModel('{"answer":"yes"}', '{"answer":"yes","n":2}');
@@ -500,7 +500,7 @@ describe('token counts (Step 20.4)', () => {
   });
 });
 
-describe('reasoning effort on streams (Step 20.4)', () => {
+describe('reasoning effort on streams (decision 48)', () => {
   it('asks a reasoning model for the requested effort, and leaves other models alone', async () => {
     const oss = textModel(['a']);
     const qwen = textModel(['b']);

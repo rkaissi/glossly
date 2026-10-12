@@ -21,7 +21,7 @@ export interface AiSdkLlmDeps {
   onUsage?: (usage: LlmUsage) => void;
 }
 
-/** One model call's token counts (Step 20.4). Codes and counts only. */
+/** One model call's token counts (decision 48). Codes and counts only. */
 export interface LlmUsage {
   action: string;
   role: RoleName;

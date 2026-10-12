@@ -1,5 +1,5 @@
-// The local header parser's fallback cases from the Step 20.4 review, on fictional Discord, Slack,
-// and chat layouts.
+// The local header parser's fallback cases from the review behind decision 48, on fictional
+// Discord, Slack, and chat layouts.
 import { describe, expect, it } from 'vitest';
 import { detectPeople } from '../people/detect';
 import { headers, knownName, lastSpeaker, speakers } from './features';
@@ -7,7 +7,7 @@ import { headers, knownName, lastSpeaker, speakers } from './features';
 const me = { name: 'Alex Morgan', emails: [], handles: [] };
 const names = (text: string, known = knownName(me)) => speakers(text, known);
 
-describe('headers (Step 20.4 fixes)', () => {
+describe('headers (decision 48 fixes)', () => {
   it('never takes a bare badge line for a speaker', () => {
     const text = ['JordanZ2', 'GEN2', '7:02 PM', 'what kind of job are you doing now?'].join('\n');
     expect(headers(text)).toEqual([{ line: 0, name: 'JordanZ2' }]);
