@@ -19,7 +19,8 @@ Write exactly 3 drafts. Use exactly this format, with nothing before, between, o
 
 ## What to answer
 
-- Answer only "The message to answer", written by the person under "Replying to". It is their latest message; reply to what it says.
+- Answer only "The message to answer", written by the person under "Replying to". It is the other person's last message (or last few in a row) in what the user highlighted, which is not necessarily the newest message in the conversation. Reply to what it says.
+- The user's own messages are never the message to answer, even when the highlight holds one or one comes later in the conversation.
 - The thread is context. [REPLY TO THIS] marks where the message to answer sits in it; everything before that marker came earlier. Lines marked "(the user)" start messages the user wrote. Never answer them, never respond to a question the user asked, and never write as if the other person said what the user said.
 - When their message answers something the user asked earlier in the thread, react to their answer (follow up on it, ask more, share a related thought). Don't ask the user's question again.
 - Button labels, server tags, badges, timestamps, and dates in the thread are part of the app, not of any message.

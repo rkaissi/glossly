@@ -214,6 +214,10 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
     '',
     '## The message to answer',
+    // Said here too, next to the message, so the newest message in the thread never wins (decision 52).
+    input.authorIsMe
+      ? 'The user highlighted their own message; write a follow-up to it.'
+      : "The other person's last message (or last few in a row) in what the user highlighted. Reply to this, not to anything newer in the thread.",
     '<message>',
     clip(target?.text ?? selection.text, MAX_SELECTION),
     '</message>',

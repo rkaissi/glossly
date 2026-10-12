@@ -301,3 +301,12 @@ describe('Reply on the conversation read (decision 48)', () => {
     expect(message).not.toContain('internship');
   });
 });
+
+describe('what Reply is told to answer (decision 52)', () => {
+  it('says the target is the other person’s last highlighted message, never the user’s or a newer one', () => {
+    const p = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: null, voice: [] }, now);
+    expect(p).toContain("## The message to answer\nThe other person's last message (or last few in a row) in what the user highlighted. Reply to this, not to anything newer in the thread.\n<message>");
+    const own = buildReplyPrompt(settings, { selection, author: null, authorIsMe: true, person: null, voice: [] }, now);
+    expect(own).toContain('## The message to answer\nThe user highlighted their own message; write a follow-up to it.');
+  });
+});
