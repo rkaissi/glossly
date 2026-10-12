@@ -1116,9 +1116,16 @@ export class Capture {
     }
     const container = (await s.container) ?? null;
     const people = this.services.people;
-    const det = detectPeople(detectInputFor(s.selection, container), identity, this.services.store.listKnownPeople());
-    const a = det.author;
-    const author = det.authorIsMe ? 'me' : (a?.email ?? (a?.handle ? `@${a.handle}` : null) ?? a?.name ?? null);
+    const readInput = detectInputFor(s.selection, container);
+    const det = detectPeople(readInput, identity, this.services.store.listKnownPeople());
+    // The conversation read (Step 20.4): who wrote what, shared with Who and Tasks (often cached
+    // by now). The panel says "Reading the conversation…" until this answers. A failed read leaves the parser's.
+    const tRead = performance.now();
+    const got = await this.readPeople(readInput, new AbortController().signal).catch(() => null);
+    const read = got?.read ?? null;
+    const by = authorFrom(read, det);
+    const a = by.author;
+    const author = by.authorIsMe ? 'me' : (a?.email ?? (a?.handle ? `@${a.handle}` : null) ?? a?.name ?? null);
     const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, author, text: s.selection.text });
     // The panel was closed and opened again while the drafts were still being written: carry on
     // with that run. The text so far comes back with this answer; the rest streams under the same id.
@@ -1132,7 +1139,7 @@ export class Capture {
     const state: NonNullable<Session['reply']> = { requestId, ctl, personId: null, done: false, used: false, learned: false, key, raw: '', start: null };
     s.reply = state;
 
-    const match = det.author ? resolvePerson(people, det.author, s.selection.source_app) : null;
+    const match = a ? resolvePerson(people, a, s.selection.source_app) : null;
     const person = match?.kind === 'exact' ? people.card(match.personId) : null;
     state.personId = person?.id ?? null;
     const to: ReplyTo = {
@@ -1141,7 +1148,7 @@ export class Capture {
       handle: a?.handle ?? null,
       personId: state.personId,
       match: match?.kind ?? 'none',
-      authorIsMe: det.authorIsMe,
+      authorIsMe: by.authorIsMe,
     };
     // Samples, preferences, and notes for this person, their relationship, and this kind of platform (Profile > How you write).
     const channel = replyChannel(s.selection.source_app, s.selection.window_title);
@@ -1153,13 +1160,15 @@ export class Capture {
     const input = {
       selection: s.selection,
       container,
-      author: det.author,
-      authorIsMe: det.authorIsMe,
+      author: a,
+      authorIsMe: by.authorIsMe,
       person,
-      voice: people.voiceForPrompt(5, audience),
+      voice: people.voiceForPrompt(3, audience),
       preferences,
       notes: learning ? people.styleNotes().map((n) => n.text) : [],
       redo: redo ?? null,
+      messages: read?.messages ?? null,
+      channel,
     };
     if (redo) {
       // "Shorter" or "Longer" on all three drafts says which way they were wrong; the other asks only steer this run.
@@ -1185,7 +1194,7 @@ export class Capture {
       return start;
     }
 
-    log.info('reply drafts', { cached: false, redo: Boolean(redo), author: Boolean(author) });
+    log.info('reply drafts', { cached: false, redo: Boolean(redo), author: Boolean(author), read: read ? (read.local ?? 'model') : 'failed', read_cached: got?.cached ?? false, messages: read?.messages?.length ?? 0, read_ms: ms(tRead) });
     void (async () => {
       const t = performance.now();
       let firstMs: number | null = null;

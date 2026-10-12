@@ -148,6 +148,10 @@ export class AiSdkLlm implements LlmProvider {
         };
         const { provider, modelId } = parseRef(ref);
         const tools = req.tools && lookupCapabilities(provider, modelId)?.tools !== false ? req.tools : undefined;
+        // A reasoning model streams at the effort asked for (Reply asks for low), never above its own.
+        const caps = lookupCapabilities(provider, modelId);
+        const effort = req.reasoning && caps?.reasoning && caps.reasoning !== 'none' ? req.reasoning : undefined;
+        const providerOptions: Record<string, Record<string, string>> | undefined = effort ? (provider === 'groq' ? { groq: { reasoningEffort: effort } } : provider === 'openai' ? { openai: { reasoningEffort: effort } } : undefined) : undefined;
         try {
           const result = streamText({
             model: m,
@@ -158,6 +162,7 @@ export class AiSdkLlm implements LlmProvider {
             temperature: req.temperature,
             maxRetries: 0,
             ...(tools && { tools }),
+            ...(providerOptions && { providerOptions }),
           });
           for await (const part of result.stream) {
             if (part.type === 'text-delta') {

@@ -499,3 +499,18 @@ describe('token counts (Step 20.4)', () => {
     ]);
   });
 });
+
+describe('reasoning effort on streams (Step 20.4)', () => {
+  it('asks a reasoning model for the requested effort, and leaves other models alone', async () => {
+    const oss = textModel(['a']);
+    const qwen = textModel(['b']);
+    const { llm } = llmWith(
+      { 'groq:openai/gpt-oss-120b': oss, 'groq:qwen/qwen3.8-27b': qwen },
+      roles({ chat: { model: 'groq:openai/gpt-oss-120b', fallback: null, manual: false }, fast: { model: 'groq:qwen/qwen3.8-27b', fallback: null, manual: false } }),
+    );
+    await collect(llm.stream({ role: 'chat', action: 'reply', instructions: 'i', prompt: 'p', reasoning: 'low' }).textStream);
+    await collect(llm.stream({ role: 'fast', instructions: 'i', prompt: 'p', reasoning: 'low' }).textStream);
+    expect(oss.doStreamCalls[0]!.providerOptions).toMatchObject({ groq: { reasoningEffort: 'low' } });
+    expect(qwen.doStreamCalls[0]!.providerOptions?.groq).toBeUndefined();
+  });
+});

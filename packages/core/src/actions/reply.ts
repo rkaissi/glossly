@@ -2,14 +2,14 @@
 // role, written with what the user knows about the person and in the user's own voice.
 import replyPrompt from '../../prompts/reply.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
+import type { ReadMessage } from '../people/conversation';
 import type { DetectedPerson } from '../people/detect';
 import { describeIdentity, isMe } from '../people/names';
-import { headers, knownName, lastSpeaker } from '../router/features';
-import type { ReplyRedo, ReplyRedoAsk } from '../people/reply-style';
+import { headers, isHeaderChrome, knownName, lastSpeaker, type KnownName } from '../router/features';
+import type { ReplyChannel, ReplyRedo, ReplyRedoAsk } from '../people/reply-style';
 import type { PersonCard } from '../people/types';
 import type { Identity, Settings } from '../settings';
 import type { ContainerContext, SelectionPayload } from '../types';
-import { contextWindow } from './context';
 
 export interface ReplyInput {
   selection: SelectionPayload;
@@ -18,7 +18,7 @@ export interface ReplyInput {
   authorIsMe: boolean;
   /** The author's record, when they resolved exactly. */
   person: PersonCard | null;
-  /** Up to 5 samples of how the user writes (pasted in Profile, then replies they edited). */
+  /** Up to 3 samples of how the user writes (pasted in Profile, then replies they edited). */
   voice: string[];
   /** What the user tends to pick here, one line each with its evidence (`preferenceLine`). */
   preferences?: string[];
@@ -26,6 +26,10 @@ export interface ReplyInput {
   notes?: string[];
   /** "None of these": the drafts the user passed on and what they asked for instead. */
   redo?: ReplyRedo | null;
+  /** Who wrote each message in the selection, from the conversation read; null uses the header parser (Step 20.4). */
+  messages?: ReadMessage[] | null;
+  /** The kind of platform, for the output cap; email gets room for full emails. */
+  channel?: ReplyChannel;
 }
 
 const REDO_LINES: Record<ReplyRedoAsk, string> = {
@@ -37,10 +41,15 @@ const REDO_LINES: Record<ReplyRedoAsk, string> = {
 };
 
 const MAX_SELECTION = 6000;
-const THREAD_CHARS = 6000;
-const MAX_VOICE = 5;
-const MAX_VOICE_CHARS = 600;
+/** The thread around the selection (Step 20.4: about 2,500 characters, mostly before it). */
+const THREAD_BEFORE = 2000;
+const THREAD_AFTER = 300;
+const MAX_VOICE = 3;
+const MAX_VOICE_CHARS = 300;
+/** Three chat replies fit well inside this; three emails need more. Reasoning stays low (`reasoning`). */
+export const REPLY_MAX_OUTPUT: Record<ReplyChannel, number> = { messaging: 450, work_chat: 450, email: 900, other: 900 };
 const SELECTION_MARK = '[SELECTION]';
+const TARGET_MARK = '[REPLY TO THIS]';
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const day = (iso: string) => {
@@ -63,55 +72,129 @@ function personSection(p: PersonCard): string[] {
   return out;
 }
 
+/** The message to answer: `text` is `selection.slice(start)`, the other person's messages at the end of the selection. */
+export interface ReplyTarget {
+  text: string;
+  /** Where it starts in the selection. */
+  start: number;
+  /** Earlier messages in the selection (the user's, or ones the user already answered) were left out. */
+  droppedEarlier: boolean;
+}
+
 /**
  * The part of the selection to answer: the other person's messages after the user's last one
  * (decision 47, Step 20.4), so neither the user's messages nor ones the user already answered
- * are answered again. Lines before the selection's first header belong to whoever spoke last
- * before it. Null when the selection ends with the user's own message.
+ * are answered again. From the conversation read when it has messages, else the header parser,
+ * where lines before the selection's first header belong to whoever spoke last before it. Null
+ * when the selection ends with the user's own message.
  */
-export function messagesToAnswer(text: string, before: string, me: Identity): { text: string; droppedEarlier: boolean } | null {
+export function messagesToAnswer(text: string, before: string, me: Identity, messages?: ReadMessage[] | null): ReplyTarget | null {
+  if (messages?.length) {
+    let lastMine = -1;
+    messages.forEach((m, i) => {
+      if (m.user) lastMine = i;
+    });
+    const first = messages[lastMine + 1];
+    if (!first) return null;
+    // After one of the user's messages, the target starts at its own header; else it is the whole selection.
+    const start = lastMine >= 0 ? headerStart(text, messages[lastMine]!, first) : 0;
+    const target = text.slice(start).trim();
+    return target ? { text: target, start, droppedEarlier: lastMine >= 0 } : null;
+  }
   const known = knownName(me);
   const lines = text.split(/\r?\n/);
   const hs = headers(text, known);
-  const blocks: { speaker: string | null; lines: string[] }[] = [{ speaker: lastSpeaker(before, known), lines: lines.slice(0, hs[0]?.line ?? lines.length) }];
-  hs.forEach((h, i) => blocks.push({ speaker: h.name, lines: lines.slice(h.line, hs[i + 1]?.line ?? lines.length) }));
-  const used = blocks.filter((b) => b.lines.some((l) => l.trim()));
+  const blocks: { speaker: string | null; line: number }[] = [{ speaker: lastSpeaker(before, known), line: 0 }];
+  hs.forEach((h) => blocks.push({ speaker: h.name, line: h.line }));
+  const used = blocks.filter((b, i) => lines.slice(b.line, blocks[i + 1]?.line ?? lines.length).some((l) => l.trim()));
   let lastMine = -1;
   used.forEach((b, i) => {
     if (isMe(b.speaker, me)) lastMine = i;
   });
-  const theirs = used.slice(lastMine + 1);
-  if (theirs.length === 0) return null;
-  return { text: theirs.map((b) => b.lines.join('\n').trim()).join('\n'), droppedEarlier: lastMine >= 0 };
+  const first = used[lastMine + 1];
+  if (!first) return null;
+  const start = lines.slice(0, first.line).reduce((n, l) => n + l.length + 1, 0);
+  return { text: text.slice(start).trim(), start, droppedEarlier: lastMine >= 0 };
+}
+
+/** Where the target's header starts: just past the end of the user's last message's text. */
+function headerStart(text: string, mine: ReadMessage, first: ReadMessage): number {
+  // The user's message ends at the first header line before the target's first words.
+  const between = text.slice(mine.start, first.start);
+  const lines = between.split('\n');
+  let cut = lines.length;
+  while (cut > 1) {
+    const l = lines[cut - 1]!.trim();
+    if (!l || isHeaderChrome(l) || l.toLowerCase() === first.author?.trim().toLowerCase()) cut--;
+    else break;
+  }
+  const kept = lines.slice(0, cut).join('\n').length;
+  return Math.min(mine.start + kept + 1, first.start);
 }
 
 /** The thread with each of the user's own message headers marked "(the user)", so the model never answers them. */
-export function markOwnHeaders(thread: string, me: Identity): string {
+export function markOwnHeaders(thread: string, me: Identity, alsoMine: string[] = []): string {
+  const mine = new Set(alsoMine.map((n) => n.toLowerCase()));
+  const known: KnownName = (n) => knownName(me)(n) || mine.has(n.toLowerCase());
   const lines = thread.split(/\r?\n/);
-  for (const h of headers(thread, knownName(me))) if (isMe(h.name, me)) lines[h.line] = `${lines[h.line]}  (the user)`;
+  for (const h of headers(thread, known)) if (known(h.name)) lines[h.line] = `${lines[h.line]}  (the user)`;
   return lines.join('\n');
+}
+
+/** Cuts `s` to its last `n` characters, starting at a line where it can. */
+function lastLines(s: string, n: number): string {
+  if (s.length <= n) return s;
+  const cut = s.slice(-n);
+  const nl = cut.indexOf('\n');
+  return nl >= 0 && nl < cut.length - 1 ? cut.slice(nl + 1) : cut;
+}
+
+/** The text before and after the selection: tier 2 when it was read, else tier 1. */
+function around(selection: SelectionPayload, container?: ContainerContext | null): { before: string; after: string } {
+  if (container?.source === 'container' && container.text) {
+    const start = Math.max(0, container.selection_start);
+    return { before: container.text.slice(0, start), after: container.text.slice(start + Math.max(0, container.selection_length)) };
+  }
+  return { before: selection.context_before, after: selection.context_after };
+}
+
+/**
+ * The thread for the prompt: about 2,000 characters before the selection and 300 after. When
+ * there's a target, the selection's earlier part stays in the thread and `[REPLY TO THIS]` sits
+ * where the target is (it's quoted once, above); a follow-up marks the whole selection.
+ */
+export function replyThread(selection: SelectionPayload, container: ContainerContext | null | undefined, target: ReplyTarget | null): string {
+  const { before, after } = around(selection, container);
+  const head = target ? `${selection.text.slice(0, target.start)}${TARGET_MARK}` : SELECTION_MARK;
+  const tail = after.length > THREAD_AFTER ? `${after.slice(0, THREAD_AFTER)}…` : after;
+  return `${lastLines(before, THREAD_BEFORE)}${head}${tail}`;
 }
 
 export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: ReplyInput, now: Date = new Date()): string {
   const { selection } = input;
-  const win = contextWindow(selection, input.container, THREAD_CHARS);
-  const thread = markOwnHeaders(win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length), settings.identity);
-  const answer = input.authorIsMe ? null : messagesToAnswer(selection.text, selection.context_before, settings.identity);
+  const target = input.authorIsMe ? null : messagesToAnswer(selection.text, around(selection, input.container).before, settings.identity, input.messages);
+  const ownNames = (input.messages ?? []).flatMap((m) => (m.user && m.author ? [m.author] : []));
+  const thread = markOwnHeaders(replyThread(selection, input.container, target), settings.identity, ownNames);
   const a = input.author;
   const to = input.authorIsMe
     ? 'The user wrote the selected message; draft a follow-up to the other people in the thread.'
     : a
       ? [a.name, a.email, a.handle && `@${a.handle}`].filter(Boolean).join(', ')
       : 'Unknown: whoever wrote the selected message.';
-  const parts = ['## The user', describeIdentity(settings.identity) ?? 'Unknown.', '', '## Replying to', to, ''];
-  if (input.person) parts.push(...personSection(input.person), '');
+  // Stable parts first (the user, voice, preferences, notes), so Groq's prompt cache reuses them;
+  // the person, then this message's parts, last (Step 20.4).
+  const parts = ['## The user', describeIdentity(settings.identity) ?? 'Unknown.', ''];
   const voice = input.voice.slice(0, MAX_VOICE);
   parts.push('## Voice samples (how the user writes)');
   if (voice.length) voice.forEach((v) => parts.push('<sample>', clip(v, MAX_VOICE_CHARS), '</sample>'));
   else parts.push('None yet. Keep it natural and brief.');
   if (input.preferences?.length) parts.push('', '## What the user tends to pick', ...input.preferences.map((p) => `- ${p}`));
   if (input.notes?.length) parts.push('', '## Notes on how the user writes', ...input.notes.map((n) => `- ${n}`));
+  if (input.person) parts.push('', ...personSection(input.person));
   parts.push(
+    '',
+    '## Replying to',
+    to,
     '',
     '## App',
     `${selection.source_app}${selection.window_title ? `, "${clip(selection.window_title, 200)}"` : ''}`,
@@ -121,15 +204,18 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     '',
     '## The message to answer',
     '<message>',
-    clip(answer?.text ?? selection.text, MAX_SELECTION),
+    clip(target?.text ?? selection.text, MAX_SELECTION),
     '</message>',
   );
-  if (answer?.droppedEarlier) parts.push("The selection also held earlier messages (the user's, and ones the user already answered); they are in the thread as context and are not to be answered.");
-  if (thread.trim() !== SELECTION_MARK) parts.push('', `## Thread (${SELECTION_MARK} marks the selected message)`, '<thread>', thread, '</thread>');
+  if (target?.droppedEarlier) parts.push("The selection also held earlier messages (the user's, and ones the user already answered); they are in the thread as context and are not to be answered.");
+  if (thread.trim() !== SELECTION_MARK) {
+    const where = target ? `${TARGET_MARK} marks where the message to answer sits` : `${SELECTION_MARK} marks the selected message`;
+    parts.push('', `## Thread (${where})`, '<thread>', thread, '</thread>');
+  }
   const redo = input.redo;
   if (redo && (redo.passedOn.length || redo.asks.length || redo.note?.trim())) {
     parts.push('', '## Drafts the user passed on');
-    redo.passedOn.slice(0, 3).forEach((d) => parts.push('<passed>', `${d.intent}: ${clip(d.text, MAX_VOICE_CHARS)}`, '</passed>'));
+    redo.passedOn.slice(0, 3).forEach((d) => parts.push('<passed>', `${d.intent}: ${clip(d.text, 600)}`, '</passed>'));
     parts.push('', '## What the user wants instead');
     redo.asks.forEach((a) => parts.push(`- ${REDO_LINES[a]}`));
     if (redo.note?.trim()) parts.push(`- In their words: "${clip(redo.note.trim(), 300)}"`);
@@ -140,5 +226,13 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
 
 /** Streams the three drafts on the Chat role, action "reply". Local only refuses in the LLM layer. */
 export function reply(llm: LlmProvider, settings: Pick<Settings, 'identity'>, input: ReplyInput, signal?: AbortSignal): StreamResult {
-  return llm.stream({ role: 'chat', action: 'reply', instructions: replyPrompt, prompt: buildReplyPrompt(settings, input), signal, maxOutputTokens: 1200 });
+  return llm.stream({
+    role: 'chat',
+    action: 'reply',
+    instructions: replyPrompt,
+    prompt: buildReplyPrompt(settings, input),
+    signal,
+    maxOutputTokens: REPLY_MAX_OUTPUT[input.channel ?? 'other'],
+    reasoning: 'low',
+  });
 }

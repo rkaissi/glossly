@@ -13,6 +13,11 @@ export interface ChatRequest {
   maxOutputTokens?: number;
   temperature?: number;
   /**
+   * Reasoning effort for a streamed call on a reasoning model (structured calls always use the
+   * model's own from `capabilities.json`). Reasoning tokens count against `maxOutputTokens`.
+   */
+  reasoning?: 'none' | 'minimal' | 'low';
+  /**
    * Tools for a streamed call (Ask's "remember"). One step only: the tool runs, and a result
    * with a `say` string is streamed as text, so the model is never called a second time.
    * Left out for models whose capabilities say they have no tools.

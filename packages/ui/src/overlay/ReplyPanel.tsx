@@ -264,7 +264,9 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
         </div>
       )}
 
-      {stream.status === 'starting' && <p className="thinking">Writing drafts…</p>}
+      {/* Until the start arrives, the conversation read runs (Step 20.4); a cached read answers before the line fades in. */}
+      {stream.status === 'starting' && !start && <p className="thinking delayed">Reading the conversation…</p>}
+      {stream.status === 'starting' && start && <p className="thinking">Writing drafts…</p>}
       {drafts.length > 0 && (
         <ul className="drafts" role="listbox" aria-label="Drafts">
           {drafts.map((d, i) => {

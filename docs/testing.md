@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (589 tests on Oct 11)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (595 tests on Oct 11)
 pnpm typecheck   # tsc in all three packages
 ```
 
@@ -173,6 +173,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Reply (decision 47), on a fictional Discord DM with a server tag (a test server, not a real conversation): select the other person's last message after one of yours; the panel says "Reply to" their name (never "Server Tag"), and no draft answers your message; select your message and theirs together and the drafts still answer only theirs; drafts pick up a detail from their message and offer nothing you didn't.
 - [ ] Header parser fixes (Step 20.4 chunk 1), same fictional Discord server: a member with a short badge (no "Server Tag:" label) and a display name with a space; select their question, your answer, and their reply together: the panel says "Reply to" their display name (never the badge), and the drafts answer only their reply. Hover a continuation line while selecting so its timestamp is copied; the author is unchanged.
 - [ ] Conversation read (Step 20.4 chunk 2), same fictional server: open Who is this, then Tasks and events on the same selection; `main.log` shows one `who looked up` with `messages` above 0 and Tasks adds no second `who` call (`llm_tokens` events: one `who`, one `promises`). Tasks on "[their] can you send the deck by Friday? / [you] sure, I'll send it Thursday" offers You owe Thursday's deck to them. Under Local only with no local model, Who and Tasks still work from the parser.
+- [ ] Reply on the read (Step 20.4 chunk 3), same fictional server: on a fresh selection (no Who first), Reply shows "Reading the conversation…" then "Reply to" the sender; after Who, it skips straight to "Writing drafts…" (`reply drafts` log: `read_cached: true`). Select their question, your answer, and their reply: the drafts answer only the reply. Chat drafts are never cut off at 450 tokens (check `llm_tokens` for `reply`: output under 450, reasoning low on gpt-oss); an email thread in Outlook or Gmail gets full emails within 900.
 
 **Setup redesign (Step 20.3)** (throwaway profile)
 - [ ] Every step on mica, light and dark: dots, the slide from the right going on and from the left going back, the Welcome demo looping, nothing re-animating when a card or tab is picked.

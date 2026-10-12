@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from '../settings';
 import type { SelectionPayload } from '../types';
 import { buildReplyPrompt, markOwnHeaders, messagesToAnswer, reply } from './reply';
 import { detectPeople } from '../people/detect';
+import { authorFrom, readWho } from './who';
 
 const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Alex Morgan', emails: [], handles: ['alexm'] } };
 const now = new Date(2026, 9, 14, 10, 0);
@@ -50,7 +51,7 @@ describe('Reply', () => {
     expect(p).toContain('- Fri, Oct 9, from the user: Thanks, talk Friday');
     expect(p).toContain('<sample>\nsounds good!! will do\n</sample>');
     expect(p).toContain('## App\nslack.exe, "Maya Lin (DM) | Acme - Slack"');
-    expect(p).toContain('Maya Lin  9:41 AM\n[SELECTION]\nDaniel Park');
+    expect(p).toContain('Maya Lin  9:41 AM\n[REPLY TO THIS]\nDaniel Park');
   });
 
   it('handles no person record, no samples, and the user as the author', () => {
@@ -113,6 +114,32 @@ describe('Reply', () => {
     expect(calls[0]!.instructions).toContain('Follow every line in all three drafts');
     expect(calls[0]!.instructions).not.toContain('deliberately differs');
     expect(calls[0]!.instructions).toContain('Answer only "The message to answer"');
+    // Output cap by channel, with low reasoning so a reasoning model doesn't spend it (Step 20.4).
+    expect(calls[0]).toMatchObject({ maxOutputTokens: 900, reasoning: 'low' });
+    reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [], channel: 'work_chat' });
+    reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [], channel: 'email' });
+    expect(calls.slice(1).map((c) => c.maxOutputTokens)).toEqual([450, 900]);
+  });
+
+  it('keeps 3 voice samples of at most 300 characters, and stable parts before the message', () => {
+    const long = 'x'.repeat(500);
+    const p = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: maya, voice: ['one', 'two', 'three', 'four', long] }, now);
+    expect(p).toContain('<sample>\nthree\n</sample>');
+    expect(p).not.toContain('<sample>\nfour');
+    const q = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: null, voice: [long] }, now);
+    expect(q).toContain(`${'x'.repeat(300)}…`);
+    expect(q).not.toContain('x'.repeat(301));
+    const order = ['## The user', '## Voice samples', '## What you know about', '## Replying to', '## App', '## Today', '## The message to answer', '## Thread'].map((h) => p.indexOf(h));
+    expect(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!))).toBe(true);
+  });
+
+  it('sends about 2,000 characters of the thread before the selection and 300 after', () => {
+    const before = 'Maya Lin  9:00 AM\nearlier line of the chat\n'.repeat(120);
+    const after = '\nlater line'.repeat(100);
+    const p = buildReplyPrompt(settings, { selection: { ...selection, context_before: before, context_after: after }, author, authorIsMe: false, person: null, voice: [] }, now);
+    const thread = p.slice(p.indexOf('<thread>'), p.indexOf('</thread>'));
+    expect(thread.length).toBeLessThan(2000 + 300 + 100);
+    expect(thread.split('[REPLY TO THIS]')[0]!.length).toBeGreaterThan(1500);
   });
 });
 
@@ -176,5 +203,77 @@ describe('Reply’s author on Discord (decision 47)', () => {
     expect(d.authorIsMe).toBe(false);
     const inline = detectPeople({ text: 'hey', before: 'JordanZ2 Server Tag: GEN2 8:02 PM\n', after: '', source_app: 'discord.exe', window_title: 'Discord' }, me);
     expect(inline.author?.name).toBe('JordanZ2');
+  });
+});
+
+describe('Reply on the conversation read (Step 20.4)', () => {
+  const me = { name: 'Alex Morgan', emails: [], handles: [] };
+  const s2 = { ...DEFAULT_SETTINGS, identity: me };
+  // Their question, the user's answer, their reply: all selected in a fictional Discord DM.
+  const text = [
+    'what kind of job are you doing now?',
+    'Alex Morgan',
+    '7:34 PM',
+    'another internship, this time in the city',
+    'JordanZ2',
+    'GEN2',
+    '8:02 PM',
+    'working too, at a lab supply company near home',
+    "it's a startup, hopefully a good one lol",
+  ].join('\n');
+  const sel: SelectionPayload = { ...selection, source_app: 'discord.exe', window_title: 'Discord', context_before: 'JordanZ2\nGEN2\n7:02 PM\n', text, context_after: '' };
+  const input = { text, before: sel.context_before, after: '', source_app: 'discord.exe', window_title: 'Discord' };
+  const fast = (answer: unknown): LlmProvider => ({
+    stream: () => {
+      throw new Error('unused');
+    },
+    structured: async <T,>() => {
+      if (answer instanceof Error) throw answer;
+      return answer as T;
+    },
+    hasModel: () => true,
+  });
+  const rows = [
+    { author: 'JordanZ2', user: false, starts: 'what kind of job are' },
+    { author: 'Alex Morgan', user: true, starts: 'another internship, this time in' },
+    { author: 'JordanZ2', user: false, starts: 'working too, at a lab' },
+  ];
+
+  const promptFor = async (answer: unknown) => {
+    const read = await readWho(fast(answer), s2, input);
+    const by = authorFrom(read, detectPeople(input, me));
+    return { by, p: buildReplyPrompt(s2, { selection: sel, ...by, person: null, voice: [], messages: read.messages }, now) };
+  };
+
+  it('replies to the other person, answering only what came after the user’s message', async () => {
+    const { by, p } = await promptFor({ messages: rows, people: [] });
+    expect(by).toMatchObject({ author: { name: 'JordanZ2' }, authorIsMe: false });
+    expect(p).toContain('## Replying to\nJordanZ2');
+    const message = p.slice(p.indexOf('<message>'), p.indexOf('</message>'));
+    expect(message).toContain('working too, at a lab supply company');
+    expect(message).toContain('hopefully a good one lol');
+    expect(message).not.toContain('what kind of job');
+    expect(message).not.toContain('internship');
+    expect(p).toContain('earlier messages');
+    // The thread holds the earlier part, the user's header marked, and the marker where the target sits.
+    const thread = p.slice(p.indexOf('<thread>'), p.indexOf('</thread>'));
+    expect(thread).toContain('what kind of job are you doing now?');
+    expect(thread).toContain('Alex Morgan  (the user)');
+    expect(thread).toContain('another internship, this time in the city\n[REPLY TO THIS]');
+    expect(thread).not.toContain('working too');
+  });
+
+  it('writes a follow-up when the user wrote last', async () => {
+    const { by, p } = await promptFor({ messages: rows.slice(0, 2), people: [] });
+    expect(by.authorIsMe).toBe(true);
+    expect(p).toContain('The user wrote the selected message; draft a follow-up');
+  });
+
+  it('falls back to the header parser when the read fails, with the same recipient and target', async () => {
+    const { by, p } = await promptFor(new Error('rate limited'));
+    expect(by.author?.name).toBe('JordanZ2');
+    const message = p.slice(p.indexOf('<message>'), p.indexOf('</message>'));
+    expect(message).toContain('working too');
+    expect(message).not.toContain('internship');
   });
 });
