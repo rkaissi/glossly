@@ -103,12 +103,18 @@ describe('PeopleRepo', () => {
     for (let i = 0; i < 25; i++) r.addVoice(`reply ${i}`, 'inserted_edited', { channel: 'messaging', original: `draft ${i}` });
     r.addVoice('my pasted sample', 'pasted');
     expect(r.voiceSamples().filter((v) => v.origin === 'inserted_edited')).toHaveLength(20);
-    expect(r.voiceForPrompt(3)).toEqual(['my pasted sample', 'reply 24', 'reply 23']);
+    const texts = (vs: { text: string }[]) => vs.map((v) => v.text);
+    expect(texts(r.voiceForPrompt(3))).toEqual(['my pasted sample', 'reply 24', 'reply 23']);
     const p = r.create({ name: 'Jordan Hale' });
     r.addVoice('to jordan by email', 'inserted_edited', { channel: 'email', personId: p.id });
     r.addVoice('newest, in email', 'inserted_edited', { channel: 'email' });
-    expect(r.voiceForPrompt(3, { channel: 'email', personId: p.id })).toEqual(['my pasted sample', 'to jordan by email', 'newest, in email']);
-    expect(r.voiceForPrompt(2, { channel: 'messaging' })).toEqual(['my pasted sample', 'reply 24']);
+    // For a platform: replies written there first, then pasted ones; never another platform's (decision 57).
+    expect(r.voiceForPrompt(3, { channel: 'email', personId: p.id })).toEqual([
+      { text: 'to jordan by email', from: 'email' },
+      { text: 'newest, in email', from: 'email' },
+      { text: 'my pasted sample', from: null },
+    ]);
+    expect(texts(r.voiceForPrompt(2, { channel: 'messaging' }))).toEqual(['reply 24', 'reply 23']);
     expect(r.editedPairs(3).map((x) => x.original)).toEqual(['draft 24', 'draft 23', 'draft 22']);
   });
 

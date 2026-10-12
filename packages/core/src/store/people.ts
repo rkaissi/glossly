@@ -18,6 +18,7 @@ import type {
   PersonSummary,
   StyleNote,
   VoiceOrigin,
+  VoiceForPrompt,
   VoiceSample,
 } from '../people/types';
 import { isoNow } from '../types';
@@ -505,11 +506,13 @@ export class PeopleRepo {
   }
 
   /**
-   * Up to `n` samples for a Reply prompt: pasted ones first, then edited and self-written replies ranked by the
-   * same person, then the same relationship (friends, colleagues), then the same kind of
-   * platform. Newest first among equals.
+   * Up to `n` samples for a Reply prompt, each with the kind of platform it was written on (null
+   * for pasted ones). With a platform given, replies written on another platform are left out: a
+   * chat reply says little about how the user writes an email (decision 57). Replies from this
+   * platform come first, ranked by the same person, then the same relationship; pasted samples
+   * follow. Newest first among equals.
    */
-  voiceForPrompt(n = 5, to: { channel?: ReplyChannel; personId?: string | null; relationship?: Relationship | null } = {}): string[] {
+  voiceForPrompt(n = 5, to: { channel?: ReplyChannel; personId?: string | null; relationship?: Relationship | null } = {}): VoiceForPrompt[] {
     const all = this.voiceSamples();
     const pasted = all.filter((v) => v.origin === 'pasted');
     const relOf = new Map(
@@ -521,10 +524,12 @@ export class PeopleRepo {
       (to.channel && v.channel === to.channel ? 1 : 0);
     const edited = all
       .filter((v) => v.origin === 'inserted_edited' || v.origin === 'written')
+      .filter((v) => !to.channel || !v.channel || v.channel === to.channel)
       .map((v, i) => ({ v, i }))
       .sort((a, b) => rank(b.v) - rank(a.v) || a.i - b.i)
       .map(({ v }) => v);
-    return [...pasted, ...edited].slice(0, n).map((v) => v.text);
+    const ordered = to.channel ? [...edited, ...pasted] : [...pasted, ...edited];
+    return ordered.slice(0, n).map((v) => ({ text: v.text, from: (v.channel as ReplyChannel | null) ?? null }));
   }
 
   /** The newest edited replies with the draft they started from and where they were written, for the style notes. */

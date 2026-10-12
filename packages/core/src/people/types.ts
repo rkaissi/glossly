@@ -72,6 +72,12 @@ export interface VoiceSample {
   original: string | null;
 }
 
+/** A voice sample for a Reply prompt and the kind of platform it was written on (null: pasted in Profile). */
+export interface VoiceForPrompt {
+  text: string;
+  from: ReplyChannel | null;
+}
+
 export interface StyleNote {
   id: string;
   text: string;

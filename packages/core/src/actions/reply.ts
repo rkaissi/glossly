@@ -7,7 +7,7 @@ import type { DetectedPerson } from '../people/detect';
 import { describeIdentity, isMe } from '../people/names';
 import { headers, isHeaderChrome, knownName, lastSpeaker, type KnownName } from '../router/features';
 import { describeSource, type ReplyChannel, type ReplyRedo, type ReplyRedoAsk } from '../people/reply-style';
-import type { PersonCard } from '../people/types';
+import type { PersonCard, VoiceForPrompt } from '../people/types';
 import type { Identity, Settings } from '../settings';
 import type { ContainerContext, SelectionPayload } from '../types';
 
@@ -18,8 +18,8 @@ export interface ReplyInput {
   authorIsMe: boolean;
   /** The author's record, when they resolved exactly. */
   person: PersonCard | null;
-  /** Up to 3 samples of how the user writes (pasted in Profile, then replies they edited). */
-  voice: string[];
+  /** Up to 3 samples of how the user writes, with the platform each was written on when known. */
+  voice: (string | VoiceForPrompt)[];
   /** What the user tends to pick here, one line each with its evidence (`preferenceLine`). */
   preferences?: string[];
   /** Style notes written from the user's edits (Profile). */
@@ -49,6 +49,7 @@ const MAX_VOICE_CHARS = 300;
 /** Three chat replies fit well inside this; three emails need more. Reasoning stays low (`reasoning`). */
 export const REPLY_MAX_OUTPUT: Record<ReplyChannel, number> = { messaging: 450, work_chat: 450, email: 900, other: 900 };
 const SELECTION_MARK = '[SELECTION]';
+const PLATFORM: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', other: 'other app' };
 const TARGET_MARK = '[REPLY TO THIS]';
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -197,7 +198,12 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
   const parts = ['## The user', describeIdentity(settings.identity) ?? 'Unknown.', ''];
   const voice = input.voice.slice(0, MAX_VOICE);
   parts.push('## Voice samples (how the user writes)');
-  if (voice.length) voice.forEach((v) => parts.push('<sample>', clip(v, MAX_VOICE_CHARS), '</sample>'));
+  // Each sample says where it was written, so the platform's form comes from samples on it (decision 57).
+  if (voice.length)
+    voice.forEach((v) => {
+      const s = typeof v === 'string' ? { text: v, from: null } : v;
+      parts.push(s.from ? `<sample from="${PLATFORM[s.from]}">` : '<sample>', clip(s.text, MAX_VOICE_CHARS), '</sample>');
+    });
   else parts.push('None yet. Keep it natural and brief.');
   if (input.preferences?.length) parts.push('', '## What the user tends to pick', ...input.preferences.map((p) => `- ${p}`));
   if (input.notes?.length) parts.push('', '## Notes on how the user writes', ...input.notes.map((n) => `- ${n}`));

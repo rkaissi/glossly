@@ -322,3 +322,24 @@ describe('context in the prompt (decision 54)', () => {
     expect(p).toContain('## App\nchrome.exe, "Mail - Alex Morgan - Outlook - Google Chrome" (email)');
   });
 });
+
+describe('voice samples by platform (decision 57)', () => {
+  it('marks where each sample was written', () => {
+    const p = buildReplyPrompt(
+      settings,
+      {
+        selection: { ...selection, source_app: 'chrome.exe', window_title: 'Mail - Alex Morgan - Outlook - Google Chrome' },
+        author,
+        authorIsMe: false,
+        person: null,
+        voice: [
+          { text: 'Hi Maya,\n\nThanks, that works for me. I will send the deck Friday.\n\nBest,\nAlex', from: 'email' },
+          { text: 'sounds good!!', from: null },
+        ],
+      },
+      now,
+    );
+    expect(p).toContain('<sample from="email">\nHi Maya,');
+    expect(p).toContain('<sample>\nsounds good!!\n</sample>');
+  });
+});
