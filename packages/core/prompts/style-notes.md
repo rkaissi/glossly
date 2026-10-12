@@ -20,7 +20,7 @@ Compare each draft with what was sent, and look for the same change in several p
 - `greeting` and `signoff`: drops or changes them ("Hey" for "Hi", just a dash and their first name).
 - `capitalization`: lowercase sentences, lowercase "i", capitalized names only.
 - `punctuation`: how much (fewer commas, no final period) and which kinds (exclamation marks, question marks, dashes, ellipses, semicolons, apostrophes in "dont").
-- `formality`: casual or formal wording ("yeah" for "yes", "Could you" for "Can you"). Slang, abbreviations ("gonna", "idk", "tbh"), and contractions without apostrophes ("im", "dont") are casual. A draft with no contraction in it says nothing about formality.
+- `formality`: casual or formal wording ("yeah" for "yes", "Could you" for "Can you"). Slang, abbreviations ("gonna", "idk", "tbh"), and contractions without apostrophes ("im", "dont") are casual.
 - `sentiment`: warmer or cooler, more or less upbeat, softens or sharpens requests, fewer apologies or thanks.
 - `word_choice`: phrases they always cut or swap ("Thanks!" for "Thank you so much"), filler they remove.
 - `emoji`: adds or removes them, and which.
