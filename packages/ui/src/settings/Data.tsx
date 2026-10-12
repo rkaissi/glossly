@@ -25,7 +25,10 @@ function EmbedLine({ embed }: { embed: EmbedStatus }) {
   );
 }
 
-/** The local embedding model (shown in Models). */
+/** Download size of the default embedding model (all-MiniLM-L6-v2, quantized). */
+const EMBED_SIZE = '23 MB';
+
+/** The local embedding model (shown in Models): its name and size, then its status. */
 export function Embeddings({ view }: { view: SettingsView }) {
   const { busy, error, run } = useAction();
   const e = view.embed;
@@ -34,16 +37,18 @@ export function Embeddings({ view }: { view: SettingsView }) {
     <div className="field">
       <div className="field-label">
         <strong>Search model</strong>
-        <p className="muted small">Finds related notes in what you save. A small download that runs on this computer.</p>
+        <p className="muted small">Finds related notes in what you save. Runs on this computer.</p>
       </div>
       <div className="row">
-        <EmbedLine embed={e} />
+        <span className="tag">{e.model.split('/').pop()}</span>
+        <span className="tag">{EMBED_SIZE}</span>
+        <span className="spacer" />
         {e.pending > 0 && (
           <span className="muted small">
             {e.pending} saved item{e.pending === 1 ? '' : 's'} waiting
           </span>
         )}
-        <span className="spacer" />
+        <EmbedLine embed={e} />
         {canStart && (
           <button disabled={busy} onClick={() => void run(() => glossly.invoke('embed:download'))}>
             {e.state === 'error' ? 'Try again' : 'Download'}
