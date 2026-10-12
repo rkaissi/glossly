@@ -140,6 +140,12 @@ Rayan's direction:
 **Parked (Rayan: "way later" or not now):**
 - Google Calendar sync (was Step 19.3; parked Oct 11). Open questions for when it comes back: OAuth with a Google Cloud project (one client for Glossly, or each user's own), what syncs which way (events only, two-way, or tasks to Google Tasks too), and blocking it under Local only (Google is off this computer). The local Agenda (decision 37) stays the source either way.
 - A monthly subscription with a cap on Ask, as a third privacy choice beside All models and Local only, enforced in the model layer next to the Local only refusal. Not before packaging.
+  - *Cost basis if every role ran on `gpt-6-luna` with thinking off* (Oct 12, 2026; published rates, check OpenAI's pricing page first, since one aggregator lists double): $0.10 per million input tokens, $0.50 per million output, $0.01 per million cached input; Batch and Flex are half that.
+  - *Per user per month* (estimated from prompt sizes after Step 20.5, about 4 characters a token, not measured):
+    - Typical day (~60 bar opens, ~35 actions; about 135K tokens in, 17K out): about $0.65, or about $0.55 with prompt caching.
+    - Heavy day every day (~320 bar opens, ~290 actions; about 720K in, 92K out): about $3.50.
+    - The router (a model call on every bar open) is about half the input, so skipping it when the rules are confident would cut the cost most.
+  - Replace these with real numbers from the `llm_tokens` metrics (per action, Step 21) before setting a price or a cap.
 - Optional decision providers for the router (the spec's Jev via OpenRouter and OpenAI Decisions, Phase 4): a `DecisionProvider` (`router/types.ts`) per API behind a setting in the Models tab. Scrapped from the plan on Oct 11; check their current docs first if it comes back, since both may have changed or no longer exist.
 
 ## Open questions for Rayan
