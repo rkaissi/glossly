@@ -138,12 +138,28 @@ describe('Reply answers only the other person (decision 47)', () => {
   it('drops the user’s own messages from a selection that holds both', () => {
     const both = ['Alex', '7:34 PM', 'are you in school this term?', theirs].join('\n');
     const r = messagesToAnswer(both, '', me);
-    expect(r?.droppedOwn).toBe(true);
+    expect(r?.droppedEarlier).toBe(true);
     expect(r?.text).toContain('working too');
     expect(r?.text).not.toContain('school this term');
     // Lines before the first header belong to whoever spoke last before the selection.
     expect(messagesToAnswer('are you in school this term?', 'Alex\n7:34 PM\n', me)).toBeNull();
-    expect(messagesToAnswer('working too', before.replace(/Alex\n7:34 PM[\s\S]*$/, ''), me)?.droppedOwn).toBe(false);
+    expect(messagesToAnswer('working too', before.replace(/Alex\n7:34 PM[\s\S]*$/, ''), me)?.droppedEarlier).toBe(false);
+  });
+
+  it('answers only what they wrote after the user’s last message (Step 20.4)', () => {
+    // Their question, the user's answer, their reply: only the reply is answered.
+    const convo = ['JordanZ2', 'GEN2', '7:02 PM', 'what kind of job are you doing now?', 'Alex Morgan', '7:34 PM', 'another internship, this time in the city', theirs].join('\n');
+    const r = messagesToAnswer(convo, '', me);
+    expect(r?.droppedEarlier).toBe(true);
+    expect(r?.text).toContain('hopefully a good one');
+    expect(r?.text).not.toContain('what kind of job');
+    expect(r?.text).not.toContain('internship');
+    // Only theirs: all of it.
+    const only = messagesToAnswer(['what kind of job are you doing now?', theirs].join('\n'), 'JordanZ2\nGEN2\n7:02 PM\n', me);
+    expect(only?.droppedEarlier).toBe(false);
+    expect(only?.text).toContain('what kind of job');
+    // Ending with the user's own message: a follow-up, nothing to answer.
+    expect(messagesToAnswer([theirs, 'Alex', '8:10 PM', 'nice, good luck'].join('\n'), '', me)).toBeNull();
   });
 
   it('marks the user’s headers in the thread', () => {

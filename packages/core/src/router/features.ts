@@ -122,31 +122,93 @@ const TIME_LINE = /^(?:(?:today|yesterday)\s+at\s+|\d{1,2}\/\d{1,2}\/\d{2,4},?\s
 const LABEL_LINE = /^(?:(?:server tag|role|tag|pronouns)\s*:.*|bot|app)$/i;
 const isBadge = (l: string) => LABEL_LINE.test(l) || /^(?:[A-Z0-9]{2,6}|[^\p{L}\p{N}]{1,4})$/u.test(l);
 const LONE_NAME = /^[\p{L}][\p{L}\p{N}_.'-]{1,30}$/u;
+const NAME_WORD = /^[\p{L}][\p{L}\p{N}_.'-]{0,30}$/u;
+const TITLE_WORD = /^\p{Lu}[\p{L}.'-]*$/u;
+
+const WEEKDAY = '(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)';
+const MONTH = '(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)';
+/** A line that names a day, never a person: "Friday", "Today", "Fri, Oct 9", "October 9, 2026", "3/14/26". */
+const DATE_LINE = new RegExp(
+  String.raw`^(?:today|yesterday|tomorrow|${WEEKDAY}\.?(?:,?\s+(?:${MONTH}|\d).*)?|${MONTH}\.?(?:\s+\d{1,2}(?:st|nd|rd|th)?)?(?:,?\s+\d{4})?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)$`,
+  'i',
+);
+/** Short chat lines that sit above Discord's hover timestamp on a continuation ("lol" / "7:03 PM" / "ok"). */
+const CHAT_WORDS = new Set(
+  'lol lmao lmfao rofl haha hahaha hah heh hehe ok okay k kk yes yeah yep yup ya yea no nope nah sure nice cool true same wait what why how hmm hm oh ah ahh ooh wow damn bruh bro dude thanks thx ty tysm np yw sorry mb idk ikr omg gg brb lgtm agreed done exactly definitely totally right fr bet rip welp hi hey hello yo sup'.split(' '),
+);
+// Months are names too ("May Chen"); a month alone or with a day is caught by DATE_LINE.
+const MONTH_WORD = new RegExp(`^${MONTH}$`, 'i');
+const NOT_NAME_WORDS = new Set([
+  ...[...NOT_FIRST_NAMES].filter((w) => !MONTH_WORD.test(w)),
+  ...'Meeting Sync Standup Call Lunch Review Team Update Event Reminder Today Yesterday Tomorrow'.split(' '),
+]);
+
+/** Whether a name seen elsewhere (the user, a saved person) is known; headers also treat earlier speakers as seen. */
+export type KnownName = (name: string) => boolean;
+
+/** The user and saved people as a `KnownName` for `headers`. */
+export function knownName(me?: Identity | null, people: Pick<KnownPerson, 'name' | 'aliases'>[] = []): KnownName {
+  const names = new Set(people.flatMap((p) => [p.name, ...p.aliases]).map((n) => n.toLowerCase()));
+  return (n) => (me ? isMe(n, me) : false) || names.has(n.toLowerCase());
+}
+
+const isDateName = (s: string) => DATE_LINE.test(s.trim());
+
+/**
+ * A line alone above a header's time that can be a speaker (Step 20.4): one word, or up to 3
+ * when Title Case or already seen; never a label, a day or date, or a short chat word like "lol".
+ */
+function isNameLine(line: string, seen: KnownName): boolean {
+  if (!line || line.length > 40 || NOT_SPEAKERS.has(line.toLowerCase()) || isDateName(line)) return false;
+  const words = line.split(/\s+/);
+  if (words.length > 3 || !words.every((w) => NAME_WORD.test(w))) return false;
+  if (seen(line)) return true;
+  if (words.length === 1) return LONE_NAME.test(line) && !CHAT_WORDS.has(line.toLowerCase()) && !line.endsWith('.');
+  return words.every((w) => TITLE_WORD.test(w) && !NOT_NAME_WORDS.has(w));
+}
 
 /**
  * Every message header in order: "Sam Lee  10:42 AM", "Sam: hi", and a name alone on its line
  * with the time on a following one, perhaps after a server tag or badge (Discord's layout,
- * decision 47). A label like "Server Tag: GEN2" is never a speaker. `line` is the header's index.
+ * decision 47). A label like "Server Tag: GEN2" is never a speaker, and neither is a line skipped
+ * as a badge, a day ("Friday" / "3:00 PM"), or a short line above a hover timestamp (Step 20.4).
+ * `known` marks names seen elsewhere (`knownName`), which may be lowercase or several words.
+ * `line` is the header's index.
  */
-export function headers(text: string): { line: number; name: string }[] {
+export function headers(text: string, known: KnownName = () => false): { line: number; name: string }[] {
   const lines = text.split(/\r?\n/).map((l) => l.replace(/\s*server tag:\s*\S+/i, '').trim());
   const out: { line: number; name: string }[] = [];
+  const said = new Set<string>();
+  const seen: KnownName = (n) => said.has(n.toLowerCase()) || known(n);
+  const add = (line: number, name: string) => {
+    out.push({ line, name });
+    said.add(name.toLowerCase());
+  };
+  const skip = new Set<number>();
   for (let i = 0; i < lines.length; i++) {
+    if (skip.has(i)) continue;
     const line = lines[i]!;
     const s = chatSpeaker(line);
     if (s) {
-      out.push({ line: i, name: s });
+      add(i, s);
       continue;
     }
-    if (!LONE_NAME.test(line) || NOT_SPEAKERS.has(line.toLowerCase())) continue;
+    if (!isNameLine(line, seen)) continue;
     let j = i + 1;
     while (j < lines.length && j <= i + 3 && (isBadge(lines[j]!) || !lines[j])) j++;
-    if (j < lines.length && TIME_LINE.test(lines[j]!)) out.push({ line: i, name: line });
+    if (j >= lines.length || !TIME_LINE.test(lines[j]!)) continue;
+    // A time followed by another time is a list of times, not a message.
+    let k = j + 1;
+    while (k < lines.length && !lines[k]) k++;
+    if (k < lines.length && TIME_LINE.test(lines[k]!)) continue;
+    add(i, line);
+    // The badge and time lines under a header are never speakers themselves.
+    for (let b = i + 1; b <= j; b++) skip.add(b);
   }
   return out;
 }
 
-export const speakers = (text: string): string[] => headers(text).map((h) => h.name);
+export const speakers = (text: string, known?: KnownName): string[] => headers(text, known).map((h) => h.name);
 
 /** The speaker of a chat header line ("Sam Lee  10:42 AM", "[10:42] sam:", "Sam: hi"), or null. */
 export function chatSpeaker(line: string): string | null {
@@ -156,7 +218,7 @@ export function chatSpeaker(line: string): string | null {
     /^\s*([A-Z][\w.'-]*(?:\s[A-Z][\w.'-]*){0,3})\s*(?:[—–-]\s*)?(?:(?:Today|Yesterday)\s+at\s+)?\d{1,2}:\d{2}\s*(?:[AaPp][Mm])?\s*$/.exec(line) ??
     /^\s*([A-Z][\w.'-]*(?:\s[A-Z][\w.'-]*){0,2}):\s+\S/.exec(line);
   const name = m?.[1]?.trim();
-  if (!name || NOT_SPEAKERS.has(name.toLowerCase())) return null;
+  if (!name || NOT_SPEAKERS.has(name.toLowerCase()) || isDateName(name) || CHAT_WORDS.has(name.toLowerCase())) return null;
   return name;
 }
 
@@ -170,8 +232,8 @@ function unique(xs: Iterable<string>): string[] {
 }
 
 /** Whoever wrote the last message in `text` (the last header in it), or null. */
-export function lastSpeaker(text: string): string | null {
-  return speakers(text).at(-1) ?? null;
+export function lastSpeaker(text: string, known?: KnownName): string | null {
+  return speakers(text, known).at(-1) ?? null;
 }
 
 export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [], me?: Identity): Features {
@@ -219,7 +281,7 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     codeScore,
     ideaWords: IDEA.test(text),
     automated: AUTOMATED.test(text) || AUTOMATED.test(ctx.window_title) || (BROADCAST_GREETING.test(text) && BROADCAST_WORDS.test(text)),
-    authorIsMe: me ? isMe(lastSpeaker(`${ctx.context_before}${text}`), me) : false,
+    authorIsMe: me ? isMe(lastSpeaker(`${ctx.context_before}${text}`, knownName(me, people)), me) : false,
     inEditable: ctx.is_editable,
   };
 }

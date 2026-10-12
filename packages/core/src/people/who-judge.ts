@@ -1,6 +1,6 @@
 // Code's half of Who is this. The model proposes rows; this file keeps or drops them.
 // With no model, a strict local pass keeps only addresses, handles, headers, sign-offs, and speakers.
-import { speakers } from '../router/features';
+import { knownName, speakers } from '../router/features';
 import type { Identity } from '../settings';
 import type { DetectedPerson, DetectInput } from './detect';
 import { findEmails, isRoleAddress } from './emails';
@@ -270,7 +270,7 @@ export function localWho(input: DetectInput, me: Identity): DetectedPerson[] {
   }
   const sign = SIGN_OFF.exec(input.text.trimEnd());
   if (sign) addLocal(found, { name: sign[1]!, email: '', handle: '', evidence: sign[1]!, ...blank }, me);
-  for (const name of speakers(corpus)) addLocal(found, { name, email: '', handle: '', evidence: name, ...blank }, me);
+  for (const name of speakers(corpus, knownName(me))) addLocal(found, { name, email: '', handle: '', evidence: name, ...blank }, me);
   const people = acceptWhoRows([...found.values()], corpus, me).map((p) => ({ ...p, detail: null, about: null, relationship: null }));
   return people.slice(0, WHO_MAX_PEOPLE);
 }

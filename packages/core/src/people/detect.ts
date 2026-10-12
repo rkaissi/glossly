@@ -1,7 +1,7 @@
 // Finds the people in a selection without a model call: the author of the selected message
 // (chat header, "From:" line, sign-off, or a DM window title) and the people it mentions
 // (name pairs, emails, handles, and known people). The user's own names are left out.
-import { extractFeatures, lastSpeaker } from '../router/features';
+import { extractFeatures, knownName, lastSpeaker, type KnownName } from '../router/features';
 import type { KnownPerson } from '../router/types';
 import type { Identity } from '../settings';
 import { isRoleAddress } from './emails';
@@ -55,10 +55,10 @@ function parseFrom(value: string): { name: string | null; email: string | null }
   return { name: value.replace(/^"|"$/g, '').trim() || null, email: null };
 }
 
-function findAuthor(input: DetectInput): { name: string | null; email: string | null } | null {
+function findAuthor(input: DetectInput, known: KnownName): { name: string | null; email: string | null } | null {
   const upToEnd = `${input.before}${input.text}`;
   // The last chat header up to the end of the selection is whoever wrote the last message in it.
-  const speaker = lastSpeaker(upToEnd);
+  const speaker = lastSpeaker(upToEnd, known);
   if (speaker) return { name: speaker, email: null };
 
   const froms = [...upToEnd.matchAll(FROM_LINE)];
@@ -90,7 +90,7 @@ export function detectPeople(input: DetectInput, me: Identity, known: KnownPerso
     if (p.name) names.add(canonicalize(p.name));
   };
 
-  const a = findAuthor(input);
+  const a = findAuthor(input, knownName(me, known));
   const authorIsMe = a !== null && (isMe(a.name, me) || isMe(a.email, me));
   const knownIdFor = (name: string | null, email: string | null) => {
     const vals = [name, email].filter(Boolean).map((v) => canonicalize(v!));
