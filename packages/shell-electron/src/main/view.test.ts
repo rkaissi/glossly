@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { ExpiringLru, Lru, replyCacheKey, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
+import { ExpiringLru, Lru, replyCacheKey, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -131,6 +131,14 @@ describe('fitOnScreen', () => {
 
   it('keeps the bottom edge when the bar sits above the selection', () => {
     expect(fitOnScreen({ x: 100, y: 500, w: 200, h: 40 }, 400, 200, area, true, limits)).toEqual({ x: 100, y: 340, w: 400, h: 200 });
+  });
+});
+
+describe('mouseAwayLimit (decision 55)', () => {
+  it('keeps the setting, or allows half of it more than where the cursor started', () => {
+    expect(mouseAwayLimit(40, 200)).toBe(200);
+    // A pill placed 260 px away (past a toolbar) hides only once the cursor is 360 px away.
+    expect(mouseAwayLimit(260, 200)).toBe(360);
   });
 });
 

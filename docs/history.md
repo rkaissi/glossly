@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| 20.6c | Oct 12 | (this commit) | The pill waits 400 ms on keyboard activity so the hotkey expands it in place; mouse-away measures from where the cursor started (decision 55). |
 | 20.6b | Oct 12 | `43d75f7` | Every model call is told where the text came from, including the kind of platform; Ask knows today (decision 54). |
 | 20.6a | Oct 12 | `0ad3267` | Who and Tasks need evidence in the text: someone other than the user named; "please" alone doesn't back a task; job titles aren't names (decision 53). |
 | 20.5d | Oct 12 | `722d89f` | Reply's thread ends at the selected message: later messages after the selection are left out (decision 52). |

@@ -102,7 +102,7 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { ExpiringLru, Lru, actionForSlot, replyCacheKey, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { ExpiringLru, Lru, actionForSlot, replyCacheKey, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, mouseAwayLimit, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
@@ -122,6 +122,11 @@ const CARET_CHARS = 4000;
  * keyboard_activity about 50 to 100 ms later, often while the bar is visible and not focused yet.
  */
 const HOTKEY_SETTLE_MS = 500;
+/**
+ * Keyboard activity hides the pill this long after it's reported, so the hotkey's first keys
+ * (Ctrl, Alt) don't hide it before the hotkey arrives to expand it in place (decision 55).
+ */
+const KEY_HIDE_GRACE_MS = 400;
 
 type Foreground = CommandResult<'foreground'>;
 
@@ -254,6 +259,8 @@ export class Capture {
   /** Bumped by every mouse press, so an older auto capture still in flight is dropped. */
   private autoGen = 0;
   private watchTimer: ReturnType<typeof setInterval> | null = null;
+  /** A keyboard-activity hide waiting out its grace (KEY_HIDE_GRACE_MS). */
+  private keyHideTimer: ReturnType<typeof setTimeout> | null = null;
   private inputWatch = false;
   /** Set while focus is handed to the source app to read tier 2 on the hotkey path. */
   private bouncing = false;
@@ -375,8 +382,14 @@ export class Capture {
         return;
       }
       case 'wheel':
-      case 'keyboard_activity':
         this.activityHide(ev.event);
+        return;
+      case 'keyboard_activity':
+        // The hotkey cancels this if it comes within the grace, and expands the pill in place.
+        this.keyHideTimer ??= setTimeout(() => {
+          this.keyHideTimer = null;
+          this.activityHide('keyboard_activity');
+        }, KEY_HIDE_GRACE_MS);
         return;
       case 'foreground': {
         // The overlay belongs to the window the text was selected in: close it when another
@@ -601,6 +614,7 @@ export class Capture {
 
   async hotkey(): Promise<void> {
     this.services.metrics.record('hotkey');
+    this.cancelKeyHide();
     const s = this.session;
     // A visible pill or unfocused bar: expand it and take focus.
     if (s && this.overlay.isVisible && !this.overlay.hasFocus && s.selection) {
@@ -2024,9 +2038,17 @@ ${s.selection.text}`;
 
   // ---- hide-on-activity watch (pill and unfocused bar) ----
 
+  private cancelKeyHide(): void {
+    if (this.keyHideTimer) clearTimeout(this.keyHideTimer);
+    this.keyHideTimer = null;
+  }
+
   private startWatch(): void {
     this.stopWatch();
     void this.setInputWatch(true);
+    // How far the cursor was when the overlay appeared: a pill placed past a toolbar can start
+    // farther away than the setting allows (decision 55).
+    let limit: number | null = null;
     this.watchTimer = setInterval(() => {
       if (!this.overlay.isVisible || this.overlay.hasFocus) return;
       const cursor = screen.getCursorScreenPoint();
@@ -2037,11 +2059,14 @@ ${s.selection.text}`;
         void this.expand(this.session.id);
         return;
       }
-      if (distanceToRect(cursor, hit) > this.settings.capture.hideDistancePx) this.activityHide('mouse_away');
+      const away = distanceToRect(cursor, hit);
+      limit ??= mouseAwayLimit(away, this.settings.capture.hideDistancePx);
+      if (away > limit) this.activityHide('mouse_away');
     }, WATCH_INTERVAL_MS);
   }
 
   private stopWatch(): void {
+    this.cancelKeyHide();
     if (this.watchTimer) clearInterval(this.watchTimer);
     this.watchTimer = null;
     void this.setInputWatch(false);

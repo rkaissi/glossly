@@ -180,6 +180,15 @@ export type HideSignal = 'keyboard_activity' | 'wheel' | 'mouse_away' | 'foregro
  * bounce in that window would hide a bar the user just opened. Wheel still hides an
  * unfocused pill (a scroll is not the hotkey).
  */
+/**
+ * How far the cursor may go from the pill before it hides: the setting, or, when the pill
+ * appeared farther away than that (placed past a toolbar), that distance plus half the setting,
+ * so only moving away hides it (decision 55).
+ */
+export function mouseAwayLimit(startDistance: number, hideDistance: number): number {
+  return Math.max(hideDistance, startDistance + hideDistance / 2);
+}
+
 export function shouldHideOverlay(input: {
   signal: HideSignal;
   visible: boolean;
