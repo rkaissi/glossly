@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| 20.7a | Oct 12 | (this commit) | A remembered 429 more than an hour away is dropped, so a clock set back can't skip a model for longer (decision 60). |
 | 20.7 | Oct 12 | `832901a` | The router gets its own model (Decision Qwen, Fast gpt-oss-20b, Chat gpt-oss-120b), 429s are remembered until retry-after, the router gets 900 ms on its fallback, the rules are recorded beside the model, and an opt-in 30-day model call log (decisions 60 and 61). |
 | 20.6h | Oct 12 | `bb2ce91` | Pasted voice samples get a platform label (suggested in code, a Select in Profile, existing ones labeled once at startup), and Reply ranks them by it (decision 59). |
 | 20.6g | Oct 12 | `240d051` | The pill stays while Ctrl, Alt, or Windows is held, so a slow hotkey expands it in place (helper `keyboard_activity.modifiers`; decision 58). Checked live. |

@@ -5,7 +5,7 @@ Three kinds of checks: unit tests (fast, run on every change), evals (call real 
 ## Unit tests
 
 ```powershell
-pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (631 tests on Oct 12)
+pnpm test        # vitest run --project unit: packages/*/src/**/*.test.ts (632 tests on Oct 12)
 pnpm typecheck   # tsc in all three packages
 ```
 

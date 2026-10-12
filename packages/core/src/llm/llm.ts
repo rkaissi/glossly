@@ -182,11 +182,14 @@ export class AiSdkLlm implements LlmProvider {
     return refs.map((ref) => ({ ref, model: this.deps.createModel(ref, this.deps.apiKey(parseRef(ref).provider)!) }));
   }
 
-  /** Until when a model is rate-limited, or null. A lapsed entry is dropped. */
+  /**
+   * Until when a model is rate-limited, or null. A lapsed entry is dropped, and so is one more
+   * than the longest wait away: the system clock went back, so the time no longer means anything.
+   */
   limitedUntil(ref: ModelRef): number | null {
     const until = this.limited.get(ref);
     if (until === undefined) return null;
-    if (until <= this.now()) {
+    if (until <= this.now() || until - this.now() > RETRY_MAX_MS) {
       this.limited.delete(ref);
       return null;
     }
