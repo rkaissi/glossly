@@ -15,53 +15,61 @@ const ROLE_LABEL: Record<RoleName, string> = { fast: 'Fast', chat: 'Chat', decis
  * A cloud model never gets a local one as its automatic fallback: a local model is slow and
  * loads the machine, so it is only a fallback when picked by hand.
  */
-function pickFallback(role: 'fast' | 'chat', models: CatalogModel[], primary: ModelRef | null): ModelRef | null {
+function pickFallback(role: RoleName, models: CatalogModel[], primary: ModelRef | null, avoid: ModelRef[] = []): ModelRef | null {
   if (!primary) return null;
   const { provider } = parseRef(primary);
   if (provider !== LOCAL_PROVIDER) models = models.filter((m) => m.provider !== LOCAL_PROVIDER);
-  const other = pickDefault(role, models.filter((m) => m.provider !== provider));
-  if (other) return other.ref;
-  const same = pickDefault(role, models.filter((m) => m.ref !== primary));
-  return same?.ref ?? null;
+  models = models.filter((m) => m.ref !== primary);
+  const pick = (pool: CatalogModel[]) => pickDefault(role, pool.filter((m) => m.provider !== provider)) ?? pickDefault(role, pool);
+  const any = pick(models);
+  const kept = pick(models.filter((m) => !avoid.includes(m.ref)));
+  // Avoiding a model is worth it only at no extra cost.
+  const cost = (m: CatalogModel | null) => COST_RANK[m?.capabilities?.cost ?? 'low'];
+  return (kept && cost(kept) <= cost(any) ? kept : any)?.ref ?? null;
+}
+
+const COST_RANK = { low: 0, medium: 1, high: 2 } as const;
+
+/**
+ * The default for a role, avoiding `avoid` while another model fits. Never trades a cloud model
+ * for a local one to do it: a local model is slower than sharing a rate limit.
+ */
+function pickPrimary(role: RoleName, models: CatalogModel[], avoid: ModelRef[]): ModelRef | null {
+  const best = pickDefault(role, models);
+  const local = !best || best.provider === LOCAL_PROVIDER;
+  const other = pickDefault(role, models.filter((m) => !avoid.includes(m.ref) && (local || m.provider !== LOCAL_PROVIDER)));
+  return (other ?? best)?.ref ?? null;
 }
 
 /**
- * Called whenever keys or the model catalog change. Fills empty roles from the defaults in
- * capabilities.json, never overwrites a hand-picked role that is still available, and switches
- * a role whose model disappeared back to the default with a notice.
+ * Called on launch and whenever keys or the model catalog change. A role picked by hand keeps
+ * its model while it is available (a model that went away switches the role back to automatic,
+ * with a notice); an automatic role follows the defaults in capabilities.json. Decision gets the
+ * fastest model, and Fast and its fallback avoid that model, so the router, which runs on every
+ * bar open, and Who, Tasks, and Save don't share one model's rate limit (decision 60).
  */
 export function updateRoles(current: Settings['roles'], models: CatalogModel[]): RoleUpdate {
   const available = new Set(models.map((m) => m.ref));
   const notices: string[] = [];
   const roles = structuredClone(current);
 
-  for (const role of ['fast', 'chat'] as const) {
+  for (const role of ['decision', 'fast', 'chat'] as const) {
     const r: RoleAssignment = roles[role];
+    const avoid = role === 'fast' && roles.decision.model ? [roles.decision.model] : [];
     if (r.model && !available.has(r.model)) {
-      const def = pickDefault(role, models);
+      const def = pickPrimary(role, models, avoid);
       notices.push(
         def
-          ? `${ROLE_LABEL[role]} model ${parseRef(r.model).modelId} is no longer available. Switched to ${def.modelId}.`
+          ? `${ROLE_LABEL[role]} model ${parseRef(r.model).modelId} is no longer available. Switched to ${parseRef(def).modelId}.`
           : `${ROLE_LABEL[role]} model ${parseRef(r.model).modelId} is no longer available. Add a key in Settings.`,
       );
-      r.model = null;
       r.manual = false;
     }
-    if (!r.model) {
-      r.model = pickDefault(role, models)?.ref ?? null;
-      r.manual = false;
-    }
-    if (r.fallback && (!available.has(r.fallback) || r.fallback === r.model)) r.fallback = null;
-    if (!r.fallback && !r.manual) r.fallback = pickFallback(role, models, r.model);
+    if (!r.manual) {
+      r.model = pickPrimary(role, models, avoid);
+      r.fallback = pickFallback(role, models, r.model, avoid);
+    } else if (r.fallback && (!available.has(r.fallback) || r.fallback === r.model)) r.fallback = null;
   }
-
-  const d = roles.decision;
-  if (d.model && !available.has(d.model)) {
-    notices.push(`Decision model ${parseRef(d.model).modelId} is no longer available. Using the Fast model.`);
-    d.model = null;
-    d.manual = false;
-  }
-  if (d.fallback && !available.has(d.fallback)) d.fallback = null;
 
   return { roles, changed: JSON.stringify(roles) !== JSON.stringify(current), notices };
 }

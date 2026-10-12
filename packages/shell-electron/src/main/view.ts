@@ -280,3 +280,41 @@ export class ExpiringLru<K, V> {
     this.lru.clear();
   }
 }
+
+const slotPair = (s: Slots): [string, string] => [s.slot3?.action ?? 'none', s.slot4?.action ?? 'none'];
+
+/**
+ * The model's slots 3 and 4 beside the ones the rules alone would show, for every routing the
+ * model answered (decision 61): codes only. `agree` ignores the order of the two.
+ */
+export function routeComparison(r: RouteResult): Record<string, string | boolean> {
+  if (!r.rules) return {};
+  const [m3, m4] = slotPair(r.slots);
+  const [r3, r4] = slotPair(r.rules.slots);
+  return {
+    model_slot3: m3,
+    model_slot4: m4,
+    rules_slot3: r3,
+    rules_slot4: r4,
+    rules_type: r.rules.decisions.content_type,
+    agree: [m3, m4].sort().join() === [r3, r4].sort().join(),
+    type_agree: r.decisions.content_type === r.rules.decisions.content_type,
+  };
+}
+
+/** Where a clicked action was on the bar, and whether the model's and the rules' slots offered it (decision 61). */
+export function clickedWhere(action: ActionId, view: SlotsView | null, route: RouteResult | null | undefined): Record<string, string | boolean> {
+  const where = !view
+    ? 'none'
+    : view.slot1?.action === action
+      ? 'slot1'
+      : view.slot2?.action === action
+        ? 'slot2'
+        : view.slot3?.action === action
+          ? 'slot3'
+          : view.slot4?.action === action
+            ? 'slot4'
+            : 'more';
+  if (!route?.rules) return { where };
+  return { where, in_model: slotPair(route.slots).includes(action), in_rules: slotPair(route.rules.slots).includes(action) };
+}

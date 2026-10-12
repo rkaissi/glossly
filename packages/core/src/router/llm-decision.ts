@@ -30,7 +30,7 @@ export class LlmStructuredDecision implements DecisionProvider {
 
   constructor(private readonly llm: LlmProvider) {}
 
-  async decide(input: DecisionInput, signal?: AbortSignal): Promise<Decisions> {
+  async decide(input: DecisionInput, signal?: AbortSignal, onFallback?: () => void): Promise<Decisions> {
     const out = await this.llm.structured(
       {
         role: 'decision',
@@ -40,6 +40,7 @@ export class LlmStructuredDecision implements DecisionProvider {
         signal,
         temperature: 0,
         maxOutputTokens: 200,
+        ...(onFallback && { onFallback: () => onFallback() }),
       },
       decisionCallSchema(input.collections),
     );

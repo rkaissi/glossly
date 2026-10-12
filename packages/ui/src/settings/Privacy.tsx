@@ -1,6 +1,6 @@
 import type { Privacy, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { ChoiceCards } from '../controls/Toggles';
+import { ChoiceCards, Switch } from '../controls/Toggles';
 import { canBackfill } from './format';
 import { useAction } from './useAction';
 
@@ -78,6 +78,36 @@ export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: 
       <ChoiceCards label="Where model calls go" value={current} disabled={busy} onChange={set} options={CHOICES.map((c) => ({ value: c.value, title: c.label, desc: c.desc }))} />
       {current === 'local' && <LocalOnlyStatus view={view} onSetUp={onSetUp} />}
       <EntityBackfill view={view} />
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * The model call log (decision 61): every call's prompt (with the selected text), answer, model,
+ * and timing, kept 30 days in the local database to see what the models saw. Off deletes it.
+ */
+export function CallLog({ view }: { view: SettingsView }) {
+  const { busy, error, run } = useAction();
+  const on = view.settings.callLog;
+  const toggle = (value: boolean) =>
+    void run(async () => {
+      const r = await glossly.invoke('settings:set', { key: 'callLog', value });
+      if (r.error) throw new Error(r.error);
+    });
+  return (
+    <div className="field">
+      <div className="toggle">
+        <span>
+          <strong>Keep a log of model calls</strong>
+          <span className="muted small block">
+            Keeps each model call for 30 days: what was sent (including the text you selected), the answer, the model, whether it fell back, and how
+            long it took. It stays on this computer, isn't exported, and is for finding out why a model got something wrong. Turning it off deletes
+            the log.
+          </span>
+        </span>
+        <Switch label="Keep a log of model calls" checked={on} disabled={busy} onChange={toggle} />
+      </div>
       {error && <p className="error small">{error}</p>}
     </div>
   );

@@ -8,9 +8,9 @@ import { capabilityBadges, groupByProvider, roleWarning } from './format';
 import { useAction } from './useAction';
 
 const ROLES: { role: RoleName; label: string; desc: string }[] = [
-  { role: 'fast', label: 'Fast', desc: 'Routing when no decision model is set, and finding people and dates when you save. Needs structured output.' },
-  { role: 'chat', label: 'Chat', desc: 'Writes Ask answers. Pick the strongest writer you have.' },
-  { role: 'decision', label: 'Decision', desc: 'Picks the extra actions in slots 3 and 4. Rules take over if it is slower than {timeout} ms.' },
+  { role: 'fast', label: 'Fast', desc: 'Who is this, Tasks, Visualize, and finding people and dates when you save. Needs structured output. Kept off the Decision model, so the two have separate rate limits.' },
+  { role: 'chat', label: 'Chat', desc: 'Writes Ask answers, Reply drafts, and paste summaries. Pick the strongest writer you have.' },
+  { role: 'decision', label: 'Decision', desc: 'Picks the extra actions in slots 3 and 4 each time the bar opens, so it should be the fastest small model. Rules take over if it is slower than {timeout} ms ({fallback} ms while its fallback answers).' },
 ];
 
 const ACTION_OVERRIDES: { action: string; label: string; role: RoleName }[] = [
@@ -74,7 +74,7 @@ function RoleRow({ view, role, label, desc }: { view: SettingsView; role: RoleNa
         <strong>{label}</strong>
         {cur.manual && <span className="tag">Picked by you</span>}
       </div>
-      <p className="muted small">{desc.replace('{timeout}', String(view.settings.router.decisionTimeoutMs))}</p>
+      <p className="muted small">{desc.replace('{timeout}', String(view.settings.router.decisionTimeoutMs)).replace('{fallback}', String(view.settings.router.fallbackTimeoutMs))}</p>
       <div className="role-pickers">
         <label>
           <span className="small muted">Model</span>

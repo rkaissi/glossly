@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type ModelRef, type Settings } from '../settings';
 import { isChatModel, lookupCapabilities, parseRef, pickDefault, toCatalogModel, toRef } from './catalog';
-import { AiSdkLlm, isFallbackError, LOCAL_UNREACHABLE_MESSAGE, privacyChain } from './llm';
+import { AiSdkLlm, isFallbackError, LOCAL_UNREACHABLE_MESSAGE, privacyChain, REASONING_ROOM, retryAfterMs, type LlmCall } from './llm';
 import { isLoopbackUrl, LocalProvider, normalizeBaseUrl, PROVIDERS, ProviderKeyError } from './providers';
 import { modelChain, updateLocalModel, updateRoles } from './roles';
 import { LlmError } from './types';
@@ -17,8 +17,8 @@ const usage = {
 };
 const finish = { unified: 'stop' as const, raw: 'stop' };
 
-function apiError(status: number) {
-  return new APICallError({ message: `HTTP ${status}`, url: 'https://x', requestBodyValues: {}, statusCode: status, isRetryable: false });
+function apiError(status: number, responseHeaders?: Record<string, string>) {
+  return new APICallError({ message: `HTTP ${status}`, url: 'https://x', requestBodyValues: {}, statusCode: status, isRetryable: false, responseHeaders });
 }
 
 function textModel(chunks: string[], tailError?: unknown) {
@@ -32,13 +32,13 @@ function textModel(chunks: string[], tailError?: unknown) {
   return new MockLanguageModelV4({ doStream: { stream: convertArrayToReadableStream(parts) } });
 }
 
-function failingModel(status: number) {
+function failingModel(status: number, headers?: Record<string, string>) {
   return new MockLanguageModelV4({
     doStream: async () => {
-      throw apiError(status);
+      throw apiError(status, headers);
     },
     doGenerate: async () => {
-      throw apiError(status);
+      throw apiError(status, headers);
     },
   });
 }
@@ -55,9 +55,12 @@ function roles(over: Partial<Settings['roles']>): LlmSettings {
   return { roles: { ...DEFAULT_SETTINGS.roles, ...over }, actionModels: {}, privacy: 'all', local: DEFAULT_SETTINGS.local };
 }
 
-function llmWith(models: Record<ModelRef, MockLanguageModelV4>, settings: LlmSettings, keys = ['groq', 'openai', 'anthropic']) {
+function llmWith(models: Record<ModelRef, MockLanguageModelV4>, settings: LlmSettings, keys = ['groq', 'openai', 'anthropic'], clock = { t: 0 }) {
   const fallbacks: unknown[] = [];
+  const calls: LlmCall[] = [];
   const llm = new AiSdkLlm({
+    now: () => clock.t,
+    onCall: (c) => calls.push(c),
     settings: () => settings,
     apiKey: (p) => (keys.includes(p) ? 'k' : null),
     createModel: (ref) => {
@@ -67,7 +70,7 @@ function llmWith(models: Record<ModelRef, MockLanguageModelV4>, settings: LlmSet
     },
     onFallback: (info) => fallbacks.push(info),
   });
-  return { llm, fallbacks };
+  return { llm, fallbacks, calls };
 }
 
 async function collect(it: AsyncIterable<string>): Promise<string> {
@@ -94,7 +97,7 @@ describe('AiSdkLlm.stream', () => {
     const r = llm.stream({ role: 'chat', instructions: 'i', prompt: 'p' });
     expect(await collect(r.textStream)).toBe('ok');
     expect(await r.model).toBe('openai:gpt-5-mini');
-    expect(fallbacks).toEqual([{ from: 'anthropic:claude-sonnet-5-5', to: 'openai:gpt-5-mini', status: 429 }]);
+    expect(fallbacks).toEqual([{ action: 'chat', role: 'chat', from: 'anthropic:claude-sonnet-5-5', to: 'openai:gpt-5-mini', status: 429, reason: 'rate_limit' }]);
   });
 
   it('does not fall back after the first token', async () => {
@@ -334,6 +337,115 @@ describe('AiSdkLlm.structured', () => {
   });
 });
 
+describe('rate-limit memory (decision 60)', () => {
+  const Schema = z.object({ answer: z.string(), n: z.number() });
+  const FAST = { model: 'groq:qwen/qwen3.8-27b', fallback: 'groq:openai/gpt-oss-20b', manual: false };
+
+  it('skips a model that got a 429 until retry-after, then tries it again, and a success clears it', async () => {
+    const clock = { t: 0 };
+    const limited = failingModel(429, { 'retry-after': '30' });
+    const backup = jsonModel(...Array.from({ length: 4 }, () => '{"answer":"b","n":1}'));
+    const { llm, fallbacks } = llmWith({ 'groq:qwen/qwen3.8-27b': limited, 'groq:openai/gpt-oss-20b': backup }, roles({ fast: FAST }), ['groq'], clock);
+    const seen: string[] = [];
+    const ask = () => llm.structured({ role: 'fast', action: 'who', instructions: 'i', prompt: 'p', onFallback: (to) => seen.push(to) }, Schema);
+    await ask();
+    expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).toBe(30_000);
+    clock.t = 29_000;
+    await ask();
+    expect(limited.doGenerateCalls).toHaveLength(1);
+    expect(fallbacks.map((f) => (f as { reason: string }).reason)).toEqual(['rate_limit', 'remembered']);
+    expect(seen).toEqual(['groq:openai/gpt-oss-20b', 'groq:openai/gpt-oss-20b']);
+    // At the time it lapses; the next 429 brings a fresh time.
+    clock.t = 30_000;
+    expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).toBeNull();
+    await ask();
+    expect(limited.doGenerateCalls).toHaveLength(2);
+    expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).toBe(60_000);
+  });
+
+  it('tries a limited model anyway when every model in the chain is limited', async () => {
+    const clock = { t: 0 };
+    const a = failingModel(429, { 'retry-after': '20' });
+    const b = failingModel(429, { 'retry-after': '20' });
+    const { llm } = llmWith({ 'groq:qwen/qwen3.8-27b': a, 'groq:openai/gpt-oss-20b': b }, roles({ fast: FAST }), ['groq'], clock);
+    await expect(llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema)).rejects.toMatchObject({ statusCode: 429 });
+    await expect(llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema)).rejects.toMatchObject({ statusCode: 429 });
+    expect([a.doGenerateCalls.length, b.doGenerateCalls.length]).toEqual([2, 2]);
+  });
+
+  it('a success on a remembered model clears it', async () => {
+    const clock = { t: 0 };
+    let fail = true;
+    const flaky = new MockLanguageModelV4({
+      doGenerate: async () => {
+        if (fail) throw apiError(429, { 'retry-after': '5' });
+        return { content: [{ type: 'text' as const, text: '{"answer":"a","n":1}' }], finishReason: finish, usage, warnings: [] };
+      },
+    });
+    const { llm } = llmWith({ 'groq:qwen/qwen3.8-27b': flaky, 'groq:openai/gpt-oss-20b': jsonModel('{"answer":"b","n":1}') }, roles({ fast: FAST }), ['groq'], clock);
+    await llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema);
+    fail = false;
+    clock.t = 6_000;
+    await llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema);
+    expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).toBeNull();
+  });
+
+  it('reads retry-after in seconds or as a date, then Groq\'s token reset, else 10 s, within 1 s to an hour', () => {
+    const now = Date.parse('2026-10-12T10:00:00Z');
+    expect(retryAfterMs(apiError(429, { 'retry-after': '7' }), now)).toBe(7000);
+    expect(retryAfterMs(apiError(429, { 'Retry-After': 'Mon, 12 Oct 2026 10:00:42 GMT' }), now)).toBe(42_000);
+    expect(retryAfterMs(apiError(429, { 'x-ratelimit-reset-tokens': '2m59.5s' }), now)).toBe(179_500);
+    expect(retryAfterMs(apiError(429, { 'x-ratelimit-reset-tokens': '450ms' }), now)).toBe(1000);
+    expect(retryAfterMs(apiError(429), now)).toBe(10_000);
+    expect(retryAfterMs(apiError(429, { 'retry-after': '86400' }), now)).toBe(3_600_000);
+  });
+});
+
+describe('call log (decision 61)', () => {
+  const Schema = z.object({ answer: z.string(), n: z.number() });
+
+  it('reports every try with its prompt, answer, model, and the model it fell back from', async () => {
+    const { llm, calls } = llmWith(
+      { 'groq:qwen/qwen3.8-27b': failingModel(429), 'groq:openai/gpt-oss-20b': jsonModel('{"answer":"b","n":4}') },
+      roles({ fast: { model: 'groq:qwen/qwen3.8-27b', fallback: 'groq:openai/gpt-oss-20b', manual: false } }),
+      ['groq'],
+    );
+    await llm.structured({ role: 'fast', action: 'who', instructions: 'i', prompt: 'Who is Casey Lin?' }, Schema);
+    expect(calls.map((c) => [c.model, c.status, c.error, c.fallbackFrom])).toEqual([
+      ['groq:qwen/qwen3.8-27b', 'error', '429', null],
+      ['groq:openai/gpt-oss-20b', 'ok', null, 'groq:qwen/qwen3.8-27b'],
+    ]);
+    expect(calls[1]).toMatchObject({ action: 'who', role: 'fast', prompt: 'Who is Casey Lin?', response: '{"answer":"b","n":4}' });
+    expect(calls[1]!.usage?.input).toBe(10);
+  });
+
+  it('logs a streamed call with the text it streamed', async () => {
+    const { llm, calls } = llmWith({ 'anthropic:claude-sonnet-5-5': textModel(['Hi ', 'there']) }, roles({ chat: { ...CHAT, fallback: null } }));
+    await collect(llm.stream({ role: 'chat', action: 'reply', instructions: 'i', prompt: 'p' }).textStream);
+    expect(calls).toMatchObject([{ action: 'reply', model: 'anthropic:claude-sonnet-5-5', status: 'ok', response: 'Hi there' }]);
+  });
+
+  it('logs an answer that failed validation with the raw text', async () => {
+    const { llm, calls } = llmWith({ 'openai:gpt-5-mini': jsonModel('nope', '{"answer":"a","n":1}') }, roles({ fast: { model: 'openai:gpt-5-mini', fallback: null, manual: false } }));
+    await llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema);
+    expect(calls.map((c) => [c.status, c.response])).toEqual([
+      ['invalid_output', 'nope'],
+      ['ok', '{"answer":"a","n":1}'],
+    ]);
+  });
+
+  it('gives reasoning models room for their reasoning on top of the output cap (decision 60)', async () => {
+    const Small = z.object({ answer: z.string(), n: z.number() });
+    const oss = jsonModel('{"answer":"a","n":1}');
+    const qwen = jsonModel('{"answer":"a","n":1}');
+    const { llm } = llmWith({ 'groq:openai/gpt-oss-20b': oss, 'groq:qwen/qwen3.8-27b': qwen }, roles({ fast: { model: 'groq:openai/gpt-oss-20b', fallback: null, manual: false }, chat: { model: 'groq:qwen/qwen3.8-27b', fallback: null, manual: false } }), ['groq']);
+    await llm.structured({ role: 'fast', instructions: 'i', prompt: 'p', maxOutputTokens: 200 }, Small);
+    await llm.structured({ role: 'chat', instructions: 'i', prompt: 'p', maxOutputTokens: 200 }, Small);
+    expect(oss.doGenerateCalls[0]!.maxOutputTokens).toBe(200 + REASONING_ROOM);
+    expect(qwen.doGenerateCalls[0]!.maxOutputTokens).toBe(200);
+  });
+});
+
 describe('isFallbackError', () => {
   it('is true for 429 and 5xx only', () => {
     expect([429, 500, 503, 400, 401, 404].map((s) => isFallbackError(apiError(s)))).toEqual([true, true, true, false, false, false]);
@@ -376,15 +488,24 @@ describe('roles', () => {
     expect(u.roles.fast).toEqual({ model: 'groq:llama-3.1-8b-instant', fallback: 'anthropic:claude-haiku-4-5', manual: false });
     expect(u.roles.chat.model).toBe('anthropic:claude-sonnet-5-5');
     expect(parseRef(u.roles.chat.fallback!).provider).toBe('groq');
-    expect(u.roles.decision.model).toBeNull();
+    // Decision: the fastest structured model, schema-native first; its fallback from another provider.
+    expect(u.roles.decision).toEqual({ model: 'anthropic:claude-haiku-4-5', fallback: 'groq:llama-3.1-8b-instant', manual: false });
   });
 
-  it('with only the current Groq catalog, puts the small Qwen model on Fast and spreads fallbacks across models', () => {
+  it('with only the current Groq catalog, gives the router Qwen and keeps Fast off it (decision 60)', () => {
     const live = ['qwen/qwen3.8-27b', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'].map((id) => toCatalogModel('groq', id));
     const u = updateRoles(DEFAULT_SETTINGS.roles, live);
-    expect(u.roles.fast).toEqual({ model: 'groq:qwen/qwen3.8-27b', fallback: 'groq:openai/gpt-oss-20b', manual: false });
-    expect(u.roles.chat.model).toBe('groq:openai/gpt-oss-120b');
-    expect(u.roles.chat.fallback).not.toBe('groq:openai/gpt-oss-120b');
+    expect(u.roles.decision).toEqual({ model: 'groq:qwen/qwen3.8-27b', fallback: 'groq:openai/gpt-oss-20b', manual: false });
+    expect(u.roles.fast).toEqual({ model: 'groq:openai/gpt-oss-20b', fallback: 'groq:openai/gpt-oss-120b', manual: false });
+    // Chat: the smartest, then the next smartest.
+    expect(u.roles.chat).toEqual({ model: 'groq:openai/gpt-oss-120b', fallback: 'groq:qwen/qwen3.8-27b', manual: false });
+    // Automatic roles follow the defaults, so an install from before moves over on its own.
+    const before = { ...DEFAULT_SETTINGS.roles, fast: { model: 'groq:qwen/qwen3.8-27b', fallback: 'groq:openai/gpt-oss-20b', manual: false } };
+    expect(updateRoles(before, live).roles).toEqual(u.roles);
+    // A hand pick stays, "Use Fast model" for Decision included.
+    const picked = { ...u.roles, decision: { model: null, fallback: null, manual: true }, fast: { model: 'groq:qwen/qwen3.8-27b', fallback: null, manual: true } };
+    expect(updateRoles(picked, live).roles.decision).toEqual({ model: null, fallback: null, manual: true });
+    expect(updateRoles(picked, live).roles.fast.model).toBe('groq:qwen/qwen3.8-27b');
   });
 
   it('keeps a manual pick that is still available, and replaces one that went away with a notice', () => {

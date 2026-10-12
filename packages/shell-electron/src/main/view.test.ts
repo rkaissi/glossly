@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { ExpiringLru, Lru, replyCacheKey, actionForSlot, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
+import { ExpiringLru, Lru, replyCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -23,6 +23,8 @@ function route(partial: Partial<RouteResult['slots']> = {}, collection = 'Notes'
     },
     features: {} as RouteResult['features'],
     ms: 3.4,
+    fellBack: false,
+    rules: null,
     fallback: null,
   };
 }
@@ -258,5 +260,28 @@ describe('sourceRoom', () => {
     expect(sourceRoom({ x: 300, y: 400, w: 400, h: 40 }, 'below', null, 320)).toBeNull();
     expect(sourceRoom({ x: 300, y: 790, w: 400, h: 40 }, 'below', source, 320)).toBeNull();
     expect(sourceRoom({ x: 300, y: 600, w: 400, h: 40 }, 'below', source, 320)).toBeNull();
+  });
+});
+
+describe('rules beside the model (decision 61)', () => {
+  const withRules = (rules: Partial<RouteResult['slots']>): RouteResult => {
+    const r = route();
+    return { ...r, decisions: { ...r.decisions, provider: 'llm_structured' }, rules: { decisions: route().decisions, slots: { ...route().slots, ...rules } } };
+  };
+
+  it('says whether the rules would have shown the same slots 3 and 4, in any order', () => {
+    expect(routeComparison(route())).toEqual({});
+    const same = routeComparison(withRules({ slot3: { action: 'promises', score: 0.7 }, slot4: { action: 'reply', score: 0.9 } }));
+    expect(same).toMatchObject({ model_slot3: 'reply', model_slot4: 'promises', agree: true, type_agree: true });
+    const differ = routeComparison(withRules({ slot3: { action: 'who', score: 0.6 }, slot4: null }));
+    expect(differ).toMatchObject({ rules_slot3: 'who', rules_slot4: 'none', agree: false });
+  });
+
+  it('says where a clicked action was and which side offered it', () => {
+    const view = slotsView(route(), 'model');
+    expect(clickedWhere('reply', view, route())).toEqual({ where: 'slot3' });
+    const r = withRules({ slot3: { action: 'who', score: 0.6 }, slot4: null });
+    expect(clickedWhere('reply', view, r)).toEqual({ where: 'slot3', in_model: true, in_rules: false });
+    expect(clickedWhere('who', view, r)).toEqual({ where: 'more', in_model: false, in_rules: true });
   });
 });

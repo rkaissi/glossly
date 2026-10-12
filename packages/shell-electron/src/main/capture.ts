@@ -102,7 +102,7 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { ExpiringLru, Lru, actionForSlot, replyCacheKey, contains, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, mouseAwayLimit, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { ExpiringLru, Lru, actionForSlot, clickedWhere, replyCacheKey, contains, routeComparison, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, mouseAwayLimit, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
@@ -961,12 +961,13 @@ export class Capture {
       const routed = {
         provider: r.decisions.provider,
         fallback: r.fallback ?? 'none',
+        fell_back: r.fellBack,
         ms: Math.round(r.ms),
-        budget_ms: this.settings.router.decisionTimeoutMs,
+        budget_ms: r.fellBack ? this.settings.router.fallbackTimeoutMs : this.settings.router.decisionTimeoutMs,
         author,
         mine: r.features.authorIsMe,
       };
-      this.services.metrics.record('router_done', { ...routed, content_type: r.decisions.content_type });
+      this.services.metrics.record('router_done', { ...routed, content_type: r.decisions.content_type, ...routeComparison(r) });
       log.info('routed', routed);
     } catch (e) {
       log.error('route failed', errorInfo(e));
@@ -988,7 +989,7 @@ export class Capture {
       return;
     }
     this.stopWatch();
-    this.services.metrics.record('action_clicked', { action, ms: ms(s.t0), trigger: s.trigger });
+    this.services.metrics.record('action_clicked', { action, ms: ms(s.t0), trigger: s.trigger, ...clickedWhere(action, this.state.slots, s.route) });
     this.tried(s, 'action');
     if (action === 'recall') this.services.metrics.record('recall_opened', { count: this.visibleRecall(s).length });
 

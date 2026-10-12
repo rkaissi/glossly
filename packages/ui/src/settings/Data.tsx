@@ -3,7 +3,7 @@ import type { EmbedStatus, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { pct } from './format';
 import { BlockList } from './General';
-import { PrivacyChoice } from './Privacy';
+import { CallLog, PrivacyChoice } from './Privacy';
 import { useAction } from './useAction';
 
 const EMBED_STATE: Record<EmbedStatus['state'], string> = {
@@ -181,6 +181,7 @@ export function PrivacyDataTab({ view }: { view: SettingsView }) {
       <p className="muted">Everything stays on this computer in one database. Nothing is sent anywhere except the model calls you trigger.</p>
       <PrivacyChoice view={view} onSetUp={() => (location.hash = 'models')} />
       <BlockList view={view} />
+      <CallLog view={view} />
       <h3>Your data</h3>
       <Export />
       <DeleteAll />

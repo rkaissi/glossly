@@ -103,6 +103,7 @@ async function main(): Promise<void> {
 
   if (services.embed.downloaded || services.settings.firstRunComplete) services.embed.start();
   services.refreshIfStale().catch((e: unknown) => log.warn('catalog refresh failed', errorInfo(e)));
+  setInterval(() => services.pruneCallLog(), 86_400_000).unref();
   if (!services.settings.firstRunComplete && !process.env.GLOSSLY_SMOKE) settingsWindow.open('setup');
 
   app.on('second-instance', () => settingsWindow.open());

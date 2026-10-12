@@ -8,6 +8,7 @@ import { canonicalize } from '../people/names';
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS } from './migrations';
 import { PeopleRepo } from './people';
+import { toLlmCallRow } from './llm-call-row';
 import { Store } from './store';
 
 const require = createRequire(import.meta.url);
@@ -25,7 +26,7 @@ function unit(dims: number, hot: number): Float32Array {
 describe('Store', () => {
   it('migrates and seeds default collections', () => {
     store = new Store(':memory:');
-    expect(store.schemaVersion).toBe(8);
+    expect(store.schemaVersion).toBe(9);
     expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
     expect(store.collectionByName('reading')?.name).toBe('Reading');
   });
@@ -44,7 +45,7 @@ describe('Store', () => {
       old.exec("INSERT INTO style_notes (id, text, created_at) VALUES ('n', 'Writes in lowercase', '2026-10-10T20:00:00-04:00')");
       old.close();
       store = new Store(path);
-      expect(store.schemaVersion).toBe(8);
+      expect(store.schemaVersion).toBe(9);
       const people = new PeopleRepo(store);
       expect(people.styleSignals().map((s) => s.dimension)).toEqual(['length']);
       expect(people.styleNotes()).toMatchObject([{ text: 'Writes in lowercase', channel: null }]);
@@ -249,6 +250,26 @@ describe('Store', () => {
     store.insertEvent('action_clicked', { action: 'ask' }, '2026-10-09T10:00:00-04:00');
     store.insertEvent('hotkey', null, '2026-10-10T10:00:00-04:00');
     expect(store.listEvents('2026-10-10').map((e) => e.kind)).toEqual(['hotkey']);
+  });
+
+  it('keeps the model call log apart: pruned by age, cleared with the data, never exported (decision 61)', () => {
+    store = new Store(':memory:');
+    const call = (at: string, action: string) =>
+      store.addLlmCall(
+        toLlmCallRow(
+          { action, role: 'fast', model: 'groq:openai/gpt-oss-20b', fallbackFrom: null, status: 'ok', error: null, ms: 312, prompt: 'Who is Jordan Hale?', response: '{}', usage: null },
+          at,
+        ),
+      );
+    call('2026-09-01T10:00:00Z', 'who');
+    call('2026-10-11T10:00:00Z', 'promises');
+    call('2026-10-12T10:00:00Z', 'who');
+    expect(store.llmCalls({ action: 'who' }).map((c) => c.at)).toEqual(['2026-10-12T10:00:00Z', '2026-09-01T10:00:00Z']);
+    expect(store.pruneLlmCalls('2026-09-12T10:00:00Z')).toBe(1);
+    expect(store.llmCalls()).toHaveLength(2);
+    expect(Object.keys((store.exportAll() as { tables: Record<string, unknown> }).tables)).not.toContain('llm_calls');
+    store.deleteAll();
+    expect(store.llmCalls()).toEqual([]);
   });
 });
 

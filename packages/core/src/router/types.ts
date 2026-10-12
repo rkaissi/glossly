@@ -69,7 +69,8 @@ export interface DecisionInput {
 
 export interface DecisionProvider {
   readonly id: DecisionProviderId;
-  decide(input: DecisionInput, signal?: AbortSignal): Promise<Decisions>;
+  /** `onFallback` is called when the call moves to a fallback model (decision 60). */
+  decide(input: DecisionInput, signal?: AbortSignal, onFallback?: () => void): Promise<Decisions>;
 }
 
 export const CONTEXTUAL_ACTIONS = ['reply', 'who', 'promises', 'visualize'] as const;

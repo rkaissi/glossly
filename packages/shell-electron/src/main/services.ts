@@ -18,6 +18,8 @@ import {
   Store,
   isLoopbackUrl,
   isoNow,
+  toLlmCallRow,
+  CALL_LOG_DAYS,
   normalizeBaseUrl,
   parseRef,
   toCatalogModel,
@@ -98,10 +100,21 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
         if (!info) throw new Error(`Unknown provider: ${provider}`);
         return info.createModel(key, modelId);
       },
-      onFallback: ({ status }) => this.metrics.record('llm_fallback', status ? { status } : null),
+      // Which call moved from which model, and why (decision 60): codes only.
+      onFallback: (f) => this.metrics.record('llm_fallback', { ...f, status: f.status ?? 'none' }),
       // Token counts per call (decision 48): codes and counts only.
       onUsage: (u) => this.metrics.record('llm_tokens', { ...u }),
+      // The call log holds the user's text, so only while it is on (decision 61); never in main.log.
+      onCall: (c) => {
+        if (!this.settingsCache.callLog) return;
+        try {
+          this.store.addLlmCall(toLlmCallRow(c, isoNow()));
+        } catch (e) {
+          log.warn('call log write failed', { name: (e as Error)?.name ?? 'error' });
+        }
+      },
     });
+    this.pruneCallLog();
 
     const { model, dims } = this.settingsCache.embeddings;
     store.ensureVectorModel(model, dims);
@@ -125,6 +138,8 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     if (!shape) throw new Error(`Unknown setting: ${String(key)}`);
     const parsed = shape.parse(value);
     this.store.setSetting(key, parsed as never);
+    // Turning the call log off deletes it (decision 61).
+    if (key === 'callLog' && parsed === false) this.store.pruneLlmCalls();
     this.settingsCache = { ...this.settingsCache, [key]: parsed };
     this.emit('settings', this.settingsCache);
     return this.settingsCache;
@@ -325,8 +340,16 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     return { models: this.catalog(), notices, errors };
   }
 
-  /** On launch: refresh the catalog when it is older than 24 hours. */
+  /** Drops call-log entries older than 30 days (on launch and once a day after). */
+  pruneCallLog(): void {
+    const before = new Date(Date.now() - CALL_LOG_DAYS * 86_400_000).toISOString();
+    const n = this.store.pruneLlmCalls(before);
+    if (n) log.info('call log pruned', { count: n });
+  }
+
+  /** On launch: re-fit automatic roles to the catalog we have (decision 60), then refresh it when it is older than 24 hours. */
   async refreshIfStale(): Promise<void> {
+    this.applyRoleUpdate();
     if (this.keys.providers().length === 0 && !this.settingsCache.local.baseUrl) return;
     const fetched = this.store.listModels().map((m) => Date.parse(m.fetched_at));
     const oldest = fetched.length ? Math.min(...fetched) : 0;
@@ -353,7 +376,8 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
     if (fallback && !available.has(fallback)) throw new Error('That fallback model is not available with your keys.');
     if (role !== 'decision' && !model) throw new Error('Pick a model.');
     const roles = structuredClone(this.settingsCache.roles);
-    roles[role] = { model, fallback: fallback === model ? null : fallback, manual: role === 'decision' ? model !== null : true };
+    // A pick here is the user's, "Use Fast model" for Decision included (decision 60).
+    roles[role] = { model, fallback: fallback === model ? null : fallback, manual: true };
     return this.setSetting('roles', roles).roles;
   }
 

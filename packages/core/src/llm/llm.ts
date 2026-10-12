@@ -16,9 +16,43 @@ export interface AiSdkLlmDeps {
   /** Builds a model from a ref. Defaults to the provider registry; tests pass mocks. */
   createModel: (ref: ModelRef, apiKey: string) => LanguageModel;
   /** Called on each fallback, with no text: for metrics. */
-  onFallback?: (info: { from: ModelRef; to: ModelRef; status: number | undefined }) => void;
+  onFallback?: (info: LlmFallback) => void;
   /** Token counts after each call that reached a model (each try of a structured call counts), for metrics. */
   onUsage?: (usage: LlmUsage) => void;
+  /**
+   * Every try on a model, with its prompt and answer, for the call log (decision 61). Holds the
+   * user's text: the caller keeps it only while the user has the log on, and never logs it.
+   */
+  onCall?: (call: LlmCall) => void;
+  /** Clock for the rate-limit memory; tests pass their own. */
+  now?: () => number;
+}
+
+/** A call moved to the next model in its chain. Codes only. */
+export interface LlmFallback {
+  action: string;
+  role: RoleName;
+  from: ModelRef;
+  to: ModelRef;
+  status: number | undefined;
+  /** rate_limit: this call got a 429; remembered: an earlier 429 still holds, so the model was skipped; server: a 5xx. */
+  reason: 'rate_limit' | 'remembered' | 'server';
+}
+
+/** One try on one model (decision 61). `prompt` and `response` are the user's text. */
+export interface LlmCall {
+  action: string;
+  role: RoleName;
+  model: ModelRef;
+  /** The model this call moved from, when it is a fallback. */
+  fallbackFrom: ModelRef | null;
+  status: 'ok' | 'error' | 'aborted' | 'invalid_output';
+  /** HTTP status or error code when it failed. */
+  error: string | null;
+  ms: number;
+  prompt: string;
+  response: string | null;
+  usage: LlmUsage | null;
 }
 
 /** One model call's token counts (decision 48). Codes and counts only. */
@@ -59,6 +93,35 @@ export function isFallbackError(e: unknown): boolean {
   return s === 429 || (s !== undefined && s >= 500);
 }
 
+const RETRY_DEFAULT_MS = 10_000;
+const RETRY_MAX_MS = 60 * 60_000;
+
+/** Groq-style durations: "7.66s", "2m59.56s", "1h2m", "500ms". */
+function durationMs(v: string): number | null {
+  const parts = [...v.matchAll(/(\d+(?:\.\d+)?)(ms|h|m|s)/g)];
+  if (parts.length === 0 || parts.map((p) => p[0]).join('') !== v.trim()) return null;
+  const unit = { ms: 1, s: 1000, m: 60_000, h: 3_600_000 } as const;
+  return parts.reduce((t, p) => t + Number(p[1]) * unit[p[2] as keyof typeof unit], 0);
+}
+
+/**
+ * How long a 429 says to wait, from the response's `retry-after` (seconds or a date), else
+ * Groq's `x-ratelimit-reset-tokens`, else 10 s; kept between 1 s and an hour (decision 60).
+ */
+export function retryAfterMs(e: unknown, now: number): number {
+  const inner = RetryError.isInstance(e) ? e.lastError : e;
+  const h = APICallError.isInstance(inner) ? (inner.responseHeaders ?? {}) : {};
+  const get = (k: string) => Object.entries(h).find(([key]) => key.toLowerCase() === k)?.[1];
+  let ms: number | null = null;
+  const ra = get('retry-after')?.trim();
+  if (ra) ms = /^\d+(\.\d+)?$/.test(ra) ? Number(ra) * 1000 : Number.isNaN(Date.parse(ra)) ? null : Date.parse(ra) - now;
+  if (ms === null) {
+    const reset = get('x-ratelimit-reset-tokens');
+    ms = reset ? durationMs(reset) : null;
+  }
+  return Math.min(RETRY_MAX_MS, Math.max(1000, ms ?? RETRY_DEFAULT_MS));
+}
+
 function toLlmError(e: unknown, ref?: ModelRef): LlmError {
   if (e instanceof LlmError) return e;
   if ((e as Error)?.name === 'AbortError') return new LlmError('aborted', 'Cancelled');
@@ -68,6 +131,9 @@ function toLlmError(e: unknown, ref?: ModelRef): LlmError {
   if (ref && isLocal(ref) && APICallError.isInstance(inner) && status === undefined) return new LlmError('provider', LOCAL_UNREACHABLE_MESSAGE);
   return new LlmError('provider', (inner as Error)?.message ?? 'Model call failed', status);
 }
+
+/** Output tokens added for a reasoning model's thinking on structured calls (decision 60). */
+export const REASONING_ROOM = 512;
 
 export const LOCAL_ONLY_MESSAGE = 'Local only is on and no local model is set up, so nothing is sent.';
 export const LOCAL_UNREACHABLE_MESSAGE = "Couldn't reach the local model. Check that Ollama or LM Studio is running.";
@@ -93,7 +159,18 @@ export function privacyChain(settings: Pick<Settings, 'roles' | 'actionModels' |
  * sent when there is none.
  */
 export class AiSdkLlm implements LlmProvider {
+  /**
+   * Models that answered 429, and until when (decision 60). A call skips them while another
+   * model in its chain is free. Each new 429 replaces the time with the provider's latest
+   * answer, a success on the model clears it, and it lapses at the time; in memory only.
+   */
+  private readonly limited = new Map<ModelRef, number>();
+
   constructor(private readonly deps: AiSdkLlmDeps) {}
+
+  private now(): number {
+    return (this.deps.now ?? Date.now)();
+  }
 
   private resolve(role: RoleName, action?: string): ModelRef[] {
     return privacyChain(this.deps.settings(), role, action).filter((ref) => this.deps.apiKey(parseRef(ref).provider) !== null);
@@ -105,6 +182,63 @@ export class AiSdkLlm implements LlmProvider {
     return refs.map((ref) => ({ ref, model: this.deps.createModel(ref, this.deps.apiKey(parseRef(ref).provider)!) }));
   }
 
+  /** Until when a model is rate-limited, or null. A lapsed entry is dropped. */
+  limitedUntil(ref: ModelRef): number | null {
+    const until = this.limited.get(ref);
+    if (until === undefined) return null;
+    if (until <= this.now()) {
+      this.limited.delete(ref);
+      return null;
+    }
+    return until;
+  }
+
+  /**
+   * The chain without the models still rate-limited, reporting each skip as a fallback. When
+   * every model is limited, the whole chain is tried: a fresh 429 refreshes the times.
+   */
+  private usable<C extends { ref: ModelRef }>(chain: C[], req: ChatRequest): C[] {
+    const free = chain.filter((c) => this.limitedUntil(c.ref) === null);
+    if (free.length === 0 || free.length === chain.length) return chain;
+    const first = free[0]!;
+    for (const c of chain.slice(0, chain.indexOf(first))) this.fellBack(req, c.ref, first.ref, 429, 'remembered');
+    return free;
+  }
+
+  private fellBack(req: ChatRequest, from: ModelRef, to: ModelRef, status: number | undefined, reason: LlmFallback['reason']): void {
+    this.deps.onFallback?.({ action: req.action ?? req.role, role: req.role, from, to, status, reason });
+    req.onFallback?.(to);
+  }
+
+  /** After a failed try: remembers a 429, and says whether the call moves on to `next`. */
+  private failed(req: ChatRequest, ref: ModelRef, e: unknown, next: ModelRef | undefined): boolean {
+    const status = statusOf(e);
+    if (status === 429) this.limited.set(ref, this.now() + retryAfterMs(e, this.now()));
+    if (!next || !isFallbackError(e) || req.signal?.aborted) return false;
+    this.fellBack(req, ref, next, status, status === 429 ? 'rate_limit' : 'server');
+    return true;
+  }
+
+  private logCall(req: ChatRequest, ref: ModelRef, from: ModelRef | null, t0: number, out: { response: string | null; error?: unknown; usage: LlmUsage | null; prompt?: string }): void {
+    if (!this.deps.onCall) return;
+    const e = out.error;
+    const status: LlmCall['status'] =
+      e === undefined ? 'ok' : req.signal?.aborted || (e as Error)?.name === 'AbortError' || (e instanceof LlmError && e.code === 'aborted') ? 'aborted' : e instanceof LlmError && e.code === 'invalid_output' ? 'invalid_output' : 'error';
+    const code = e === undefined ? null : (statusOf(e)?.toString() ?? (e instanceof LlmError ? e.code : ((e as Error)?.name ?? 'error')));
+    this.deps.onCall({
+      action: req.action ?? req.role,
+      role: req.role,
+      model: ref,
+      fallbackFrom: from,
+      status,
+      error: code,
+      ms: Math.round(performance.now() - t0),
+      prompt: out.prompt ?? req.prompt,
+      response: out.response,
+      usage: out.usage,
+    });
+  }
+
   /** True if the role resolves to a usable model under the current privacy choice. */
   hasModel(role: RoleName): boolean {
     return this.resolve(role).length > 0;
@@ -114,7 +248,7 @@ export class AiSdkLlm implements LlmProvider {
     let chain: { ref: ModelRef; model: LanguageModel }[] = [];
     let refused: LlmError | null = null;
     try {
-      chain = this.chain(req.role, req.action);
+      chain = this.usable(this.chain(req.role, req.action), req);
     } catch (e) {
       if (!(e instanceof LlmError)) throw e;
       refused = e;
@@ -127,6 +261,7 @@ export class AiSdkLlm implements LlmProvider {
     });
     model.catch(() => {});
     const deps = this.deps;
+    const self = this;
 
     async function* run(): AsyncGenerator<string> {
       if (refused) {
@@ -140,6 +275,9 @@ export class AiSdkLlm implements LlmProvider {
       }
       for (let i = 0; i < chain.length; i++) {
         const { ref, model: m } = chain[i]!;
+        const from = i > 0 ? chain[i - 1]!.ref : null;
+        const t0 = performance.now();
+        let text = '';
         let started = false;
         const start = () => {
           if (started) return;
@@ -167,6 +305,7 @@ export class AiSdkLlm implements LlmProvider {
           for await (const part of result.stream) {
             if (part.type === 'text-delta') {
               start();
+              text += part.text;
               yield part.text;
             } else if (part.type === 'tool-result') {
               start();
@@ -184,13 +323,13 @@ export class AiSdkLlm implements LlmProvider {
           if (!started) resolveModel(ref);
           const used = usageOf(req, ref, await Promise.resolve(result.usage).catch(() => undefined));
           if (used) deps.onUsage?.(used);
+          self.limited.delete(ref);
+          self.logCall(req, ref, from, t0, { response: text, usage: used });
           return;
         } catch (e) {
-          const next = chain[i + 1];
-          if (!started && next && isFallbackError(e) && !req.signal?.aborted) {
-            deps.onFallback?.({ from: ref, to: next.ref, status: statusOf(e) });
-            continue;
-          }
+          self.logCall(req, ref, from, t0, { response: text || null, error: e, usage: null });
+          if (!started && self.failed(req, ref, e, chain[i + 1]?.ref)) continue;
+          if (statusOf(e) === 429 && started) self.limited.set(ref, self.now() + retryAfterMs(e, self.now()));
           const err = req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e, ref);
           rejectModel(err);
           throw err;
@@ -202,18 +341,17 @@ export class AiSdkLlm implements LlmProvider {
   }
 
   async structured<T>(req: ChatRequest, schema: z.ZodType<T>): Promise<T> {
-    const chain = this.chain(req.role, req.action);
-    if (chain.length === 0) throw new LlmError('no_model', `No ${req.role} model is set up. Add a key in Settings.`);
+    const all = this.chain(req.role, req.action);
+    if (all.length === 0) throw new LlmError('no_model', `No ${req.role} model is set up. Add a key in Settings.`);
+    const chain = this.usable(all, req);
     for (let i = 0; i < chain.length; i++) {
       const { ref, model } = chain[i]!;
       try {
-        return await this.structuredOnModel(ref, model, req, schema);
+        const out = await this.structuredOnModel(ref, model, req, schema, i > 0 ? chain[i - 1]!.ref : null);
+        this.limited.delete(ref);
+        return out;
       } catch (e) {
-        const next = chain[i + 1];
-        if (next && isFallbackError(e) && !req.signal?.aborted) {
-          this.deps.onFallback?.({ from: ref, to: next.ref, status: statusOf(e) });
-          continue;
-        }
+        if (this.failed(req, ref, e, chain[i + 1]?.ref)) continue;
         throw req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e, ref);
       }
     }
@@ -221,7 +359,7 @@ export class AiSdkLlm implements LlmProvider {
   }
 
   /** One call, plus one retry that tells the model what was wrong with its answer. */
-  private async structuredOnModel<T>(ref: ModelRef, model: LanguageModel, req: ChatRequest, schema: z.ZodType<T>): Promise<T> {
+  private async structuredOnModel<T>(ref: ModelRef, model: LanguageModel, req: ChatRequest, schema: z.ZodType<T>, from: ModelRef | null): Promise<T> {
     const { provider, modelId } = parseRef(ref);
     const caps = lookupCapabilities(provider, modelId);
     const jsonMode = caps?.structured !== 'json_schema';
@@ -237,8 +375,11 @@ export class AiSdkLlm implements LlmProvider {
           ? { openai: { reasoningEffort } }
           : undefined;
 
+    // Reasoning tokens count against the output cap, so a reasoning model gets room for them on top.
+    const maxOutputTokens = req.maxOutputTokens && reasoningEffort && reasoningEffort !== 'none' ? req.maxOutputTokens + REASONING_ROOM : req.maxOutputTokens;
     let prompt = req.prompt;
     for (let attempt = 0; attempt < 2; attempt++) {
+      const t0 = performance.now();
       try {
         const { output, usage } = await generateText({
           model,
@@ -246,19 +387,24 @@ export class AiSdkLlm implements LlmProvider {
           prompt,
           output: Output.object({ schema }),
           abortSignal: req.signal,
-          maxOutputTokens: req.maxOutputTokens,
+          maxOutputTokens,
           temperature: req.temperature,
           maxRetries: 0,
           providerOptions,
         });
         const used = usageOf(req, ref, usage);
         if (used) this.deps.onUsage?.(used);
+        this.logCall(req, ref, from, t0, { prompt, response: JSON.stringify(output), usage: used });
         return output as T;
       } catch (e) {
-        if (NoObjectGeneratedError.isInstance(e)) {
-          const used = usageOf(req, ref, e.usage);
-          if (used) this.deps.onUsage?.(used);
-        }
+        const used = NoObjectGeneratedError.isInstance(e) ? usageOf(req, ref, e.usage) : null;
+        if (used) this.deps.onUsage?.(used);
+        this.logCall(req, ref, from, t0, {
+          prompt,
+          response: NoObjectGeneratedError.isInstance(e) ? (e.text ?? null) : null,
+          error: NoObjectGeneratedError.isInstance(e) ? new LlmError('invalid_output', 'invalid') : e,
+          usage: used,
+        });
         if (!NoObjectGeneratedError.isInstance(e) || attempt === 1) {
           if (NoObjectGeneratedError.isInstance(e)) throw new LlmError('invalid_output', 'The model returned invalid structured output');
           throw e;

@@ -1,5 +1,5 @@
 import capabilitiesFile from '../../models/capabilities.json';
-import type { ModelRef } from '../settings';
+import type { ModelRef, RoleName } from '../settings';
 
 export type Tier = 'low' | 'medium' | 'high';
 export type Speed = 'slow' | 'medium' | 'fast';
@@ -74,10 +74,29 @@ export function toCatalogModel(provider: string, modelId: string, displayName?: 
 const COST: Record<Tier, number> = { low: 0, medium: 1, high: 2 };
 const SPEED: Record<Speed, number> = { fast: 0, medium: 1, slow: 2 };
 
-/** Default pick for a role from the available models, or null. Untested models are skipped. */
-export function pickDefault(role: 'fast' | 'chat', models: CatalogModel[]): CatalogModel | null {
+/**
+ * Default pick for a role from the available models, or null. Untested models are skipped.
+ * Decision (the router, after every bar open) takes the fastest structured model, preferring one
+ * that doesn't reason, then the smallest among equals, which answers soonest (decision 60). Fast takes the cheapest,
+ * fastest structured model; Chat the highest tier.
+ */
+export function pickDefault(role: RoleName, models: CatalogModel[]): CatalogModel | null {
   const tested = models.filter((m): m is CatalogModel & { capabilities: Capabilities } => m.capabilities !== null);
   const order = (m: CatalogModel) => entries.findIndex((e) => e.provider === m.provider && e.re.test(m.modelId));
+  if (role === 'decision') {
+    const reasons = (c: Capabilities) => (c.reasoning && c.reasoning !== 'none' ? 1 : 0);
+    const ok = tested.filter((m) => m.capabilities.structured !== 'none');
+    ok.sort(
+      (a, b) =>
+        SPEED[a.capabilities.speed] - SPEED[b.capabilities.speed] ||
+        reasons(a.capabilities) - reasons(b.capabilities) ||
+        COST[a.capabilities.cost] - COST[b.capabilities.cost] ||
+        Number(b.capabilities.structured === 'json_schema') - Number(a.capabilities.structured === 'json_schema') ||
+        a.capabilities.tier - b.capabilities.tier ||
+        order(a) - order(b),
+    );
+    return ok[0] ?? null;
+  }
   if (role === 'fast') {
     const ok = tested.filter((m) => m.capabilities.structured !== 'none');
     ok.sort(

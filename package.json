@@ -17,7 +17,8 @@
     "helper:record": "node scripts/record-helper.mjs",
     "test": "vitest run --project unit",
     "eval": "vitest run --project evals && node evals/print-results.mjs",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "calls": "node scripts/call-log.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.9.0",

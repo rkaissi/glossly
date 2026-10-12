@@ -166,6 +166,27 @@ export const MIGRATIONS: string[] = [
   DELETE FROM style_signals WHERE dimension = 'contractions';
   ALTER TABLE style_notes ADD COLUMN channel TEXT;
   `,
+  /* 9: The model call log (decision 61): every try on a model with its prompt and answer, kept
+     30 days and only while the user has the log on (Privacy). Not exported. */ `
+  CREATE TABLE llm_calls (
+    id TEXT PRIMARY KEY,
+    at TEXT NOT NULL,
+    action TEXT NOT NULL,
+    role TEXT NOT NULL,
+    model TEXT NOT NULL,
+    fallback_from TEXT,
+    status TEXT NOT NULL,
+    error TEXT,
+    ms INTEGER NOT NULL,
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    cached_tokens INTEGER,
+    reasoning_tokens INTEGER,
+    prompt TEXT NOT NULL,
+    response TEXT
+  );
+  CREATE INDEX llm_calls_at ON llm_calls(at);
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */
@@ -188,5 +209,8 @@ export const DATA_TABLES = [
   'settings',
 ] as const;
 
+/** Logs kept on this computer only: cleared with the data, never exported (decision 61). */
+export const LOG_TABLES = ['llm_calls'] as const;
+
 /** What "Delete all data" clears: everything but settings and the model list (and meta). */
-export const USER_DATA_TABLES = DATA_TABLES.filter((t) => t !== 'models' && t !== 'settings');
+export const USER_DATA_TABLES = [...DATA_TABLES.filter((t) => t !== 'models' && t !== 'settings'), ...LOG_TABLES];

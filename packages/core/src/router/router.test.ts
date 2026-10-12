@@ -234,6 +234,34 @@ describe('Router', () => {
     expect(called.n).toBe(0);
   });
 
+  it('records what the rules alone would show beside a model answer (decision 61)', async () => {
+    const r = await router(slowDecision(5, { aborted: false })).route(ctx(THREAD));
+    expect(r.rules?.decisions.provider).toBe('rules');
+    expect(r.rules?.slots).toEqual(assignSlots(rules(ctx(THREAD)), extractFeatures(ctx(THREAD)), DEFAULT_SETTINGS.router));
+    expect((await router(slowDecision(500, { aborted: false })).route(ctx(THREAD))).rules).toBeNull();
+  });
+
+  it('gives the call the fallback budget once it moves to the fallback model (decision 60)', async () => {
+    const moving = (moveAt: number | null): DecisionProvider => ({
+      id: 'llm_structured',
+      decide: (_input, _signal, onFallback) =>
+        new Promise((resolve) => {
+          if (moveAt !== null) setTimeout(() => onFallback?.(), moveAt);
+          setTimeout(() => resolve(modelDecision), 120);
+        }),
+    });
+    const withBudgets = (d: DecisionProvider) =>
+      new Router({
+        decision: d,
+        settings: () => ({ ...DEFAULT_SETTINGS, router: { ...DEFAULT_SETTINGS.router, decisionTimeoutMs: 50, fallbackTimeoutMs: 400 } }),
+        collections: () => collections,
+      });
+    const moved = await withBudgets(moving(10)).route(ctx(THREAD));
+    expect([moved.fallback, moved.fellBack, moved.decisions.provider]).toEqual([null, true, 'llm_structured']);
+    const stayed = await withBudgets(moving(null)).route(ctx(THREAD));
+    expect([stayed.fallback, stayed.fellBack]).toEqual(['timeout', false]);
+  });
+
   it('quick() is rules only', () => {
     const r = router(slowDecision(5, { aborted: false })).quick(ctx(TABLE));
     expect(r.decisions.provider).toBe('rules');

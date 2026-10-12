@@ -5,6 +5,7 @@ import { DEFAULT_COLLECTIONS, SETTINGS_MIGRATIONS, parseSettings, type Settings,
 import { isoNow, type Collection, type Item } from '../types';
 import { canonicalize } from '../people/names';
 import { DATA_TABLES, MIGRATIONS, USER_DATA_TABLES } from './migrations';
+import type { LlmCallRow } from './llm-call-row';
 
 export type EntityKind = 'person' | 'company' | 'product' | 'place' | 'other';
 
@@ -404,6 +405,32 @@ export class Store {
   }
 
   // ---- events (local metrics) ----
+
+  // ---- model call log (decision 61) ----
+
+  addLlmCall(c: LlmCallRow): void {
+    this.db
+      .prepare(
+        `INSERT INTO llm_calls (id, at, action, role, model, fallback_from, status, error, ms, input_tokens, output_tokens, cached_tokens, reasoning_tokens, prompt, response)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(uuidv7(), c.at, c.action, c.role, c.model, c.fallback_from, c.status, c.error, c.ms, c.input_tokens, c.output_tokens, c.cached_tokens, c.reasoning_tokens, c.prompt, c.response);
+  }
+
+  /** Newest first, optionally one action's. */
+  llmCalls(opts: { action?: string; limit?: number } = {}): (LlmCallRow & { id: string })[] {
+    const limit = Math.max(1, Math.min(1000, opts.limit ?? 50));
+    const rows = opts.action
+      ? this.db.prepare('SELECT * FROM llm_calls WHERE action = ? ORDER BY at DESC, rowid DESC LIMIT ?').all(opts.action, limit)
+      : this.db.prepare('SELECT * FROM llm_calls ORDER BY at DESC, rowid DESC LIMIT ?').all(limit);
+    return rows as unknown as (LlmCallRow & { id: string })[];
+  }
+
+  /** Drops calls older than `beforeIso`; with no time, all of them (the log was turned off). Returns how many. */
+  pruneLlmCalls(beforeIso?: string): number {
+    const r = beforeIso ? this.db.prepare('DELETE FROM llm_calls WHERE at < ?').run(beforeIso) : this.db.prepare('DELETE FROM llm_calls').run();
+    return Number(r.changes);
+  }
 
   insertEvent(kind: string, payload: Record<string, unknown> | null = null, at = isoNow()): void {
     this.db.prepare('INSERT INTO events (id, kind, payload_json, at) VALUES (?, ?, ?, ?)').run(uuidv7(), kind, payload ? JSON.stringify(payload) : null, at);

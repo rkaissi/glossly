@@ -23,6 +23,8 @@ export interface ChatRequest {
    * Left out for models whose capabilities say they have no tools.
    */
   tools?: ToolSet;
+  /** Called when the call moves to a fallback model, with that model (the router's budget grows then; decision 60). */
+  onFallback?: (to: ModelRef) => void;
 }
 
 /** What a tool returns to be reported in the stream. */

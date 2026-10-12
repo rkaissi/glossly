@@ -20,6 +20,8 @@ export type MetricValue = number | boolean | string;
 export type MetricPayload = Record<string, MetricValue>;
 
 const IDENT = /^[\w.:-]{1,40}$/;
+/** Values may also be model refs ("groq:openai/gpt-oss-20b"); still no spaces, so no free text. */
+const VALUE = /^[\w.:/-]{1,80}$/;
 const MAX_KEYS = 20;
 
 /**
@@ -33,7 +35,7 @@ export function sanitizePayload(payload: Record<string, unknown> | null | undefi
   for (const [k, v] of Object.entries(payload)) {
     if (n >= MAX_KEYS) break;
     if (!IDENT.test(k)) continue;
-    if (typeof v === 'number' ? Number.isFinite(v) : typeof v === 'boolean' || (typeof v === 'string' && IDENT.test(v))) {
+    if (typeof v === 'number' ? Number.isFinite(v) : typeof v === 'boolean' || (typeof v === 'string' && VALUE.test(v))) {
       out[k] = v as MetricValue;
       n++;
     }

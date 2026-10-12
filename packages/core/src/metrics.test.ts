@@ -14,13 +14,14 @@ describe('sanitizePayload', () => {
         ms: 312,
         ok: true,
         text: 'Sam said the launch moves',
-        long: 'x'.repeat(41),
+        ref: 'groq:openai/gpt-oss-20b',
+        long: 'x'.repeat(81),
         nan: Number.NaN,
         nested: { a: 1 },
         list: [1],
         'bad key': 1,
       }),
-    ).toEqual({ action: 'ask', model: 'groq:llama-3.1-8b-instant', ms: 312, ok: true });
+    ).toEqual({ action: 'ask', model: 'groq:llama-3.1-8b-instant', ms: 312, ok: true, ref: 'groq:openai/gpt-oss-20b' });
     expect(sanitizePayload({ text: 'hello there' })).toBeNull();
     expect(sanitizePayload(null)).toBeNull();
   });

@@ -72,6 +72,11 @@ export const SettingsSchema = z.object({
     .prefault({}),
   /** Reply learns from the drafts the user picks and edits (Profile). Off: nothing is recorded or used. */
   replyLearning: z.boolean().default(true),
+  /**
+   * Keep every model call's prompt, answer, model, and timing in the local `llm_calls` table for
+   * 30 days, to debug what the models saw (decision 61). Off by default; turning it off deletes the log.
+   */
+  callLog: z.boolean().default(false),
   debugView: z.boolean().default(true),
   identity: IdentitySchema.prefault({}),
 
@@ -107,6 +112,8 @@ export const SettingsSchema = z.object({
       slotThreshold: z.number().min(0).max(1).default(0.5),
       moreThreshold: z.number().min(0).max(1).default(0.2),
       decisionTimeoutMs: z.number().int().min(50).default(600),
+      /** The budget once the router's call has moved to its fallback model (after a 429 or 5xx, or one remembered; decision 60). */
+      fallbackTimeoutMs: z.number().int().min(50).default(900),
     })
     .prefault({}),
 
@@ -114,7 +121,7 @@ export const SettingsSchema = z.object({
     .object({
       fast: RoleAssignmentSchema.default(emptyRole),
       chat: RoleAssignmentSchema.default(emptyRole),
-      /** model null means "Use Fast model". */
+      /** Filled automatically with the fastest model (decision 60); model null ("Use Fast model") only when picked by hand. */
       decision: RoleAssignmentSchema.default(emptyRole),
     })
     .prefault({}),

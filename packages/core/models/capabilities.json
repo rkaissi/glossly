@@ -1,5 +1,5 @@
 {
-  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Patterns are case-insensitive regexes over the provider's model ID.",
+  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). tier: a rough intelligence rank across providers (a decimal places a model between two steps; Rayan, Oct 12: gpt-oss-120b, then Qwen 3.8 27B, then gpt-oss-20b). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Patterns are case-insensitive regexes over the provider's model ID.",
   "version": 1,
   "exclude": [
     "embed",
@@ -30,7 +30,7 @@
   ],
   "models": [
     { "provider": "groq", "pattern": "^qwen/qwen3\\.\\d+-", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2, "reasoning": "none" },
-    { "provider": "groq", "pattern": "^openai/gpt-oss-20b", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 2, "reasoning": "low" },
+    { "provider": "groq", "pattern": "^openai/gpt-oss-20b", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 1.5, "reasoning": "low" },
     { "provider": "groq", "pattern": "^openai/gpt-oss-120b", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 3, "reasoning": "low" },
     { "provider": "groq", "pattern": "^moonshotai/kimi-k2", "structured": "json_schema", "streaming": true, "tools": true, "context": 262144, "cost": "medium", "speed": "fast", "tier": 3 },
     { "provider": "groq", "pattern": "^meta-llama/llama-4-scout", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
