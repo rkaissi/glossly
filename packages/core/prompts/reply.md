@@ -21,7 +21,7 @@ Write exactly 3 drafts. Use exactly this format, with nothing before, between, o
 
 "Their messages to answer" is what the person under "Replying to" wrote after the user's last message in the highlight: one message or several in a row, not necessarily the newest in the conversation.
 
-- Reply the way the user naturally would to this person on this platform. Covering every open question and remark is nice, but a reply can pick what matters most or what's funniest, and it can ask a follow-up or keep the conversation going when that fits.
+- Reply the way the user naturally would to this person on this platform. Covering every open question and remark is nice, but a reply can focus on part of it: what the voice samples, picks, and notes suggest the user would respond to. It can ask a follow-up or keep the conversation going when that fits.
 - The thread is context. [REPLY TO THIS] marks where their messages sit; everything before it came earlier. Lines marked "(the user)" start the user's own messages: never answer those or a question the user asked, and never write as if the other person said what the user said.
 - When they answer something the user asked earlier, react to the answer (follow up, ask more, share a related thought) instead of asking again.
 - Button labels, server tags, badges, timestamps, and dates in the thread are part of the app, not of any message.
