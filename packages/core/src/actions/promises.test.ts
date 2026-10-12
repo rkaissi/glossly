@@ -89,6 +89,34 @@ describe('What did I promise', () => {
     expect(rows[1]).toMatchObject({ owner: 'them', due_phrase: null, due_at: null, selected: false, person_name: 'Maya', match: { personId: maya.id, kind: 'fuzzy' } });
   });
 
+  it('drops rows and events the selection does not back, and never makes the user the other person (Step 21)', async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const invite: SelectionPayload = {
+      ...selection,
+      text: 'Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?',
+      context_before: 'Jordan Hale\njordan.hale@example.com\n',
+      context_after: '\nSend the report by Friday 5pm.\nCan we push the review to Monday?',
+      source_app: 'notepad.exe',
+    };
+    const llm = new FakeLlm(() => ({
+      commitments: [
+        { owner: 'them', person_name: 'Alex Morgan', text: 'bring the deck', due_phrase: '', confidence: 0.9, change: 'new', open_task: 'none' },
+        { owner: 'them', person_name: 'Alex Morgan', text: 'send the report', due_phrase: 'Friday 5pm', confidence: 0.9, change: 'new', open_task: 'none' },
+        { owner: 'me', person_name: 'Jordan Hale', text: 'push the review', due_phrase: 'Monday', confidence: 0.9, change: 'new', open_task: 'none' },
+      ],
+      events: [
+        { title: 'Lunch with Jordan', when: 'Thursday at 1pm', end: '', duration_minutes: 0, location: 'Northwind Cafe', people: ['Jordan Hale'], confidence: 0.9 },
+        { title: 'Review meeting', when: 'Monday', end: '', duration_minutes: 0, location: '', people: [], confidence: 0.8 },
+      ],
+    }));
+    const author = { name: 'Jordan Hale', email: null, handle: null, role: 'author', knownId: null } as DetectedPerson;
+    const { rows, events } = await extractPromises(llm, people, settings, { selection: invite, author, authorIsMe: false }, undefined, now);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ owner: 'me', text: 'bring the deck', person_name: 'Jordan Hale' });
+    expect(events.map((e) => e.title)).toEqual(['Lunch with Jordan']);
+  });
+
   it('passes a Local only refusal through', async () => {
     store = new Store(':memory:');
     const llm = new FakeLlm(() => {
@@ -242,7 +270,8 @@ describe('Tasks and open tasks (decision 36)', () => {
     }));
     // The schema's enum would refuse t9 from a real model; the fake skips validation of that, so code must cope.
     llm.loose = true;
-    const r = await extractPromises(llm, people, settings, { selection: fromJordan, author, authorIsMe: false, people: [author] }, undefined, now);
+    const sel: SelectionPayload = { ...fromJordan, text: 'Can we push the deck review to later? And book the venue.' };
+    const r = await extractPromises(llm, people, settings, { selection: sel, author, authorIsMe: false, people: [author] }, undefined, now);
     expect(r.rows[0]).toMatchObject({ change: 'same', existing: { id: deck.id }, selected: false, due_at: '2026-10-15' });
     expect(r.rows[1]).toMatchObject({ change: 'new', existing: null, text: 'book the venue' });
   });
@@ -272,7 +301,8 @@ describe('events from the same call (decision 37)', () => {
       commitments: [{ owner: 'me', person_name: 'Jordan Hale', text: 'bring the deck', due_phrase: 'Thursday', confidence: 0.8, change: 'new', open_task: 'none' }],
       events: [{ title: 'Lunch with Jordan', when: 'Thursday 1pm', end: '', duration_minutes: 90, location: 'Northwind Cafe', people: ['Jordan Hale'], confidence: 0.9 }],
     }));
-    const r = await extractPromises(llm, people, settings, { selection, author: null, authorIsMe: false }, undefined, now, [], calendar);
+    const invite: SelectionPayload = { ...selection, text: 'Lunch with Jordan Thursday at 1pm at Northwind Cafe? Can you bring the deck?' };
+    const r = await extractPromises(llm, people, settings, { selection: invite, author: null, authorIsMe: false }, undefined, now, [], calendar);
     expect(r.rows).toHaveLength(1);
     expect(r.events).toEqual([
       expect.objectContaining({ title: 'Lunch with Jordan', all_day: false, location: 'Northwind Cafe', attendees: ['Jordan Hale'], people: [], selected: true }),

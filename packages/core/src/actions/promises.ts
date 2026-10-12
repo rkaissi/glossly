@@ -8,7 +8,7 @@ import type { LlmProvider } from '../llm/types';
 import { resolveDue } from '../people/dates';
 import { splitMessages, type ReadMessage } from '../people/conversation';
 import type { DetectedPerson } from '../people/detect';
-import { canonicalize, describeIdentity } from '../people/names';
+import { canonicalize, describeIdentity, isMe } from '../people/names';
 import { resolvePerson } from '../people/resolve';
 import type { CommitmentView, NewPersonDetails, PromiseRow, PromiseSaveRow, TaskChange } from '../people/types';
 
@@ -160,6 +160,31 @@ export function detailsOf(d: DetectedPerson): NewPersonDetails {
   return { email: d.email, handle: d.handle, note: note || null, relationship: d.relationship ?? null };
 }
 
+/** Words too common to tie a row to the selection. */
+const COMMON = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'your', 'you', 'our', 'they', 'them', 'will', 'can', 'could', 'would', 'should', 'have', 'has', 'about', 'into', 'some', 'any', 'all', 'please']);
+/** A word's first 4 letters, so "sending" meets "send" and "screenshots" meets "screenshot". */
+const stems = (s: string) => new Set(tokens(s).filter((w) => w.length >= 3 && !COMMON.has(w)).map((w) => w.slice(0, 4)));
+
+/**
+ * Whether the selected text backs a row the model found: one of its words, or its date phrase as
+ * written. The prompt asks for tasks in the selection only, but a small model also lifts them from
+ * the surrounding lines (Step 21: a Notepad line got tasks from the lines below it).
+ */
+export function inSelection(selection: string, text: string, phrase = ''): boolean {
+  const sel = stems(selection);
+  if ([...stems(text)].some((w) => sel.has(w))) return true;
+  const p = canonicalize(phrase);
+  return p.length > 0 && canonicalize(selection).includes(p);
+}
+
+/** What code checks the rows against: the selected text, the user, and the author (decision 22). */
+export interface RowCheck {
+  selection: string;
+  me: Settings['identity'];
+  /** The selected message's author when it isn't the user. */
+  author: string | null;
+}
+
 /**
  * Turns the model's answer into review rows: due phrases resolved in code, names resolved
  * against people. `detected` is what the people reader (Who's) found in the same text: a short
@@ -172,6 +197,7 @@ export function toPromiseRows(
   now: Date,
   detected: DetectedPerson[] = [],
   open: OpenTaskRef[] = [],
+  check?: RowCheck,
 ): PromiseRow[] {
   const seen = new Set<string>();
   const touched = new Set<string>();
@@ -205,10 +231,18 @@ export function toPromiseRows(
       });
       continue;
     }
-    const dupe = `${c.owner}:${canonicalize(text)}`;
+    // A new task must come from the selected text, not its surroundings.
+    if (check && !inSelection(check.selection, text, c.due_phrase)) continue;
+    let owner = c.owner;
+    let written = c.person_name.trim() || null;
+    // The user is never the other person: "they owe the user" with the user named is the user's task, owed to the author.
+    if (check && written && isMe(written, check.me)) {
+      owner = 'me';
+      written = check.author;
+    }
+    const dupe = `${owner}:${canonicalize(text)}`;
     if (seen.has(dupe)) continue;
     seen.add(dupe);
-    const written = c.person_name.trim() || null;
     const found = written ? findDetected(written, detected) : null;
     const name = found?.name && tokens(found.name).length > tokens(written!).length ? found.name : written;
     const due_phrase = c.due_phrase.trim() || null;
@@ -226,7 +260,7 @@ export function toPromiseRows(
       key: `c${i}`,
       change: 'new',
       existing: null,
-      owner: c.owner,
+      owner,
       text: text.slice(0, 300),
       due_phrase,
       due_at: resolveDue(due_phrase, now),
@@ -313,11 +347,15 @@ export async function extractPromises(
     );
     [out, found] = await Promise.all([call, detected]);
   }
-  const rows = toPromiseRows(out, people, sourceApp, now, found, open);
+  // Pattern rows come from the selection itself; the model's are checked against it.
+  const check: RowCheck | undefined = byRules
+    ? undefined
+    : { selection: input.selection.text, me: settings.identity, author: input.authorIsMe ? null : (input.author?.name ?? null) };
+  const rows = toPromiseRows(out, people, sourceApp, now, found, open, check);
   const everyone = new Set([...ids, ...exactIds(people, found, sourceApp), ...rows.flatMap((r) => (r.match?.kind === 'exact' ? [r.match.personId] : []))]);
   const about = new Set(rows.flatMap((r) => (r.existing ? [r.existing.id] : [])));
   const rest = people.commitments({ personIds: [...everyone], status: 'open' }).filter((t) => !about.has(t.id));
-  const events = toEventRows(out.events ?? [], people, sourceApp, now);
+  const events = toEventRows(check ? (out.events ?? []).filter((e) => inSelection(check.selection, e.title, e.when)) : (out.events ?? []), people, sourceApp, now);
   const days = [...new Set(events.flatMap((e) => (e.starts_at ? [e.starts_at.slice(0, 10)] : [])))];
   const sameDay = calendar ? days.flatMap((d) => calendar.list({ from: d, to: d })) : [];
   return { rows, events, sameDay, open: rest, byRules };

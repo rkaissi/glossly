@@ -52,7 +52,8 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 21a | Oct 12 | (next commit records it) | Eval runners for Step 21: Who and the conversation read, Tasks with dates, Visualize as the app runs it, Recall on local embeddings; the router eval on the Decision role; a shared case limit, token pacing, and a stop on repeated 429s (`evals/lib.ts`). |
+| 21b | Oct 12 | (next commit records it) | End-to-end pass A (Setup, settings); Tasks rows must come from the selection and the user is never the other person (decision 63). |
+| 21a | Oct 12 | `aef9343` | Eval runners for Step 21: Who and the conversation read, Tasks with dates, Visualize as the app runs it, Recall on local embeddings; the router eval on the Decision role; a shared case limit, token pacing, and a stop on repeated 429s (`evals/lib.ts`). |
 | 20.8a | Oct 12 | `7218353` | The search model shows its name and download size as two tags, its status on the right. |
 | 20.8 | Oct 12 | `331b84d` | Settings copy cut to one line per option, Privacy and data renamed Privacy, a confirm before the call log is deleted, and the tray and helper use the Glass icon (decision 62). |
 | 20.7b | Oct 12 | `914c479` | Rate-limit deadlines use the monotonic `performance.now()` instead of the wall clock; the one-hour guard from 20.7a goes (decision 60). |
