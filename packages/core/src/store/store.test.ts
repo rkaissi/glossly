@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
 import { canonicalize } from '../people/names';
+import { DatabaseSync } from 'node:sqlite';
+import { MIGRATIONS } from './migrations';
+import { PeopleRepo } from './people';
 import { Store } from './store';
 
 const require = createRequire(import.meta.url);
@@ -22,9 +25,33 @@ function unit(dims: number, hot: number): Float32Array {
 describe('Store', () => {
   it('migrates and seeds default collections', () => {
     store = new Store(':memory:');
-    expect(store.schemaVersion).toBe(7);
+    expect(store.schemaVersion).toBe(8);
     expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
     expect(store.collectionByName('reading')?.name).toBe('Reading');
+  });
+
+  it('drops every stored contractions vote and gives style notes a platform (migration 8, decision 49)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glossly-m8-'));
+    const path = join(dir, 'db.sqlite');
+    try {
+      const old = new DatabaseSync(path);
+      MIGRATIONS.slice(0, 7).forEach((m) => old.exec(m));
+      old.exec('PRAGMA user_version = 7');
+      const add = old.prepare("INSERT INTO style_signals (id, dimension, pole, weight, channel, person_id, at) VALUES (?, ?, ?, 1, 'messaging', NULL, '2026-10-10T20:00:00-04:00')");
+      add.run('a', 'contractions', 'without');
+      add.run('b', 'contractions', 'with');
+      add.run('c', 'length', 'shorter');
+      old.exec("INSERT INTO style_notes (id, text, created_at) VALUES ('n', 'Writes in lowercase', '2026-10-10T20:00:00-04:00')");
+      old.close();
+      store = new Store(path);
+      expect(store.schemaVersion).toBe(8);
+      const people = new PeopleRepo(store);
+      expect(people.styleSignals().map((s) => s.dimension)).toEqual(['length']);
+      expect(people.styleNotes()).toMatchObject([{ text: 'Writes in lowercase', channel: null }]);
+    } finally {
+      store?.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('round-trips settings with defaults for missing and corrupt keys', () => {

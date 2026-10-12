@@ -527,12 +527,12 @@ export class PeopleRepo {
     return [...pasted, ...edited].slice(0, n).map((v) => v.text);
   }
 
-  /** The newest edited replies with the draft they started from, for the style notes. */
-  editedPairs(n = 10): { original: string; text: string }[] {
+  /** The newest edited replies with the draft they started from and where they were written, for the style notes. */
+  editedPairs(n = 10): { original: string; text: string; channel: ReplyChannel | null }[] {
     return this.voiceSamples()
       .filter((v): v is VoiceSample & { original: string } => v.origin === 'inserted_edited' && Boolean(v.original))
       .slice(0, n)
-      .map((v) => ({ original: v.original, text: v.text }));
+      .map((v) => ({ original: v.original, text: v.text, channel: (v.channel as ReplyChannel | null) ?? null }));
   }
 
   // ---- what Reply learned (picks and edits) ----
@@ -567,17 +567,19 @@ export class PeopleRepo {
     } else if (where.channel) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ?').run(dimension, where.channel);
   }
 
-  styleNotes(): StyleNote[] {
-    return this.db.prepare('SELECT * FROM style_notes ORDER BY created_at, rowid').all() as unknown as StyleNote[];
+  /** Every note, or only those for one kind of platform (with the ones for everywhere). */
+  styleNotes(channel?: ReplyChannel): StyleNote[] {
+    const all = this.db.prepare('SELECT id, text, channel, created_at FROM style_notes ORDER BY created_at, rowid').all() as unknown as StyleNote[];
+    return channel ? all.filter((n) => n.channel === null || n.channel === channel) : all;
   }
 
   /** The model's notes replace the previous set. */
-  replaceStyleNotes(notes: string[]): StyleNote[] {
+  replaceStyleNotes(notes: { text: string; channel: ReplyChannel | null }[]): StyleNote[] {
     const at = this.now();
     this.store.tx(() => {
       this.db.exec('DELETE FROM style_notes');
-      const insert = this.db.prepare('INSERT INTO style_notes (id, text, created_at) VALUES (?, ?, ?)');
-      for (const n of notes) insert.run(uuidv7(), clip(oneLine(n), MAX_STYLE_NOTE), at);
+      const insert = this.db.prepare('INSERT INTO style_notes (id, text, channel, created_at) VALUES (?, ?, ?, ?)');
+      for (const n of notes) insert.run(uuidv7(), clip(oneLine(n.text), MAX_STYLE_NOTE), n.channel, at);
     });
     return this.styleNotes();
   }

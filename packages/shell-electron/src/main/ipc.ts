@@ -3,6 +3,7 @@ import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } fr
 import {
   REPLY_REDO_ASKS,
   STYLE_DIMENSIONS,
+  channelWords,
   WROTE_OWN,
   aliasKindOf,
   allPreferences,
@@ -444,7 +445,7 @@ export function registerIpc(deps: IpcDeps): void {
       const name = p.personId ? (people.get(p.personId)?.name ?? null) : null;
       return { ...p, label: preferenceLabel(p), where: preferenceScope(p, name) };
     }),
-    notes: people.styleNotes(),
+    notes: people.styleNotes().map((n) => ({ ...n, where: n.channel ? channelWords(n.channel) : null })),
   });
   handle('style:get', () => styleView());
   handle('style:forget', (a) => {

@@ -82,8 +82,24 @@ describe('pickSignals', () => {
   it('counts a pick only on traits where the drafts differ', () => {
     const s = pickSignals({ drafts: [d(short), d(medium), d(long)], chosen: 0, final: short });
     expect(s).toContainEqual({ dimension: 'length', pole: 'shorter', weight: 1 });
-    expect(s).toContainEqual({ dimension: 'greeting', pole: 'without', weight: 1 });
     expect(s.find((x) => x.dimension === 'emoji')).toBeUndefined();
+  });
+
+  it('never reads a pick as a choice against something the draft had no place for (decision 49)', () => {
+    // The short draft has no greeting, contraction, or exclamation mark; picking it says nothing about them.
+    const drafts = [d('sure, saturday works'), d("Hi Jordan! Yes, I'm around on Saturday afternoon."), d("Sounds great, I'll be there!")];
+    const s = pickSignals({ drafts, chosen: 0, final: 'sure, saturday works' });
+    expect(s.map((x) => x.dimension)).not.toContain('greeting');
+    expect(s.map((x) => x.dimension)).not.toContain('exclamation');
+    expect(s.map((x) => x.dimension)).not.toContain('contractions');
+    // Choices every draft makes still count.
+    expect(s).toContainEqual({ dimension: 'capitals', pole: 'without', weight: 1 });
+  });
+
+  it('reads "Im" for "I’m" as dropping the apostrophe, never as dropping contractions', () => {
+    const s = pickSignals({ drafts: [d('sure, I’m around saturday afternoon')], chosen: 0, final: 'sure Im around saturday' });
+    expect(s).toContainEqual({ dimension: 'apostrophes', pole: 'without', weight: 2 });
+    expect(s.map((x) => x.dimension)).not.toContain('contractions');
   });
 
   it('counts an edit twice and lets it replace the pick', () => {

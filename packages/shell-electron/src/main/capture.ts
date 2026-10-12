@@ -31,6 +31,7 @@ import {
   reply,
   replyChannel,
   preferencesFor,
+  REPLY_CHANNELS,
   preferenceLine,
   pickSignals,
   isMeaningfulEdit,
@@ -1165,7 +1166,7 @@ export class Capture {
       person,
       voice: people.voiceForPrompt(3, audience),
       preferences,
-      notes: learning ? people.styleNotes().map((n) => n.text) : [],
+      notes: learning ? people.styleNotes(channel).map((n) => n.text) : [],
       redo: redo ?? null,
       messages: read?.messages ?? null,
       channel,
@@ -1278,11 +1279,22 @@ export class Capture {
     store.setMeta('style_edits_pending', '0');
     this.styleNotesRunning = true;
     const people = this.services.people;
-    void writeStyleNotes(this.services.llm, people.editedPairs(), people.removedStyleNotes())
-      .then((notes) => {
-        // Nothing repeating in the latest edits keeps the notes there are.
-        if (notes.length) people.replaceStyleNotes(notes);
-        log.info('style notes written', { count: notes.length });
+    // What the picks show per kind of platform, as the Reply prompt words it (decision 49).
+    const signals = people.styleSignals();
+    const picks = Object.fromEntries(
+      REPLY_CHANNELS.map((channel) => [
+        channel,
+        preferencesFor(signals, { channel, personId: null, relationship: null })
+          .filter((p) => p.scope === 'channel')
+          .map((p) => preferenceLine(p)),
+      ]),
+    );
+    const current = people.styleNotes().map((n) => ({ text: n.text, channel: n.channel }));
+    void writeStyleNotes(this.services.llm, { pairs: people.editedPairs(), current, picks, removed: people.removedStyleNotes() })
+      .then((r) => {
+        // The model may see nothing new: the notes there are stay.
+        if (!r.keep) people.replaceStyleNotes(r.notes);
+        log.info('style notes written', { kept: r.keep, count: r.keep ? current.length : r.notes.length });
       })
       .catch((e: unknown) => {
         // Local only, no key, or a failed call: try again after the next edit.

@@ -160,6 +160,12 @@ export const MIGRATIONS: string[] = [
      model, or no key yet), so they can be offered a backfill later (Step 20.3, decision 44). */ `
   ALTER TABLE items ADD COLUMN entities_pending INTEGER NOT NULL DEFAULT 0;
   `,
+  /* 8: Reply stops counting contractions (decision 49): the old votes read "Im" and "cant" as
+     dropping contractions and a pick without one as a choice, so they all go. Style notes get the
+     kind of platform they hold for (null: everywhere). */ `
+  DELETE FROM style_signals WHERE dimension = 'contractions';
+  ALTER TABLE style_notes ADD COLUMN channel TEXT;
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */

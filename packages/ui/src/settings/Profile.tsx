@@ -231,9 +231,9 @@ function LearnedStyle({ learning }: { learning: boolean }) {
         <span>
           <strong>Learn from the drafts I pick and edit</strong>
           <span className="muted small block">
-            Reply notes which draft you take (its length, greeting, sign-off, tone, and what it does) and how you edit it, per person, per
-            relationship (friends, colleagues, ...) on each kind of platform, and per kind of platform (email, messaging apps, work chat). A habit shows up here once your recent picks agree on it. Every 5 edited replies, your model writes a few
-            notes on how you edit. All of it stays on this computer and goes to your model provider only inside a Reply request.
+            Reply notes which draft you take (its length, tone, and what it does) and how you edit it, per person, per
+            relationship (friends, colleagues, ...) on each kind of platform, and per kind of platform (email, messaging apps, work chat). A habit shows up here once your recent picks agree on it. Every 5 edited replies, your model reads your edits
+            and updates its notes on how you write, or leaves them as they are. All of it stays on this computer and goes to your model provider only inside a Reply request.
           </span>
         </span>
         <Switch label="Learn from the drafts I pick and edit" checked={learning} disabled={busy} onChange={toggle} />
@@ -247,7 +247,7 @@ function LearnedStyle({ learning }: { learning: boolean }) {
       {notes.length > 0 && (
         <>
           <p className="muted small">Notes from your edits</p>
-          <ul className="list">{notes.map((n) => row(`note:${n.id}`, n.text, null, () => removeNote(n.id)))}</ul>
+          <ul className="list">{notes.map((n) => row(`note:${n.id}`, n.text, n.where, () => removeNote(n.id)))}</ul>
         </>
       )}
       {error && <p className="error small">{error}</p>}

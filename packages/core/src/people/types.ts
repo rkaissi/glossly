@@ -75,6 +75,8 @@ export interface VoiceSample {
 export interface StyleNote {
   id: string;
   text: string;
+  /** The kind of platform it holds for; null for everywhere (decision 49). */
+  channel: ReplyChannel | null;
   created_at: string;
 }
 

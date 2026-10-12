@@ -241,10 +241,14 @@ export interface StylePreferenceView extends StylePreference {
   /** "in email", "with Jordan Hale". */
   where: string;
 }
+export interface StyleNoteView extends StyleNote {
+  /** "in messaging apps", or null for everywhere. */
+  where: string | null;
+}
 export interface StyleView {
   learning: boolean;
   preferences: StylePreferenceView[];
-  notes: StyleNote[];
+  notes: StyleNoteView[];
 }
 /** inserted: pasted into the source app. copied: on the clipboard instead (focus failed, or the focused field doesn't take text). */
 export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; reason: 'focus' | 'not_editable' | 'paste' };

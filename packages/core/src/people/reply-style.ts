@@ -1,9 +1,12 @@
 // What Reply learns from the drafts the user picks and edits, in code: no text is kept for a
 // pick, only which way it leaned on a few traits. Code measures length, greeting, sign-off,
-// exclamation marks, emoji, contractions, capitalization, the final period, apostrophes,
-// dashes, ellipses, line breaks, sentence and word length, and how much punctuation; the
-// model tags each draft's kind (acknowledge, ask, shift, ...) and tone (playful, warm, ...).
-// An edit is read by comparing the draft before and after. A trait becomes a preference only when recent picks agree,
+// exclamation marks, emoji, capitalization, the final period, apostrophes, dashes, ellipses,
+// line breaks, sentence and word length, and how much punctuation; the model tags each draft's
+// kind (acknowledge, ask, shift, ...) and tone (playful, warm, ...). An edit is read by comparing
+// the draft before and after. A pick only says something where every draft had to choose:
+// length, kind, tone, capitals, the final period, apostrophes; a draft that has no emoji or
+// greeting may just have had no place for one (decision 49). Formality and word choice are for
+// the model's style notes, not counted here. A trait becomes a preference only when recent picks agree,
 // so one long reply after a run of short ones changes nothing, and a new habit takes over
 // as the old picks age out. It is learned at three levels: the person, the relationship
 // (friends, colleagues, ...) on that kind of platform, and the kind of platform.
@@ -20,7 +23,6 @@ export const STYLE_DIMENSIONS = [
   'signoff',
   'exclamation',
   'emoji',
-  'contractions',
   'capitals',
   'end_period',
   'apostrophes',
@@ -250,8 +252,15 @@ export const MEANINGFUL_EDIT = 0.15;
 
 export const isMeaningfulEdit = (original: string, final: string) => editRatio(original, final) >= MEANINGFUL_EDIT;
 
-type Flag = 'greeting' | 'signoff' | 'exclamation' | 'emoji' | 'contractions' | 'capitals' | 'end_period' | 'apostrophes' | 'dashes' | 'ellipsis' | 'line_breaks';
-const FLAGS: readonly Flag[] = ['greeting', 'signoff', 'exclamation', 'emoji', 'contractions', 'capitals', 'end_period', 'apostrophes', 'dashes', 'ellipsis', 'line_breaks'];
+type Flag = 'greeting' | 'signoff' | 'exclamation' | 'emoji' | 'capitals' | 'end_period' | 'apostrophes' | 'dashes' | 'ellipsis' | 'line_breaks';
+const FLAGS: readonly Flag[] = ['greeting', 'signoff', 'exclamation', 'emoji', 'capitals', 'end_period', 'apostrophes', 'dashes', 'ellipsis', 'line_breaks'];
+/**
+ * The flags a pick can speak for: every draft has capitals or not, a final period or not, and
+ * apostrophes or not once it has a contraction. The rest are things a draft may simply have had
+ * no place for (a short reply with no emoji or greeting), so passing on one that has them isn't
+ * a choice against them (decision 49). Edits still count every flag.
+ */
+const PICK_FLAGS: readonly Flag[] = ['capitals', 'end_period', 'apostrophes'];
 
 /** A measured trait with two directions: which way an edit moved it, and whether drafts differ enough on it for a pick to say anything. */
 interface Scale {
@@ -315,7 +324,7 @@ function spreadSignals(traits: DraftTraits[], chosen: number, skip: Set<StyleDim
     if (s.value(c) === min) out.push({ dimension: s.dimension, pole: s.down, weight: 1 });
     else if (s.value(c) === max) out.push({ dimension: s.dimension, pole: s.up, weight: 1 });
   }
-  for (const d of FLAGS) {
+  for (const d of PICK_FLAGS) {
     const v = c[d];
     if (skip.has(d) || v === null) continue;
     if (traits.some((t) => t[d] !== null && t[d] !== v)) out.push({ dimension: d, pole: v ? 'with' : 'without', weight: 1 });
@@ -453,7 +462,6 @@ const PHRASES: Record<StyleDimension, Partial<Record<StylePole, string>>> = {
   signoff: { with: 'Ends with a sign-off', without: 'Skips the sign-off' },
   exclamation: { with: 'Uses exclamation marks', without: 'Avoids exclamation marks' },
   emoji: { with: 'Uses emoji', without: 'Avoids emoji' },
-  contractions: { with: 'Writes casually, with contractions', without: 'Writes formally, without contractions' },
   capitals: { with: 'Capitalizes sentences', without: 'Writes in lowercase' },
   end_period: { with: 'Ends with a period', without: 'Leaves off the final period' },
   apostrophes: { with: 'Keeps apostrophes in contractions', without: "Drops apostrophes (dont, im)" },
@@ -484,6 +492,9 @@ const PHRASES: Record<StyleDimension, Partial<Record<StylePole, string>>> = {
 };
 
 const CHANNEL_WORDS: Record<ReplyChannel, string> = { email: 'in email', messaging: 'in messaging apps', work_chat: 'in work chat', other: 'in other apps' };
+
+/** "in messaging apps", for a style note's platform. */
+export const channelWords = (c: ReplyChannel): string => CHANNEL_WORDS[c];
 
 export function preferenceLabel(p: Pick<StylePreference, 'dimension' | 'pole'>): string {
   return PHRASES[p.dimension][p.pole] ?? `${p.dimension}: ${p.pole}`;

@@ -120,9 +120,15 @@ describe('PeopleRepo', () => {
     expect(r.styleSignals()).toHaveLength(2);
     r.forgetStyle('length', { channel: null, personId: p.id });
     expect(r.styleSignals().map((x) => x.dimension)).toEqual(['tone']);
-    const [note] = r.replaceStyleNotes(['Drops the greeting', 'Signs off with a dash']);
+    const [note] = r.replaceStyleNotes([
+      { text: 'Drops the greeting', channel: null },
+      { text: 'Signs off with a dash', channel: 'email' },
+      { text: 'Writes in lowercase', channel: 'messaging' },
+    ]);
     r.removeStyleNote(note!.id);
-    expect(r.styleNotes().map((n) => n.text)).toEqual(['Signs off with a dash']);
+    expect(r.styleNotes().map((n) => n.text)).toEqual(['Signs off with a dash', 'Writes in lowercase']);
+    // Reply in email gets the notes for email and for everywhere (decision 49).
+    expect(r.styleNotes('email').map((n) => [n.text, n.channel])).toEqual([['Signs off with a dash', 'email']]);
     expect(r.removedStyleNotes()).toEqual(['Drops the greeting']);
   });
 
