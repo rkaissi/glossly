@@ -115,7 +115,7 @@ describe('Reply', () => {
     expect(calls[0]!.instructions).toContain('Write exactly 3 drafts');
     expect(calls[0]!.instructions).toContain('Follow every line in all three drafts');
     expect(calls[0]!.instructions).not.toContain('deliberately differs');
-    expect(calls[0]!.instructions).toContain('Respond to every open point in it');
+    expect(calls[0]!.instructions).toContain('Reply the way the user naturally would');
     // Output cap by channel, with low reasoning so a reasoning model doesn't spend it (decision 48).
     expect(calls[0]).toMatchObject({ maxOutputTokens: 900, reasoning: 'low' });
     reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [], channel: 'work_chat' });
