@@ -115,7 +115,7 @@ describe('Reply', () => {
     expect(calls[0]!.instructions).toContain('Write exactly 3 drafts');
     expect(calls[0]!.instructions).toContain('Follow every line in all three drafts');
     expect(calls[0]!.instructions).not.toContain('deliberately differs');
-    expect(calls[0]!.instructions).toContain('Answer only "The message to answer"');
+    expect(calls[0]!.instructions).toContain('Respond to every open point in it');
     // Output cap by channel, with low reasoning so a reasoning model doesn't spend it (decision 48).
     expect(calls[0]).toMatchObject({ maxOutputTokens: 900, reasoning: 'low' });
     reply(llm, settings, { selection, author, authorIsMe: false, person: null, voice: [], channel: 'work_chat' });
@@ -131,7 +131,7 @@ describe('Reply', () => {
     const q = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: null, voice: [long] }, now);
     expect(q).toContain(`${'x'.repeat(300)}…`);
     expect(q).not.toContain('x'.repeat(301));
-    const order = ['## The user', '## Voice samples', '## What you know about', '## Replying to', '## App', '## Today', '## The message to answer', '## Thread'].map((h) => p.indexOf(h));
+    const order = ['## The user', '## Voice samples', '## What you know about', '## Replying to', '## App', '## Today', '## Their messages to answer', '## Thread'].map((h) => p.indexOf(h));
     expect(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!))).toBe(true);
   });
 
@@ -278,7 +278,6 @@ describe('Reply on the conversation read (decision 48)', () => {
     expect(message).toContain('hopefully a good one lol');
     expect(message).not.toContain('what kind of job');
     expect(message).not.toContain('internship');
-    expect(p).toContain('earlier messages');
     // The thread holds the earlier part, the user's header marked, and the marker where the target sits.
     const thread = p.slice(p.indexOf('<thread>'), p.indexOf('</thread>'));
     expect(thread).toContain('what kind of job are you doing now?');
@@ -303,10 +302,16 @@ describe('Reply on the conversation read (decision 48)', () => {
 });
 
 describe('what Reply is told to answer (decision 52)', () => {
-  it('says the target is the other person’s last highlighted message, never the user’s or a newer one', () => {
-    const p = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: null, voice: [] }, now);
-    expect(p).toContain("## The message to answer\nThe other person's last message (or last few in a row) in what the user highlighted. Reply to this, not to anything newer in the thread.\n<message>");
+  it('sends every message they wrote after the user’s last one, under a heading that says so', () => {
+    const me = { name: 'Alex Morgan', emails: [], handles: [] };
+    // Their greeting, the user's answer, then three open points in a row.
+    const text = ['Jordan', '6:01 PM', 'hey how are you', 'Alex', '6:05 PM', 'good, you?', 'Jordan', '6:07 PM', 'how was the trip?', 'is your sister still in town?', 'i finally finished the course btw'].join('\n');
+    const p = buildReplyPrompt({ ...DEFAULT_SETTINGS, identity: me }, { selection: { ...selection, source_app: 'discord.exe', window_title: 'Discord', context_before: '', text, context_after: '' }, author: { ...author, name: 'Jordan' }, authorIsMe: false, person: null, voice: [] }, now);
+    const message = p.slice(p.indexOf('## Their messages to answer\n<message>'), p.indexOf('</message>'));
+    expect(message).toContain('how was the trip?\nis your sister still in town?\ni finally finished the course btw');
+    expect(message).not.toContain('hey how are you');
+    expect(message).not.toContain('good, you?');
     const own = buildReplyPrompt(settings, { selection, author: null, authorIsMe: true, person: null, voice: [] }, now);
-    expect(own).toContain('## The message to answer\nThe user highlighted their own message; write a follow-up to it.');
+    expect(own).toContain("## The user's message (write a follow-up)\n<message>");
   });
 });

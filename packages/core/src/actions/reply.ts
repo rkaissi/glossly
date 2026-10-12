@@ -213,18 +213,13 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     '## Today',
     now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
     '',
-    '## The message to answer',
-    // Said here too, next to the message, so the newest message in the thread never wins (decision 52).
-    input.authorIsMe
-      ? 'The user highlighted their own message; write a follow-up to it.'
-      : "The other person's last message (or last few in a row) in what the user highlighted. Reply to this, not to anything newer in the thread.",
+    input.authorIsMe ? "## The user's message (write a follow-up)" : '## Their messages to answer',
     '<message>',
     clip(target?.text ?? selection.text, MAX_SELECTION),
     '</message>',
   );
-  if (target?.droppedEarlier) parts.push("The selection also held earlier messages (the user's, and ones the user already answered); they are in the thread as context and are not to be answered.");
   if (thread.trim() !== SELECTION_MARK) {
-    const where = target ? `${TARGET_MARK} marks where the message to answer sits` : `${SELECTION_MARK} marks the selected message`;
+    const where = target ? `${TARGET_MARK} marks where their messages sit` : `${SELECTION_MARK} marks the selected message`;
     parts.push('', `## Thread (${where})`, '<thread>', thread, '</thread>');
   }
   const redo = input.redo;
