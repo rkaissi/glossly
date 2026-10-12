@@ -363,21 +363,6 @@ describe('rate-limit memory (decision 60)', () => {
     expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).toBe(60_000);
   });
 
-  it('forgets a limit when the system clock goes back past the longest wait', async () => {
-    const clock = { t: 10 * 3_600_000 };
-    const { llm } = llmWith(
-      { 'groq:qwen/qwen3.8-27b': failingModel(429, { 'retry-after': '30' }), 'groq:openai/gpt-oss-20b': jsonModel('{"answer":"b","n":1}') },
-      roles({ fast: FAST }),
-      ['groq'],
-      clock,
-    );
-    await llm.structured({ role: 'fast', instructions: 'i', prompt: 'p' }, Schema);
-    clock.t -= 5_000;
-    expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).not.toBeNull();
-    clock.t -= 24 * 3_600_000;
-    expect(llm.limitedUntil('groq:qwen/qwen3.8-27b')).toBeNull();
-  });
-
   it('tries a limited model anyway when every model in the chain is limited', async () => {
     const clock = { t: 0 };
     const a = failingModel(429, { 'retry-after': '20' });

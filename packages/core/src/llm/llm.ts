@@ -24,7 +24,7 @@ export interface AiSdkLlmDeps {
    * user's text: the caller keeps it only while the user has the log on, and never logs it.
    */
   onCall?: (call: LlmCall) => void;
-  /** Clock for the rate-limit memory; tests pass their own. */
+  /** Monotonic clock for the rate-limit memory (default `performance.now`); tests pass their own. */
   now?: () => number;
 }
 
@@ -107,14 +107,15 @@ function durationMs(v: string): number | null {
 /**
  * How long a 429 says to wait, from the response's `retry-after` (seconds or a date), else
  * Groq's `x-ratelimit-reset-tokens`, else 10 s; kept between 1 s and an hour (decision 60).
+ * `wallNow` is only for a date: it turns that into a wait.
  */
-export function retryAfterMs(e: unknown, now: number): number {
+export function retryAfterMs(e: unknown, wallNow = Date.now()): number {
   const inner = RetryError.isInstance(e) ? e.lastError : e;
   const h = APICallError.isInstance(inner) ? (inner.responseHeaders ?? {}) : {};
   const get = (k: string) => Object.entries(h).find(([key]) => key.toLowerCase() === k)?.[1];
   let ms: number | null = null;
   const ra = get('retry-after')?.trim();
-  if (ra) ms = /^\d+(\.\d+)?$/.test(ra) ? Number(ra) * 1000 : Number.isNaN(Date.parse(ra)) ? null : Date.parse(ra) - now;
+  if (ra) ms = /^\d+(\.\d+)?$/.test(ra) ? Number(ra) * 1000 : Number.isNaN(Date.parse(ra)) ? null : Date.parse(ra) - wallNow;
   if (ms === null) {
     const reset = get('x-ratelimit-reset-tokens');
     ms = reset ? durationMs(reset) : null;
@@ -169,7 +170,8 @@ export class AiSdkLlm implements LlmProvider {
   constructor(private readonly deps: AiSdkLlmDeps) {}
 
   private now(): number {
-    return (this.deps.now ?? Date.now)();
+    // Monotonic, so a change to the system clock can't stretch or cut a wait.
+    return (this.deps.now ?? performance.now.bind(performance))();
   }
 
   private resolve(role: RoleName, action?: string): ModelRef[] {
@@ -182,14 +184,11 @@ export class AiSdkLlm implements LlmProvider {
     return refs.map((ref) => ({ ref, model: this.deps.createModel(ref, this.deps.apiKey(parseRef(ref).provider)!) }));
   }
 
-  /**
-   * Until when a model is rate-limited, or null. A lapsed entry is dropped, and so is one more
-   * than the longest wait away: the system clock went back, so the time no longer means anything.
-   */
+  /** Until when a model is rate-limited (on `now`'s clock), or null. A lapsed entry is dropped. */
   limitedUntil(ref: ModelRef): number | null {
     const until = this.limited.get(ref);
     if (until === undefined) return null;
-    if (until <= this.now() || until - this.now() > RETRY_MAX_MS) {
+    if (until <= this.now()) {
       this.limited.delete(ref);
       return null;
     }
@@ -216,7 +215,7 @@ export class AiSdkLlm implements LlmProvider {
   /** After a failed try: remembers a 429, and says whether the call moves on to `next`. */
   private failed(req: ChatRequest, ref: ModelRef, e: unknown, next: ModelRef | undefined): boolean {
     const status = statusOf(e);
-    if (status === 429) this.limited.set(ref, this.now() + retryAfterMs(e, this.now()));
+    if (status === 429) this.limited.set(ref, this.now() + retryAfterMs(e));
     if (!next || !isFallbackError(e) || req.signal?.aborted) return false;
     this.fellBack(req, ref, next, status, status === 429 ? 'rate_limit' : 'server');
     return true;
@@ -332,7 +331,7 @@ export class AiSdkLlm implements LlmProvider {
         } catch (e) {
           self.logCall(req, ref, from, t0, { response: text || null, error: e, usage: null });
           if (!started && self.failed(req, ref, e, chain[i + 1]?.ref)) continue;
-          if (statusOf(e) === 429 && started) self.limited.set(ref, self.now() + retryAfterMs(e, self.now()));
+          if (statusOf(e) === 429 && started) self.limited.set(ref, self.now() + retryAfterMs(e));
           const err = req.signal?.aborted ? new LlmError('aborted', 'Cancelled') : toLlmError(e, ref);
           rejectModel(err);
           throw err;
