@@ -89,6 +89,14 @@ Commands: `notepad [file]` (opens a tab in Rayan's Notepad, doesn't kill his tab
 - Killing the app with `Stop-Process` logs `overlay renderer gone {"reason":"crashed"}` and `worker exited`; that's the kill, not a crash.
 - Test pages: `%TEMP%\glossly-live\reply-test.html` (a Slack-like page titled "#design | Acme - Slack" with a message and a reply box; it may need recreating). Who fixtures as text are in `core/src/people/who-judge.test.ts`.
 
+### Measured live (Oct 12, Step 20.6)
+
+Throwaway profile (`Local State` and `keys` only), Notepad sample text, Sonnet subagent; three runs each.
+- Hotkey after a highlight (Ctrl and Alt down, 250 ms, then Space): the bar opened where the pill was (top-left within 2 px), with no `keyboard_activity` close; the bar kept the pill's session (`trigger: auto`). Decision 55.
+- Typing over a pill: `keyboard_activity` close 0.50 to 0.54 s after the key (400 ms grace plus the helper's report lag). Decision 55.
+- Moving the cursor 700 px away: `mouse_away` close within about 50 ms of the move. Decision 55.
+- Helper Raw Input: `input watch {"touch":true}` on the first pill. A real trackpad still needs Rayan (decision 56).
+
 ### Measured live (Oct 10)
 
 - Pill (auto path, no toolbar expected): Notepad 117 to 125 ms, Chrome 116 to 117 ms (was 314 to 358 ms before Step 12.2). Two shots 0.35 s and 1.5 s apart were pixel-identical: a shown pill never moves.
