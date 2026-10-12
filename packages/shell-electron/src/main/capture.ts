@@ -386,7 +386,10 @@ export class Capture {
         this.activityHide(ev.event);
         return;
       case 'keyboard_activity':
-        // The hotkey cancels this if it comes within the grace, and expands the pill in place.
+        // Ctrl, Alt, or Windows held: the start of a shortcut, maybe the hotkey, so the pill stays
+        // until they're let go (decision 58). Otherwise the hotkey cancels this if it comes within
+        // the grace, and expands the pill in place.
+        if (ev.modifiers) return;
         this.keyHideTimer ??= setTimeout(() => {
           this.keyHideTimer = null;
           this.activityHide('keyboard_activity');

@@ -220,7 +220,7 @@ Turns `mouse_down`, `mouse_up`, and `wheel` events on or off. Result: `{"enabled
 | --- | --- |
 | `enabled` | Required bool |
 
-While on, the helper emits `keyboard_activity` when the system's last-input time moves without a matching mouse event. Touchpad, touchscreen, and pen input counts as the mouse: the helper registers them with Raw Input (a message-only window, `RIDEV_INPUTSINK`) and keeps only when they sent something, never what (decision 56). There is no keyboard hook: the helper never sees which keys were pressed. The app turns this on only while the pill is visible. Result: `{"enabled": bool, "touch": bool}`; `touch` is false when Raw Input couldn't be registered, and touch input then reads as keyboard activity as before.
+While on, the helper emits `keyboard_activity` when the system's last-input time moves without a matching mouse event. Touchpad, touchscreen, and pen input counts as the mouse: the helper registers them with Raw Input (a message-only window, `RIDEV_INPUTSINK`) and keeps only when they sent something, never what (decision 56). There is no keyboard hook: the helper never sees which keys were pressed, only whether Ctrl, Alt, or Windows is held when it reports activity. The app turns this on only while the pill is visible. Result: `{"enabled": bool, "touch": bool}`; `touch` is false when Raw Input couldn't be registered, and touch input then reads as keyboard activity as before.
 
 ## Events
 
@@ -232,7 +232,7 @@ Event lines have an `event` field and no `id`.
 | `mouse_down` | `x`, `y`, `button` (`left`, `right`, `other`) | Any button press, while `mouse_hook` is on |
 | `mouse_up` | `x`, `y`, `drag`, `double` | Left button release. `drag`: moved more than 4 px since the press. `double`: a second click within the system double-click time and 4 px |
 | `wheel` | | Vertical or horizontal wheel, at most every 100 ms |
-| `keyboard_activity` | | Non-mouse input, while `input_watch` is on. Reported 50 to 100 ms after it happens |
+| `keyboard_activity` | `modifiers` | Non-mouse input, while `input_watch` is on. Reported 50 to 100 ms after it happens. `modifiers` is true while Ctrl, Alt, or Windows is held (the start of a shortcut, such as the hotkey); only those keys' state is read, never which other keys (decision 58) |
 | `foreground` | `handle`, `pid` | Another window came to the front (`EVENT_SYSTEM_FOREGROUND`), while `input_watch` is on. The app closes the pill or unfocused bar unless it is the source window or one of its own |
 
 The helper's own injected input (copy, paste, focus tricks) never produces events.

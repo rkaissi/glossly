@@ -95,7 +95,8 @@ Throwaway profile (`Local State` and `keys` only), Notepad sample text, Sonnet s
 - Hotkey after a highlight (Ctrl and Alt down, 250 ms, then Space): the bar opened where the pill was (top-left within 2 px), with no `keyboard_activity` close; the bar kept the pill's session (`trigger: auto`). Decision 55.
 - Typing over a pill: `keyboard_activity` close 0.50 to 0.54 s after the key (400 ms grace plus the helper's report lag). Decision 55.
 - Moving the cursor 700 px away: `mouse_away` close within about 50 ms of the move. Decision 55.
-- Helper Raw Input: `input watch {"touch":true}` on the first pill. A real trackpad still needs Rayan (decision 56).
+- Helper Raw Input: `input watch {"touch":true}` on the first pill.
+- Slow hotkey (Ctrl+Alt held 1.2 s, then Space): the pill stayed and became the bar in place, 3 of 3; Ctrl held 1 s then released: hidden about 0.5 s after the release; Shift alone: hidden about 0.5 s after the key. Decision 58. A real trackpad still needs Rayan (decision 56).
 
 ### Measured live (Oct 10)
 

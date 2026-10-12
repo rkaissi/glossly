@@ -8,7 +8,8 @@
     { "event": "mouse_up", "x": 438, "y": 413, "drag": false, "double": true },
     { "event": "mouse_down", "x": 900, "y": 120, "button": "right" },
     { "event": "wheel" },
-    { "event": "keyboard_activity" },
+    { "event": "keyboard_activity", "modifiers": false },
+    { "event": "keyboard_activity", "modifiers": true },
     { "event": "foreground", "handle": 722856, "pid": 4120 }
   ]
 }

@@ -6,7 +6,7 @@ namespace Glossly.Helper;
 /// <summary>
 /// Mouse-only low-level hook, plus a keyboard-activity signal derived from GetLastInputInfo.
 /// There is deliberately no keyboard hook: the app learns that "some non-mouse input happened",
-/// never which keys were pressed. Touchpad, touchscreen, and pen input move the last-input time
+/// never which keys were pressed (only whether Ctrl, Alt, or Windows is held, decision 58). Touchpad, touchscreen, and pen input move the last-input time
 /// without a mouse event (a resting finger, a two-finger scroll), so Raw Input tells the helper
 /// when those devices sent something, and they count as the mouse (decision 56). Raw Input says
 /// which device, never what it reported.
@@ -202,6 +202,16 @@ internal static class MouseHook
         Output.Event("foreground", new { Handle = hwnd.ToInt64(), Pid = (int)pid });
     }
 
+    /// <summary>
+    /// Ctrl, Alt, or Windows is held right now: the start of a shortcut such as the hotkey, not
+    /// typing. Only those keys' up or down state is read, never which other keys (decision 58).
+    /// </summary>
+    private static bool ModifierHeld()
+    {
+        static bool Down(ushort vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+        return Down(VK_CONTROL) || Down(VK_MENU) || Down(VK_LWIN) || Down(VK_RWIN);
+    }
+
     private static void PollLoop()
     {
         var lii = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
@@ -223,7 +233,7 @@ internal static class MouseHook
                 uint mouse = (uint)Interlocked.Read(ref _lastMouseTick);
                 long sinceInjected = Environment.TickCount64 - Interlocked.Read(ref Input.LastInjectedTick);
                 bool fromMouse = (int)(tick - mouse) <= MouseTickToleranceMs;
-                if (!fromMouse && sinceInjected > InjectedQuietMs) Output.Event("keyboard_activity");
+                if (!fromMouse && sinceInjected > InjectedQuietMs) Output.Event("keyboard_activity", new { Modifiers = ModifierHeld() });
             }
             if (lii.dwTime != seen)
             {
