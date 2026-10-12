@@ -159,22 +159,33 @@ function around(selection: SelectionPayload, container?: ContainerContext | null
 }
 
 /**
- * The thread for the prompt: about 2,000 characters before the selection and 300 after. When
- * there's a target, the selection's earlier part stays in the thread and `[REPLY TO THIS]` sits
- * where the target is (it's quoted once, above); a follow-up marks the whole selection.
+ * The text after the selection that still belongs to the selected message: up to the next
+ * header. Later messages, the user's answer among them, are left out, so the model never takes
+ * one for the message to answer (decision 52).
  */
-export function replyThread(selection: SelectionPayload, container: ContainerContext | null | undefined, target: ReplyTarget | null): string {
+function restOfMessage(after: string, me: Identity): string {
+  const first = headers(after, knownName(me))[0];
+  const rest = first ? after.split(/\r?\n/).slice(0, first.line).join('\n') : after;
+  return rest.length > THREAD_AFTER ? `${rest.slice(0, THREAD_AFTER)}…` : rest;
+}
+
+/**
+ * The thread for the prompt: about 2,000 characters before the selection, and after it only the
+ * rest of the selected message (decision 52). When there's a target, the selection's earlier part
+ * stays in the thread and `[REPLY TO THIS]` sits where the target is (it's quoted once, above); a
+ * follow-up marks the whole selection.
+ */
+export function replyThread(selection: SelectionPayload, container: ContainerContext | null | undefined, target: ReplyTarget | null, me: Identity): string {
   const { before, after } = around(selection, container);
   const head = target ? `${selection.text.slice(0, target.start)}${TARGET_MARK}` : SELECTION_MARK;
-  const tail = after.length > THREAD_AFTER ? `${after.slice(0, THREAD_AFTER)}…` : after;
-  return `${lastLines(before, THREAD_BEFORE)}${head}${tail}`;
+  return `${lastLines(before, THREAD_BEFORE)}${head}${restOfMessage(after, me)}`;
 }
 
 export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: ReplyInput, now: Date = new Date()): string {
   const { selection } = input;
   const target = input.authorIsMe ? null : messagesToAnswer(selection.text, around(selection, input.container).before, settings.identity, input.messages);
   const ownNames = (input.messages ?? []).flatMap((m) => (m.user && m.author ? [m.author] : []));
-  const thread = markOwnHeaders(replyThread(selection, input.container, target), settings.identity, ownNames);
+  const thread = markOwnHeaders(replyThread(selection, input.container, target, settings.identity), settings.identity, ownNames);
   const a = input.author;
   const to = input.authorIsMe
     ? 'The user wrote the selected message; draft a follow-up to the other people in the thread.'

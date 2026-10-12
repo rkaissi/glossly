@@ -51,7 +51,9 @@ describe('Reply', () => {
     expect(p).toContain('- Fri, Oct 9, from the user: Thanks, talk Friday');
     expect(p).toContain('<sample>\nsounds good!! will do\n</sample>');
     expect(p).toContain('## App\nslack.exe, "Maya Lin (DM) | Acme - Slack"');
-    expect(p).toContain('Maya Lin  9:41 AM\n[REPLY TO THIS]\nDaniel Park');
+    expect(p).toContain('Maya Lin  9:41 AM\n[REPLY TO THIS]');
+    // A later message isn't part of the thread (decision 52).
+    expect(p).not.toContain('Daniel Park');
   });
 
   it('handles no person record, no samples, and the user as the author', () => {
@@ -131,6 +133,28 @@ describe('Reply', () => {
     expect(q).not.toContain('x'.repeat(301));
     const order = ['## The user', '## Voice samples', '## What you know about', '## Replying to', '## App', '## Today', '## The message to answer', '## Thread'].map((h) => p.indexOf(h));
     expect(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!))).toBe(true);
+  });
+
+  it('leaves out the messages after the selected one, the user’s answer among them (decision 52)', () => {
+    const me = { name: 'Alex Morgan', emails: [], handles: [] };
+    const sel: SelectionPayload = {
+      ...selection,
+      source_app: 'discord.exe',
+      window_title: 'Discord',
+      context_before: 'Jordan\nYesterday at 3:03 PM\nhaha\nOctober 11, 2026\nJordan\n5:11 PM\n',
+      text: 'know anyone still looking for a room near campus next term?',
+      context_after: '\nAlex\n7:34 PM\nnot that I know of\nill tell you if I hear of someone\n',
+    };
+    const p = buildReplyPrompt({ ...DEFAULT_SETTINGS, identity: me }, { selection: sel, author: { ...author, name: 'Jordan' }, authorIsMe: false, person: null, voice: [] }, now);
+    const thread = p.slice(p.indexOf('<thread>'), p.indexOf('</thread>'));
+    expect(p).toContain('## Replying to\nJordan');
+    expect(thread).toContain('5:11 PM\n[REPLY TO THIS]');
+    expect(thread).not.toContain('not that I know of');
+    expect(thread).not.toContain('ill tell you');
+    // The rest of the selected message after the selection stays.
+    const cut = buildReplyPrompt({ ...DEFAULT_SETTINGS, identity: me }, { selection: { ...sel, text: 'know anyone still looking', context_after: ' for a room near campus?\nAlex\n7:34 PM\nnope\n' }, author, authorIsMe: false, person: null, voice: [] }, now);
+    expect(cut).toContain('[REPLY TO THIS] for a room near campus?');
+    expect(cut).not.toContain('nope');
   });
 
   it('sends about 2,000 characters of the thread before the selection and 300 after', () => {
