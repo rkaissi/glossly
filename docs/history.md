@@ -52,7 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 20.6g | Oct 12 | (this commit) | The pill stays while Ctrl, Alt, or Windows is held, so a slow hotkey expands it in place (helper `keyboard_activity.modifiers`; decision 58). Checked live. |
+| 20.6g | Oct 12 | `240d051` | The pill stays while Ctrl, Alt, or Windows is held, so a slow hotkey expands it in place (helper `keyboard_activity.modifiers`; decision 58). Checked live. |
 | 20.6f | Oct 12 | `b970847` | Voice samples for Reply come from the same platform and are marked with it, so an email reply is an email (decision 57). |
 | 20.6e | Oct 12 | `5ecb0d5` | Step 20.6 live checks: hotkey in place, typing grace, mouse-away, touch registration (all pass). |
 | 20.6d | Oct 12 | `54854ed` | Helper: touchpad, touchscreen, and pen input count as the mouse through Raw Input, so touch no longer reads as typing (decision 56). |
