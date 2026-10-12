@@ -1,0 +1,126 @@
+{
+  "$comment": "Tasks and events cases for evals/tasks.eval.ts (decisions 36, 37, 48). Fictional people only; the user is Alex Morgan. Today is Wednesday, Oct 14 2026, 10:00. author: who wrote the selection (\"me\" for the user). messages: a perfect conversation read (author, user, first words), as the app passes it after the read. people: others the message is about (their open tasks go in the prompt). open: open tasks saved before the message (owner me: the user owes the person; them: the person owes the user). expected.tasks: rows that must be found (owner; words the text must contain; person, or null for a personal todo; due as YYYY-MM-DD or null; change and open, the index of the open task it is about); omitted fields are not scored. expected.events: events that must be found (words in the title, day, start HH:MM or null for all day); null skips event scoring. Other rows count as extras.",
+  "cases": [
+    {
+      "id": "chat-01",
+      "selection": { "text": "hey! did you get a chance to look at the venue list?\nalso can you send me the forms before friday?", "context_before": "Jordan Hale\nNWM\n — Today at 7:30 PM\n", "source_app": "Discord.exe", "window_title": "@Jordan Hale - Discord" },
+      "author": "Jordan Hale",
+      "expected": { "tasks": [{ "owner": "me", "has": ["forms"], "person": "Jordan Hale", "due": "2026-10-16", "change": "new" }], "events": [] }
+    },
+    {
+      "id": "chat-02",
+      "selection": { "text": "Jordan Hale  9:02 AM\ncan you send the deck by Friday?\nAlex Morgan  9:05 AM\nsure, I'll send it Thursday", "source_app": "slack.exe", "window_title": "Jordan Hale (DM) | Acme - Slack" },
+      "author": "me",
+      "messages": [{ "author": "Jordan Hale", "user": false, "starts": "can you send the deck" }, { "author": "Alex Morgan", "user": true, "starts": "sure, I'll send it" }],
+      "people": ["Jordan Hale"],
+      "expected": { "tasks": [{ "owner": "me", "has": ["deck"], "person": "Jordan Hale", "due": "2026-10-15" }], "events": [] }
+    },
+    {
+      "id": "chat-03",
+      "selection": { "text": "I'll get you the contract draft by end of day tomorrow", "context_before": "Maya Chen  4:10 PM\n", "source_app": "slack.exe", "window_title": "Maya Chen (DM) | Acme - Slack" },
+      "author": "Maya Chen",
+      "expected": { "tasks": [{ "owner": "them", "has": ["contract"], "person": "Maya Chen", "due": "2026-10-15" }], "events": [] }
+    },
+    {
+      "id": "chat-04",
+      "selection": { "text": "Casey Lin  9:41 AM\nLaunch checklist is up in the doc. Jordan, can you confirm the press list by Thursday?\nJordan Hale  9:44 AM\nYes, I'll have it done Thursday morning.\nAlex Morgan  9:47 AM\nI'll handle the landing page copy. Should be ready tomorrow.\nMaya Chen  9:52 AM\nThanks both. Alex, could you also send me the final screenshots by end of day Friday? I need them for the deck.", "source_app": "slack.exe", "window_title": "Thread in #launch | Acme - Slack" },
+      "author": "Maya Chen",
+      "messages": [
+        { "author": "Casey Lin", "user": false, "starts": "Launch checklist is up" },
+        { "author": "Jordan Hale", "user": false, "starts": "Yes, I'll have it" },
+        { "author": "Alex Morgan", "user": true, "starts": "I'll handle the landing" },
+        { "author": "Maya Chen", "user": false, "starts": "Thanks both. Alex, could" }
+      ],
+      "people": ["Casey Lin", "Jordan Hale"],
+      "expected": { "tasks": [{ "owner": "me", "has": ["screenshots"], "person": "Maya Chen", "due": "2026-10-16" }, { "owner": "me", "has": ["landing page"], "due": "2026-10-15" }], "events": [] }
+    },
+    {
+      "id": "chat-05",
+      "selection": { "text": "haha that was a great talk yesterday, thanks for organizing!", "context_before": "Casey Lin  6:12 PM\n", "source_app": "slack.exe", "window_title": "#general | Acme - Slack" },
+      "author": "Casey Lin",
+      "expected": { "tasks": [], "events": [] }
+    },
+    {
+      "id": "chat-06",
+      "selection": { "text": "please review the PR today if you can, it's blocking the release", "context_before": "Jordan Hale  8:55 AM\n", "source_app": "slack.exe", "window_title": "#eng | Acme - Slack" },
+      "author": "Jordan Hale",
+      "expected": { "tasks": [{ "owner": "me", "has": ["review", "PR"], "person": "Jordan Hale", "due": "2026-10-14" }], "events": [] }
+    },
+    {
+      "id": "chat-07",
+      "selection": { "text": "I'll book the room for the workshop, leave it with me", "context_before": "Jordan Hale\n — Today at 7:40 PM\n", "source_app": "Discord.exe", "window_title": "#planning | Northwind Makers - Discord" },
+      "author": "Jordan Hale",
+      "expected": { "tasks": [{ "owner": "them", "has": ["room"], "person": "Jordan Hale", "due": null }], "events": [] }
+    },
+    {
+      "id": "chat-08",
+      "selection": { "text": "ok great, can you share the slides with the team by the 23rd?", "context_before": "Casey Lin\n — Today at 7:05 PM\n", "source_app": "Discord.exe", "window_title": "@Casey Lin - Discord" },
+      "author": "Casey Lin",
+      "expected": { "tasks": [{ "owner": "me", "has": ["slides"], "person": "Casey Lin", "due": "2026-10-23" }], "events": [] }
+    },
+    {
+      "id": "email-01",
+      "selection": { "text": "Hi Alex,\n\nThanks for the numbers. Could you send the revised forecast by Friday? Also, are you free for a call on Tuesday at 2pm to go through the travel line?\n\nBest,\nJordan", "context_before": "Jordan Hale <jordan.hale@example.com>\nOct 14, 2026, 9:15 AM\nto me\n", "source_app": "chrome.exe", "window_title": "Re: Q4 budget review - alex.morgan@example.com - Gmail - Google Chrome" },
+      "author": "Jordan Hale",
+      "expected": { "tasks": [{ "owner": "me", "has": ["forecast"], "person": "Jordan Hale", "due": "2026-10-16" }], "events": [{ "has": ["call"], "day": "2026-10-20", "start": "14:00" }] }
+    },
+    {
+      "id": "email-02",
+      "selection": { "text": "From: Maya Chen <maya.chen@example.com>\nSent: Wednesday, October 14, 2026 9:02 AM\nTo: Alex Morgan <alex.morgan@example.com>; Casey Lin <casey.lin@example.com>\nSubject: Offsite budget\n\nHi both, can you each send me your travel estimates by Monday? I'll share the final budget on Friday.\n\nThanks,\nMaya", "source_app": "OUTLOOK.EXE", "window_title": "Offsite budget - Message (HTML)" },
+      "author": "Maya Chen",
+      "expected": { "tasks": [{ "owner": "me", "has": ["travel estimate"], "person": "Maya Chen", "due": "2026-10-19" }, { "owner": "them", "has": ["budget"], "person": "Maya Chen", "due": "2026-10-16" }], "events": [] }
+    },
+    {
+      "id": "todo-01",
+      "selection": { "text": "remember to renew passport by Nov 1", "source_app": "Notepad.exe", "window_title": "todo.txt - Notepad" },
+      "author": "me",
+      "expected": { "tasks": [{ "owner": "me", "has": ["passport"], "person": null, "due": "2026-11-01" }], "events": [] }
+    },
+    {
+      "id": "todo-02",
+      "selection": { "text": "need to call the dentist and book the car service on the 28th", "source_app": "Notepad.exe", "window_title": "todo.txt - Notepad" },
+      "author": "me",
+      "expected": { "tasks": [{ "owner": "me", "has": ["dentist"], "person": null }, { "owner": "me", "has": ["car service"], "person": null, "due": "2026-10-28" }], "events": null }
+    },
+    {
+      "id": "open-01",
+      "selection": { "text": "Here is the budget. Also, can we push the review to Monday?", "source_app": "Discord.exe", "window_title": "@Jordan Hale - Discord" },
+      "author": "me",
+      "people": ["Jordan Hale"],
+      "open": [{ "owner": "me", "person": "Jordan Hale", "text": "Send the budget", "due": "2026-10-16" }, { "owner": "me", "person": "Jordan Hale", "text": "Review the venue proposal", "due": "2026-10-15" }],
+      "expected": { "tasks": [{ "owner": "me", "has": ["budget"], "change": "done", "open": 0 }, { "owner": "me", "has": ["review"], "change": "moved", "open": 1, "due": "2026-10-19" }], "events": [] }
+    },
+    {
+      "id": "open-02",
+      "selection": { "text": "don't forget the slides for Thursday's review!", "context_before": "Jordan Hale  3:30 PM\n", "source_app": "slack.exe", "window_title": "Jordan Hale (DM) | Acme - Slack" },
+      "author": "Jordan Hale",
+      "open": [{ "owner": "me", "person": "Jordan Hale", "text": "Send the slides for the review", "due": "2026-10-15" }],
+      "expected": { "tasks": [{ "owner": "me", "has": ["slides"], "change": "same", "open": 0 }], "events": [] }
+    },
+    {
+      "id": "open-03",
+      "selection": { "text": "Sent you the signed contract just now, let me know if anything's missing.", "context_before": "Casey Lin  11:02 AM\n", "source_app": "slack.exe", "window_title": "Casey Lin (DM) | Acme - Slack" },
+      "author": "Casey Lin",
+      "open": [{ "owner": "them", "person": "Casey Lin", "text": "Send the signed contract", "due": null }],
+      "expected": { "tasks": [{ "owner": "them", "has": ["contract"], "change": "done", "open": 0 }], "events": [] }
+    },
+    {
+      "id": "event-01",
+      "selection": { "text": "Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?", "context_before": "Jordan Hale  10:02 AM\n", "source_app": "slack.exe", "window_title": "Jordan Hale (DM) | Acme - Slack" },
+      "author": "Jordan Hale",
+      "expected": { "tasks": [{ "owner": "me", "has": ["deck"], "person": "Jordan Hale" }], "events": [{ "has": ["lunch"], "day": "2026-10-15", "start": "13:00" }] }
+    },
+    {
+      "id": "event-02",
+      "selection": { "text": "Team offsite Oct 20 at the Acme office. Agenda to follow.", "context_before": "Maya Chen  2:40 PM\n", "source_app": "slack.exe", "window_title": "#general | Acme - Slack" },
+      "author": "Maya Chen",
+      "expected": { "tasks": [], "events": [{ "has": ["offsite"], "day": "2026-10-20", "start": null }] }
+    },
+    {
+      "id": "event-03",
+      "selection": { "text": "Send the report by Friday 5pm please", "context_before": "Jordan Hale  9:12 AM\n", "source_app": "slack.exe", "window_title": "Jordan Hale (DM) | Acme - Slack" },
+      "author": "Jordan Hale",
+      "expected": { "tasks": [{ "owner": "me", "has": ["report"], "person": "Jordan Hale", "due": "2026-10-16" }], "events": [] }
+    }
+  ]
+}

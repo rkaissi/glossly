@@ -20,13 +20,26 @@ pnpm typecheck   # tsc in all three packages
 
 Don't run these unless Rayan asks: they call Groq, whose free tier allows 1,000 requests per day and 8,000 tokens per minute per model.
 
-**Planned for Step 21: the conversation-read eval** (decision 48). About 30 fictional selections (Discord with server tags, badges, hover timestamps, and names with spaces; Slack threads; Teams; WhatsApp with "You"; email chains), each with the expected messages (author, user, first words) and the expected Reply target. It runs `readWho` and scores: messages accepted, author accuracy, `user` accuracy, the target's author and span, the share of reads that fell back to the parser, and the read's input and output tokens (from `llm_tokens`). The same cases run through the parser alone give the fallback's numbers and decide whether the read can be skipped when the parse is unambiguous.
+**Step 21 runners.** Run one at a time, never `pnpm eval` with a key set (it would run them all). Every runner paces its calls under 6,000 tokens a minute (`GLOSSLY_EVAL_TPM`), retries a 429 after the wait Groq asks for, and **stops the run** on a third 429 in a row or a wait over a minute (the daily limit; `RateLimitStop`). `GLOSSLY_EVAL_LIMIT=<n>` takes n cases in turn from each group (the id's prefix), so a small run covers every kind; `GLOSSLY_EVAL_IDS=a,b` picks exact cases; `GLOSSLY_EVAL_MODEL` swaps the model (results files carry the model's name). Each writes JSON to `evals/results/` with per-case rows, calls, and tokens.
+
+| Runner | Model (role) | Cases | Calls per case | Offline part |
+| --- | --- | --- | --- | --- |
+| `evals/router.eval.ts` | Qwen 3.8 (Decision) | 60 in `fixtures/*.json` | 1 | the rules on the same cases |
+| `evals/who.eval.ts` | gpt-oss-20b (Fast) | 18 in `fixtures/who/cases.json` | 1 | the parser alone (`readWho` with no model) |
+| `evals/tasks.eval.ts` | gpt-oss-20b (Fast) | 18 in `fixtures/tasks/cases.json` | 1 | a scripted answer must score perfectly |
+| `evals/visualize.eval.ts` | gpt-oss-20b (Fast) | 20 in `fixtures/visualize/charts.json` | 1 or 2 | none |
+| `evals/recall.eval.ts` | local embeddings | 16 selections over 20 items in `fixtures/recall/cases.json` | 0 | all of it |
+
+- **Who** (decision 48): Discord (badges, ` — Today at` headers, a hover timestamp, a one-word message), Slack, Teams, WhatsApp ("You"), an email chain, an Outlook header block, a welcome email, a contact card, an article. Scores whether the read was accepted, the authors in order, the last author (through `authorFrom`, as Tasks and Reply use it), people found and strings never listed (badges, buttons, shared inboxes, the user), and Reply's target (`messagesToAnswer`).
+- **Tasks** (decisions 36, 37): on Wednesday, Oct 14 2026, with open tasks saved first; multi-writer cases get a perfect read so only the extraction is scored. Scores tasks found, person, due date (the date resolver with the model in the loop: the model copies the phrase, `resolveDue` reads it), new/same/done/moved against open tasks, events with day and time, extra rows.
+- **Visualize**: the app's `visualize()` (code reads the table when it can), scored with the comparison eval's chart checks (now in `evals/visualize-lib.ts`).
+- **Recall**: also prints each expected item's similarity against `minSimilarity`, to tell a threshold miss from an entity miss.
 
 ```powershell
 pnpm eval   # vitest run --project evals, then evals/print-results.mjs
 ```
 
-- **Router eval** (`evals/router.eval.ts`, 60 hand-written cases in `fixtures/{messages,commitments,tables,articles,code,contacts}.json`, each `{id, context, expected: {content_type, slots}}`). Rules run offline; the LLM run needs `GROQ_API_KEY` (model `groq:qwen/qwen3.8-27b`, override with `GLOSSLY_EVAL_MODEL`), waits and retries on 429 (about 3.5 minutes for 60 cases), and fails if more than 10% of calls error. Results go to git-ignored `evals/results/router-{rules,llm}.json`; `print-results.mjs` prints the summary, distinct errors, and misses.
+- **Router eval** (`evals/router.eval.ts`, 60 hand-written cases in `fixtures/{messages,commitments,tables,articles,code,contacts}.json`, each `{id, context, expected: {content_type, slots}}`). Rules run offline; the LLM run needs `GROQ_API_KEY` (model `groq:qwen/qwen3.8-27b` in the Decision role, override with `GLOSSLY_EVAL_MODEL`) and fails if more than 10% of calls error. It also scores the rules on exactly the cases the model answered (`rules_slot_accuracy_same_cases`), for the pre-agreed rule. Results go to git-ignored `evals/results/router-{rules,llm}.json`; `print-results.mjs` prints the summary, distinct errors, and misses.
 - **Comparison evals** (only with `GROQ_API_KEY` and `GLOSSLY_COMPARE=1`; helpers in `evals/lib.ts`, old code and prompts in `evals/legacy/`; calls paced by `GLOSSLY_COMPARE_GAP_MS`, default 2.5 s; about 300 calls for both):
   - `evals/visualize-compare.eval.ts`: model-written Vega-Lite against the structured chart pick, 20 cases in `fixtures/visualize/charts.json`; renders both and writes JSON plus a side-by-side HTML page to `evals/results/`.
   - `evals/router-collection-compare.eval.ts`: string collection with a code fix-up against the enum, 60 fixtures, Qwen 3.8 and gpt-oss-20b (`GLOSSLY_COMPARE_MODELS`).

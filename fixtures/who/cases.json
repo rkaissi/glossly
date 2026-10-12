@@ -1,0 +1,203 @@
+{
+  "$comment": "Conversation-read and Who cases for evals/who.eval.ts (decision 48). Fictional people only; the user is Alex Morgan (alex.morgan@example.com, @alexm, @alexmorgan). expected.messages: the authors in order, consecutive messages by one author merged (\"me\" is the user); null skips message scoring. author: who wrote the last message (\"me\" for the user); omitted skips it. people: names Who must list; not_people: strings that must never be a person (badges, buttons, shared inboxes, the user). target: words that must be in the first 120 characters of the text Reply answers, and a part it must leave out, or null when there is nothing to answer (the selection ends with the user's message); omitted skips it.",
+  "cases": [
+    {
+      "id": "discord-01",
+      "input": {
+        "text": "Jordan Hale\nNWM\n — Today at 7:30 PM\nhey! did you get a chance to look at the venue list?\nalso can you send me the forms before friday?",
+        "before": "",
+        "after": "",
+        "source_app": "Discord.exe",
+        "window_title": "@Jordan Hale - Discord"
+      },
+      "expected": { "messages": ["Jordan Hale"], "author": "Jordan Hale", "people": ["Jordan Hale"], "not_people": ["NWM", "Alex Morgan"], "target": { "starts": "hey! did you get a chance" } }
+    },
+    {
+      "id": "discord-02",
+      "input": {
+        "text": "Jordan Hale\nNWM\n — Today at 7:30 PM\nalso can you send me the forms before friday?\nAlex Morgan\n — Today at 7:32 PM\nI'll send the forms Thursday\nJordan Hale\nNWM\n — Today at 7:34 PM\nperfect, thanks\ncan we push the venue review to Monday?",
+        "before": "hey! did you get a chance to look at the venue list?\n",
+        "after": "",
+        "source_app": "Discord.exe",
+        "window_title": "@Jordan Hale - Discord"
+      },
+      "expected": { "messages": ["Jordan Hale", "me", "Jordan Hale"], "author": "Jordan Hale", "people": ["Jordan Hale"], "not_people": ["NWM", "Alex Morgan"], "target": { "starts": "perfect, thanks", "excludes": "send the forms Thursday" } }
+    },
+    {
+      "id": "discord-03",
+      "input": {
+        "text": "Maya Chen\nGEN2\n — Today at 6:58 PM\nwho's booking the room for the workshop on the 24th?\nAlex Morgan\n — Today at 7:02 PM\nI can do it tomorrow morning\nCasey Lin\n — Today at 7:05 PM\nSure\n7:05 PM\nok great, can someone share the slides with the team before Wednesday?",
+        "before": "",
+        "after": "",
+        "source_app": "chrome.exe",
+        "window_title": "#planning | Northwind Makers - Discord (3) - Google Chrome"
+      },
+      "expected": { "messages": ["Maya Chen", "me", "Casey Lin"], "author": "Casey Lin", "people": ["Casey Lin", "Maya Chen"], "not_people": ["GEN2", "Alex Morgan", "Discord"], "target": { "starts": "Sure", "excludes": "I can do it tomorrow" } }
+    },
+    {
+      "id": "discord-04",
+      "input": {
+        "text": "Alex Morgan\n — Today at 7:32 PM\nyes, looked at it this morning, the second one is best\nI'll send the forms Thursday",
+        "before": "Jordan Hale\nNWM\n — Today at 7:30 PM\nhey! did you get a chance to look at the venue list?\n",
+        "after": "Jordan Hale\nNWM\n — Today at 7:34 PM\nperfect, thanks\n",
+        "source_app": "Discord.exe",
+        "window_title": "@Jordan Hale - Discord"
+      },
+      "expected": { "messages": ["me"], "author": "me", "people": [], "not_people": ["NWM", "Alex Morgan"], "target": null }
+    },
+    {
+      "id": "discord-05",
+      "input": {
+        "text": "Casey Lin\n — Friday at 3:00 PM\nlol\nare we still on for the dry run tomorrow?",
+        "before": "",
+        "after": "",
+        "source_app": "Discord.exe",
+        "window_title": "@Casey Lin - Discord"
+      },
+      "expected": { "messages": ["Casey Lin"], "author": "Casey Lin", "people": ["Casey Lin"], "not_people": ["Friday", "lol"], "target": { "starts": "lol" } }
+    },
+    {
+      "id": "discord-06",
+      "input": {
+        "text": "quinn\n3:12 PM\nhey\nAlex\n3:14 PM\nsure @alexmorgan\nAdd Reaction\nEdit\nEdit\nForward\nForward\nReply\nMore",
+        "before": "",
+        "after": "",
+        "source_app": "chrome.exe",
+        "window_title": "@quinn - Google Chrome"
+      },
+      "expected": { "messages": ["quinn", "me"], "author": "me", "people": ["quinn"], "not_people": ["Add Reaction", "Edit", "Forward", "Reply", "More", "Alex"], "target": null }
+    },
+    {
+      "id": "slack-01",
+      "input": {
+        "text": "Casey Lin  9:41 AM\nLaunch checklist is up in the doc. Jordan, can you confirm the press list by Thursday?\nJordan Hale  9:44 AM\nYes, I'll have it done Thursday morning.\nAlex Morgan  9:47 AM\nI'll handle the landing page copy. Should be ready tomorrow.\nMaya Chen  9:52 AM\nThanks both. Alex, could you also send me the final screenshots by end of day Friday? I need them for the deck.",
+        "before": "",
+        "after": "",
+        "source_app": "slack.exe",
+        "window_title": "Thread in #launch | Acme - Slack"
+      },
+      "expected": { "messages": ["Casey Lin", "Jordan Hale", "me", "Maya Chen"], "author": "Maya Chen", "people": ["Maya Chen", "Casey Lin", "Jordan Hale"], "not_people": ["Alex Morgan", "Acme"], "target": { "starts": "Maya Chen", "excludes": "landing page copy" } }
+    },
+    {
+      "id": "slack-02",
+      "input": {
+        "text": "Jordan Hale  2:15 PM\n@Casey Lin can you review the PR before standup? cc @alexm",
+        "before": "",
+        "after": "",
+        "source_app": "slack.exe",
+        "window_title": "#eng | Acme - Slack"
+      },
+      "expected": { "messages": ["Jordan Hale"], "author": "Jordan Hale", "people": ["Jordan Hale", "Casey Lin"], "not_people": ["alexm", "Alex Morgan"], "target": { "starts": "Jordan Hale" } }
+    },
+    {
+      "id": "slack-03",
+      "input": {
+        "text": "Maya Chen  11:20 AM\nquick one: is the 3pm still on?\nAlex Morgan  11:21 AM\nyes!\nMaya Chen  11:21 AM\ngreat, I'll bring the printouts",
+        "before": "",
+        "after": "",
+        "source_app": "slack.exe",
+        "window_title": "Maya Chen (DM) | Acme - Slack"
+      },
+      "expected": { "messages": ["Maya Chen", "me", "Maya Chen"], "author": "Maya Chen", "people": ["Maya Chen"], "not_people": ["Alex Morgan"], "target": { "starts": "Maya Chen", "excludes": "yes!" } }
+    },
+    {
+      "id": "teams-01",
+      "input": {
+        "text": "Jordan Hale\n10/12 3:04 PM\nCan you share the Q4 deck with the team?\nAlex Morgan\n10/12 3:06 PM\nSure, sending it now",
+        "before": "",
+        "after": "",
+        "source_app": "ms-teams.exe",
+        "window_title": "Chat | Jordan Hale | Microsoft Teams"
+      },
+      "expected": { "messages": ["Jordan Hale", "me"], "author": "me", "people": ["Jordan Hale"], "not_people": ["Alex Morgan"], "target": null }
+    },
+    {
+      "id": "teams-02",
+      "input": {
+        "text": "Casey Lin 9:15 AM\nMorning! Are you joining the 10:00 sync?\nCasey Lin 9:16 AM\nAlso, Maya Chen will present the roadmap, so bring questions",
+        "before": "",
+        "after": "",
+        "source_app": "ms-teams.exe",
+        "window_title": "Chat | Casey Lin | Microsoft Teams"
+      },
+      "expected": { "messages": ["Casey Lin"], "author": "Casey Lin", "people": ["Casey Lin", "Maya Chen"], "not_people": ["Alex Morgan"], "target": { "starts": "Casey Lin" } }
+    },
+    {
+      "id": "whatsapp-01",
+      "input": {
+        "text": "[10/12/26, 8:01 PM] Jordan Hale: dinner tomorrow at 7?\n[10/12/26, 8:03 PM] You: works for me\n[10/12/26, 8:04 PM] Jordan Hale: great, I'll book Northwind Cafe",
+        "before": "",
+        "after": "",
+        "source_app": "WhatsApp.exe",
+        "window_title": "WhatsApp"
+      },
+      "expected": { "messages": ["Jordan Hale", "me", "Jordan Hale"], "author": "Jordan Hale", "people": ["Jordan Hale"], "not_people": ["You", "Northwind Cafe"], "target": { "starts": "great, I'll book", "excludes": "works for me" } }
+    },
+    {
+      "id": "whatsapp-02",
+      "input": {
+        "text": "[10/12/26, 6:10 PM] Maya Chen: who's bringing snacks Saturday?\n[10/12/26, 6:12 PM] Casey Lin: I can do drinks\n[10/12/26, 6:15 PM] You: I'll bring chips",
+        "before": "",
+        "after": "",
+        "source_app": "WhatsApp.exe",
+        "window_title": "WhatsApp"
+      },
+      "expected": { "messages": ["Maya Chen", "Casey Lin", "me"], "author": "me", "people": ["Maya Chen", "Casey Lin"], "not_people": ["You"], "target": null }
+    },
+    {
+      "id": "email-01",
+      "input": {
+        "text": "Jordan Hale <jordan.hale@example.com>\nOct 7, 2026, 10:15 AM\nto me\n\nHi Alex,\n\nThanks for the numbers. Could you send the revised forecast by Friday? Also, are you free for a call on Tuesday at 2pm?\n\nBest,\nJordan\n\nOn Tue, Oct 6, 2026 at 3:12 PM Alex Morgan <alex.morgan@example.com> wrote:\nHi Jordan,\nAttached are the first Q4 numbers. Travel is over by about 12%, the rest is on plan.\nAlex",
+        "before": "Re: Q4 budget review\n",
+        "after": "Reply\nForward\n",
+        "source_app": "chrome.exe",
+        "window_title": "Re: Q4 budget review - alex.morgan@example.com - Gmail - Google Chrome"
+      },
+      "expected": { "messages": ["Jordan Hale", "me"], "author": "Jordan Hale", "people": ["Jordan Hale"], "not_people": ["Alex Morgan"], "target": { "starts": "Jordan Hale", "excludes": "Attached are the first Q4 numbers" } }
+    },
+    {
+      "id": "email-02",
+      "input": {
+        "text": "From: Maya Chen <maya.chen@example.com>\nSent: Monday, October 12, 2026 9:02 AM\nTo: Alex Morgan <alex.morgan@example.com>; Casey Lin <casey.lin@example.com>\nCc: finance@example.com\nSubject: Offsite budget\n\nHi both, can you each send me your travel estimates by Wednesday?\n\nThanks,\nMaya",
+        "before": "",
+        "after": "",
+        "source_app": "OUTLOOK.EXE",
+        "window_title": "Offsite budget - Message (HTML)"
+      },
+      "expected": { "author": "Maya Chen", "people": ["Maya Chen", "Casey Lin"], "not_people": ["finance", "Alex Morgan"], "target": { "starts": "From: Maya Chen" } }
+    },
+    {
+      "id": "email-03",
+      "input": {
+        "text": "Northwind Team <hello@northwind.example.com>\nWelcome to Northwind!\nYour workspace is ready. If you have questions, reply to this email or reach Jordan Hale, your onboarding lead, at jordan.hale@example.com.\nReply\nForward\nMark as unread",
+        "before": "",
+        "after": "",
+        "source_app": "msedge.exe",
+        "window_title": "Mail - Alex Morgan - Outlook"
+      },
+      "expected": { "people": ["Jordan Hale"], "not_people": ["Reply", "Forward", "Mark as unread", "Alex Morgan"] }
+    },
+    {
+      "id": "card-01",
+      "input": {
+        "text": "Jordan Hale\nProduct Lead, Northwind Traders\njordan.hale@example.com\n+1 555 0142",
+        "before": "",
+        "after": "",
+        "source_app": "Notepad.exe",
+        "window_title": "contacts.txt - Notepad"
+      },
+      "expected": { "people": ["Jordan Hale"], "not_people": ["Northwind Traders", "Product Lead"] }
+    },
+    {
+      "id": "article-01",
+      "input": {
+        "text": "Acme confirmed on Monday that its merger with Northwind will close in the first quarter. Chief executive Maya Chen said the combined company would keep both brands, and finance chief Casey Lin expects savings of about $40 million a year.",
+        "before": "",
+        "after": "",
+        "source_app": "chrome.exe",
+        "window_title": "Acme and Northwind to merge - Example News - Google Chrome"
+      },
+      "expected": { "people": ["Maya Chen", "Casey Lin"], "not_people": ["Acme", "Northwind", "Example News"] }
+    }
+  ]
+}

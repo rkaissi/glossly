@@ -1,0 +1,43 @@
+{
+  "$comment": "Recall cases for evals/recall.eval.ts. Fictional saved items with the entities Save would link, and selections with the saved items Recall should offer. expect: items that must be offered; ok: items that may also be offered; anything else counts as a false hit. An empty expect means nothing should be offered.",
+  "items": [
+    { "id": "i01", "text": "Jordan Hale shared the venue shortlist for the Q4 offsite: Lisbon, Porto, or Madrid.", "entities": [["person", "Jordan Hale"], ["place", "Lisbon"], ["place", "Porto"], ["place", "Madrid"]] },
+    { "id": "i02", "text": "Offsite budget: flights capped at $600 per person, hotel at $180 a night.", "entities": [] },
+    { "id": "i03", "text": "Maya Chen's notes on the onboarding flow: users drop off at the workspace naming step.", "entities": [["person", "Maya Chen"]] },
+    { "id": "i04", "text": "Acme renewal: the contract renews on Jan 1 and the price goes up 8%.", "entities": [["company", "Acme"]] },
+    { "id": "i05", "text": "Recipe: one-pan lemon chicken with potatoes, 45 minutes at 200°C.", "entities": [] },
+    { "id": "i06", "text": "Weeknight pasta: garlic, chili flakes, olive oil, and parmesan; ready in 15 minutes.", "entities": [] },
+    { "id": "i07", "text": "Casey Lin recommended Designing Data-Intensive Applications for the backend reading group.", "entities": [["person", "Casey Lin"], ["product", "Designing Data-Intensive Applications"]] },
+    { "id": "i08", "text": "The launch checklist: press list, landing page copy, screenshots, and the announcement email.", "entities": [] },
+    { "id": "i09", "text": "Northwind Traders asked for a demo of the reporting dashboard next quarter.", "entities": [["company", "Northwind Traders"]] },
+    { "id": "i10", "text": "To fix the flaky test, wait for the database migration to finish before seeding fixtures.", "entities": [] },
+    { "id": "i11", "text": "Postgres connection pool exhausted under load; raise max connections or add PgBouncer.", "entities": [["product", "Postgres"], ["product", "PgBouncer"]] },
+    { "id": "i12", "text": "Flight to Lisbon on Oct 21, returning Oct 25; hotel near Alfama.", "entities": [["place", "Lisbon"]] },
+    { "id": "i13", "text": "Hiring plan: two backend engineers and one designer before March.", "entities": [] },
+    { "id": "i14", "text": "Jordan Hale prefers calls after 2pm and short agendas sent the day before.", "entities": [["person", "Jordan Hale"]] },
+    { "id": "i15", "text": "Running plan: three easy runs a week and one long run on Sunday, building up to 10 km.", "entities": [] },
+    { "id": "i16", "text": "Q4 revenue forecast: travel spend is 12% over plan, everything else on track.", "entities": [] },
+    { "id": "i17", "text": "Maya Chen will present the roadmap at the all-hands on the 24th.", "entities": [["person", "Maya Chen"]] },
+    { "id": "i18", "text": "Acme's support team answers within 4 hours on the premium plan.", "entities": [["company", "Acme"]] },
+    { "id": "i19", "text": "Interview feedback template: strengths, concerns, and a hire or no-hire call.", "entities": [] },
+    { "id": "i20", "text": "Sourdough starter: feed it equal parts flour and water every 12 hours.", "entities": [] }
+  ],
+  "cases": [
+    { "id": "q01", "text": "Can you send me the venue options for the offsite?", "expect": ["i01"], "ok": ["i02", "i12"] },
+    { "id": "q02", "text": "Jordan Hale asked when we should schedule our call.", "expect": ["i14", "i01"], "ok": [] },
+    { "id": "q03", "text": "What's a quick dinner I can make tonight?", "expect": ["i06"], "ok": ["i05"] },
+    { "id": "q04", "text": "The Acme contract price increase is too high for us.", "expect": ["i04"], "ok": ["i18"] },
+    { "id": "q05", "text": "Our tests keep failing randomly in CI.", "expect": ["i10"], "ok": ["i11"] },
+    { "id": "q06", "text": "The database runs out of connections at peak traffic.", "expect": ["i11"], "ok": ["i10"] },
+    { "id": "q07", "text": "Booking flights and a hotel for the trip to Portugal.", "expect": ["i12"], "ok": ["i01", "i02"] },
+    { "id": "q08", "text": "We need to hire more engineers next year.", "expect": ["i13"], "ok": ["i19"] },
+    { "id": "q09", "text": "Maya Chen wants feedback on the roadmap slides.", "expect": ["i17", "i03"], "ok": [] },
+    { "id": "q10", "text": "What should go in the launch announcement?", "expect": ["i08"], "ok": [] },
+    { "id": "q11", "text": "Northwind Traders wants to see the dashboard before they sign.", "expect": ["i09"], "ok": [] },
+    { "id": "q12", "text": "How do I keep my sourdough starter alive?", "expect": ["i20"], "ok": ["i05", "i06"] },
+    { "id": "q13", "text": "Training for my first 10k race.", "expect": ["i15"], "ok": [] },
+    { "id": "q14", "text": "Travel costs are over budget this quarter.", "expect": ["i16"], "ok": ["i02", "i12"] },
+    { "id": "q15", "text": "The weather is nice today, let's go to the park.", "expect": [], "ok": [] },
+    { "id": "q16", "text": "Casey Lin is looking for a good book on distributed systems.", "expect": ["i07"], "ok": [] }
+  ]
+}
