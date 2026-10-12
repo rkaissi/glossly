@@ -155,6 +155,11 @@ Rayan's direction:
     - The router (a model call on every bar open) is about half the input, so skipping it when the rules are confident would cut the cost most.
   - Replace these with real numbers from the `llm_tokens` metrics (per action, Step 21) before setting a price or a cap.
 - Optional decision providers for the router (the spec's Jev via OpenRouter and OpenAI Decisions, Phase 4): a `DecisionProvider` (`router/types.ts`) per API behind a setting in the Models tab. Scrapped from the plan on Oct 11; check their current docs first if it comes back, since both may have changed or no longer exist.
+- **Platform labels for pasted voice samples** (proposed Oct 12; Rayan isn't sure yet and wants it in its own chat). Edited and self-written replies already store their platform (`voice_samples.channel`), so decision 57 can rank them; only samples pasted in Profile have none, and they used to crowd email replies with chat lines.
+  - Proposal: code suggests a label at paste time. A greeting line plus a sign-off or several paragraphs is email, one short line is messaging, anything else is any platform. Profile > How you write shows a small select per pasted sample (Email, Messaging app, Work chat, Any) preset to the suggestion, and it saves to `voice_samples.channel`.
+  - No model call: pastes are rare, and a visible label the user can fix beats a hidden guess. No schema change. Existing pasted samples get the suggestion once at startup.
+  - Reply needs no change: a labeled pasted sample counts as same-platform in `voiceForPrompt`.
+  - Show Rayan a before/after preview of the Profile page.
 
 ## Open questions for Rayan
 
