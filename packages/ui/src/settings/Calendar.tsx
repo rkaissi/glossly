@@ -206,7 +206,7 @@ function EventEditor({ anchor, draft: initial, onClose }: { anchor: HTMLElement;
           {d.id && (
             <button
               type="button"
-              className={`ee-delete${confirming ? ' armed' : ''}`}
+              className={`delete-btn${confirming ? ' armed' : ''}`}
               title={confirming ? 'Delete this event' : 'Delete event'}
               aria-label={confirming ? 'Confirm: delete this event' : 'Delete event'}
               onClick={() => (confirming ? void remove() : setConfirming(true))}

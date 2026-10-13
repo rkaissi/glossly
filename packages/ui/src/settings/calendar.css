@@ -755,50 +755,6 @@ button.add-people {
 .ee-foot .invisible {
   visibility: hidden;
 }
-/* The trash button, 28 px and quiet; armed, it grows into the filled red Delete in place. */
-button.ee-delete {
-  height: var(--h-sm);
-  min-width: var(--h-sm);
-  padding: 0 7px;
-  gap: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--fg-2);
-  font-size: 13px;
-  transition:
-    background-color 180ms var(--ease-out),
-    color 180ms var(--ease-out),
-    padding var(--spring-soft-ms) var(--spring-soft),
-    gap var(--spring-soft-ms) var(--spring-soft),
-    transform var(--spring-pop-ms) var(--spring-pop);
-}
-button.ee-delete > span {
-  max-width: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition:
-    max-width var(--spring-soft-ms) var(--spring-soft),
-    opacity 150ms var(--ease-out);
-}
-button.ee-delete:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  color: var(--danger);
-}
-button.ee-delete.armed,
-button.ee-delete.armed:hover:not(:disabled) {
-  padding: 0 10px;
-  gap: 6px;
-  background: var(--danger-solid);
-  color: #fff;
-}
-button.ee-delete.armed:hover:not(:disabled) {
-  background: var(--danger-solid-hover);
-}
-button.ee-delete.armed > span {
-  max-width: 64px;
-  opacity: 1;
-}
-
 @media (max-width: 720px) {
   .aday {
     grid-template-columns: 1fr;

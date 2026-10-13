@@ -9,7 +9,7 @@ import { useAction } from './useAction';
 const PAGE = 30;
 const KIND_LABEL: Record<LibraryItem['kind'], string | null> = { selection: null, note: 'Note', chart: 'Chart' };
 
-/** One saved item: the text, where and when it was saved, and Copy, Move, and Delete (with a confirm). */
+/** One saved item: the text, where and when it was saved, and Copy, Move, and Delete (trash morphs in place). */
 function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collections: string[]; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -54,19 +54,20 @@ function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collect
         <button className="icon-btn sm" title="Copy" aria-label="Copy" disabled={busy} onClick={copy}>
           {copied ? <Check size={14} strokeWidth={1.75} aria-hidden /> : <Copy size={14} strokeWidth={1.75} aria-hidden />}
         </button>
-        <button className="icon-btn sm danger" title="Delete" aria-label="Delete" disabled={busy} onClick={() => setConfirming(true)}>
+        {/* Same morph as the event editor (decision 46): trash grows into Delete; blur backs out. */}
+        <button
+          type="button"
+          className={`delete-btn${confirming ? ' armed' : ''}`}
+          title={confirming ? 'Delete this saved item' : 'Delete'}
+          aria-label={confirming ? 'Confirm: delete this saved item' : 'Delete'}
+          disabled={busy}
+          onClick={() => (confirming ? void del() : setConfirming(true))}
+          onBlur={() => setConfirming(false)}
+        >
           <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+          <span>Delete</span>
         </button>
       </div>
-      {confirming && (
-        <div className="confirm">
-          <span className="grow">Delete this saved item? This can't be undone.</span>
-          <button className="danger" disabled={busy} onClick={del}>
-            Delete
-          </button>
-          <button onClick={() => setConfirming(false)}>Cancel</button>
-        </div>
-      )}
       {error && <p className="error small">{error}</p>}
     </li>
   );

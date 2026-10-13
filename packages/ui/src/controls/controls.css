@@ -13,6 +13,7 @@
   left: 0;
   min-width: 180px;
   padding: var(--s-1);
+  overflow-x: hidden;
   overflow-y: auto;
   border-radius: var(--radius-md);
   background: var(--popover);
@@ -72,6 +73,7 @@
 }
 .popover > .pop-menu:only-child {
   max-height: 320px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 .pop-item {
@@ -123,7 +125,9 @@
 .pop-sep {
   flex: none;
   height: 1px;
-  margin: var(--s-1) calc(-1 * var(--s-1));
+  /* Pull into the popover's padding without growing the scroll width (that drew a horizontal bar). */
+  width: calc(100% + 2 * var(--s-1));
+  margin: var(--s-1) 0 var(--s-1) calc(-1 * var(--s-1));
   background: var(--border);
 }
 .pop-head {
