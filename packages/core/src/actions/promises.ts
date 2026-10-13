@@ -34,7 +34,8 @@ export function commitmentsSchema(openKeys: string[]) {
   return z.object({
     commitments: z.array(
       z.object({
-        owner: z.enum(['me', 'them']).describe('me: the user has to do it. them: someone else has to.'),
+        // Not 'me' and 'them': a message author's "I" read as `me` flipped owners (Step 21's Tasks eval).
+        owner: z.enum(['user', 'other']).describe('user: the user has to do it. other: someone else has to.'),
         person_name: z.string().describe('The other person, as written, or "". Never the user.'),
         text: z.string().describe('The task, 3 to 12 words, starting with a verb, without the name or deadline.'),
         due_phrase: z.string().describe('The deadline exactly as written, or "".'),
@@ -49,6 +50,8 @@ export function commitmentsSchema(openKeys: string[]) {
   });
 }
 export const ExtractedCommitmentsSchema = commitmentsSchema([]);
+/** The model's answer as it comes back (owners as user/other), before code reads it. */
+export type ModelCommitments = z.infer<typeof ExtractedCommitmentsSchema>;
 
 /** A row as the model (or the patterns) found it. Pattern rows leave `change` and `open_task` out until matched. */
 export interface ExtractedCommitment {
@@ -65,6 +68,9 @@ export interface ExtractedCommitments {
   /** Missing in pattern output and older test answers. */
   events?: ExtractedEvent[];
 }
+
+/** The model's owner (user or other) as rows and storage keep it (me or them). */
+const ownerOf = (o: string): 'me' | 'them' => (o === 'user' || o === 'me' ? 'me' : 'them');
 
 /** At most this many open tasks go into the prompt. */
 const MAX_OPEN = 12;
@@ -345,7 +351,10 @@ export async function extractPromises(
       },
       commitmentsSchema(open.map((o) => o.key)),
     );
-    [out, found] = await Promise.all([call, detected]);
+    const [answer, people_] = await Promise.all([call, detected]);
+    // The model answers user/other; rows and storage keep me/them.
+    out = { ...answer, commitments: answer.commitments.map((c) => ({ ...c, owner: ownerOf(c.owner) })) };
+    found = people_;
   }
   // Pattern rows come from the selection itself; the model's are checked against it.
   const check: RowCheck | undefined = byRules

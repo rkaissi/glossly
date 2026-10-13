@@ -4,8 +4,10 @@ Return `commitments` (the tasks) and `events`.
 
 `commitments` is a list of at most 8 items, each with:
 
-- `owner`: who has to do it. `me` when the user has to do it: they promised it ("I'll send it Friday"), someone asked them to ("Can you send me the slides?"), or it is their own todo ("renew passport by Nov 1", "remember to book the flights"). `them` when someone else has to do it: they promised it ("I'll share them with Daniel"), or the user asked them to.
-- `person_name`: the other person in the task, as written, with a full name when the text gives one. For `me`, who it is owed to; for `them`, who owes it. Use the message author's name when that is who it is. Never the user. An empty string for a personal todo, or when nobody is named or clear.
+- `owner`: who has to do it. "I" and "me" in a message mean whoever wrote that message, which is often not the user.
+  - `user` when the user has to do it: the user promised it (the user wrote "I'll send it Friday"), someone else asked the user to (someone else wrote "Can you send me the slides?"), or it is the user's own todo ("renew passport by Nov 1", "remember to book the flights").
+  - `other` when someone else has to do it: they promised it (someone else wrote "I'll book the room" or "I'll get you the draft by tomorrow"), or the user asked them to (the user wrote "Can you send me the forecast?").
+- `person_name`: the other person in the task, as written, with a full name when the text gives one. For `user`, who it is owed to; for `other`, who owes it. Use the message author's name when that is who it is. Never the user. An empty string for a personal todo, or when nobody is named or clear.
 - `text`: the task as a short phrase, 3 to 12 words, starting with a verb ("send the slides from Tuesday's review"). Leave out the person's name and the deadline.
 - `due_phrase`: the deadline exactly as written ("Friday", "before Friday", "end of next week", "tomorrow 3pm"), or an empty string when there is none. Never compute or rewrite a date.
 - `confidence`: 0 to 1, how sure you are that this is a real task someone would want to track. Casual intentions with no recipient ("I'll look at it sometime") score lower.

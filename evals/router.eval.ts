@@ -14,7 +14,7 @@ import {
   type Decisions,
   type SelectionContext,
 } from '@glossly/core';
-import { countedLlm, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, withRateLimitRetry } from './lib';
+import { countedLlm, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, resultsFile, withRateLimitRetry } from './lib';
 
 interface Case {
   id: string;
@@ -81,7 +81,7 @@ function report<E extends object>(name: string, results: CaseResult[], extra: E 
     results,
   };
   mkdirSync(resultsDir, { recursive: true });
-  writeFileSync(join(resultsDir, `router-${name}.json`), JSON.stringify(summary, null, 2));
+  writeFileSync(join(resultsDir, resultsFile(`router-${name}`)), JSON.stringify(summary, null, 2));
   return summary;
 }
 

@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { visualize, type VisualizeResult } from '@glossly/core';
-import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, rate, withRateLimitRetry } from './lib';
+import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, resultsFile, rate, withRateLimitRetry } from './lib';
 import { describeSpec, problems, relevant, render, type Expect } from './visualize-lib';
 
 interface Case {
@@ -121,7 +121,7 @@ describe('visualize eval', () => {
     };
     console.log('visualize', JSON.stringify(summary));
     mkdirSync(resultsDir, { recursive: true });
-    writeFileSync(join(resultsDir, `visualize-${modelRef.split('/').at(-1)}.json`), JSON.stringify({ eval: 'visualize', model: modelRef, at: new Date().toISOString(), ...summary, results: rows }, null, 2));
+    writeFileSync(join(resultsDir, resultsFile(`visualize-${modelRef.split('/').at(-1)}`)), JSON.stringify({ eval: 'visualize', model: modelRef, at: new Date().toISOString(), ...summary, results: rows }, null, 2));
     // A budget stop keeps the cases run so far; only a rate-limit stop fails the run.
     expect(stopped?.startsWith('budget') ? null : stopped, 'stopped on rate limits').toBeNull();
   }, 3_600_000);

@@ -207,6 +207,9 @@ export function limitCases<T extends { id: string }>(all: T[], group: (c: T) => 
   return out;
 }
 
+/** A results file name: `<base>.json`, or `<base>-ids.json` for a run of picked cases (GLOSSLY_EVAL_IDS), so it never replaces a full run's file. */
+export const resultsFile = (base: string) => `${base}${process.env.GLOSSLY_EVAL_IDS ? '-ids' : ''}.json`;
+
 // --- Small helpers ----------------------------------------------------------------------------
 
 /** A short error label: the provider's code when it gives one (json_validate_failed), else the error's name. */

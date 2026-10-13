@@ -24,7 +24,7 @@ import {
   type SelectionPayload,
   type Settings,
 } from '@glossly/core';
-import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, rate, sameName, withRateLimitRetry } from './lib';
+import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, resultsFile, rate, sameName, withRateLimitRetry } from './lib';
 
 interface ExpectedTask {
   owner: 'me' | 'them';
@@ -186,13 +186,13 @@ describe('tasks eval', () => {
     const answers: Record<string, unknown> = {
       'open-01': {
         commitments: [
-          { owner: 'me', person_name: 'Jordan Hale', text: 'Send the budget', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't2' },
-          { owner: 'me', person_name: 'Jordan Hale', text: 'Review the venue proposal', due_phrase: 'Monday', confidence: 0.9, change: 'moved', open_task: 't1' },
+          { owner: 'user', person_name: 'Jordan Hale', text: 'Send the budget', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't2' },
+          { owner: 'user', person_name: 'Jordan Hale', text: 'Review the venue proposal', due_phrase: 'Monday', confidence: 0.9, change: 'moved', open_task: 't1' },
         ],
         events: [],
       },
       'event-01': {
-        commitments: [{ owner: 'me', person_name: 'Jordan Hale', text: 'Bring the deck', due_phrase: '', confidence: 0.9, change: 'new', open_task: 'none' }],
+        commitments: [{ owner: 'user', person_name: 'Jordan Hale', text: 'Bring the deck', due_phrase: '', confidence: 0.9, change: 'new', open_task: 'none' }],
         events: [{ title: 'Lunch with Jordan', when: 'Thursday at 1pm', end: '', duration_minutes: 0, location: 'Northwind Cafe', people: ['Jordan Hale'], confidence: 0.9 }],
       },
     };
@@ -259,7 +259,7 @@ describe('tasks eval', () => {
     };
     console.log('tasks', JSON.stringify(summary));
     mkdirSync(resultsDir, { recursive: true });
-    writeFileSync(join(resultsDir, `tasks-${modelRef.split('/').at(-1)}.json`), JSON.stringify({ eval: 'tasks', model: modelRef, at: new Date().toISOString(), ...summary, results: rows }, null, 2));
+    writeFileSync(join(resultsDir, resultsFile(`tasks-${modelRef.split('/').at(-1)}`)), JSON.stringify({ eval: 'tasks', model: modelRef, at: new Date().toISOString(), ...summary, results: rows }, null, 2));
     // A budget stop keeps the cases run so far; only a rate-limit stop fails the run.
     expect(stopped?.startsWith('budget') ? null : stopped, 'stopped on rate limits').toBeNull();
     expect(summary.errors).toBeLessThanOrEqual(rows.length * 0.1);

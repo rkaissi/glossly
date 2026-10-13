@@ -7,7 +7,7 @@ import { CalendarRepo } from '../store/calendar';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { isoNow, type SelectionPayload } from '../types';
-import { buildPromisesPrompt, extractPromises, reminderCutoff, reminderText, savePromises, type ExtractedCommitments } from './promises';
+import { buildPromisesPrompt, extractPromises, reminderCutoff, reminderText, savePromises, type ModelCommitments } from './promises';
 import { detectInputFor } from './who';
 
 const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: [] };
@@ -46,11 +46,11 @@ const selection: SelectionPayload = {
   foreground_handle: 1,
 };
 
-const answer: ExtractedCommitments = {
+const answer: ModelCommitments = {
   commitments: [
-    { owner: 'me', person_name: 'Maya Lin', text: "send the slides from Tuesday's review", due_phrase: 'before Friday', confidence: 0.92, change: 'new', open_task: 'none' },
-    { owner: 'them', person_name: 'Maya', text: 'share the slides with Daniel', due_phrase: '', confidence: 0.4, change: 'new', open_task: 'none' },
-    { owner: 'me', person_name: 'Maya Lin', text: "Send the slides from  Tuesday's review", due_phrase: 'Friday', confidence: 0.9, change: 'new', open_task: 'none' },
+    { owner: 'user', person_name: 'Maya Lin', text: "send the slides from Tuesday's review", due_phrase: 'before Friday', confidence: 0.92, change: 'new', open_task: 'none' },
+    { owner: 'other', person_name: 'Maya', text: 'share the slides with Daniel', due_phrase: '', confidence: 0.4, change: 'new', open_task: 'none' },
+    { owner: 'user', person_name: 'Maya Lin', text: "Send the slides from  Tuesday's review", due_phrase: 'Friday', confidence: 0.9, change: 'new', open_task: 'none' },
   ],
   events: [],
 };
@@ -101,9 +101,9 @@ describe('What did I promise', () => {
     };
     const llm = new FakeLlm(() => ({
       commitments: [
-        { owner: 'them', person_name: 'Alex Morgan', text: 'bring the deck', due_phrase: '', confidence: 0.9, change: 'new', open_task: 'none' },
-        { owner: 'them', person_name: 'Alex Morgan', text: 'send the report', due_phrase: 'Friday 5pm', confidence: 0.9, change: 'new', open_task: 'none' },
-        { owner: 'me', person_name: 'Jordan Hale', text: 'push the review', due_phrase: 'Monday', confidence: 0.9, change: 'new', open_task: 'none' },
+        { owner: 'other', person_name: 'Alex Morgan', text: 'bring the deck', due_phrase: '', confidence: 0.9, change: 'new', open_task: 'none' },
+        { owner: 'other', person_name: 'Alex Morgan', text: 'send the report', due_phrase: 'Friday 5pm', confidence: 0.9, change: 'new', open_task: 'none' },
+        { owner: 'user', person_name: 'Jordan Hale', text: 'push the review', due_phrase: 'Monday', confidence: 0.9, change: 'new', open_task: 'none' },
       ],
       events: [
         { title: 'Lunch with Jordan', when: 'Thursday at 1pm', end: '', duration_minutes: 0, location: 'Northwind Cafe', people: ['Jordan Hale'], confidence: 0.9 },
@@ -168,8 +168,8 @@ describe('What did I promise', () => {
     const people = new PeopleRepo(store);
     const llm = new FakeLlm(() => ({
       commitments: [
-        { owner: 'me', person_name: 'Daniel', text: 'intro Daniel to legal', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
-        { owner: 'them', person_name: 'Priya', text: 'send the budget', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
+        { owner: 'user', person_name: 'Daniel', text: 'intro Daniel to legal', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
+        { owner: 'other', person_name: 'Priya', text: 'send the budget', due_phrase: '', confidence: 0.8, change: 'new', open_task: 'none' },
       ],
       events: [],
     }));
@@ -231,10 +231,10 @@ describe('Tasks and open tasks (decision 36)', () => {
     const { people, budget, deck, intro } = seed();
     const llm = new FakeLlm(() => ({
       commitments: [
-        { owner: 'them', person_name: 'Jordan Hale', text: 'send the budget', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't1' },
-        { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'Monday', confidence: 0.9, change: 'moved', open_task: 't2' },
+        { owner: 'other', person_name: 'Jordan Hale', text: 'send the budget', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't1' },
+        { owner: 'user', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'Monday', confidence: 0.9, change: 'moved', open_task: 't2' },
         // A second row about the same task is dropped.
-        { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck again', due_phrase: '', confidence: 0.9, change: 'same', open_task: 't2' },
+        { owner: 'user', person_name: 'Jordan Hale', text: 'review the deck again', due_phrase: '', confidence: 0.9, change: 'same', open_task: 't2' },
       ],
       events: [],
     }));
@@ -263,8 +263,8 @@ describe('Tasks and open tasks (decision 36)', () => {
     const { people, deck } = seed();
     const llm = new FakeLlm(() => ({
       commitments: [
-        { owner: 'me', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'later', confidence: 0.9, change: 'moved', open_task: 't2' },
-        { owner: 'me', person_name: 'Jordan Hale', text: 'book the venue', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't9' },
+        { owner: 'user', person_name: 'Jordan Hale', text: 'review the deck', due_phrase: 'later', confidence: 0.9, change: 'moved', open_task: 't2' },
+        { owner: 'user', person_name: 'Jordan Hale', text: 'book the venue', due_phrase: '', confidence: 0.9, change: 'done', open_task: 't9' },
       ],
       events: [],
     }));
@@ -298,7 +298,7 @@ describe('events from the same call (decision 37)', () => {
     calendar.add({ title: 'Dentist', starts_at: '2026-10-15T09:00:00' + isoNow(now).slice(19), ends_at: null, all_day: false, location: null, attendees: [], personIds: [] }, null);
     calendar.add({ title: 'Other day', starts_at: '2026-10-16', ends_at: null, all_day: true, location: null, attendees: [], personIds: [] }, null);
     const llm = new FakeLlm(() => ({
-      commitments: [{ owner: 'me', person_name: 'Jordan Hale', text: 'bring the deck', due_phrase: 'Thursday', confidence: 0.8, change: 'new', open_task: 'none' }],
+      commitments: [{ owner: 'user', person_name: 'Jordan Hale', text: 'bring the deck', due_phrase: 'Thursday', confidence: 0.8, change: 'new', open_task: 'none' }],
       events: [{ title: 'Lunch with Jordan', when: 'Thursday 1pm', end: '', duration_minutes: 90, location: 'Northwind Cafe', people: ['Jordan Hale'], confidence: 0.9 }],
     }));
     const invite: SelectionPayload = { ...selection, text: 'Lunch with Jordan Thursday at 1pm at Northwind Cafe? Can you bring the deck?' };

@@ -24,7 +24,7 @@ import {
   type Settings,
   type WhoRead,
 } from '@glossly/core';
-import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, rate, sameName, withRateLimitRetry } from './lib';
+import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, resultsFile, rate, sameName, withRateLimitRetry } from './lib';
 
 interface Case {
   id: string;
@@ -202,7 +202,7 @@ describe('who eval', () => {
       budget_checks: budgetLog,
     };
     console.log('read', JSON.stringify(summary));
-    write(`who-${modelRef.split('/').at(-1)}`, { eval: 'who', mode: 'read', model: modelRef, at: new Date().toISOString(), ...summary, results: rows });
+    write(resultsFile(`who-${modelRef.split('/').at(-1)}`).replace(/\.json$/, ''), { eval: 'who', mode: 'read', model: modelRef, at: new Date().toISOString(), ...summary, results: rows });
     // A budget stop keeps the cases run so far; only a rate-limit stop fails the run.
     expect(stopped?.startsWith('budget') ? null : stopped, 'stopped on rate limits').toBeNull();
     expect(summary.errors).toBeLessThanOrEqual(rows.length * 0.1);
