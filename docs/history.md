@@ -52,7 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 22e | Oct 13 | (next commit records it) | The `ship-release` skill for Claude Code and Cursor, with `scripts/release.mjs` (version checks, bump, notes, verify, publish). |
+| 22e | Oct 13 | `cf9ecd5` | The `ship-release` skill for Claude Code and Cursor, with `scripts/release.mjs` (version checks, bump, notes, verify, publish). |
 | 22d | Oct 13 | (tag `v0.1.0`) | v0.1.0 published on GitHub Releases (installer, `.blockmap`, `latest.yml`; private repo). |
 | 22c | Oct 13 | `9a545a7` | Installed-app check finished (setup, the Updates group, pill and Ask, Save with an embedding, the reminder, Quit); the draft release's notes updated. The taskbar icon is still Electron's on this machine. |
 | 22b | Oct 13 | `2828bd5` | Updates: electron-updater on the GitHub Releases feed, auto download, Restart to update in Settings > General and a toast, installs at the end of shutdown (decision 70); the builder config becomes `electron-builder.config.cjs` (owner from the git remote). |
