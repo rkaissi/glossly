@@ -319,17 +319,6 @@ kbd.hotkey {
   border-top: 1px solid var(--border);
 }
 
-/* The block confirm (Delete all data, Reset settings); an inline one sits in its row with no outline. */
-.confirm:not(.inline) {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-sm);
-}
-
 /* ---- models ---- */
 
 .roles {

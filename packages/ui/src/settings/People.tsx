@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react';
 import type { CommitmentView, PersonCard, PersonSummary } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { InlineConfirm } from '../confirm';
 import { Select } from '../controls/Select';
 import { formatDay } from '../dates';
 import { CommitmentList, PersonCardView } from '../people/PersonCard';
@@ -115,20 +116,18 @@ function Merge({ card }: { card: PersonCard }) {
           }}
           options={others.map((p) => ({ value: p.id, label: p.name, hint: p.aliases.length ? p.aliases.join(', ') : undefined }))}
         />
-        <button className="danger" disabled={!pick || busy} onClick={() => setConfirming(true)}>
+        <button className="danger" disabled={!pick || busy || confirming} onClick={() => setConfirming(true)}>
           Merge…
         </button>
       </div>
       {confirming && pick && (
-        <div className="confirm">
-          <span className="grow">
-            Merge {pick.name} into {card.name}? This can't be undone.
-          </span>
-          <button className="danger" disabled={busy} onClick={() => void run(() => glossly.invoke('people:merge', { keepId: card.id, dropId: pick.id }))}>
-            Merge
-          </button>
-          <button onClick={() => setConfirming(false)}>Cancel</button>
-        </div>
+        <InlineConfirm
+          prompt={`Merge ${pick.name} into ${card.name}? This can't be undone.`}
+          confirm="Merge"
+          busy={busy}
+          onConfirm={() => void run(() => glossly.invoke('people:merge', { keepId: card.id, dropId: pick.id }))}
+          onCancel={() => setConfirming(false)}
+        />
       )}
       {error && <p className="error small">{error}</p>}
     </div>
@@ -149,21 +148,25 @@ function Delete({ card }: { card: PersonCard }) {
         <strong>Delete {card.name}</strong>
         <p className="muted small">Removes their aliases, messages, and commitments. Items you saved that mention them stay.</p>
       </div>
-      {confirming ? (
-        <div className="confirm">
-          <span className="grow">Delete {card.name}? This can't be undone.</span>
-          <button className="danger" disabled={busy} onClick={del}>
-            Delete
+      {/* Same morph as events and Saved (decision 66); Cancel backs out. */}
+      <div className="row">
+        <button
+          type="button"
+          className={`delete-btn${confirming ? ' armed' : ''}`}
+          title={confirming ? `Delete ${card.name}` : 'Delete person'}
+          aria-label={confirming ? `Confirm: delete ${card.name}` : 'Delete person'}
+          disabled={busy}
+          onClick={() => (confirming ? del() : setConfirming(true))}
+        >
+          <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+          <span>Delete</span>
+        </button>
+        {confirming && (
+          <button type="button" className="ghost sm" disabled={busy} onClick={() => setConfirming(false)}>
+            Cancel
           </button>
-          <button onClick={() => setConfirming(false)}>Cancel</button>
-        </div>
-      ) : (
-        <div className="row">
-          <button className="danger" onClick={() => setConfirming(true)}>
-            Delete person…
-          </button>
-        </div>
-      )}
+        )}
+      </div>
       {error && <p className="error small">{error}</p>}
     </div>
   );

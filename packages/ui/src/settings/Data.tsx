@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { EmbedStatus, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { InlineConfirm } from '../confirm';
 import { pct } from './format';
 import { BlockList } from './General';
 import { CallLog, PrivacyChoice } from './Privacy';
@@ -115,19 +116,10 @@ function Destructive(props: {
         <strong>{props.title}</strong>
         <p className="muted small">{props.description}</p>
       </div>
-      {confirming ? (
-        <div className="confirm">
-          <span>{props.warning}</span>
-          <span className="spacer" />
-          <button onClick={() => setConfirming(false)} disabled={busy}>
-            Cancel
-          </button>
-          <button className="danger" onClick={() => void go()} disabled={busy}>
-            {props.confirm}
-          </button>
-        </div>
-      ) : (
-        <div className="row">
+      <div className="row">
+        {confirming ? (
+          <InlineConfirm prompt={props.warning} confirm={props.confirm} busy={busy} onConfirm={() => void go()} onCancel={() => setConfirming(false)} />
+        ) : (
           <button
             className="danger"
             onClick={() => {
@@ -137,9 +129,9 @@ function Destructive(props: {
           >
             {props.button}
           </button>
-          {done && <span className="ok small">{props.done}</span>}
-        </div>
-      )}
+        )}
+        {done && !confirming && <span className="ok small">{props.done}</span>}
+      </div>
       {error && <p className="error small">{error}</p>}
     </div>
   );
