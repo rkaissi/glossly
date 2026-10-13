@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 13, 2026 (evening). **Step 22 (packaging) is underway:** the installer builds and installs (decision 69), and its first check passed what it could before the Windows session locked; the rest of the installed-app check is next (see **Next**). **Step 21 is done** except the Visualize eval (gpt-oss-20b's rolling daily limit). Everything is committed and pushed except this chunk's commit. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
+Last updated Oct 13, 2026 (evening). **Step 22 (packaging) is underway:** the installer builds and installs (decision 69), and its first check passed what it could before the Windows session locked; the rest of the installed-app check is next (see **Next**). **Step 21 is done** except the Visualize eval (gpt-oss-20b's rolling daily limit). Everything is committed and pushed. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
 
 **Delete confirms (Oct 12 evening; decision 66).** Trash morph for Saved, Tasks, calendar events, person header (pencil rename beside it; warning only when armed), and Profile voice/learned rows; chips keep the small x; Merge / Delete all / Reset use borderless `InlineConfirm`; event Save stays visible but disabled while delete is armed or the event is unchanged. Red-bordered confirm boxes are gone.
 
