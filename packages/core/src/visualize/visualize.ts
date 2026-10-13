@@ -91,6 +91,13 @@ export function specFromChoice(c: ChartChoice, table: ParsedTable, types: FieldT
   if (c.chart === 'none' || !table.columns.includes(c.x)) return null;
   let measures = [...new Set(c.measures)].filter((m) => m !== c.x && table.columns.includes(m) && typeOf(m) === 'quantitative');
   if (measures.length === 0) return null;
+  // Series on one axis need one scale: when the largest values differ more than tenfold, the small
+  // one lies flat, so keep the model's first (main) measure. The prompt asks for this; code makes sure (Step 21).
+  if (measures.length > 1) {
+    const peak = (m: string) => Math.max(0, ...table.rows.map((r) => Math.abs(Number(r[table.columns.indexOf(m)]) || 0)));
+    const peaks = measures.map(peak).filter((p) => p > 0);
+    if (peaks.length > 1 && Math.max(...peaks) / Math.min(...peaks) > 10) measures = measures.slice(0, 1);
+  }
   let kind = c.chart;
   if (kind === 'point' && typeOf(c.x) !== 'quantitative') kind = 'bar';
   if (kind === 'point') measures = measures.slice(0, 1);

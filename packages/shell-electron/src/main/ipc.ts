@@ -421,7 +421,9 @@ export function registerIpc(deps: IpcDeps): void {
   handle('commitments:add', (a) => {
     const due = a.due_at === null ? null : str(a.due_at, 40);
     if (due && !DUE.test(due)) throw new Error('Invalid date');
-    people.addCommitment({ person_id: null, owner: 'me', text: str(a.text, 300), due_at: due, source_interaction_id: null });
+    // Quick add with the person filter set: the user owes that person (Step 21). An unknown id is ignored.
+    const personId = typeof a.person_id === 'string' && people.get(a.person_id) ? a.person_id : null;
+    people.addCommitment({ person_id: personId, owner: 'me', text: str(a.text, 300), due_at: due, source_interaction_id: null });
     broadcastPeople();
   });
   handle('commitments:delete', (a) => {

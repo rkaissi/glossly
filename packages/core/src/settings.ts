@@ -77,7 +77,8 @@ export const SettingsSchema = z.object({
    * 30 days, to debug what the models saw (decision 61). Off by default; turning it off deletes the log.
    */
   callLog: z.boolean().default(false),
-  debugView: z.boolean().default(true),
+  /** The debug block under the bar. Off for new profiles (Step 21): testers shouldn't start with it. */
+  debugView: z.boolean().default(false),
   identity: IdentitySchema.prefault({}),
 
   /** Keys are process names ("slack.exe") or window-title suffixes ("- Google Docs"). */

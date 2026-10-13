@@ -112,7 +112,8 @@ function Section({ title, count, when, tone, children }: { title: string; count:
 }
 
 /** Text first, then the due chip; a date said in the text fills the chip and leaves the title (decision 40). */
-function QuickAdd({ today }: { today: string }) {
+/** `person`: the person filter's pick; a new task is then owed to them. */
+function QuickAdd({ today, person }: { today: string; person: { id: string; name: string } | null }) {
   const ws = useContext(WeekStartContext);
   const [text, setText] = useState('');
   const [due, setDue] = useState<string | null>(null);
@@ -137,7 +138,7 @@ function QuickAdd({ today }: { today: string }) {
     const title = found ? withoutDue(v, found) : v;
     // `run` gives undefined on failure; the call itself returns nothing, so say it worked.
     const ok = await run(async () => {
-      await glossly.invoke('commitments:add', { text: title, due_at: shownDue });
+      await glossly.invoke('commitments:add', { text: title, due_at: shownDue, person_id: person?.id ?? null });
       return true;
     });
     if (!ok) return;
@@ -167,7 +168,7 @@ function QuickAdd({ today }: { today: string }) {
         <input
           ref={input}
           value={text}
-          placeholder="Add a task, e.g. Send Jordan the deck by Friday"
+          placeholder={person ? `Add a task for ${person.name}` : 'Add a task, e.g. Send Jordan the deck by Friday'}
           aria-label="New task"
           maxLength={300}
           onChange={(e) => setText(e.target.value)}
@@ -268,7 +269,7 @@ export function TasksTab() {
           options={[{ value: '', label: 'Everyone', icon: <UsersRound size={16} strokeWidth={1.75} aria-hidden /> }, ...(people ?? []).map((p, i) => ({ value: p.id, label: p.name, separator: i === 0, hint: p.open ? String(p.open) : undefined }))]}
         />
       </div>
-      <QuickAdd today={today} />
+      <QuickAdd today={today} person={(people ?? []).find((p) => p.id === personId) ?? null} />
       <div className="task-filters" role="group" aria-label="Show">
         {FILTERS.map(([f, label]) => (
           <button key={f} type="button" className="fchip" aria-pressed={filter === f} onClick={() => setFilter(f)}>

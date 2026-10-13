@@ -58,6 +58,10 @@ describe('app matching', () => {
     expect(keyMatches('Discord', dm)).toBe(true);
     expect(keyMatches('discord', discordApp)).toBe(true);
     expect(keyMatches('Discord', { process_name: 'chrome.exe', title: 'Discord - Google Chrome' })).toBe(true);
+    // An unread count at the end of the title stays out of the rule (Step 21).
+    const counted = { process_name: 'chrome.exe', title: '#planning | Northwind Makers - Discord (3) - Google Chrome' };
+    expect(placeNameFor(counted)).toBe('Discord');
+    expect(keyMatches('Discord', { ...counted, title: '#general | Northwind Makers - Discord (12) - Google Chrome' })).toBe(true);
     expect(keyMatches('Discord', { process_name: 'chrome.exe', title: 'Discord tips | Medium - Google Chrome' })).toBe(false);
     expect(keyMatches('Google Docs', edgeDocs)).toBe(true);
     expect(keyMatches('Google Docs', slack)).toBe(false);

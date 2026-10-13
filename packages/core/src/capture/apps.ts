@@ -51,6 +51,8 @@ const BROWSER_SUFFIXES = [
   // Edge and Chrome add "and N more pages" / profile names in some locales.
   /\s+-\s+Personal$/,
   /\s+-\s+Work$/,
+  // An unread count some sites put last ("#planning - Discord (3)"), so a rule doesn't hold the count (Step 21).
+  /\s+\(\d+\+?\)$/,
 ];
 
 export function stripBrowserSuffix(title: string): string {

@@ -51,6 +51,13 @@ describe('specFromChoice', () => {
     expect(spec.encoding).toMatchObject({ x: { field: 'Region', type: 'nominal' }, y: { field: 'Q1', type: 'quantitative' } });
   });
 
+  it('keeps only the first measure when their scales differ more than tenfold (Step 21)', () => {
+    const traffic = parseTable('Month\tVisitors\tSignups\nJan\t1200\t85\nFeb\t1350\t92\nMar\t1600\t110')!;
+    const spec = specFromChoice({ chart: 'line', x: 'Month', measures: ['Visitors', 'Signups'], split_by: '', sort: 'data' }, traffic, inferTypes(traffic))!;
+    expect(spec.transform).toBeUndefined();
+    expect(spec.encoding).toMatchObject({ y: { field: 'Visitors' } });
+  });
+
   it('folds several measures, sorts and turns bars, and draws a line with points', () => {
     const grouped = specFromChoice(pick({ measures: ['Q1', 'Q2'] }), table, types)!;
     expect(grouped.transform).toEqual([{ fold: ['Q1', 'Q2'], as: ['series', 'value'] }]);

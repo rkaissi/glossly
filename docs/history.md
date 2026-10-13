@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| 21e | Oct 12 | (next commit records it) | Fixes from the live checks (decision 65): debug view off for new profiles, quick add with a person, Who drops verb-like names, Visualize keeps one scale, trailing unread counts, Reply's drafts answer only the target; the HANDOFF summarizes Step 21's end-to-end results. |
 | 21d | Oct 12 | `6a2184d` | End-to-end pass D (Reply and chat): the empty bar shows More's actions; an email chain's newest message is the one to answer (decision 64). |
 | 21c | Oct 12 | `29c2461` | End-to-end passes B and C: `context_caret` reads the page around a Chromium reply box; the settings window redraws its mica on a theme change. |
 | 21b | Oct 12 | `1f1ed11` | End-to-end pass A (Setup, settings); Tasks rows must come from the selection and the user is never the other person (decision 63). |

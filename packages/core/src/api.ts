@@ -492,7 +492,8 @@ export interface InvokeChannels {
   'calendar:update': { args: { id: string; patch: EventPatch }; result: void };
   'calendar:delete': { args: { id: string }; result: void };
   /** A personal todo typed in the Agenda tab: owner "me", no person. */
-  'commitments:add': { args: { text: string; due_at: string | null }; result: void };
+  /** A task from quick add: the user's, owed to `person_id` when the person filter names one. */
+  'commitments:add': { args: { text: string; due_at: string | null; person_id?: string | null }; result: void };
   /** Voice samples for Reply: pasted ones (at most 5) and the replies the user inserted. */
   'voice:list': { args: void; result: VoiceSample[] };
   'voice:add': { args: { text: string }; result: VoiceSample[] };

@@ -176,7 +176,8 @@ function attachContacts(rows: WhoCandidate[], corpus: string): WhoCandidate[] {
     const norm = kind === 'email' ? normalizeEmail(value) : normalizeHandle(value);
     if (kind === 'email' && isRoleAddress(norm)) return;
     if (out.some((r) => (kind === 'email' ? normalizeEmail(r.email) === norm : normalizeHandle(r.handle) === norm))) return;
-    const name = neighborName(before);
+    const near = neighborName(before);
+    const name = near && !verbLike(near, corpus) ? near : null;
     const host = name ? out.find((r) => r.name && canonicalize(r.name) === canonicalize(name)) : undefined;
     if (host) {
       if (kind === 'email') host.email = norm;
@@ -234,11 +235,23 @@ function toDetected(r: WhoCandidate): DetectedPerson | null {
  * people, the user, and fragments of one name. An address attaches to the neighboring
  * name; a bare or shared inbox does not become a person. @handles are kept.
  */
+/**
+ * A one-word "name" that is a verb in the text: it ends in -ing, and every time it appears it
+ * starts a sentence and the next word is lowercase or an address ("Copying finance@example.com",
+ * "Looping in Casey"). Step 21: Who listed "Copying" as a person. "We met Sterling at" is a name.
+ */
+function verbLike(name: string, corpus: string): boolean {
+  const n = name.trim();
+  if (!/^[A-Z][a-z]{3,}ing$/.test(n)) return false;
+  const uses = [...corpus.matchAll(new RegExp(String.raw`(^|[.!?:]\s+|\n\s*)?\b${n}\b[ \t]+(\S+)`, 'g'))];
+  return uses.length > 0 && uses.every((m) => (m.index === 0 || m[1] !== undefined) && (/^[a-z]/.test(m[2]!) || m[2]!.includes('@')));
+}
+
 export function acceptWhoRows(rows: WhoCandidate[], corpus: string, me: Identity): DetectedPerson[] {
   const flat = squash(corpus);
   const grounded = rows.filter((r) => {
     if (confidenceOf(r.confidence) < WHO_MIN_CONFIDENCE) return false;
-    if (NOT_PEOPLE.has(canonicalize(r.name))) return false;
+    if (NOT_PEOPLE.has(canonicalize(r.name)) || verbLike(r.name, corpus)) return false;
     // A quote that spans a line break comes back with a space: compare with whitespace squashed.
     const evidence = squash(r.evidence);
     if (!evidence || !flat.includes(evidence)) return false;

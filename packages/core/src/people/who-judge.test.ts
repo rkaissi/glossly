@@ -324,3 +324,19 @@ describe("localWho edge cases", () => {
         ).toEqual(["quinn"]);
     });
 });
+
+describe("verb-like names (Step 21)", () => {
+    it("drops a one-word -ing name used as a verb, and keeps a real one", () => {
+        const corpus = "Hi Alex, can you pull the Q4 numbers? Copying finance@example.com for visibility.\nJordan Hale <jordan.hale@example.com>\nWe met Sterling at the offsite.";
+        const people = acceptWhoRows(
+            [
+                row({ name: "Copying", email: "finance@example.com", evidence: "Copying finance@example.com" }),
+                row({ name: "Jordan Hale", email: "jordan.hale@example.com", evidence: "Jordan Hale <jordan.hale@example.com>" }),
+                row({ name: "Sterling", evidence: "We met Sterling at the offsite." }),
+            ],
+            corpus,
+            me
+        );
+        expect(people.map((p) => p.name)).toEqual(["Jordan Hale", "Sterling"]);
+    });
+});
