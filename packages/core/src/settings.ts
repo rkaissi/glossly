@@ -145,7 +145,9 @@ export const SettingsSchema = z.object({
   recall: z
     .object({
       /** Cosine similarity a saved item needs to count as related (spec: Recall). */
-      minSimilarity: z.number().min(0).max(1).default(0.78),
+      // 0.78 was out of reach for all-MiniLM-L6-v2: related notes score about 0.4 to 0.75 and unrelated
+      // ones under 0.35 (Step 21's Recall eval), so similar-topic recall never fired. Decision 66.
+      minSimilarity: z.number().min(0).max(1).default(0.5),
       /** Lower bar for the search box, where the user asked for it. */
       searchSimilarity: z.number().min(0).max(1).default(0.45),
       maxResults: z.number().int().min(1).max(20).default(5),
@@ -237,6 +239,12 @@ export const SETTINGS_MIGRATIONS: {
   },
   // Oct 11: the Local only checkbox became a choice (decision 34): localOnly true → privacy "local".
   { key: 'privacy', from: 'localOnly', migrate: (v) => (v === true ? 'local' : 'all') },
+  // Oct 13: Recall's similarity floor went from 0.78 to 0.5 (decision 66). A stored 0.78 (the old default) moves; any other value stays.
+  {
+    key: 'recall',
+    migrate: (r) =>
+      r && typeof r === 'object' && (r as { minSimilarity?: unknown }).minSimilarity === 0.78 ? { ...r, minSimilarity: 0.5 } : undefined,
+  },
 ];
 
 /** Parses a partial or stale stored object, keeping valid keys and defaulting the rest. */

@@ -66,6 +66,11 @@ describe('recall eval', () => {
         got: hits.map((h) => `${byFixture.get(h.itemId)} ${h.reason}${h.similarity ? ` ${h.similarity.toFixed(2)}` : ''}`),
         // Similarity of each expected item to the selection, against minSimilarity.
         expected_similarity: Object.fromEntries(c.expect.map((e) => [e, Number(dot(q!, vectors.get(e)!).toFixed(3))])),
+        // The five most similar items, with whether each is expected, allowed, or wrong: what a threshold would let through.
+        nearest: [...vectors.entries()]
+          .map(([id, v]) => ({ id, sim: Number(dot(q!, v).toFixed(3)), kind: c.expect.includes(id) ? 'expect' : c.ok.includes(id) ? 'ok' : 'wrong' }))
+          .sort((a, b) => b.sim - a.sim)
+          .slice(0, 5),
       });
       const r = rows.at(-1)!;
       console.log(`${c.id} ${r.all_found ? 'ok ' : 'MISS'} got [${r.got.join(', ')}]${r.missed.length ? ` missed ${r.missed.map((m) => `${m} (${r.expected_similarity[m]})`).join(', ')}` : ''}${r.false_hits.length ? ` false ${r.false_hits.join(',')}` : ''}`);

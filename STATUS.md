@@ -94,6 +94,8 @@ Tasks and events (Oct 13, gpt-oss-20b, 18 fictional cases on a fixed Wednesday):
 
 Qwen 3.8 against gpt-oss-20b on 5 Who and 5 Tasks fixtures: Qwen got all 10 right with fewer tokens; gpt-oss-20b's misses there were all ones since fixed in code. Fast stays on gpt-oss-20b so it doesn't share the router's rate limit (decision 60).
 
+Recall (Oct 13, on this computer, 16 fictional selections over 20 saved items): related notes by topic were never offered, because their similarity (0.37 to 0.74) was under the 0.78 floor; only shared people and companies worked. With the floor at 0.5, 13 of 16 selections get everything they should, with no wrong suggestions (decision 66).
+
 ## Capture results per app
 
 Pending your hand tests; see `evals/capture.md`. So far, Notepad passes on both paths (UIA read in about 55 to 60 ms, tier 2 in 50 to 93 ms), and the settings window passes on the auto path (UIA, 283 to 335 ms to the pill).
