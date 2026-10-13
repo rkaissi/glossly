@@ -37,6 +37,10 @@ const CASES: [string, string | null][] = [
   ['end of the month', '2026-10-31'],
   ['end of day', at(10, 14, 17)],
   ['by EOD', at(10, 14, 17)],
+  // Step 21's Tasks eval: the end of a named day.
+  ['end of day tomorrow', at(10, 15, 17)],
+  ['by end of day Friday', at(10, 16, 17)],
+  ['Friday end of day', at(10, 16, 17)],
   ['next week', '2026-10-19'],
   ['next month', '2026-11-01'],
   ['in 2 days', '2026-10-16'],

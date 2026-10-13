@@ -173,6 +173,9 @@ export function resolveDue(phrase: string | null | undefined, now: Date = new Da
   // Leading words that don't change the date.
   s = s.replace(/^(?:due|by|before|on|until|till|no later than|sometime|some time|latest|at the latest)\s+/g, '').replace(/^(?:by|on|before)\s+/, '');
   s = s.replace(/\s+(?:at the latest|latest)$/, '');
+  // "end of day tomorrow", "Friday end of day": the day plus its end, like "eod" (Step 21's Tasks eval).
+  // "end of day" alone keeps its own meaning (today at the end of the day).
+  s = s.replace(/\bend of (?:the )?(?:business )?day\b/, (m) => (s.trim() === m ? m : 'eod'));
   if (!s) return null;
   const today = dayOf(now);
 

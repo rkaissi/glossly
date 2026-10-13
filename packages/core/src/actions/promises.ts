@@ -189,6 +189,8 @@ export interface RowCheck {
   me: Settings['identity'];
   /** The selected message's author when it isn't the user. */
   author: string | null;
+  /** The one other person in the selection (its author, or the only other writer), else null. A task left without a person is between the user and them. */
+  counterpart: string | null;
 }
 
 /**
@@ -246,6 +248,8 @@ export function toPromiseRows(
       owner = 'me';
       written = check.author;
     }
+    // No person, but only one other person in the selection: the task is between the user and them (Step 21's Tasks eval).
+    if (check && !written) written = check.counterpart;
     const dupe = `${owner}:${canonicalize(text)}`;
     if (seen.has(dupe)) continue;
     seen.add(dupe);
@@ -357,9 +361,11 @@ export async function extractPromises(
     found = people_;
   }
   // Pattern rows come from the selection itself; the model's are checked against it.
+  const author = input.authorIsMe ? null : (input.author?.name ?? null);
+  const writers = [...new Set((input.messages ?? []).flatMap((m) => (m.author && !m.user ? [m.author] : [])))];
   const check: RowCheck | undefined = byRules
     ? undefined
-    : { selection: input.selection.text, me: settings.identity, author: input.authorIsMe ? null : (input.author?.name ?? null) };
+    : { selection: input.selection.text, me: settings.identity, author, counterpart: writers.length ? (writers.length === 1 ? writers[0]! : null) : author };
   const rows = toPromiseRows(out, people, sourceApp, now, found, open, check);
   const everyone = new Set([...ids, ...exactIds(people, found, sourceApp), ...rows.flatMap((r) => (r.match?.kind === 'exact' ? [r.match.personId] : []))]);
   const about = new Set(rows.flatMap((r) => (r.existing ? [r.existing.id] : [])));

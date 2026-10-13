@@ -117,6 +117,19 @@ describe('What did I promise', () => {
     expect(events.map((e) => e.title)).toEqual(['Lunch with Jordan']);
   });
 
+  it('gives a task with no person to the one other person in the selection, never in the user\'s own notes (Step 21)', async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const ask: SelectionPayload = { ...selection, text: 'please review the PR today if you can' };
+    const answer = { commitments: [{ owner: 'user', person_name: '', text: 'review the PR', due_phrase: 'today', confidence: 0.9, change: 'new', open_task: 'none' }], events: [] };
+    const author = { name: 'Jordan Hale', email: null, handle: null, role: 'author', knownId: null } as DetectedPerson;
+    const fromJordan = await extractPromises(new FakeLlm(() => answer), people, settings, { selection: ask, author, authorIsMe: false }, undefined, now);
+    expect(fromJordan.rows[0]).toMatchObject({ owner: 'me', person_name: 'Jordan Hale' });
+    const note: SelectionPayload = { ...selection, text: 'review the PR today' };
+    const mine = await extractPromises(new FakeLlm(() => answer), people, settings, { selection: note, author: null, authorIsMe: true }, undefined, now);
+    expect(mine.rows[0]).toMatchObject({ owner: 'me', person_name: null });
+  });
+
   it('passes a Local only refusal through', async () => {
     store = new Store(':memory:');
     const llm = new FakeLlm(() => {
