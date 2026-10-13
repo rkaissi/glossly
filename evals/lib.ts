@@ -19,6 +19,8 @@ export interface Counted {
   total: () => Usage;
   /** The rate-limit headers of the last answer (Groq: daily requests, tokens per minute). */
   limits: () => Limits | null;
+  /** The text of the last answer (the structured JSON), to see what the model said on a miss. */
+  answer: () => string | null;
   reset: () => void;
 }
 
@@ -28,7 +30,7 @@ export const groqKey = () => process.env.GROQ_API_KEY ?? null;
 export const evalModel = (fallback: ModelRef): ModelRef => (process.env.GLOSSLY_EVAL_MODEL as ModelRef | undefined) ?? fallback;
 
 type Gen = {
-  doGenerate: (o: unknown) => Promise<{ usage?: { inputTokens?: { total?: number }; outputTokens?: { total?: number } }; response?: { headers?: Record<string, string> } }>;
+  doGenerate: (o: unknown) => Promise<{ usage?: { inputTokens?: { total?: number }; outputTokens?: { total?: number } }; response?: { headers?: Record<string, string> }; content?: { type: string; text?: string }[] }>;
 };
 
 /** Groq's x-ratelimit headers: requests are per day (refilling one at a time), tokens per minute. */
@@ -49,6 +51,7 @@ export function countedLlm(modelRef: ModelRef): Counted {
   const now: Usage = { attempts: 0, inputTokens: 0, outputTokens: 0 };
   const all: Usage = { attempts: 0, inputTokens: 0, outputTokens: 0 };
   let last: Limits | null = null;
+  let answer: string | null = null;
   const add = (u: Usage, i: number, o: number) => {
     u.attempts++;
     u.inputTokens += i;
@@ -63,6 +66,7 @@ export function countedLlm(modelRef: ModelRef): Counted {
             const i = r.usage?.inputTokens?.total ?? 0;
             const o = r.usage?.outputTokens?.total ?? 0;
             last = readLimits(r.response?.headers) ?? last;
+            answer = (r.content ?? []).flatMap((p) => (p.type === 'text' && p.text ? [p.text] : [])).join('') || answer;
             add(now, i, o);
             add(all, i, o);
             spent(i + o);
@@ -83,6 +87,7 @@ export function countedLlm(modelRef: ModelRef): Counted {
     calls: () => ({ ...now }),
     total: () => ({ ...all }),
     limits: () => last,
+    answer: () => answer,
     reset: () => {
       now.attempts = 0;
       now.inputTokens = 0;

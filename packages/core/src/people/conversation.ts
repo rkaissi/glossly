@@ -103,7 +103,9 @@ function withoutNextHeader(text: string, nextAuthor: string | null | undefined):
   const next = nextAuthor?.trim().toLowerCase();
   while (lines.length > 1) {
     const last = lines.at(-1)!.trim();
-    if (!last || isHeaderChrome(last) || (next && last.toLowerCase() === next)) lines.pop();
+    // The next writer's name alone, or with its time on the same line (Slack's "Name  9:41 AM").
+    const sameLine = next && last.toLowerCase().startsWith(next) && isHeaderChrome(last.slice(next.length).replace(/^[\s—–-]+/, ''));
+    if (!last || isHeaderChrome(last) || (next && last.toLowerCase() === next) || sameLine) lines.pop();
     else break;
   }
   return lines.join('\n').trim();

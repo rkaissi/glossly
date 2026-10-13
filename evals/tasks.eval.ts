@@ -230,14 +230,14 @@ describe('tasks eval', () => {
           },
         );
         const u = counted.calls();
-        rows.push({ id: c.id, ...score(c, out, openIds), ms: Math.round(performance.now() - t), input_tokens: u.inputTokens, output_tokens: u.outputTokens, error: null as string | null });
+        rows.push({ id: c.id, ...score(c, out, openIds), ms: Math.round(performance.now() - t), input_tokens: u.inputTokens, output_tokens: u.outputTokens, error: null as string | null, answer: counted.answer() });
       } catch (e) {
         if (e instanceof RateLimitStop) {
           stopped = e.message;
           store.close();
           break;
         }
-        rows.push({ id: c.id, ...score(c, { rows: [], events: [], sameDay: [], open: [], byRules: null }, openIds), ms: Math.round(performance.now() - t), input_tokens: 0, output_tokens: 0, error: errorLabel(e) });
+        rows.push({ id: c.id, ...score(c, { rows: [], events: [], sameDay: [], open: [], byRules: null }, openIds), ms: Math.round(performance.now() - t), input_tokens: 0, output_tokens: 0, error: errorLabel(e), answer: null as string | null });
       }
       store.close();
       const r = rows.at(-1)!;

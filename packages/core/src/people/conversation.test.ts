@@ -111,6 +111,15 @@ describe('splitMessages and the author', () => {
     ]);
   });
 
+  it('drops a next header that has its time on the same line (Slack)', () => {
+    const slack = 'Casey Lin  9:41 AM\nCan you check the list?\nJordan Hale  9:44 AM\nOn it.';
+    const msgs = [
+      { author: 'Casey Lin', user: false, start: slack.indexOf('Can you') },
+      { author: 'Jordan Hale', user: false, start: slack.indexOf('On it') },
+    ];
+    expect(splitMessages(slack, msgs).map((x) => x.text)).toEqual(['Can you check the list?', 'On it.']);
+  });
+
   it('is the last message’s author, with details from the read’s people', () => {
     const people = [{ name: 'JordanZ2', email: 'jordan@example.com', handle: null, role: 'mentioned' as const, knownId: null }];
     expect(readAuthor(m, people)).toEqual({ author: { ...people[0], role: 'author' }, authorIsMe: false });

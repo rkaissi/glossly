@@ -201,6 +201,35 @@ export function ownerFromText(selection: string, taskText: string): 'me' | 'them
   return promised === asked ? null : promised ? 'them' : 'me';
 }
 
+/**
+ * Who asked for a task when another writer did: the one writer whose messages back it best (a
+ * shared verb alone doesn't tie it to a message) and who asked for it ("can you confirm…"), and
+ * whether they asked the user (the user is named, or is the only other one there). Null when the
+ * user wrote one of those messages or it isn't a request. Step 21's Tasks check: in a group thread
+ * the model kept "Casey asks Jordan" as a task someone owes the user.
+ */
+export function askedBy(messages: SplitMessage[], text: string, me: Settings['identity'], counterpart: string | null): { writer: string; toUser: boolean } | null {
+  const words = stems(text);
+  const shared = messages.map((m) => [...stems(m.text)].filter((w) => words.has(w)).length);
+  const most = Math.max(0, ...shared);
+  const backing = most ? messages.filter((_, i) => shared[i] === most) : [];
+  const writer = backing[0]?.author;
+  if (!writer || isMe(writer, me)) return null;
+  if (!backing.every((m) => !m.user && m.author === writer && ownerFromText(m.text, text) === 'me')) return null;
+  const named = backing.some((m) => (m.text.match(/\b[A-Z][\w'-]+/g) ?? []).some((w) => isMe(w, me)));
+  return { writer, toUser: named || counterpart === writer };
+}
+
+/**
+ * Promises the one other writer made ("I'll share the budget Friday") that the model left out,
+ * found by the patterns; a row the model gave with the same words (past the verb) covers one.
+ * Step 21's Tasks eval: the model missed one in three runs out of three.
+ */
+export function missedPromises(model: ExtractedCommitment[], rules: ExtractedCommitment[]): ExtractedCommitment[] {
+  const said = new Set(model.flatMap((c) => [...stems(c.text)]));
+  return rules.filter((r) => r.owner === 'them' && ![...stems(r.text)].slice(1).some((w) => said.has(w)));
+}
+
 /** What code checks the rows against: the selected text, the user, and the author (decision 22). */
 export interface RowCheck {
   selection: string;
@@ -209,7 +238,11 @@ export interface RowCheck {
   author: string | null;
   /** The one other person in the selection (its author, or the only other writer), else null. A task left without a person is between the user and them. */
   counterpart: string | null;
+  /** The selection cut into its writers' messages, when the read found more than one; else null. */
+  messages?: SplitMessage[] | null;
 }
+
+type SplitMessage = ReturnType<typeof splitMessages>[number];
 
 /**
  * Turns the model's answer into review rows: due phrases resolved in code, names resolved
@@ -272,6 +305,13 @@ export function toPromiseRows(
     if (check?.author && check.counterpart === check.author) {
       const said = ownerFromText(check.selection, text);
       if (said) owner = said;
+    }
+    // Another writer asked for it: the user's task when they asked the user, else not the user's to track.
+    const asked = check?.messages && owner === 'them' ? askedBy(check.messages, text, check.me, check.counterpart) : null;
+    if (asked && !asked.toUser) continue;
+    if (asked) {
+      owner = 'me';
+      written = asked.writer;
     }
     const dupe = `${owner}:${canonicalize(text)}`;
     if (seen.has(dupe)) continue;
@@ -388,7 +428,18 @@ export async function extractPromises(
   const writers = [...new Set((input.messages ?? []).flatMap((m) => (m.author && !m.user ? [m.author] : [])))];
   const check: RowCheck | undefined = byRules
     ? undefined
-    : { selection: input.selection.text, me: settings.identity, author, counterpart: writers.length ? (writers.length === 1 ? writers[0]! : null) : author };
+    : {
+        selection: input.selection.text,
+        me: settings.identity,
+        author,
+        counterpart: writers.length ? (writers.length === 1 ? writers[0]! : null) : author,
+        messages: input.messages && input.messages.length > 1 ? splitMessages(input.selection.text, input.messages) : null,
+      };
+  // One other writer: their own promises the model left out come from the patterns.
+  if (check?.author && check.counterpart === check.author) {
+    const rules = rulesCommitments(input.selection.text.slice(0, MAX_SELECTION), { name: check.author, isMe: false }, now).commitments;
+    out = { ...out, commitments: [...out.commitments, ...missedPromises(out.commitments, rules)] };
+  }
   const rows = toPromiseRows(out, people, sourceApp, now, found, open, check);
   const everyone = new Set([...ids, ...exactIds(people, found, sourceApp), ...rows.flatMap((r) => (r.match?.kind === 'exact' ? [r.match.personId] : []))]);
   const about = new Set(rows.flatMap((r) => (r.existing ? [r.existing.id] : [])));

@@ -7,7 +7,7 @@ import { CalendarRepo } from '../store/calendar';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { isoNow, type SelectionPayload } from '../types';
-import { buildPromisesPrompt, extractPromises, ownerFromText, reminderCutoff, reminderText, savePromises, type ModelCommitments } from './promises';
+import { buildPromisesPrompt, extractPromises, missedPromises, ownerFromText, reminderCutoff, reminderText, savePromises, type ModelCommitments } from './promises';
 import { detectInputFor } from './who';
 
 const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: [] };
@@ -143,6 +143,43 @@ describe('What did I promise', () => {
     const author = { name: 'Maya Chen', email: null, handle: null, role: 'author', knownId: null } as DetectedPerson;
     const r = await extractPromises(new FakeLlm(() => answer), people, settings, { selection: draft, author, authorIsMe: false }, undefined, now);
     expect(r.rows[0]).toMatchObject({ owner: 'them', person_name: 'Maya Chen', due_at: expect.stringMatching(/^2026-10-15T17:00/) });
+  });
+
+  it('drops a task one writer asked of another, unless the user asked (Step 21)', async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const text =
+      'Casey Lin  9:41 AM\nJordan, can you confirm the venue list by Thursday?\nAlex Morgan  9:47 AM\nJordan, could you also confirm the caterer?\nMaya Chen  9:50 AM\nAlex, can you book the bus?';
+    const at = (s: string) => text.indexOf(s);
+    const messages = [
+      { author: 'Casey Lin', user: false, start: at('Jordan, can') },
+      { author: 'Alex Morgan', user: true, start: at('Jordan, could') },
+      { author: 'Maya Chen', user: false, start: at('Alex, can') },
+    ];
+    const row = (person_name: string, text: string) => ({ owner: 'other', person_name, text, due_phrase: '', confidence: 0.9, change: 'new', open_task: 'none' });
+    // The model's group-thread mistakes: Casey's ask of Jordan as Casey's, and Maya's ask of the user as hers.
+    const answer = { commitments: [row('Casey Lin', 'confirm the venue list'), row('Jordan Hale', 'confirm the caterer'), row('Maya Chen', 'book the bus')], events: [] };
+    const input = { selection: { ...selection, text }, author: { name: 'Maya Chen', email: null, handle: null, role: 'author', knownId: null } as DetectedPerson, authorIsMe: false, messages };
+    const r = await extractPromises(new FakeLlm(() => answer), people, settings, input, undefined, now);
+    expect(r.rows.map((x) => [x.owner, x.person_name, x.text])).toEqual([
+      ['them', 'Jordan Hale', 'confirm the caterer'],
+      ['me', 'Maya Chen', 'book the bus'],
+    ]);
+  });
+
+  it("adds the other writer's promise the model left out, from the patterns (Step 21)", async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const text = "Hi both, can you each send me your travel notes by Monday? I'll share the final agenda on Friday.";
+    const answer = { commitments: [{ owner: 'user', person_name: 'Maya Chen', text: 'send travel notes', due_phrase: 'Monday', confidence: 0.9, change: 'new', open_task: 'none' }], events: [] };
+    const author = { name: 'Maya Chen', email: null, handle: null, role: 'author', knownId: null } as DetectedPerson;
+    const r = await extractPromises(new FakeLlm(() => answer), people, settings, { selection: { ...selection, text }, author, authorIsMe: false }, undefined, now);
+    expect(r.rows.map((x) => [x.owner, x.person_name, x.text])).toEqual([
+      ['me', 'Maya Chen', 'send travel notes'],
+      ['them', 'Maya Chen', 'share the final agenda'],
+    ]);
+    const given = { owner: 'me' as const, person_name: 'Maya Chen', text: 'send travel notes', due_phrase: 'Monday', confidence: 0.9 };
+    expect(missedPromises([given], [{ owner: 'them', person_name: 'Maya Chen', text: 'send the travel notes', due_phrase: '', confidence: 0.4 }])).toEqual([]);
   });
 
   it('passes a Local only refusal through', async () => {

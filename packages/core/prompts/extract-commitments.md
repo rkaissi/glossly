@@ -33,6 +33,7 @@ Rules:
 - A deadline is a task, not an event: "send the deck by Friday 5pm" is a task; "review the deck together Friday at 5" is an event. An invitation to an event ("Lunch Thursday at 1?") is an event, not a task, unless it also asks for something to be done ("bring the slides" is a task too).
 - An event already over, or one the message cancels, is not an event.
 - "The user" says who the user is, and "Message author" says who wrote the selected message ("the user" when they wrote it). Use them to decide `owner`.
+- Only tasks the user is part of: skip a task between two other people (Casey asks Jordan to confirm a list). A promise made to a group that includes the user counts ("I'll send everyone the agenda by Monday" in an email to the user and others is `other`, owed by its writer).
 - Only include tasks in the selected text. Use the context to understand it, not as a source of more tasks. Open tasks the message doesn't touch are not rows.
 - Return a row for an open task the message finishes or moves even when the message doesn't restate the task itself.
 - Never point two rows at the same open task, and never mark a task done unless the message clearly says so.
