@@ -90,6 +90,10 @@ Router eval on the 60 hand-written fixtures in `fixtures/`. The spec's target is
 
 Conversation read and Who is this (Oct 13, gpt-oss-20b, 18 fictional cases from Discord, Slack, Teams, WhatsApp, email, a contact card, and an article): the read was accepted every time, with every message's author right; Who found 23 of 25 people and never listed a button, badge, shared inbox, or you; Reply aimed at the right message in 13 of 15. The misses were two fixture expectations and one low-confidence filter, both fixed (100% on the recorded answers). Median 495 ms and about 1,300 tokens a read. Without the model, the text parser gets the author right in 40% of these cases.
 
+Tasks and events (Oct 13, gpt-oss-20b, 18 fictional cases on a fixed Wednesday): due dates, changes to open tasks (done, moved, same), and events with day and time were right every time. The model read another writer's "I'll …" as yours, and later left the person blank; tasks found went from 80% to 95% with a schema change, and code now fills the person and checks the owner from the writer's own words. A date bug ("end of day Friday") was fixed. The final check was cut short by the daily limit.
+
+Qwen 3.8 against gpt-oss-20b on 5 Who and 5 Tasks fixtures: Qwen got all 10 right with fewer tokens; gpt-oss-20b's misses there were all ones since fixed in code. Fast stays on gpt-oss-20b so it doesn't share the router's rate limit (decision 60).
+
 ## Capture results per app
 
 Pending your hand tests; see `evals/capture.md`. So far, Notepad passes on both paths (UIA read in about 55 to 60 ms, tier 2 in 50 to 93 ms), and the settings window passes on the auto path (UIA, 283 to 335 ms to the pill).
