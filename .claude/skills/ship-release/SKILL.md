@@ -5,7 +5,7 @@ description: Ship a new Glossly version (0.1.1, 0.2.0, 1.0.0, 2.0.0-beta.1, any 
 
 # Ship a Glossly release
 
-Builds the Windows installer for a new version and publishes it on GitHub Releases, where installed copies pick it up (Settings > General > Updates; decision 70). Works for any version: patch, minor, major, or a prerelease. `scripts/release.mjs` does the checks; this file is the order and the rules.
+Builds the Windows installer for a new version and publishes it on GitHub Releases, where installed copies pick it up (Settings > General > Updates; decision 70). Works for any version: patch, minor, major, or a prerelease. "v1.2.0" and "1.2.0" mean the same; the script drops the v (the tag gets it back). `scripts/release.mjs` does the checks; this file is the order and the rules.
 
 ## Rules
 

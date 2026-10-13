@@ -8,7 +8,7 @@
 //   node scripts/release.mjs publish <version> --notes <file> --yes
 //                                                 creates and publishes the GitHub release (only after Rayan's go)
 //
-// Versions are semver without a leading v ("0.1.1", "1.0.0", "2.3.0-beta.1"); the tag is v<version>.
+// Versions are semver ("0.1.1", "1.0.0", "2.3.0-beta.1"); a leading v is dropped ("v0.1.1" is 0.1.1), and the tag is v<version>.
 // A version with a "-" part is published as a prerelease, which installed copies don't update to.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -74,10 +74,11 @@ function latestTag() {
   return versions.sort(compare).at(-1) ?? null;
 }
 
-function requireVersion(v) {
-  if (!v) fail('Give the version, like 0.1.1 (no leading v).');
-  if (v.startsWith('v')) fail(`Write the version without the v: ${v.slice(1)}`);
-  if (!parse(v)) fail(`"${v}" isn't a semver version (major.minor.patch, optionally -prerelease).`);
+function requireVersion(raw) {
+  if (!raw) fail('Give the version, like 0.1.1.');
+  // The v belongs to the tag; package.json and the update feed take the bare version.
+  const v = raw.replace(/^v/i, '');
+  if (!parse(v)) fail(`"${raw}" isn't a semver version (major.minor.patch, optionally -prerelease).`);
   return v;
 }
 
