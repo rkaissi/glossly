@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 13, 2026 (afternoon). **Step 21 is done**, except the Visualize eval, which gpt-oss-20b's rolling daily limit pushed out (run it when there's room; see **Next**). End-to-end done (decisions 63 to 65); evals done for the router, Who, Tasks (decision 68), the Qwen comparison, and Recall (decision 67); the real-use record is read and every number is in `STATUS.md` and `docs/testing.md`. **Next: Step 22, packaging**, which needs a few answers from Rayan first (below). Committed to `main`; the Oct 13 afternoon commits are **not pushed** yet. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
+Last updated Oct 13, 2026 (evening). **Step 22 (packaging) is underway:** the installer builds and installs (decision 69), and its first check passed what it could before the Windows session locked; the rest of the installed-app check is next (see **Next**). **Step 21 is done** except the Visualize eval (gpt-oss-20b's rolling daily limit). Everything is committed and pushed except this chunk's commit. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
 
 **Delete confirms (Oct 12 evening; decision 66).** Trash morph for Saved, Tasks, calendar events, person header (pencil rename beside it; warning only when armed), and Profile voice/learned rows; chips keep the small x; Merge / Delete all / Reset use borderless `InlineConfirm`; event Save stays visible but disabled while delete is armed or the event is unchanged. Red-bordered confirm boxes are gone.
 
@@ -18,18 +18,13 @@ Last updated Oct 13, 2026 (afternoon). **Step 21 is done**, except the Visualize
 
 **Groq's rolling day bites twice in a row.** The afternoon Tasks rerun stopped at 12 of 18 because the morning's evals were still inside gpt-oss-20b's 24-hour window (about 100K tokens in the morning, about 95K in the afternoon). Plan at most about 150K tokens of evals on one model per 24 hours, and leave room for the app.
 
-**Next, in order:**
-1. **Visualize eval** (left from Step 21): 15 cases on gpt-oss-20b (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls and 30K tokens) once its day has room (check with one tiny call printing only the `x-ratelimit-*` headers; a 429 asking for minutes means it's still spent). The one-scale rule (decision 65) is the main thing to see. Ask Rayan first.
-2. **Step 22, packaging**, after Rayan answers "What Step 22 needs from Rayan" below.
+**Step 22 so far (Oct 13; decision 69).** Rayan's answers: test the installed app on throwaway data, Glossly as publisher, build locally, a draft GitHub Release (repo private), no history rewrite yet, version 0.1.0, no license yet, models as they are. Built: `packages/shell-electron/electron-builder.yml` (NSIS, one click, per user, Start Menu shortcut, not started after install, data kept on uninstall), `--data-dir=<folder>` in any build (`dataDirArg`), `author` "Glossly", `@glossly/core` moved to dev dependencies (it's bundled). The package is trimmed (x64 only, English locales, no `onnxruntime-web`): 163 MB installer (was 218 MB). **Installed and checked** (`docs/testing.md`, "Installed app"): install folder, shortcut, Apps & features name and publisher, no auto-start, `--data-dir` isolation (Rayan's profile untouched), a clean start with sqlite-vec and the helper, and setup opening all pass. **Not yet:** setup walked through, the pill, Ask, Save with an embedding, the reminder toast, Quit; the Windows session locked mid-pass. The taskbar button showed Electron's atom although `Glossly.exe` has the Glass icon (likely Windows' icon cache for `com.glossly.app`; recheck after a restart). The installed build is on this machine at `%LOCALAPPDATA%\Programs\glossly`; the throwaway profile is `%TEMP%\glossly-pkg-test`. **Rayan's own dev instance was stopped** for the build (with his OK) and not restarted.
 
-**What Step 22 needs from Rayan:**
-- **Testing the installed app on which data?** `GLOSSLY_USER_DATA` only works in the dev build (`index.ts`), so an installed Glossly opens his real `%APPDATA%\Glossly`. Either allow a data-folder override in the packaged build too (a command-line flag; recommended, so the installed-app pass runs on a throwaway profile), or test on his real data with every test save undone.
-- **Stopping his running instance** for the install and the installed-app pass (the installer replaces files, and the helper exe is locked while Glossly runs).
-- **Publisher name** in the installer and Apps & features: `packages/shell-electron/package.json` has his full name as `author`; keep it, or use "Glossly"?
-- **Releases:** publish to GitHub Releases on `origin` from here (needs `gh` signed in, or a token), or build locally and he uploads? Draft or public? The repo's history still holds some real names (Things to remember): rewrite before the first public release or not.
-- **Version** for the first build (package.json says 0.1.0).
-- **The license** (for the installer's metadata now and the README in Step 23).
-- **The open questions below** (Fast model, debug view), ideally before testers get a build.
+**Next, in order:**
+1. **Finish the installed-app check** through a subagent while Rayan is away and the session is unlocked: setup through to the end, the pill in Notepad, Ask, Save with an embedding, the reminder toast (Settings > Tasks quick add "... today"; a toast within 60 s), Quit from the tray; and the taskbar icon after a restart. Always start it with `--data-dir=%TEMP%\glossly-pkg-test`, never from the Start Menu. Delete the throwaway profile afterwards.
+2. **Draft GitHub Release** v0.1.0 with the installer (`gh release create v0.1.0 --draft`, unsigned, with the SmartScreen note) once item 1 passes; the repo is private.
+3. **Visualize eval** (left from Step 21): 15 cases on gpt-oss-20b (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls and 30K tokens) once its day has room (one tiny call printing only the `x-ratelimit-*` headers first). Ask Rayan first.
+4. Then Step 23 (the README).
 
 646 unit tests pass; `pnpm typecheck` is clean.
 
@@ -61,7 +56,7 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Steps 18 to 20.3's setup (Oct 11):** built with unit tests only (the settings side of 20.1 to 20.3 also previewed in the browser with fictional data); their live checks are in the backlog under "Local models and privacy", "Tasks and events", "Design system and controls", "Tasks and Calendar", "Motion, key hints, app icon", and "Setup redesign". The overlay side of Step 20 (the panel's pickers and its window growing for them, key chips, the overlay's motion) has never been seen running.
 - **Step 20.4 done** (decision 48): the local parser fixes, the shared conversation read for Who, Tasks, and Reply, the token trims, and token counts in metrics. Unit tests only; its live checks are in the backlog under "Tasks and events" and Reply's Discord items.
 - **Steps 20.5 to 20.8 done** (Oct 12; decisions 49 to 62): Rayan's two Oct 12 reviews (20.5, 20.6, with pasted voice samples labeled by platform as 20.6h), the model split with the call log (20.7), and the settings cleanup with the Glass tray icon (20.8). 20.6's hotkey, typing, mouse-away, and touch checks passed live; the rest is unit tests only, with live checks in the backlog. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
-- **Step 21 (Oct 12 to 13):** done except the Visualize eval; see the top of this file. **Not started:** Steps 22 and 23.
+- **Step 21 (Oct 12 to 13):** done except the Visualize eval; see the top of this file. **Step 22** underway (top of this file); **Step 23** not started.
 - **On Rayan's machine (last known, Oct 13):** his instance was last started on the build of `eba1e42` (outside his Cursor terminal; migrations up to 9 ran; call log on). Rayan's own delete-confirm commits and the eval fixes landed after it, so **rebuild and restart** (`pnpm build`) before using or checking it: the new build moves his stored Recall floor 0.78 to 0.5 (decision 67) and carries the Tasks owner changes. His Notepad may have a `notes.txt` tab of fictional test text, and an elevated Task Manager may be minimized. Test pages live in `%TEMP%\glossly-live` (fictional: `discord-*.html`, `slack-thread.html`, `email-thread.html`, `reply-test.html`, `notes.txt`).
 
 ## Next steps, in order
@@ -179,7 +174,7 @@ Rayan's direction:
 4. ~~Read the real-use record~~ (done Oct 13; above): `pnpm calls --router` (rules vs model per content type, and which side the clicks backed) and the call log, if Rayan turned it on.
 5. ~~Record every number~~ (done Oct 13) in `STATUS.md` and `docs/testing.md`, including the re-tuned router prompt's slot match. Pre-agreed rule: if the router's slot match stays under the rules' 90%, use the model only for `content_type` and `best_collection` and compute the people and commitment scores from rules. Who's own model call stays.
 
-**Step 22: packaging.** `electron-builder` config (none exists yet; `pnpm dist` runs `helper:publish` then `electron-builder --win`): the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon (`packages/shell-electron/resources/icon.png`, Glass; electron-builder makes the installer's `.ico`; ship `icon.png` and `icon.ico` in resources too, which `appIconPath()` and `appIcoPath()` read when packaged), and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
+**Step 22: packaging** (underway; the config is `packages/shell-electron/electron-builder.yml`, decision 69, and what's done is at the top of this file). The plan as written: the helper's `helpers/windows/publish` output into `resources/helper` (`paths.ts` already looks there when packaged), `asarUnpack` for sqlite-vec's DLL and onnxruntime (`services.ts` already rewrites the sqlite-vec path to `app.asar.unpacked`), an NSIS installer with the Step 20 icon (`packages/shell-electron/resources/icon.png`, Glass; electron-builder makes the installer's `.ico`; ship `icon.png` and `icon.ico` in resources too, which `appIconPath()` and `appIcoPath()` read when packaged), and unsigned GitHub Releases as in the spec's "Distribution to testers" (with the SmartScreen note). Test the installed app end to end through a subagent, including the reminder toast that never appeared in the dev build (Windows toasts likely need the installer's Start Menu shortcut for `com.glossly.app`). Before publishing a release or making the repo public, revisit the git history note under "Things to remember".
 
 **Step 23: the public README.** Rewrite `README.md` as the repo's front page for when it goes public: what Glossly is in one or two lines, a short demo (GIF or video) and screenshots of the pill, the bar, a few panels, and settings in light and dark, the features (from `docs/features.md`, in plain words), privacy (what stays local, Local only, keys in `safeStorage`), install from GitHub Releases (with the SmartScreen note), requirements (Windows 11; a Groq, OpenAI, or Anthropic key, or a local model), building from source, the tech stack, project layout with links to `docs/`, the roadmap (macOS later), and the license (ask Rayan which). Capture screenshots and the demo with a subagent on fictional sample data only (AGENTS.md first section), never Rayan's real data. Keep `STATUS.md` and `docs/` as the contributor docs and link them.
 
@@ -196,8 +191,7 @@ Rayan's direction:
 
 ## Open questions for Rayan
 
-- **Fast on Qwen 3.8 or gpt-oss-20b?** Qwen got all 10 comparison fixtures right with fewer tokens; gpt-oss-20b's misses there are all fixed in code now, so they likely tie. Moving Fast to Qwen would share the router's rate-limit bucket again (the reason for decision 60). Recommendation: keep the split. Rayan hasn't decided.
-- **Debug view for testers:** new profiles now start with it off (decision 65); Rayan may want to confirm before Step 22.
+- None open: the model split and the debug view are settled (decision 69).
 
 Everything else he was asked is answered and recorded in `docs/decisions.md`.
 
@@ -294,6 +288,6 @@ pnpm eval                # only when Rayan asks
 - Hand-test capture across the apps in `evals/capture.md` (part of Step 21; any time).
 - Try the real apps the Step 21 live checks only imitated with look-alike pages: Reply, Who, and Tasks in Discord, Slack, Gmail, and Outlook (including a whole quoted email chain), and a real trackpad (decision 56).
 - Rebuild and restart his instance (`pnpm build`) to run the Oct 13 fixes (decisions 67 and 68).
-- Push the Oct 13 afternoon commits (`git push`), or say so and the next session will.
-- Answer "What Step 22 needs from Rayan" above.
+- His instance is stopped (the Step 22 build), so the rebuild above is also the restart. The installed build and the dev build share `%APPDATA%\Glossly`, so run one at a time.
+- Check the installed app's taskbar icon after a restart (Step 22).
 - Answer the open questions above.

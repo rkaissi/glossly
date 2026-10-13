@@ -1,0 +1,57 @@
+# Windows installer (Step 22, decision 69). `pnpm dist` at the repo root publishes the helper
+# first, then builds and packs; the installer lands in packages/shell-electron/dist.
+appId: com.glossly.app
+productName: Glossly
+# electron-builder needs an exact version; keep it equal to the installed electron.
+electronVersion: 44.7.0
+copyright: Copyright © 2026 Glossly
+# The install folder comes from the package name ("@glossly/shell-electron" made
+# "@glosslyshell-electron"); the app's name and data folder still come from productName.
+extraMetadata:
+  name: glossly
+# The UI is English only; Chromium's other locales add about 45 MB.
+electronLanguages: [en-US]
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+  # onnxruntime ships every platform's binaries; this x64 build needs only its own.
+  - '!**/node_modules/onnxruntime-node/bin/napi-v*/{linux,darwin}/**'
+  - '!**/node_modules/onnxruntime-node/bin/napi-v*/win32/arm64/**'
+  # transformers.js inlines the web runtime in its own bundle and runs on onnxruntime-node here.
+  - '!**/node_modules/onnxruntime-web/**'
+# Native code can't load from inside the asar: sqlite-vec's DLL (services.ts points at
+# app.asar.unpacked) and onnxruntime and sharp under transformers.js.
+asarUnpack:
+  - '**/node_modules/sqlite-vec*/**'
+  - '**/node_modules/onnxruntime-node/**'
+  - '**/node_modules/sharp/**'
+  - '**/node_modules/@img/**'
+extraResources:
+  # paths.ts looks for the helper and the icons here when packaged.
+  - from: ../../helpers/windows/publish
+    to: helper
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/icon.ico
+    to: icon.ico
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  executableName: Glossly
+nsis:
+  # Per-user install with a Start Menu shortcut (Windows toasts need one for com.glossly.app).
+  oneClick: true
+  perMachine: false
+  # Not started right after install, so a test install never opens the real profile by itself.
+  runAfterFinish: false
+  deleteAppDataOnUninstall: false
+  artifactName: Glossly-Setup-${version}.${ext}
+  shortcutName: Glossly
+  # Apps & features shows "Glossly", not "Glossly 0.1.0".
+  uninstallDisplayName: Glossly

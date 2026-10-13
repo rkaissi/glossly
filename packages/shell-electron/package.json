@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Glossly: highlight text anywhere, act on it.",
-  "author": "Rayan Kaissi",
+  "author": "Glossly",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -15,11 +15,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@glossly/core": "workspace:*",
     "@huggingface/transformers": "^4.3.1",
     "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {
+    "@glossly/core": "workspace:*",
     "@glossly/ui": "workspace:*",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^44.7.0",

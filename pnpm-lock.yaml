@@ -214,9 +214,6 @@ importers:
 
   packages/shell-electron:
     dependencies:
-      '@glossly/core':
-        specifier: workspace:*
-        version: link:../core
       '@huggingface/transformers':
         specifier: ^4.3.1
         version: 4.3.1(@types/node@24.19.1)
@@ -224,6 +221,9 @@ importers:
         specifier: ^0.1.9
         version: 0.1.9
     devDependencies:
+      '@glossly/core':
+        specifier: workspace:*
+        version: link:../core
       '@glossly/ui':
         specifier: workspace:*
         version: link:../ui

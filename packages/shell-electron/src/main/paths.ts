@@ -56,3 +56,12 @@ export function hasWindowMaterial(): boolean {
 }
 
 export const userDataPath =(...parts: string[]) => join(app.getPath('userData'), ...parts);
+
+/** The folder after `--data-dir` (`--data-dir=<folder>` or `--data-dir <folder>`), else null. */
+export function dataDirArg(argv: string[]): string | null {
+  for (const [i, a] of argv.entries()) {
+    if (a.startsWith('--data-dir=')) return a.slice('--data-dir='.length).replace(/^"|"$/g, '') || null;
+    if (a === '--data-dir' && argv[i + 1] && !argv[i + 1]!.startsWith('--')) return argv[i + 1]!;
+  }
+  return null;
+}

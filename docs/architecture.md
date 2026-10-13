@@ -60,6 +60,10 @@ pnpm monorepo. `@glossly/core` ships TypeScript and is bundled into main by elec
 - `people/PersonCard.tsx` (shared by both windows), `theme.css` (tokens for both windows: colors, the 4 px spacing scale `--s-1`…`--s-6`, control heights `--h-sm/md/lg`, radii, row sizes, the spring curves `--spring-soft/pop/gentle` with their durations, the shared keyframes, and the button styles), `icons.tsx` (`ActionIcon`, `GlosslyMark`, `GlassIcon`), `dates.ts`.
 - Component files export only components (otherwise React Fast Refresh falls back to a full reload).
 
+### Packaging (Step 22, decision 69)
+
+`pnpm dist` (repo root) runs `helper:publish` (self-contained win-x64 into `helpers/windows/publish`), then `electron-vite build` and `electron-builder --win --publish never` in `packages/shell-electron` with `electron-builder.yml`. Output: `packages/shell-electron/dist/Glossly-Setup-<version>.exe` (git-ignored). `@glossly/core` is a dev dependency because it is bundled into main; only `sqlite-vec` and `@huggingface/transformers` ship as `node_modules`, with their native parts in `app.asar.unpacked`. Packaged paths: the helper in `resources/helper`, `icon.png` and `icon.ico` in `resources` (`paths.ts`). `electronVersion` in the config must match the installed electron (electron-builder rejects the `^` range). `extraMetadata.name: glossly` names the install folder; the app's name and data folder come from `productName`.
+
 ## The capture pipeline
 
 1. **Auto path.** Helper `mouse_up` (drag or double-click, outside the overlay and Glossly's pids) → `foreground` → `gateApp` (block list, per-app modes, hotkey-only apps) → `selection` → `gateAutoSelection` → `baseline` (the helper's own mouse-down snapshot) → `pollForToolbar` with `popups_near` → `placePill` → show inactive. A generation counter drops stale captures.

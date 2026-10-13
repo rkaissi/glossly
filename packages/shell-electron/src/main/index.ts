@@ -6,7 +6,7 @@ import { registerIpc } from './ipc';
 import { errorInfo, initLog, logger } from './log';
 import { Overlay } from './overlay';
 import { Reminders } from './reminders';
-import { userDataPath } from './paths';
+import { dataDirArg, userDataPath } from './paths';
 import { Services } from './services';
 import { SettingsWindow } from './settings-window';
 import { runSmoke } from './smoke';
@@ -15,9 +15,12 @@ import { createTray } from './tray';
 const log = logger('main');
 
 app.setAppUserModelId('com.glossly.app');
-// Dev builds only: a throwaway profile (the single-instance lock is per profile), optionally
-// without the helper and hotkey, so it can run next to the real instance for settings tests.
-if (!app.isPackaged && process.env.GLOSSLY_USER_DATA) app.setPath('userData', process.env.GLOSSLY_USER_DATA);
+// A throwaway profile (the single-instance lock is per profile): `--data-dir=<folder>` in any
+// build, so the installed app can be tested without the real data (decision 69), or
+// GLOSSLY_USER_DATA in dev builds. Dev builds can also skip the helper and hotkey, so a test
+// instance runs next to the real one.
+const dataDir = dataDirArg(process.argv) ?? (!app.isPackaged ? process.env.GLOSSLY_USER_DATA : undefined);
+if (dataDir) app.setPath('userData', dataDir);
 const noCapture = !app.isPackaged && process.env.GLOSSLY_NO_CAPTURE === '1';
 const primary = app.requestSingleInstanceLock();
 

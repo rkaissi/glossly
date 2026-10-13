@@ -108,6 +108,8 @@ Start-Process node_modules\electron\dist\electron.exe packages\shell-electron
 
 `pnpm dev` also works (hot reload for both renderers; main and preload changes need a restart). Both use Rayan's real `%APPDATA%\Glossly`.
 
+**Any build:** `--data-dir=<folder>` on the command line uses another profile folder (decision 69), so the installed app can be tested without the real data: `Start-Process "$env:LOCALAPPDATA\Programs\glossly\Glossly.exe" -ArgumentList "--data-dir=$env:TEMP\glossly-pkg-test"`. Never start the installed app from the Start Menu during a test: that opens the real profile.
+
 **Dev-only switches** (ignored when packaged):
 
 | Variable | Effect |
@@ -164,6 +166,17 @@ Throwaway profile (`Local State` and `keys` only), Notepad sample text, Sonnet s
 - Hotkey path in Notepad: UIA read about 60 ms, total about 96 ms; tier 2 50 to 93 ms.
 - First Chromium `selection` call per window used to cost about 300 ms (accessibility nudge); not seen in the Step 12 check.
 - Ask: first token 705 ms, done 825 ms. Reply: three drafts in under 9 s. Who (model): 830 ms.
+
+### Installed app (Oct 13, Step 22)
+
+Installer `Glossly-Setup-0.1.0.exe` (163 MB), installed silently (`/S`) and run on a throwaway profile (`%TEMP%\glossly-pkg-test`: `Local State`, `keys\`, and `models\` copied, no database) through a Sonnet subagent, then by process and log checks.
+- [x] Installs per user to `%LOCALAPPDATA%\Programs\glossly` (the first build used `@glosslyshell-electron`, from the package name; fixed with `extraMetadata.name`), Start Menu `Glossly.lnk`, Apps & features "Glossly", version 0.1.0, publisher Glossly (was "Glossly 0.1.0"; fixed with `uninstallDisplayName`). Not started after install.
+- [x] `--data-dir` works packaged: the log, helper, and catalog went to the test profile; the real `main.log` stayed at 4,416 lines through install, run, uninstall of the first build, and reinstall, and the real database is untouched.
+- [x] Starts clean: version 0.1.0, electron 44.7.0, sqlite-vec loaded, no ERROR lines, hotkey registered, helper (protocol 1) running from `resources\helper` within about 1 s, the model catalog refreshed with the copied key.
+- [x] The first-run setup opens on a fresh profile; its title bar and the tray show the Glass icon.
+- [ ] The taskbar button still shows Electron's atom, though `Glossly.exe` carries the Glass icon (checked). Likely Windows' icon cache for `com.glossly.app`, which the dev build (electron.exe) has used for days. Check after a sign-out or restart; if it persists, look at `setAppDetails` in `settings-window.ts`.
+- [ ] Setup walked through, the pill in Notepad, Ask, Save with an embedding (onnxruntime from `app.asar.unpacked`), the reminder toast (quick-add a task due today in Settings > Tasks; a toast within 60 s and `reminder shown`), Quit from the tray. Not run: the Windows session locked mid-pass.
+- Bitdefender showed "Disinfection in progress" while the unsigned exe first ran; nothing was quarantined that the run noticed. Worth watching on testers' machines alongside SmartScreen.
 
 ## Live-check backlog
 
