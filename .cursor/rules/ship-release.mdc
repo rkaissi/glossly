@@ -1,0 +1,7 @@
+---
+description: Ship a new Glossly version (0.1.1, 0.2.0, 1.0.0, 2.0.0-beta.1, any semver) as a GitHub Release that installed copies update to. Use when asked to release, ship, publish, cut, or bump a version, or to push an update to users.
+globs:
+alwaysApply: false
+---
+
+Read and follow `.claude/skills/ship-release/SKILL.md` step by step. It is the one procedure for shipping a release in this repo (shared with Claude Code), and `scripts/release.mjs` runs its checks. Never publish without Rayan's explicit go for that version.
