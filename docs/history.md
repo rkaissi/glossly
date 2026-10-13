@@ -52,7 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 21p | Oct 13 | (next commit records it) | Visualize eval on gpt-oss-20b (15 cases: chart or not all right, every chart relevant); a crowded bar chart goes horizontal in code (`crowdedLabels`). Step 21 complete. |
+| 21p | Oct 13 | `78642e1` | Visualize eval on gpt-oss-20b (15 cases: chart or not all right, every chart relevant); a crowded bar chart goes horizontal in code (`crowdedLabels`). Step 21 complete. |
 | 22e | Oct 13 | `cf9ecd5` | The `ship-release` skill for Claude Code and Cursor, with `scripts/release.mjs` (version checks, bump, notes, verify, publish). |
 | 22d | Oct 13 | (tag `v0.1.0`) | v0.1.0 published on GitHub Releases (installer, `.blockmap`, `latest.yml`; private repo). |
 | 22c | Oct 13 | `9a545a7` | Installed-app check finished (setup, the Updates group, pill and Ask, Save with an embedding, the reminder, Quit); the draft release's notes updated. The taskbar icon is still Electron's on this machine. |
