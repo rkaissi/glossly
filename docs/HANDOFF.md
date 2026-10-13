@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done; v0.1.0 is published** (Oct 13, GitHub Releases, tag `v0.1.0` on `cd22e12`; private repo): the installer builds, installs, updates in place, and passed the installed-app check on a throwaway profile (decisions 69, 70); the release holds the installer, its `.blockmap`, and `latest.yml`. One open item: the taskbar button shows Electron's atom (likely this machine's icon cache). **Step 21 is done** except the Visualize eval. Everything is committed and pushed. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
+Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done; v0.1.0 is published** (Oct 13, GitHub Releases, tag `v0.1.0` on `cd22e12`; private repo): the installer builds, installs, updates in place, and passed the installed-app check on a throwaway profile (decisions 69, 70); the release holds the installer, its `.blockmap`, and `latest.yml`. One open item: the taskbar button shows Electron's atom (likely this machine's icon cache). **Step 21 is done**, the Visualize eval included (Oct 13 evening). Everything is committed and pushed. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
 
 **Delete confirms (Oct 12 evening; decision 66).** Trash morph for Saved, Tasks, calendar events, person header (pencil rename beside it; warning only when armed), and Profile voice/learned rows; chips keep the small x; Merge / Delete all / Reset use borderless `InlineConfirm`; event Save stays visible but disabled while delete is armed or the event is unchanged. Red-bordered confirm boxes are gone.
 
@@ -25,7 +25,7 @@ Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done; v0.1.0 is publ
 **Next, in order:**
 1. ~~**Finish the installed-app check**~~: done (Oct 13 night; `docs/testing.md`, "Installed app"). Left: the taskbar icon (Rayan: look after a restart) and a toast seen on screen (Do Not Disturb hid it; the log shows it fired). The throwaway profile is deleted; the installed app stays at `%LOCALAPPDATA%\Programs\glossly` and shares `%APPDATA%\Glossly` with the dev build, so run one at a time.
 2. ~~**Publish v0.1.0**~~: done (Oct 13; the repo's Releases page, tag `v0.1.0`). Installed copies see updates once the repo is public. Later versions: the `ship-release` skill (see Updates above).
-3. **Visualize eval** (left from Step 21): 15 cases on gpt-oss-20b (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls and 30K tokens) once its day has room (one tiny call printing only the `x-ratelimit-*` headers first). Ask Rayan first.
+3. ~~**Visualize eval**~~: done (Oct 13 evening; `docs/testing.md`): chart or not right on all 15, every chart relevant; crowded bar charts now go horizontal in code.
 4. Then Step 23 (the README).
 
 646 unit tests pass; `pnpm typecheck` is clean.
@@ -59,7 +59,7 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 - **Steps 18 to 20.3's setup (Oct 11):** built with unit tests only (the settings side of 20.1 to 20.3 also previewed in the browser with fictional data); their live checks are in the backlog under "Local models and privacy", "Tasks and events", "Design system and controls", "Tasks and Calendar", "Motion, key hints, app icon", and "Setup redesign". The overlay side of Step 20 (the panel's pickers and its window growing for them, key chips, the overlay's motion) has never been seen running.
 - **Step 20.4 done** (decision 48): the local parser fixes, the shared conversation read for Who, Tasks, and Reply, the token trims, and token counts in metrics. Unit tests only; its live checks are in the backlog under "Tasks and events" and Reply's Discord items.
 - **Steps 20.5 to 20.8 done** (Oct 12; decisions 49 to 62): Rayan's two Oct 12 reviews (20.5, 20.6, with pasted voice samples labeled by platform as 20.6h), the model split with the call log (20.7), and the settings cleanup with the Glass tray icon (20.8). 20.6's hotkey, typing, mouse-away, and touch checks passed live; the rest is unit tests only, with live checks in the backlog. Step 19 is closed (19.1 and 19.2 built; 19.3, Google Calendar sync, is parked). (Step 17 is closed: its metrics view landed as 17.1, the eval runners moved to Step 21, and the optional decision providers are parked.)
-- **Step 21 (Oct 12 to 13):** done except the Visualize eval; see the top of this file. **Step 22** underway (top of this file); **Step 23** not started.
+- **Step 21 (Oct 12 to 13):** done; see the top of this file. **Step 22** underway (top of this file); **Step 23** not started.
 - **On Rayan's machine (last known, Oct 13):** his instance was last started on the build of `eba1e42` (outside his Cursor terminal; migrations up to 9 ran; call log on). Rayan's own delete-confirm commits and the eval fixes landed after it, so **rebuild and restart** (`pnpm build`) before using or checking it: the new build moves his stored Recall floor 0.78 to 0.5 (decision 67) and carries the Tasks owner changes. His Notepad may have a `notes.txt` tab of fictional test text, and an elevated Task Manager may be minimized. Test pages live in `%TEMP%\glossly-live` (fictional: `discord-*.html`, `slack-thread.html`, `email-thread.html`, `reply-test.html`, `notes.txt`).
 
 ## Next steps, in order
@@ -171,7 +171,7 @@ Rayan's direction:
    2. ~~The conversation read and Who~~: done (Oct 13): read and authors 100%, people and targets 100% after fixes.
    3. ~~Tasks~~: done (Oct 13; four runs; decision 68).
    4. ~~The small Qwen 3.8 against gpt-oss-20b comparison~~: done (Oct 13): Qwen 10 of 10; Fast stays on gpt-oss-20b (open question below).
-   5. Visualize: **left** (pushed out by the daily limit; Next, step 1). The date resolver is done inside the Tasks eval (dates 100% after the "end of day" fix).
+   5. ~~Visualize~~: done (Oct 13 evening; 15 cases, all right on chart or not; crowded bars go horizontal). The date resolver is done inside the Tasks eval (dates 100% after the "end of day" fix).
    6. ~~Recall ranking~~: done (Oct 13): the floor moved to 0.5 (decision 67), 13 of 16 right.
    Widen a set to its full size only if the minimal run leaves an open question and the day's budget allows. No other comparison evals (decision 35).
 4. ~~Read the real-use record~~ (done Oct 13; above): `pnpm calls --router` (rules vs model per content type, and which side the clicks backed) and the call log, if Rayan turned it on.

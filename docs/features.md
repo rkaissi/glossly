@@ -102,7 +102,7 @@ Status: live in the Step 15 version (three drafts in under 9 s, Insert into a te
 
 ## Visualize
 
-1. **Table** (`visualize/table.ts`): Markdown, TSV, CSV, semicolons, pipes, or aligned columns are parsed in code (numbers with separators, currency, %, negatives in parentheses, k/M/B; column types). Otherwise one Fast call returns rows (`prompts/visualize-table.md`).
+A bar chart with many or long category names is drawn horizontally whatever the model picked (`crowdedLabels`, Step 21's eval). 1. **Table** (`visualize/table.ts`): Markdown, TSV, CSV, semicolons, pipes, or aligned columns are parsed in code (numbers with separators, currency, %, negatives in parentheses, k/M/B; column types). Otherwise one Fast call returns rows (`prompts/visualize-table.md`).
 2. **Chart** (`visualize/visualize.ts`, decision 22): one Fast call returns a chart pick (`prompts/visualize-chart.md`); `specFromChoice` writes the Vega-Lite spec, validated against the Vega-Lite schema with Ajv. No model (Local only without a local model, or no key): `rulesChoice` picks with code. Any failure shows the table with one line why.
 3. **Panel** (`VisualizePanel.tsx`): `vega-embed` loaded on open (separate chunk), rendered with `vega-interpreter` because the CSP blocks `new Function`. One series in ink; several use a validated categorical palette. Chart/Table toggle, Copy as image (PNG 2x), Copy CSV, Save (a `chart` item with Undo). Results cached per text.
 

@@ -29,6 +29,13 @@ export function categoryAxis(labels: readonly string[]): { labelAngle: number; l
   return { labelAngle: fits ? 0 : -40, labelOverlap: 'greedy', labelLimit: 100 };
 }
 
+/** More than 14 categories, or more than 6 averaging over 12 characters: too many to label a column chart's axis. */
+export function crowdedLabels(labels: readonly string[]): boolean {
+  const distinct = [...new Set(labels)];
+  const avg = distinct.reduce((n, l) => n + l.length, 0) / Math.max(1, distinct.length);
+  return distinct.length > 14 || (distinct.length > 6 && avg > 12);
+}
+
 export const VisualizeTableSchema = z.object({
   columns: z.array(z.string()).describe('Short column names.'),
   rows: z.array(z.array(z.string())).describe('One array per row, one string per column, in column order.'),
@@ -100,6 +107,8 @@ export function specFromChoice(c: ChartChoice, table: ParsedTable, types: FieldT
   }
   let kind = c.chart;
   if (kind === 'point' && typeOf(c.x) !== 'quantitative') kind = 'bar';
+  // Many or long category names crowd a column chart; the prompt asks for horizontal bars then, and code makes sure (Step 21's Visualize eval).
+  if (kind === 'bar' && typeOf(c.x) === 'nominal' && crowdedLabels(table.rows.map((r) => String(r[table.columns.indexOf(c.x)] ?? '')))) kind = 'horizontal_bar';
   if (kind === 'point') measures = measures.slice(0, 1);
   const several = measures.length > 1;
   const split =

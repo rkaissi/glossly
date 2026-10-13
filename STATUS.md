@@ -1,6 +1,6 @@
 # Glossly status: Phases 0 to 3
 
-Updated Oct 13, 2026 (Step 21, testing and evals, is done except the Visualize eval; numbers below). This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the current state and next steps; `docs/features.md` has what each feature does and how far it's been checked; `docs/decisions.md` has every decision in full.
+Updated Oct 13, 2026 (Step 21, testing and evals, is done; numbers below. Step 22, packaging, is done and v0.1.0 is published). This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the current state and next steps; `docs/features.md` has what each feature does and how far it's been checked; `docs/decisions.md` has every decision in full.
 
 ## Summary
 
@@ -94,7 +94,7 @@ Tasks and events (Oct 13, gpt-oss-20b, 18 fictional cases on a fixed Wednesday):
 
 Qwen 3.8 against gpt-oss-20b on 5 Who and 5 Tasks fixtures: Qwen got all 10 right with fewer tokens; gpt-oss-20b's misses there were all ones since fixed in code. Fast stays on gpt-oss-20b so it doesn't share the router's rate limit (decision 60).
 
-Visualize: not run yet (pushed out by the daily limit twice on Oct 13).
+Visualize (Oct 13 evening, gpt-oss-20b, 15 fictional tables): it charted exactly the tables it should and every chart was relevant, in about 0.4 s each. One chart crowded ten long names on an upright bar chart; code now switches such charts to horizontal bars.
 
 **Your real use (Oct 10 to 13).** On 28 routings where both answered, the model and the rules agreed on slots 3 and 4 only 9 times, and of your 31 clicks there, 13 were on a slot only the model offered and none on one only the rules offered: the model keeps the slots. Measured tokens per call: the router 1,166 in and 47 out (390 ms on average), the conversation read 1,422 and 175, Reply's drafts 1,978 and 184, Tasks 2,405 and 64. At the subscription cost basis in the HANDOFF that's about $0.55 a month for a typical day and $3.90 for a heavy one. Rate-limit fallbacks: 78 on Oct 10, none since Oct 12.
 

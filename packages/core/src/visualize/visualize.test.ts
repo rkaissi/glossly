@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import type { ChatRequest, LlmProvider } from '../llm/types';
 import { LlmError } from '../llm/types';
 import { inferTypes, parseNumber, parseTable, safeColumns, splitDelimited, toCsv } from './table';
-import { categoryAxis, isValidSpec, rulesSpec, specFromChoice, visualize, type ChartChoice } from './visualize';
+import { categoryAxis, crowdedLabels, isValidSpec, rulesSpec, specFromChoice, visualize, type ChartChoice } from './visualize';
 
 const TSV = 'Region\tQ1\tQ2\nNorth\t120\t140\nSouth\t90\t95\nWest\t70\t88';
 
@@ -43,6 +43,18 @@ describe('specFromChoice', () => {
   const table = parseTable(TSV)!;
   const types = inferTypes(table);
   const pick = (over: Partial<ChartChoice>): ChartChoice => ({ chart: 'bar', x: 'Region', measures: ['Q1'], split_by: '', sort: 'data', ...over });
+
+  it('turns a bar chart with many long category names horizontal (Step 21)', () => {
+    const names = ['Northwind Traders', 'Acme Corporation', 'Contoso Pharmaceuticals', 'Fabrikam Residences', 'Tailspin Toys Limited', 'Wide World Importers', 'Litware Incorporated'];
+    const long = parseTable(['Company\tOrders', ...names.map((n, i) => `${n}\t${(i + 2) * 37}`)].join('\n'))!;
+    const spec = specFromChoice({ chart: 'bar', x: 'Company', measures: ['Orders'], split_by: '', sort: 'descending' }, long, inferTypes(long))!;
+    expect((spec.encoding as { y: { field: string } }).y.field).toBe('Company');
+    expect(isValidSpec(spec)).toBe(true);
+    // Three short regions stay a column chart.
+    expect((specFromChoice(pick({}), table, types)!.encoding as { x: { field: string } }).x.field).toBe('Region');
+    expect(crowdedLabels(Array.from({ length: 15 }, (_, i) => `W${i}`))).toBe(true);
+    expect(crowdedLabels(['North', 'South', 'East', 'West'])).toBe(false);
+  });
 
   it('writes a spec that passes the Vega-Lite schema, with the rows inlined', () => {
     const spec = specFromChoice(pick({}), table, types)!;
