@@ -14,7 +14,7 @@ import {
   type Decisions,
   type SelectionContext,
 } from '@glossly/core';
-import { countedLlm, evalModel, groqKey, limitCases, median, RateLimitStop, withRateLimitRetry } from './lib';
+import { countedLlm, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, withRateLimitRetry } from './lib';
 
 interface Case {
   id: string;
@@ -109,7 +109,13 @@ describe('router eval', () => {
     const decision = new LlmStructuredDecision(counted.llm);
     const results: CaseResult[] = [];
     let stopped: string | null = null;
-    for (const c of cases) {
+    for (const [i, c] of cases.entries()) {
+      // Every few cases: is what's left of the day enough for the rest (Rayan)? If not, stop here.
+      const cut = budgetCheck(counted, i, cases.length - i, 1);
+      if (cut) {
+        stopped = cut;
+        break;
+      }
       const features = extractFeatures(c.context);
       let t = performance.now();
       try {
@@ -146,8 +152,10 @@ describe('router eval', () => {
       input_tokens: total.inputTokens,
       output_tokens: total.outputTokens,
       stopped,
+      budget_checks: budgetLog,
     });
-    expect(stopped, 'stopped on rate limits').toBeNull();
+    // A budget stop keeps the cases run so far; only a rate-limit stop fails the run.
+    expect(stopped?.startsWith('budget') ? null : stopped, 'stopped on rate limits').toBeNull();
     // Errored cases are scored on the rules fallback, so many errors would hide a broken model call.
     expect(s.errors).toBeLessThanOrEqual(cases.length * 0.1);
     expect(s.type_accuracy).toBeGreaterThanOrEqual(TARGET);

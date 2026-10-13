@@ -50,8 +50,10 @@ pnpm eval   # vitest run --project evals, then evals/print-results.mjs
 | --- | --- | --- | --- |
 | Rules only (Oct 10) | 98.3% | 90.0% | Tuned on these same fixtures, so expect lower on real selections. |
 | LLM, Qwen 3.8 (Oct 9) | 100% | 61.7% | Median 247 ms. Most slot misses: counting chat speaker headers as "mentions people" (Who added to 17 cases), low commitment scores on 6. |
+| LLM, Qwen 3.8, Decision role, 20 cases (Oct 13) | 100% | 100% | Step 21's minimal run, a balanced 20 (`GLOSSLY_EVAL_LIMIT=20`), scored on the fixtures updated for decision 45. Median 288 ms, 1 of 20 over 600 ms, 20 calls, 15,108 tokens in and 942 out. Rules on the same 20: 100% and 95% (msg-02 got Tasks). |
+| Rules only, all 60 (Oct 13) | 98.3% | 86.7% | After the decision 45 fixture update. Misses: msg-02 and msg-18 (Tasks on task-free messages), msg-04, msg-14, msg-17, cmt-06 (Who on emails or with Tasks), msg-11 (Tasks on a notice), tbl-04. |
 
-- The router prompt was tightened after the Oct 9 run (speaker headers, commitments, automated mail, contact cards, collection by content) and its schema changed (`best_collection` enum, decision 22). **None of that has been re-scored.** Step 21 is that run.
+- The router prompt was tightened after the Oct 9 run and re-scored on Oct 13 (above). **Fixture update (Oct 13):** decision 45 made Who is this show on someone else's chat message, so msg-01, 02, 03, 06, 07, 10, 12, 13, 15, 19 (messenger apps) now expect Reply and Who; before, both sides were marked wrong for following that decision. **Pre-agreed rule:** model 100% vs the rules' 90% baseline (now 86.7%): the model keeps the slots.
 - Remaining rules misses: msg-16 (first names only, so no Who), msg-18 ("please ... today" read as a commitment), tbl-04 (prose with 26% numeric tokens, under the 30% threshold). Automated mail no longer gets Reply (`reply-scoring.test.ts` checks all 60 fixtures offline).
 - Visualize comparison (one partial run, Qwen 3.8, 13 cases where both answered): the old way gave a relevant chart on 7, the chart pick on 12. No HTML was written, so looks weren't compared. The router collection comparison has never run.
 - Model latency on Groq (Oct 9, router call): Qwen 3.8 with reasoning off about 175 ms; gpt-oss-20b at low effort 320 to 550 ms; gpt-oss-120b 500 to 650 ms. Live router calls since: 287 to 446 ms.

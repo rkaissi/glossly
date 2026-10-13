@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { visualize, type VisualizeResult } from '@glossly/core';
-import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, rate, withRateLimitRetry } from './lib';
+import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, rate, withRateLimitRetry } from './lib';
 import { describeSpec, problems, relevant, render, type Expect } from './visualize-lib';
 
 interface Case {
@@ -45,7 +45,13 @@ describe('visualize eval', () => {
     const deps = { llm, settings: () => ({ privacy: 'all' as const }) };
     const rows = [];
     let stopped: string | null = null;
-    for (const c of cases) {
+    for (const [i, c] of cases.entries()) {
+      // Every few cases: is what's left of the day enough for the rest (Rayan)? If not, stop here.
+      const cut = budgetCheck(counted, i, cases.length - i, 2);
+      if (cut) {
+        stopped = cut;
+        break;
+      }
       let t = performance.now();
       let out: VisualizeResult;
       try {
@@ -111,10 +117,12 @@ describe('visualize eval', () => {
       input_tokens: total.inputTokens,
       output_tokens: total.outputTokens,
       stopped,
+      budget_checks: budgetLog,
     };
     console.log('visualize', JSON.stringify(summary));
     mkdirSync(resultsDir, { recursive: true });
     writeFileSync(join(resultsDir, `visualize-${modelRef.split('/').at(-1)}.json`), JSON.stringify({ eval: 'visualize', model: modelRef, at: new Date().toISOString(), ...summary, results: rows }, null, 2));
-    expect(stopped, 'stopped on rate limits').toBeNull();
+    // A budget stop keeps the cases run so far; only a rate-limit stop fails the run.
+    expect(stopped?.startsWith('budget') ? null : stopped, 'stopped on rate limits').toBeNull();
   }, 3_600_000);
 });

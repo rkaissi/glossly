@@ -17,6 +17,8 @@ export interface Counted {
   calls: () => Usage;
   /** Provider calls and tokens over the whole run. */
   total: () => Usage;
+  /** The rate-limit headers of the last answer (Groq: daily requests, tokens per minute). */
+  limits: () => Limits | null;
   reset: () => void;
 }
 
@@ -25,12 +27,28 @@ export const groqKey = () => process.env.GROQ_API_KEY ?? null;
 /** The model a run uses: `GLOSSLY_EVAL_MODEL`, else the role's model on today's Groq catalog (decision 60). */
 export const evalModel = (fallback: ModelRef): ModelRef => (process.env.GLOSSLY_EVAL_MODEL as ModelRef | undefined) ?? fallback;
 
-type Gen = { doGenerate: (o: unknown) => Promise<{ usage?: { inputTokens?: { total?: number }; outputTokens?: { total?: number } } }> };
+type Gen = {
+  doGenerate: (o: unknown) => Promise<{ usage?: { inputTokens?: { total?: number }; outputTokens?: { total?: number } }; response?: { headers?: Record<string, string> } }>;
+};
+
+/** Groq's x-ratelimit headers: requests are per day (refilling one at a time), tokens per minute. */
+export interface Limits {
+  requestsLeft: number;
+  requestsPerDay: number;
+  tokensLeftThisMinute: number;
+}
+
+function readLimits(h: Record<string, string> | undefined): Limits | null {
+  const n = (k: string) => Number(h?.[k] ?? NaN);
+  const l = { requestsLeft: n('x-ratelimit-remaining-requests'), requestsPerDay: n('x-ratelimit-limit-requests'), tokensLeftThisMinute: n('x-ratelimit-remaining-tokens') };
+  return Number.isFinite(l.requestsLeft) ? l : null;
+}
 
 /** An AiSdkLlm with `modelRef` in every role (Fast, Decision, Chat), no fallback, and call counting. */
 export function countedLlm(modelRef: ModelRef): Counted {
   const now: Usage = { attempts: 0, inputTokens: 0, outputTokens: 0 };
   const all: Usage = { attempts: 0, inputTokens: 0, outputTokens: 0 };
+  let last: Limits | null = null;
   const add = (u: Usage, i: number, o: number) => {
     u.attempts++;
     u.inputTokens += i;
@@ -44,6 +62,7 @@ export function countedLlm(modelRef: ModelRef): Counted {
             const r = await (target as Gen).doGenerate(opts);
             const i = r.usage?.inputTokens?.total ?? 0;
             const o = r.usage?.outputTokens?.total ?? 0;
+            last = readLimits(r.response?.headers) ?? last;
             add(now, i, o);
             add(all, i, o);
             spent(i + o);
@@ -63,6 +82,7 @@ export function countedLlm(modelRef: ModelRef): Counted {
     llm,
     calls: () => ({ ...now }),
     total: () => ({ ...all }),
+    limits: () => last,
     reset: () => {
       now.attempts = 0;
       now.inputTokens = 0;
@@ -140,6 +160,32 @@ export function retrySeconds(message: string): number {
   return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0) + Number(m[4] ?? 0) / 1000;
 }
 
+// --- Budget check -----------------------------------------------------------------------------
+
+/** How often a run checks what's left of the day (Rayan: every 5 or 10 cases). */
+export const CHECK_EVERY = Number(process.env.GLOSSLY_EVAL_CHECK_EVERY ?? 5);
+/** Daily requests to keep for the app and the rest of the evals on this model. */
+const RESERVE = Number(process.env.GLOSSLY_EVAL_RESERVE ?? 50);
+
+/**
+ * After every CHECK_EVERY cases: prints the day's requests left and this run's tokens, and returns
+ * a reason to stop when the requests left won't cover the remaining cases (about `perCase` calls
+ * each) plus the reserve. Cases run in turn across groups, so stopping early keeps a balanced set.
+ * Groq doesn't report the daily token cap; reaching it stops the run through `RateLimitStop`.
+ */
+/** Every budget check this run, for the results file (Vitest may not print console output). */
+export const budgetLog: { after: number; requests_left: number | null; requests_per_day: number | null; run_calls: number; run_tokens: number }[] = [];
+
+export function budgetCheck(counted: Counted, done: number, left: number, perCase = 1): string | null {
+  if (done === 0 || done % CHECK_EVERY !== 0) return null;
+  const l = counted.limits();
+  const t = counted.total();
+  budgetLog.push({ after: done, requests_left: l?.requestsLeft ?? null, requests_per_day: l?.requestsPerDay ?? null, run_calls: t.attempts, run_tokens: t.inputTokens + t.outputTokens });
+  console.log(`budget after ${done} cases: ${l ? `${l.requestsLeft}/${l.requestsPerDay} requests left today, ${l.tokensLeftThisMinute} tokens left this minute` : 'no limit headers'}; this run ${t.attempts} calls, ${t.inputTokens + t.outputTokens} tokens`);
+  if (l && l.requestsLeft < left * perCase + RESERVE) return `budget: ${l.requestsLeft} requests left, ${left} cases to go`;
+  return null;
+}
+
 // --- Case limit -------------------------------------------------------------------------------
 
 /**
@@ -150,16 +196,15 @@ export function limitCases<T extends { id: string }>(all: T[], group: (c: T) => 
   // GLOSSLY_EVAL_IDS (comma-separated) picks exact cases first, for a small comparison.
   const ids = process.env.GLOSSLY_EVAL_IDS?.split(',').map((s) => s.trim()).filter(Boolean);
   const cases = ids?.length ? all.filter((c) => ids.includes(c.id)) : all;
-  const n = Number(process.env.GLOSSLY_EVAL_LIMIT ?? 0);
-  if (!n || n >= cases.length) return cases;
+  const n = Math.min(Number(process.env.GLOSSLY_EVAL_LIMIT ?? 0) || cases.length, cases.length);
   const groups = new Map<string, T[]>();
   for (const c of cases) groups.set(group(c), [...(groups.get(group(c)) ?? []), c]);
   const out: T[] = [];
   for (let i = 0; out.length < n; i++) {
     for (const g of groups.values()) if (g[i] && out.length < n) out.push(g[i]!);
   }
-  const keep = new Set(out);
-  return cases.filter((c) => keep.has(c));
+  // In turn across groups, so a run cut short by the budget still covers every kind.
+  return out;
 }
 
 // --- Small helpers ----------------------------------------------------------------------------

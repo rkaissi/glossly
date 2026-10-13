@@ -24,7 +24,7 @@ import {
   type SelectionPayload,
   type Settings,
 } from '@glossly/core';
-import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, rate, sameName, withRateLimitRetry } from './lib';
+import { countedLlm, errorLabel, evalModel, groqKey, limitCases, median, RateLimitStop, budgetCheck, budgetLog, rate, sameName, withRateLimitRetry } from './lib';
 
 interface ExpectedTask {
   owner: 'me' | 'them';
@@ -212,7 +212,13 @@ describe('tasks eval', () => {
     const counted = countedLlm(modelRef);
     const rows = [];
     let stopped: string | null = null;
-    for (const c of cases) {
+    for (const [i, c] of cases.entries()) {
+      // Every few cases: is what's left of the day enough for the rest (Rayan)? If not, stop here.
+      const cut = budgetCheck(counted, i, cases.length - i, 1);
+      if (cut) {
+        stopped = cut;
+        break;
+      }
       const { store, people, input, openIds } = setup(c);
       let t = performance.now();
       try {
@@ -249,11 +255,13 @@ describe('tasks eval', () => {
       input_tokens: total.inputTokens,
       output_tokens: total.outputTokens,
       stopped,
+      budget_checks: budgetLog,
     };
     console.log('tasks', JSON.stringify(summary));
     mkdirSync(resultsDir, { recursive: true });
     writeFileSync(join(resultsDir, `tasks-${modelRef.split('/').at(-1)}.json`), JSON.stringify({ eval: 'tasks', model: modelRef, at: new Date().toISOString(), ...summary, results: rows }, null, 2));
-    expect(stopped, 'stopped on rate limits').toBeNull();
+    // A budget stop keeps the cases run so far; only a rate-limit stop fails the run.
+    expect(stopped?.startsWith('budget') ? null : stopped, 'stopped on rate limits').toBeNull();
     expect(summary.errors).toBeLessThanOrEqual(rows.length * 0.1);
   }, 3_600_000);
 });

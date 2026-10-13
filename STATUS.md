@@ -83,8 +83,10 @@ Router eval on the 60 hand-written fixtures in `fixtures/`. The spec's target is
 | --- | --- | --- | --- |
 | Rules only (Oct 10) | 98.3% | 90.0% | under 1 ms |
 | LLM, `groq:qwen/qwen3.8-27b` (Oct 9) | 100% | 61.7% | 247 ms, 3 of 60 calls over 400 ms (the budget then; now 600 ms) |
+| LLM, Qwen 3.8 on the Decision role, 20 cases (Oct 13, Step 21) | 100% | 100% (rules on the same 20: 95%) | 288 ms; 1 of 20 over the 600 ms budget; 20 calls, about 16k tokens |
+| Rules only, all 60 (Oct 13) | 98.3% | 86.7% | under 1 ms |
 
-The rules were tuned on these same fixtures, so expect lower numbers on real selections. The LLM's slot misses mostly came from counting chat speaker headers as "mentions people" (adding Who to 17 cases). The prompt was tightened afterwards but **not re-run** (Groq free-tier limits). Automated mail no longer gets Reply (Step 15.4: no-reply senders, receipts, shipping notices, one-time codes, and "Hi all, a reminder..." notices are detected locally, and Reply is also dropped for your own messages, whatever the model says; all 60 fixtures now get Reply exactly where expected). Rules still miss a message with first names only, one "please ... today" sentence read as a commitment, and one prose sentence with numbers just under the table threshold.
+**Oct 13 (Step 21):** the re-tuned prompt was re-run on a balanced 20 of the 60 (every fixture kind), scored against fixtures updated for decision 45 (someone else's message in a messenger app expects Reply and Who is this; 10 message fixtures changed). The model matched every case; the rules missed one of the same 20 and are at 86.7% on all 60 (their misses: Tasks on task-free messages, Who on emails, one prose table). **Pre-agreed rule:** the model's slot match (100%) is not under the rules' 90%, so the router keeps using the model for its slots. The real-use record (`pnpm calls --router`) had only 9 routings, too few to weigh. The rules were tuned on these same fixtures, so expect lower numbers on real selections. The LLM's slot misses mostly came from counting chat speaker headers as "mentions people" (adding Who to 17 cases). The prompt was tightened afterwards but **not re-run** (Groq free-tier limits). Automated mail no longer gets Reply (Step 15.4: no-reply senders, receipts, shipping notices, one-time codes, and "Hi all, a reminder..." notices are detected locally, and Reply is also dropped for your own messages, whatever the model says; all 60 fixtures now get Reply exactly where expected). Rules still miss a message with first names only, one "please ... today" sentence read as a commitment, and one prose sentence with numbers just under the table threshold.
 
 ## Capture results per app
 
@@ -135,7 +137,6 @@ Not verified live:
 - `Ctrl+C` in the Ask panel.
 - The forced-focus path for when Windows refuses to give the bar focus (it didn't trigger in the repro attempt).
 - The taskbar fix on the auto path (it uses the same code as the hotkey path).
-- The re-tuned router prompt (no eval re-run yet).
 - Packaging: `pnpm dist` exists but there is no `electron-builder` config yet.
 
 Known rough edges:

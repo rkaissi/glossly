@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| 21f | Oct 13 | (next commit records it) | Router eval on Qwen 3.8 (20 cases: 100% type, 100% slots; the model keeps the slots); 10 chat fixtures updated for decision 45; runners check the day's budget every 5 cases. |
 | 21e | Oct 12 | `eba1e42` | Fixes from the live checks (decision 65): debug view off for new profiles, quick add with a person, Who drops verb-like names, Visualize keeps one scale, trailing unread counts, Reply's drafts answer only the target; the HANDOFF summarizes Step 21's end-to-end results. |
 | 21d | Oct 12 | `6a2184d` | End-to-end pass D (Reply and chat): the empty bar shows More's actions; an email chain's newest message is the one to answer (decision 64). |
 | 21c | Oct 12 | `29c2461` | End-to-end passes B and C: `context_caret` reads the page around a Chromium reply box; the settings window redraws its mica on a theme change. |

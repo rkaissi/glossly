@@ -1,5 +1,5 @@
 {
-  "$comment": "20 messages or threads. expected.slots is the ideal set for slots 3 and 4 (order ignored).",
+  "$comment": "20 messages or threads. expected.slots is the ideal set for slots 3 and 4 (order ignored). Step 21 (Oct 13): someone else's message in a messenger app expects Reply and Who is this (decision 45: the sender is someone to look up); emails and task-like messages keep their earlier sets.",
   "cases": [
     {
       "id": "msg-01",
@@ -11,7 +11,7 @@
         "window_title": "#growth | Northwind - Slack",
         "is_editable": false
       },
-      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+      "expected": { "content_type": "message_thread", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-02",
@@ -23,7 +23,7 @@
         "window_title": "Dana Ortiz (DM) | Northwind - Slack",
         "is_editable": false
       },
-      "expected": { "content_type": "single_message", "slots": ["reply"] }
+      "expected": { "content_type": "single_message", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-03",
@@ -35,7 +35,7 @@
         "window_title": "#ci-fails - Indie Devs - Discord",
         "is_editable": false
       },
-      "expected": { "content_type": "single_message", "slots": ["reply"] }
+      "expected": { "content_type": "single_message", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-04",
@@ -71,7 +71,7 @@
         "window_title": "Chat | Ahmed Karim | Microsoft Teams",
         "is_editable": false
       },
-      "expected": { "content_type": "single_message", "slots": ["reply"] }
+      "expected": { "content_type": "single_message", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-07",
@@ -83,7 +83,7 @@
         "window_title": "WhatsApp",
         "is_editable": false
       },
-      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+      "expected": { "content_type": "message_thread", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-08",
@@ -119,7 +119,7 @@
         "window_title": "#design | Northwind - Slack",
         "is_editable": false
       },
-      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+      "expected": { "content_type": "message_thread", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-11",
@@ -143,7 +143,7 @@
         "window_title": "Signal",
         "is_editable": false
       },
-      "expected": { "content_type": "single_message", "slots": ["reply"] }
+      "expected": { "content_type": "single_message", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-13",
@@ -155,7 +155,7 @@
         "window_title": "#legal | Northwind - Slack",
         "is_editable": false
       },
-      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+      "expected": { "content_type": "message_thread", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-14",
@@ -179,7 +179,7 @@
         "window_title": "#bug-reports - Glossly Testers - Discord",
         "is_editable": false
       },
-      "expected": { "content_type": "single_message", "slots": ["reply"] }
+      "expected": { "content_type": "single_message", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-16",
@@ -227,7 +227,7 @@
         "window_title": "Messenger | Facebook - Google Chrome",
         "is_editable": false
       },
-      "expected": { "content_type": "message_thread", "slots": ["reply"] }
+      "expected": { "content_type": "message_thread", "slots": ["reply", "who"] }
     },
     {
       "id": "msg-20",
