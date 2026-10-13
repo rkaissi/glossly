@@ -16,7 +16,7 @@ Ask about it, save it, reply to it, find out who's in it, turn it into tasks and
 
 [Download](#install) · [Features](#features) · [Privacy](#privacy) · [Build from source](#build-from-source) · [Docs](#documentation)
 
-<img src="docs/media/hero.gif" width="860" alt="Selecting a message in a chat app, then asking Glossly about it">
+<img src="docs/media/hero.gif" width="860" alt="Selecting a chat message, opening Glossly, and inserting one of three reply drafts">
 
 </div>
 
@@ -28,68 +28,48 @@ It works in any app that shows text: chat and email apps, browsers, documents, P
 
 ## Features
 
-<table>
-<tr>
-<td width="50%" valign="top">
+### Reply in your own voice
 
-### Ask
-Ask anything about what you selected, and get an answer streamed right below it. Glossly brings in the text around your selection and your related saved notes. "Remember that…" saves a note.
-
-### Save and Recall
-Save a highlight in one click (or automatically), sorted into a collection. Later, when you select something related, Glossly shows a "2 related" badge with the notes that match by meaning or by the people and companies in them, all searched on your computer.
-
-### Reply
-Three drafts that answer the message you selected, written in your voice. Glossly learns your style from the drafts you pick and edit, per kind of app. Insert puts the reply in the message box. Nothing is ever sent for you.
-
-</td>
-<td width="50%" valign="top">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/bar-dark.png">
-  <img src="docs/media/bar-light.png" alt="The Glossly bar open over a selected chat message, with Ask, Save, Reply, and Tasks and events">
-</picture>
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-<img src="docs/media/reply.png" alt="Three reply drafts for a selected message">
-
-</td>
-<td width="50%" valign="top">
+Select a message and get three drafts that answer it, each taking a different line (say yes, ask a question, suggest another time). Glossly reads the conversation to know who wrote what and what's being asked, and learns your style from the drafts you pick and edit, separately for chat and email. **Insert** puts the reply in the message box; nothing is ever sent for you. (That's the demo at the top of this page.)
 
 ### Who is this
-A card for each person in the selection: what you know about them, what you owe each other, your last messages, and saved notes. Glossly reads the conversation to tell who wrote what, and offers to add new people to your contacts.
+
+A card for each person in what you selected: who they are to you, your notes, what you owe each other, and your last messages. New people can be added in one click, with their name, email, and handle filled in from the text.
+
+<p align="center"><img src="docs/media/who.gif" width="820" alt="Who is this: a person card opened from a selected message"></p>
 
 ### Tasks and events
-Promises, requests, and todos ("can you send the deck by Friday?") become tasks with due dates and reminders. Meetings and calls become calendar events. Glossly notices when a message finishes or moves a task you already track.
+
+Promises, requests, and todos ("could you send the deck before then?") become tasks with due dates and reminders, and meetings become calendar events. Glossly also notices when a message finishes or moves something you already track. Everything lands in Settings, in full Tasks and Calendar views.
+
+<p align="center"><img src="docs/media/tasks.gif" width="820" alt="Tasks and events: a task and a meeting found in a message, saved to the calendar"></p>
+
+### Ask
+
+Ask anything about what you selected and get the answer right below it. Glossly brings in the text around your selection and your related saved notes, and "remember that…" saves a note for later.
+
+<p align="center"><img src="docs/media/ask.gif" width="820" alt="Ask: a question about a selected message, answered in place"></p>
+
+### Save and Recall
+
+Save a highlight in one click (or automatically), sorted into a collection. Later, when you select something related, a badge shows the notes that match by meaning or by the people and companies in them. Search and matching run on your computer.
+
+<p align="center"><img src="docs/media/recall.gif" width="820" alt="Save and Recall: saving a message, then seeing related notes on a later selection"></p>
 
 ### Visualize
+
 Select a table (from a spreadsheet, a web page, Markdown, or a CSV) and get a clean chart. The chart is drawn by code straight from the table's rows; the model only picks the kind of chart and the columns.
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+<p align="center"><img src="docs/media/visualize.gif" width="820" alt="Visualize: a chart made from a selected table, dark theme"></p>
 
-<img src="docs/media/tasks.png" alt="Tasks and events found in a selected message">
+### And more
 
-</td>
-<td width="50%" valign="top">
+- **Search** everything you saved, your people, and open tasks: press the hotkey with nothing selected.
+- **Paste snippets** you saved recently, or have Glossly **write them up** for the field you're typing in.
+- **Settings** has full Tasks and Calendar views, your people and saved items, model choices, privacy controls, and local usage metrics, in light and dark.
 
-<img src="docs/media/visualize.png" alt="A chart made from a selected table">
-
-</td>
-</tr>
-</table>
-
-**And more.** Press the hotkey with nothing selected to search everything you saved, paste recent snippets, or have Glossly write them up for the field you're in. Settings has full Tasks and Calendar views, your people, your saved items, and local usage metrics.
-
-<p align="center">
-  <img src="docs/media/settings-tasks.png" width="49%" alt="The Tasks tab in Settings">
-  <img src="docs/media/settings-calendar.png" width="49%" alt="The Calendar tab in Settings, dark theme">
-</p>
+<p align="center"><img src="docs/media/settings-calendar.png" width="820" alt="The Calendar tab in Settings, dark theme"></p>
+<p align="center"><img src="docs/media/settings-tasks.png" width="820" alt="The Tasks tab in Settings"></p>
 
 ## How it works
 
