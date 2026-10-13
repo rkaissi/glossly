@@ -52,7 +52,8 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 21l | Oct 13 | `c8df4e6` | Recall eval (local): the similarity floor goes from 0.78 to 0.5 (decision 66). |
+| 21m | Oct 13 | (next commit records it) | HANDOFF brought up to date for the next session; the Recall decision renumbered 66 → 67 (Rayan's delete-confirm pass had taken 66). |
+| 21l | Oct 13 | `c8df4e6` | Recall eval (local): the similarity floor goes from 0.78 to 0.5 (decision 67). |
 | 21k | Oct 13 | `ae686b0` | Qwen 3.8 vs gpt-oss-20b on 5 Who and 5 Tasks fixtures: Qwen all right; Fast stays on gpt-oss-20b. |
 | 21j | Oct 13 | `c90b241` | Tasks check cut by gpt-oss-20b's daily limit; another writer's own "I'll …" or "can you …" decides who owes a task. |
 | 21i | Oct 13 | `0897b8d` | Tasks rerun (tasks 95%); a task with no person goes to the selection's one other person; `resolveDue` reads "end of day <day>". |
