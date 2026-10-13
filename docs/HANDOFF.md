@@ -22,7 +22,7 @@ Last updated Oct 13, 2026 (evening). **Step 22 (packaging) is underway:** the in
 
 **Next, in order:**
 1. **Finish the installed-app check** through a subagent while Rayan is away and the session is unlocked: setup through to the end, the pill in Notepad, Ask, Save with an embedding, the reminder toast (Settings > Tasks quick add "... today"; a toast within 60 s), Quit from the tray; and the taskbar icon after a restart. Always start it with `--data-dir=%TEMP%\glossly-pkg-test`, never from the Start Menu. Delete the throwaway profile afterwards.
-2. **Draft GitHub Release** v0.1.0 with the installer (`gh release create v0.1.0 --draft`, unsigned, with the SmartScreen note) once item 1 passes; the repo is private.
+2. **Draft GitHub Release** v0.1.0 exists (Oct 13, private repo, unsigned installer, SmartScreen note in its text; the tag is created when it's published). After item 1, rebuild if anything changed and replace the file: `gh release upload v0.1.0 packages/shell-electron/dist/Glossly-Setup-0.1.0.exe --clobber`, and drop the "still being checked" line from its notes. Publishing it is Rayan's call.
 3. **Visualize eval** (left from Step 21): 15 cases on gpt-oss-20b (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls and 30K tokens) once its day has room (one tiny call printing only the `x-ratelimit-*` headers first). Ask Rayan first.
 4. Then Step 23 (the README).
 
