@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, ExternalLink, Plus, Trash2, UsersRound } from 'lucide-react';
 import type { CommitmentView } from '@glossly/core/api';
 import { glossly } from '../bridge';
@@ -205,19 +206,20 @@ function QuickAdd({ today, person }: { today: string; person: { id: string; name
   );
 }
 
-/** "Completed … Undo" for a few seconds after a task is checked off. */
+/** "Completed … Undo" for a few seconds after a task is checked off. Portaled so fixed sits on the window (the page's enter animation would otherwise pin it to the section). */
 function UndoToast({ task, onUndo, onGone }: { task: CommitmentView; onUndo: () => void; onGone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onGone, 5000);
     return () => clearTimeout(t);
   }, [task, onGone]);
-  return (
+  return createPortal(
     <div className="toast-bar" role="status">
       <span className="clip1">Completed "{task.text}"</span>
       <button type="button" className="sm" onClick={onUndo}>
         Undo
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

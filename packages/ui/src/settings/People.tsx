@@ -107,10 +107,10 @@ function RecordHead({ card, onChange }: { card: PersonCard; onChange: (c: Person
       </button>
       {confirming && (
         <>
-          <span className="muted small">Removes aliases, messages, and commitments. Saved items stay.</span>
           <button type="button" className="ghost sm" disabled={busy} onClick={() => setConfirming(false)}>
             Cancel
           </button>
+          <span className="muted small">Removes aliases, messages, and commitments.</span>
         </>
       )}
       {error && <span className="error small">{error}</span>}

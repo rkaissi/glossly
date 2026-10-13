@@ -249,16 +249,16 @@ button.collapse[aria-expanded='false'] svg {
   color: var(--fg);
 }
 
-/* The Undo bar after a task is checked off. */
+/* The Undo bar after a task is checked off: bottom of the window, centered in the main pane. */
 .toast-bar {
   position: fixed;
-  left: 50%;
+  left: calc((100vw + 220px) / 2);
   bottom: 28px;
   z-index: 900;
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  max-width: min(520px, calc(100vw - 32px));
+  max-width: min(520px, calc(100vw - 252px));
   padding: 6px 6px 6px 14px;
   border-radius: var(--radius-md);
   background: var(--primary);
