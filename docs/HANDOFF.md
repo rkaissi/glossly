@@ -24,7 +24,7 @@ Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done; v0.1.0 is publ
 
 **Next, in order:**
 1. ~~**Finish the installed-app check**~~: done (Oct 13 night; `docs/testing.md`, "Installed app"). Left: the taskbar icon (Rayan: look after a restart) and a toast seen on screen (Do Not Disturb hid it; the log shows it fired). The throwaway profile is deleted; the installed app stays at `%LOCALAPPDATA%\Programs\glossly` and shares `%APPDATA%\Glossly` with the dev build, so run one at a time.
-2. ~~**Publish v0.1.0**~~: done (Oct 13; https://github.com/rkaissi/glossly/releases/tag/v0.1.0). Installed copies see updates once the repo is public. For a later version: bump `version`, `pnpm dist`, and `gh release create v<x.y.z> <the three files> --title "Glossly <x.y.z>"` (see Updates above).
+2. ~~**Publish v0.1.0**~~: done (Oct 13; the repo's Releases page, tag `v0.1.0`). Installed copies see updates once the repo is public. For a later version: bump `version`, `pnpm dist`, and `gh release create v<x.y.z> <the three files> --title "Glossly <x.y.z>"` (see Updates above).
 3. **Visualize eval** (left from Step 21): 15 cases on gpt-oss-20b (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls and 30K tokens) once its day has room (one tiny call printing only the `x-ratelimit-*` headers first). Ask Rayan first.
 4. Then Step 23 (the README).
 
