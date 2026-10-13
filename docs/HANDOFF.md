@@ -2,7 +2,7 @@
 
 The current state of the build, what to do next, and what to keep in mind. Read this at the start of every session, then follow the links for detail. Update it in the same commit as each chunk of work (`AGENTS.md`).
 
-Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done except publishing:** the installer builds, installs, updates in place, and passed the installed-app check on a throwaway profile (decisions 69, 70); the v0.1.0 draft release holds the installer, its `.blockmap`, and `latest.yml`, waiting for Rayan's go to publish. One open item: the taskbar button shows Electron's atom (likely this machine's icon cache). **Step 21 is done** except the Visualize eval. Everything is committed and pushed. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
+Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done; v0.1.0 is published** (Oct 13, GitHub Releases, tag `v0.1.0` on `cd22e12`; private repo): the installer builds, installs, updates in place, and passed the installed-app check on a throwaway profile (decisions 69, 70); the release holds the installer, its `.blockmap`, and `latest.yml`. One open item: the taskbar button shows Electron's atom (likely this machine's icon cache). **Step 21 is done** except the Visualize eval. Everything is committed and pushed. Steps 20.5 to 20.8 (decisions 49 to 62) and Rayan's delete-confirm pass (decision 66) are done.
 
 **Delete confirms (Oct 12 evening; decision 66).** Trash morph for Saved, Tasks, calendar events, person header (pencil rename beside it; warning only when armed), and Profile voice/learned rows; chips keep the small x; Merge / Delete all / Reset use borderless `InlineConfirm`; event Save stays visible but disabled while delete is armed or the event is unchanged. Red-bordered confirm boxes are gone.
 
@@ -24,7 +24,7 @@ Last updated Oct 13, 2026 (night). **Step 22 (packaging) is done except publishi
 
 **Next, in order:**
 1. ~~**Finish the installed-app check**~~: done (Oct 13 night; `docs/testing.md`, "Installed app"). Left: the taskbar icon (Rayan: look after a restart) and a toast seen on screen (Do Not Disturb hid it; the log shows it fired). The throwaway profile is deleted; the installed app stays at `%LOCALAPPDATA%\Programs\glossly` and shares `%APPDATA%\Glossly` with the dev build, so run one at a time.
-2. **Publish v0.1.0** when Rayan says go: `gh release edit v0.1.0 --draft=false` (creates the `v0.1.0` tag on `main`). `gh` is signed in with the `repo` scope, so nothing is needed from him but the go. The repo is private, so only people with access can download it, and installed copies won't see updates until it's public. Its notes are current (the "still being checked" line is gone). For a later version: bump `version`, `pnpm dist`, and `gh release create v<x.y.z> <the three files> --title "Glossly <x.y.z>"` (see Updates above).
+2. ~~**Publish v0.1.0**~~: done (Oct 13; https://github.com/rkaissi/glossly/releases/tag/v0.1.0). Installed copies see updates once the repo is public. For a later version: bump `version`, `pnpm dist`, and `gh release create v<x.y.z> <the three files> --title "Glossly <x.y.z>"` (see Updates above).
 3. **Visualize eval** (left from Step 21): 15 cases on gpt-oss-20b (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls and 30K tokens) once its day has room (one tiny call printing only the `x-ratelimit-*` headers first). Ask Rayan first.
 4. Then Step 23 (the README).
 
