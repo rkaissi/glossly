@@ -183,6 +183,24 @@ export function inSelection(selection: string, text: string, phrase = ''): boole
   return p.length > 0 && canonicalize(selection).includes(p);
 }
 
+/** A promise ("I'll send…") or a request ("can you send…") in someone else's message, by the verb that follows. */
+const PROMISE = /\b(?:i'll|i will|i'm going to|im going to|i can|let me)\s+(?:also\s+|just\s+)?([a-z]+)/gi;
+const REQUEST = /\b(?:can|could|would|will) you\s+(?:also\s+|please\s+)?([a-z]+)|\bplease\s+([a-z]+)/gi;
+
+/**
+ * Who owes a task, read from someone else's message: "them" when its writer promised the task's
+ * verb ("I'll get you the draft"), "me" when they asked the user for it ("can you send…"), else
+ * null. Step 21's Tasks eval: the model kept reading another writer's "I'll" as the user's.
+ */
+export function ownerFromText(selection: string, taskText: string): 'me' | 'them' | null {
+  const verb = taskText.trim().toLowerCase().split(/\s+/)[0]?.slice(0, 4);
+  if (!verb || verb.length < 3) return null;
+  const hits = (re: RegExp) => [...selection.matchAll(re)].some((m) => (m[1] ?? m[2] ?? '').toLowerCase().slice(0, 4) === verb);
+  const promised = hits(PROMISE);
+  const asked = hits(REQUEST);
+  return promised === asked ? null : promised ? 'them' : 'me';
+}
+
 /** What code checks the rows against: the selected text, the user, and the author (decision 22). */
 export interface RowCheck {
   selection: string;
@@ -250,6 +268,11 @@ export function toPromiseRows(
     }
     // No person, but only one other person in the selection: the task is between the user and them (Step 21's Tasks eval).
     if (check && !written) written = check.counterpart;
+    // A single other writer's own words decide who owes it, over the model's reading.
+    if (check?.author && check.counterpart === check.author) {
+      const said = ownerFromText(check.selection, text);
+      if (said) owner = said;
+    }
     const dupe = `${owner}:${canonicalize(text)}`;
     if (seen.has(dupe)) continue;
     seen.add(dupe);

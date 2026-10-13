@@ -52,7 +52,8 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 21i | Oct 13 | (next commit records it) | Tasks rerun (tasks 95%); a task with no person goes to the selection's one other person; `resolveDue` reads "end of day <day>". |
+| 21j | Oct 13 | (next commit records it) | Tasks check cut by gpt-oss-20b's daily limit; another writer's own "I'll …" or "can you …" decides who owes a task. |
+| 21i | Oct 13 | `0897b8d` | Tasks rerun (tasks 95%); a task with no person goes to the selection's one other person; `resolveDue` reads "end of day <day>". |
 | 21h | Oct 13 | `4365ff5` | Tasks eval on gpt-oss-20b (dates, changes, events 100%; owners flipped on "I" from others); the model's owner values become user/other; picked-case runs write their own results file. |
 | 21g | Oct 13 | `a0b1316` | Who and conversation-read eval on gpt-oss-20b (18 cases); accepted message writers pass Who's confidence floor. |
 | 21f | Oct 13 | `fee9a16` | Router eval on Qwen 3.8 (20 cases: 100% type, 100% slots; the model keeps the slots); 10 chat fixtures updated for decision 45; runners check the day's budget every 5 cases. |

@@ -7,7 +7,7 @@ import { CalendarRepo } from '../store/calendar';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { isoNow, type SelectionPayload } from '../types';
-import { buildPromisesPrompt, extractPromises, reminderCutoff, reminderText, savePromises, type ModelCommitments } from './promises';
+import { buildPromisesPrompt, extractPromises, ownerFromText, reminderCutoff, reminderText, savePromises, type ModelCommitments } from './promises';
 import { detectInputFor } from './who';
 
 const me = { name: 'Alex Morgan', emails: ['alex@example.com'], handles: [] };
@@ -128,6 +128,21 @@ describe('What did I promise', () => {
     const note: SelectionPayload = { ...selection, text: 'review the PR today' };
     const mine = await extractPromises(new FakeLlm(() => answer), people, settings, { selection: note, author: null, authorIsMe: true }, undefined, now);
     expect(mine.rows[0]).toMatchObject({ owner: 'me', person_name: null });
+  });
+
+  it("reads who owes a task from another writer's words (Step 21)", async () => {
+    expect(ownerFromText("I'll get you the contract draft by end of day tomorrow", 'get the contract draft')).toBe('them');
+    expect(ownerFromText("I'll book the room for the workshop, leave it with me", 'book the room')).toBe('them');
+    expect(ownerFromText('can you send me the forms before friday?', 'send the forms')).toBe('me');
+    expect(ownerFromText('please review the PR today', 'review the PR')).toBe('me');
+    expect(ownerFromText('Lunch Thursday at 1pm?', 'bring the deck')).toBeNull();
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const draft: SelectionPayload = { ...selection, text: "I'll get you the contract draft by end of day tomorrow" };
+    const answer = { commitments: [{ owner: 'user', person_name: 'Maya Chen', text: 'get the contract draft', due_phrase: 'end of day tomorrow', confidence: 0.9, change: 'new', open_task: 'none' }], events: [] };
+    const author = { name: 'Maya Chen', email: null, handle: null, role: 'author', knownId: null } as DetectedPerson;
+    const r = await extractPromises(new FakeLlm(() => answer), people, settings, { selection: draft, author, authorIsMe: false }, undefined, now);
+    expect(r.rows[0]).toMatchObject({ owner: 'them', person_name: 'Maya Chen', due_at: expect.stringMatching(/^2026-10-15T17:00/) });
   });
 
   it('passes a Local only refusal through', async () => {
