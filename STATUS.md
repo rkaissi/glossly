@@ -1,6 +1,6 @@
 # Glossly status: Phases 0 to 3
 
-Updated Oct 10, 2026. This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the current state and next steps; `docs/features.md` has what each feature does and how far it's been checked; `docs/decisions.md` has every decision in full.
+Updated Oct 13, 2026 (Step 21, testing and evals, is done except the Visualize eval; numbers below). This covers the first handoff (spec: Phases 0 and 1), Phase 2 (people layer and Reply, Step 15), and Phase 3 (Recall and Visualize, Step 16, checked live Oct 10). `docs/HANDOFF.md` has the current state and next steps; `docs/features.md` has what each feature does and how far it's been checked; `docs/decisions.md` has every decision in full.
 
 ## Summary
 
@@ -90,9 +90,13 @@ Router eval on the 60 hand-written fixtures in `fixtures/`. The spec's target is
 
 Conversation read and Who is this (Oct 13, gpt-oss-20b, 18 fictional cases from Discord, Slack, Teams, WhatsApp, email, a contact card, and an article): the read was accepted every time, with every message's author right; Who found 23 of 25 people and never listed a button, badge, shared inbox, or you; Reply aimed at the right message in 13 of 15. The misses were two fixture expectations and one low-confidence filter, both fixed (100% on the recorded answers). Median 495 ms and about 1,300 tokens a read. Without the model, the text parser gets the author right in 40% of these cases.
 
-Tasks and events (Oct 13, gpt-oss-20b, 18 fictional cases on a fixed Wednesday): due dates, changes to open tasks (done, moved, same), and events with day and time were right every time. The model read another writer's "I'll …" as yours, and later left the person blank; tasks found went from 80% to 95% with a schema change, and code now fills the person and checks the owner from the writer's own words. A date bug ("end of day Friday") was fixed. The final check was cut short by the daily limit.
+Tasks and events (Oct 13, gpt-oss-20b, 18 fictional cases on a fixed Wednesday): due dates, changes to open tasks (done, moved, same), and events with day and time were right every time. The model read another writer's "I'll …" as yours, and later left the person blank; tasks found went from 80% to 95% with a schema change, and code now fills the person and checks the owner from the writer's own words. A date bug ("end of day Friday") was fixed. On Oct 13 afternoon a 7-case check and a full run held those fixes (person and dates 100%); the two misses left, a request between two other people kept as a task and a writer's own promise to a group missed, are fixed in code (decision 68). The last run, cut at 12 of 18 by Groq's daily limit, got every task and person right; one date took the asker's "Friday" over your own "Thursday".
 
 Qwen 3.8 against gpt-oss-20b on 5 Who and 5 Tasks fixtures: Qwen got all 10 right with fewer tokens; gpt-oss-20b's misses there were all ones since fixed in code. Fast stays on gpt-oss-20b so it doesn't share the router's rate limit (decision 60).
+
+Visualize: not run yet (pushed out by the daily limit twice on Oct 13).
+
+**Your real use (Oct 10 to 13).** On 28 routings where both answered, the model and the rules agreed on slots 3 and 4 only 9 times, and of your 31 clicks there, 13 were on a slot only the model offered and none on one only the rules offered: the model keeps the slots. Measured tokens per call: the router 1,166 in and 47 out (390 ms on average), the conversation read 1,422 and 175, Reply's drafts 1,978 and 184, Tasks 2,405 and 64. At the subscription cost basis in the HANDOFF that's about $0.55 a month for a typical day and $3.90 for a heavy one. Rate-limit fallbacks: 78 on Oct 10, none since Oct 12.
 
 Recall (Oct 13, on this computer, 16 fictional selections over 20 saved items): related notes by topic were never offered, because their similarity (0.37 to 0.74) was under the 0.78 floor; only shared people and companies worked. With the floor at 0.5, 13 of 16 selections get everything they should, with no wrong suggestions (decision 67).
 
@@ -161,6 +165,8 @@ Every earlier question has been answered (Oct 10) and is recorded in `docs/decis
 Still open:
 
 1. **Who is this and What did I promise:** answered Oct 11 (decision 36): What did I promise became Tasks; Who is this stays separate.
-2. **Comparison evals:** run them alongside the one eval run in Step 21 (about 300 more Groq calls), or skip?
+2. **Comparison evals:** answered (decision 35): no more beyond the small Qwen 3.8 check.
+3. **Fast on Qwen 3.8 or gpt-oss-20b**, and **the debug view off for testers**: see `docs/HANDOFF.md`, open questions.
+4. **Before packaging (Step 22):** which data the installed-app test uses, the publisher name, how releases are published, the version, and the license; listed in `docs/HANDOFF.md`.
 
 Step 18 (local models, and All models or Local only as a choice) is built with unit tests (Oct 11). The order from here: 19 (todos and calendar), 20 (polish and UI upgrade: filled red delete buttons, a keyboard-hints setting, a new setup, the app icon, and the small fixes), 21 (all testing and evals, including the checks in the app and your hand tests), 22 (packaging), and 23 (a complete README for when the repo goes public). The spec's optional decision providers (Jev, OpenAI Decisions) are parked. See `docs/HANDOFF.md`.

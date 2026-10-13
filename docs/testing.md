@@ -60,10 +60,34 @@ pnpm eval   # vitest run --project evals, then evals/print-results.mjs
 - **Tasks check, second day (Oct 13, afternoon), gpt-oss-20b:** the 7 cases with misses: person 100%, due dates 100% (8 of 8), tasks 89%, 5 of 7 fully right (`ownerFromText`, the person fill-in, and "end of day" all hold on the model). Median 691 ms, 13,270 tokens in and 1,206 out. A full 18-case run right after: tasks 95%, person 100%, dates 100% (14 of 14), changes and events 100%, 16 of 18 fully right, 1 extra row; median 687 ms; 35,050 tokens in, 3,340 out (about 1,950 in and 165 out per call). The two left were the same as before: Casey's "Jordan, can you confirm the press list?" kept as a task (the model gave it to Casey) and Maya's "I'll share the final budget on Friday" missed (the model listed the request twice). Both fixed in code (decision 68); the runner now records each case's raw answer (`answer`), which showed the cause. **Final rerun on that code:** stopped by the daily limit after 12 of 18 ("asks for 793 s"; the app had used part of the rolling day): tasks 100% (14 of 14, email-02's missed promise now added by the patterns), person 100%, changes and events 100%, no extra rows, 11 of 12 fully right; due dates 89% (8 of 9): in chat-02 the model copied the asker's "Friday" instead of the user's own "I'll send it Thursday" (it had copied Thursday on the earlier runs). chat-04 didn't run; its recorded answer from the afternoon replayed through the new code gives exactly the two expected tasks with their dates. **Visualize** was skipped for the day (same limit).
 - **Recall (Oct 13), local all-MiniLM-L6-v2, 16 selections over 20 saved items, no Groq calls:** at the old 0.78 floor every expected item scored under it (0.37 to 0.74; unrelated items never above 0.35), so only entity matches were offered: 6 of 16 selections fully right, MRR 0.30, no false hits. The floor is now 0.5 (decision 67): 13 of 16, MRR 0.77, still no false hits. The eval now records each selection's five nearest items, so a floor can be checked against what it would let through.
 - **Qwen 3.8 against gpt-oss-20b (Oct 13, decision 60), 5 Who and 5 Tasks fixtures** (discord-02, slack-01, whatsapp-02, email-01, email-02; chat-02, chat-03, chat-07, open-01, event-01): Qwen got all 10 fully right on today's code; gpt-oss-20b's earlier runs got 3 of 5 and 2 of 5, but every one of its misses here is one since fixed in code or the fixtures (the confidence floor, a Slack target expectation, the empty person, "end of day"), so on today's code they likely tie. Qwen got owners right without the code check, and used fewer tokens (Who about 700 in and 180 out against about 1,100 and 300; it doesn't reason first). Latency was similar (median 615 ms Who, 485 ms Tasks). 10 calls on Qwen. Moving Fast to Qwen would put it in the router's rate-limit bucket again (the reason for decision 60), so the split stays unless Rayan decides otherwise.
+- **Visualize (Step 21):** not run yet. Both Oct 13 attempts were pushed out by gpt-oss-20b's daily limit; run 15 cases (`GLOSSLY_EVAL_LIMIT=15`, about 22 calls) when there's room.
+- **Groq's rolling day (Oct 13):** the afternoon Tasks rerun hit gpt-oss-20b's daily limit after about 95K tokens because the morning's evals (about 100K) were still inside the 24-hour window. Keep one model's evals under about 150K tokens per 24 hours, with room left for the app.
 - The router prompt was tightened after the Oct 9 run and re-scored on Oct 13 (above). **Fixture update (Oct 13):** decision 45 made Who is this show on someone else's chat message, so msg-01, 02, 03, 06, 07, 10, 12, 13, 15, 19 (messenger apps) now expect Reply and Who; before, both sides were marked wrong for following that decision. **Pre-agreed rule:** model 100% vs the rules' 90% baseline (now 86.7%): the model keeps the slots.
 - Remaining rules misses: msg-16 (first names only, so no Who), msg-18 ("please ... today" read as a commitment), tbl-04 (prose with 26% numeric tokens, under the 30% threshold). Automated mail no longer gets Reply (`reply-scoring.test.ts` checks all 60 fixtures offline).
 - Visualize comparison (one partial run, Qwen 3.8, 13 cases where both answered): the old way gave a relevant chart on 7, the chart pick on 12. No HTML was written, so looks weren't compared. The router collection comparison has never run.
 - Model latency on Groq (Oct 9, router call): Qwen 3.8 with reasoning off about 175 ms; gpt-oss-20b at low effort 320 to 550 ms; gpt-oss-120b 500 to 650 ms. Live router calls since: 287 to 446 ms.
+
+### Real-use record (Oct 13)
+
+Read from Rayan's database with `pnpm calls --router` and aggregate queries on `llm_calls` and the `events` table (counts, codes, and tokens only). His profile has events from Oct 10 to 13 (Oct 10 and 12 include live-check use) and the call log from Oct 12, 16:36.
+
+- **Router, rules against the model** (28 routings with both answers): slots agreed on 9 (single message 1 of 11, thread 1 of 8, table 1 of 3, article 3 of 3, other 3 of 3); content type agreed on 7. **Clicks in slots 3 and 4 or More** (31): 13 on a slot only the model offered, 0 only the rules, 17 both, 1 neither. So on real selections the model's slots are what got used, and the pre-agreed rule's outcome (the model keeps the slots) holds.
+- **Router calls** (call log, 36): 27 answered, 9 aborted when the bar closed first; average 390 ms; Qwen 3.8.
+- **Tokens per call by action** (`llm_tokens`, 142 calls, Oct 12 to 13):
+
+| Action (role) | Calls | Input avg | Output avg | Notes |
+| --- | --- | --- | --- | --- |
+| router (Decision, Qwen 3.8) | 61 | 1,166 | 47 | no reasoning tokens |
+| who, the read (Fast, gpt-oss-20b) | 35 | 1,422 | 175 | 3,023 reasoning tokens in all; 768 cached |
+| reply (Chat, gpt-oss-120b) | 31 | 1,978 | 184 | 5,120 cached in all |
+| promises (Fast) | 8 | 2,405 | 64 | |
+| paste_summary (Chat) | 5 | 1,722 | 112 | |
+| ask (Chat) | 1 | 1,738 | 154 | one call |
+| visualize_chart (Fast) | 1 | 754 | 104 | one call |
+
+- **Clicks by action** (all days, 423): Reply 121, Who 94, Ask 61, Save 52, Tasks 33, Paste 26, Visualize 21, Search 9, Recall 6.
+- **Fallbacks:** 87 rate-limit fallbacks in all, 78 of them on Oct 10 (the Step 16 live check), 8 on Oct 11, 1 on Oct 12, none since. The call log has no failed call apart from the 9 aborted router calls.
+- **Cost:** these replace the Parked estimates in the HANDOFF (typical day about $0.55 a month, heavy about $3.90, at $0.10 and $0.50 per million tokens in and out).
 
 ## Live checks
 

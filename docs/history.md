@@ -52,7 +52,8 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `2737650` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `2144392` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `7bd0691` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
-| 21n | Oct 13 | (next commit records it) | Tasks check and full rerun on gpt-oss-20b; another writer's ask is the user's or dropped, the patterns add a writer's promise the model missed (decision 68); `splitMessages` drops Slack's same-line header; the Tasks runner records the model's answer. Visualize skipped (daily limit). |
+| 21o | Oct 13 | (next commit records it) | Step 21 closed: the real-use record read (router clicks back the model; measured tokens per action replace the cost estimates), every number in `STATUS.md` and `docs/testing.md`, Step 22's questions for Rayan in the HANDOFF. The Visualize eval is left for a day with room. |
+| 21n | Oct 13 | `8bea210` | Tasks check and full rerun on gpt-oss-20b; another writer's ask is the user's or dropped, the patterns add a writer's promise the model missed (decision 68); `splitMessages` drops Slack's same-line header; the Tasks runner records the model's answer. Visualize skipped (daily limit). |
 | 21m | Oct 13 | `67d9ff8` | HANDOFF brought up to date for the next session; the Recall decision renumbered 66 → 67 (Rayan's delete-confirm pass had taken 66). |
 | 21l | Oct 13 | `c8df4e6` | Recall eval (local): the similarity floor goes from 0.78 to 0.5 (decision 67). |
 | 21k | Oct 13 | `ae686b0` | Qwen 3.8 vs gpt-oss-20b on 5 Who and 5 Tasks fixtures: Qwen all right; Fast stays on gpt-oss-20b. |
@@ -89,4 +90,4 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.4a | Oct 11 | `b5e5631` | Local header parser fixes: no bare badges, days, or hover-timestamp lines as speakers; names with spaces; known names (`knownName`); Reply answers only what came after the user's last message. |
 | — | Oct 10 | `d9ffd97` | Docs reorganized: `HANDOFF.md` slimmed; `decisions.md`, `architecture.md`, `features.md`, `testing.md`, `history.md` added. |
 
-Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Steps 21 to 23 are planned in `HANDOFF.md`; Google Calendar sync (19.3) is parked (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
+Step 14 (Rayan's hand tests) has no commit yet and is now part of Step 21. Step 21 is done except the Visualize eval; Steps 22 and 23 are planned in `HANDOFF.md`; Google Calendar sync (19.3) is parked (reordered Oct 11; the rest of Step 17, the decision providers, is parked).
