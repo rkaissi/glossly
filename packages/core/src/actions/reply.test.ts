@@ -343,3 +343,28 @@ describe('voice samples by platform (decision 57)', () => {
     expect(p).toContain('<sample>\nsounds good!!\n</sample>');
   });
 });
+
+describe('Reply on an email chain (Step 21)', () => {
+  const me = { name: 'Alex Morgan', emails: ['alex.morgan@example.com'], handles: [] };
+  const chain = [
+    'Hi Alex, could you send the revised forecast by Friday?',
+    'Jordan',
+    '',
+    'On Tue, Oct 6, 2026 at 3:12 PM Alex Morgan <alex.morgan@example.com> wrote:',
+    'Hi Jordan, attached are the first Q4 numbers.',
+    '',
+    'On Mon, Oct 5, 2026 at 9:02 AM Jordan Hale <jordan.hale@example.com> wrote:',
+    'Can you pull together the Q4 budget numbers?',
+  ].join('\n');
+  const newest = 'Hi Alex, could you send the revised forecast by Friday?\nJordan';
+
+  it('answers the newest message, never the quoted history, with or without the read', () => {
+    const read = messagesToAnswer(chain, '', me, [
+      { author: 'Jordan Hale', user: false, start: 0 },
+      { author: 'Alex Morgan', user: true, start: chain.indexOf('Hi Jordan') },
+      { author: 'Jordan Hale', user: false, start: chain.indexOf('Can you pull') },
+    ]);
+    expect(read?.text).toBe(newest);
+    expect(messagesToAnswer(chain, '', me)?.text).toBe(newest);
+  });
+});

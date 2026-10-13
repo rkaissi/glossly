@@ -2,7 +2,7 @@
 // role, written with what the user knows about the person and in the user's own voice.
 import replyPrompt from '../../prompts/reply.md?raw';
 import type { LlmProvider, StreamResult } from '../llm/types';
-import type { ReadMessage } from '../people/conversation';
+import { quoteStart, type ReadMessage } from '../people/conversation';
 import type { DetectedPerson } from '../people/detect';
 import { describeIdentity, isMe } from '../people/names';
 import { headers, isHeaderChrome, knownName, lastSpeaker, type KnownName } from '../router/features';
@@ -90,6 +90,9 @@ export interface ReplyTarget {
  * when the selection ends with the user's own message.
  */
 export function messagesToAnswer(text: string, before: string, me: Identity, messages?: ReadMessage[] | null): ReplyTarget | null {
+  // An email chain: answer the newest message, above the quoted history (Step 21).
+  const cut = quoteStart(text);
+  if (cut > 0) return messagesToAnswer(text.slice(0, cut), before, me, messages?.filter((m) => m.start < cut));
   if (messages?.length) {
     let lastMine = -1;
     messages.forEach((m, i) => {

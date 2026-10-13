@@ -51,6 +51,20 @@ function groundedAuthor(author: string, input: DetectInput): boolean {
   return [input.window_title, input.before, input.text, input.after].some((s) => squash(s).includes(a));
 }
 
+/** The line that starts a quoted earlier email: "On Tue, … wrote:", "-----Original Message-----", or a From: line followed by Sent:. */
+const QUOTE_HEADER = /^[ \t>]*(?:On\b[^\n]{0,200}\bwrote:|-{2,}\s*Original Message\s*-{2,}|From:[^\n]*\n[ \t>]*Sent:)/im;
+
+/**
+ * Where an email chain's quoted history starts in the selection, or -1. An email quotes older
+ * messages under the newest one, so the text above this is the latest message (Step 21: Reply
+ * on a whole chain answered the oldest quoted ask). A header at the very top is a forwarded or
+ * pasted message, not a reply's quote, and doesn't count.
+ */
+export function quoteStart(text: string): number {
+  const m = QUOTE_HEADER.exec(text);
+  return m && text.slice(0, m.index).trim() ? m.index : -1;
+}
+
 /** "You" and "Me" are how some apps label the user's own messages (WhatsApp, Messenger). */
 const SELF_LABEL = /^(?:you|me)$/i;
 
@@ -74,10 +88,13 @@ export function acceptMessages(rows: MessageRow[], input: DetectInput, me: Ident
     const user = author ? isMe(author, me) || SELF_LABEL.test(author) || (row.user && !hasIdentity(me)) : row.user && !hasIdentity(me);
     out.push({ author, user, start });
   }
-  if (!out.length) return null;
+  // In an email chain only the newest message counts: the quoted ones below it are history.
+  const cut = quoteStart(input.text);
+  const kept = cut > 0 && out[0]!.start < cut ? out.filter((m) => m.start < cut) : out;
+  if (!kept.length) return null;
   // The first message owns the text before its start (a header, or the end of an earlier message).
-  out[0]!.start = 0;
-  return out.slice(-READ_MAX_MESSAGES);
+  kept[0]!.start = 0;
+  return kept.slice(-READ_MAX_MESSAGES);
 }
 
 /** A message's text without the next message's header at its end (its author's name, badge, and time lines). */

@@ -173,7 +173,7 @@ function Expanded({ s }: { s: OverlayState }) {
     const closed = barItems(s.slots, s.hasSelection, false).length;
     setMenuOpen(open);
     if (!open) setHighlight((h) => (h >= closed ? 0 : h));
-    else if (s.keyboard && s.hasSelection && s.slots?.more.length) setHighlight(closed);
+    else if (s.keyboard && s.slots?.more.length) setHighlight(closed);
   };
 
   // The keyboard map is live only on the hotkey path (or once a panel has taken focus).
@@ -293,7 +293,8 @@ function Expanded({ s }: { s: OverlayState }) {
 
         {menuOpen && (
           <div className="menu" role="menu">
-            {s.hasSelection && (
+            {/* Nothing selected, More holds the paste action that didn't get a slot (Step 21). */}
+            {(s.hasSelection || more.length > 0) && (
               <>
                 <div className="menu-label">
                   More actions {hints && s.mode === 'bar' && <kbd>Tab</kbd>}

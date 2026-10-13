@@ -223,3 +223,31 @@ describe('Tasks on the read', () => {
     expect(authorFrom(read2, detectPeople(input, me)).author?.name).toBe('JordanZ2');
   });
 });
+
+describe('email chains (Step 21)', () => {
+  const chain = [
+    'Jordan Hale <jordan.hale@example.com>',
+    'Hi Alex, could you send the revised forecast by Friday?',
+    'Jordan',
+    '',
+    'On Tue, Oct 6, 2026 at 3:12 PM Alex Morgan <alex.morgan@example.com> wrote:',
+    'Hi Jordan, attached are the first Q4 numbers.',
+    'Alex',
+  ].join('\n');
+  const input: DetectInput = { text: chain, before: '', after: '', source_app: 'chrome.exe', window_title: 'Re: Q4 - Mail' };
+  const rows: MessageRow[] = [
+    { author: 'Jordan Hale', user: false, starts: 'Hi Alex, could you' },
+    { author: 'Alex Morgan', user: true, starts: 'Hi Jordan, attached are' },
+  ];
+
+  it('keeps only the newest message, above the quoted history, so the author is its sender', () => {
+    const messages = acceptMessages(rows, input, me);
+    expect(messages).toEqual([{ author: 'Jordan Hale', user: false, start: 0 }]);
+    expect(readAuthor(messages, [])).toMatchObject({ author: { name: 'Jordan Hale' }, authorIsMe: false });
+  });
+
+  it('finds no quote in a header at the very top (a forwarded message)', () => {
+    const forwarded = acceptMessages([{ author: 'Jordan Hale', user: false, starts: 'Hi Alex, could you' }], { ...input, text: `On Mon, Jordan Hale wrote:\n${chain}` }, me);
+    expect(forwarded).toHaveLength(1);
+  });
+});
