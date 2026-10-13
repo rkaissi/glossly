@@ -106,7 +106,11 @@ Commands: `notepad [file]` (opens a tab in Rayan's Notepad, doesn't kill his tab
 
 Throwaway profile (`GLOSSLY_USER_DATA`, a copy of `Local State`, `keys`, `models`), build from `HEAD`, fictional test pages in `%TEMP%\glossly-live` (`discord-dm.html`, `discord-channel.html`, `slack-thread.html`, `email-thread.html`, `notes.txt`), Sonnet subagents. Rayan's instance was stopped for it. Read-only on his profile: schema version 9, roles on the decision 60 split, `localOnly` gone, `pasted voice samples labeled` once.
 
-- **Pass A, Setup and the settings window.** Setup: all seven steps, the bad-key error (OpenAI field; Continue stays on because a Groq key is saved), identity chips, Models are ready, search setup, Try it's three ticks and `try-it` logs. Settings: our controls only, Privacy in the sidebar, the call-log confirm, Glass tray icon, the model split and `pnpm calls` / `--router` rows. Found: **Tasks took tasks from lines outside a Notepad selection and offered the user as a new person** (fixed, decision 63); **the settings window's taskbar button shows Electron's icon** in the dev build (title bar and tray are Glass; recheck in the installed build, Step 22); with the Windows theme switched to dark while Setup's Try it step was open, the window drew pale until the next step (stale acrylic, `materialStale`); the call-log switch shows off while its confirm is open; a fresh profile has the debug view on (`debugView` defaults to true). Not checked: Task Manager's helper icon (Task Manager runs elevated; the exe's embedded icon is Glass), `#keys`/`#data` landing, popovers near the window's bottom edge.
+- **Pass A, Setup and the settings window.** Setup: all seven steps, the bad-key error (OpenAI field; Continue stays on because a Groq key is saved), identity chips, Models are ready, search setup, Try it's three ticks and `try-it` logs. Settings: our controls only, Privacy in the sidebar, the call-log confirm, Glass tray icon, the model split and `pnpm calls` / `--router` rows. Found: **Tasks took tasks from lines outside a Notepad selection and offered the user as a new person** (fixed, decision 63); **the settings window's taskbar button shows Electron's icon** in the dev build (title bar and tray are Glass; recheck in the installed build, Step 22); with the Windows theme switched to dark while Setup's Try it step was open, the window drew pale until the next step (mica kept the old theme's tint; the settings window now cycles its material on a theme change, to recheck); the call-log switch shows off while its confirm is open (on purpose: it shows the state being confirmed); a fresh profile has the debug view on (`debugView` defaults to true). Not checked: Task Manager's helper icon (Task Manager runs elevated; the exe's embedded icon is Glass), `#keys`/`#data` landing, popovers near the window's bottom edge.
+
+- **Pass B, capture, Ask, People, Visualize, Saved, Metrics.** Passed: the empty hotkey bar and Search, blur closes the bar, an inline image dropped from a save (a double space remains), "Don't show here" on a Discord DM page and its removal, the hotkey recorder, Export (one JSON, no keys), Ask over a page and in a password field, Write it for here, Search's insert and copy, Who on the email and Discord pages (no buttons, no shared inbox, an address ending a sentence), the cached Who, "Is this the same Jordan?", the contact card, the relationship Select, Reply's Add to people form, a new person from Tasks, Visualize from a TSV and its cache, Saved's filter, search, move, copy, delete, the Metrics tables, and decision 63 live (one task, one event, no lines from around the selection). Found: **Ask in an empty reply box got only the box, not the thread** (Chromium's contenteditable is its own text provider; `context_caret` now adds the text around the field, see `helpers/protocol.md`); Paste snippets didn't show in a Slack-style box with Write it for here in slot 3 (rechecked in pass C). Not app bugs: the test page's title put Discord's unread count last (real Discord puts it first, which the rule already strips), and its name, badge, and time spans had no space between them ("JordanNWMToday"). Not checked: Google Docs bullets (no account), "+2 others" (the selection held two saved people; rechecked in pass C).
+
+- **Pass C, rechecks, Tasks and events, Calendar** (cut short to save tokens). Passed: Ask in the email page's empty reply box now gets the whole thread (about 1,100 characters, `[CURSOR]` at the end); the settings window turns dark with Windows; Tasks offered for a saved person with open tasks, Mark done and New date rows saved as `updated: 2` with no duplicates; the invitation saved its event (Thursday 1 to 2 PM, place, attendee) and task, shown in Calendar and on the person card; "Already that day"; a deadline stays a task; an all-day event; the time picker (typed times, arrows, clearing the start, keeping the length); a picker over the overlay panel closes alone on Esc; Settings > Tasks filters, person filter, date button, delete confirm, Done today; Calendar Week drag, resize, move, overlap, now line, 7 AM; the editor; Month and Agenda; Sunday week start; glass events in dark. Not run: Paste snippets' plain lines and its slot with text around the caret, "+2 others", restating an open task, the overlay window growing for a picker, bar button outlines, quick add's title, the tab reopening on its view, `#agenda`, reminder clicks, Local only items. Note: a cleanup click from the subagent landed in another app's window when Glossly lost focus; brief subagents to check the foreground window before clicking.
 
 ### Measured live (Oct 12, Step 20.6)
 
@@ -129,24 +133,24 @@ Throwaway profile (`Local State` and `keys` only), Notepad sample text, Sonnet s
 Built and unit tested, not yet seen in the real app. Run as one pass when Rayan is away from the machine (rebuild the helper first, so stop the running instance). Undo every test save.
 
 **Capture and bar**
-- [ ] Hotkey with nothing selected shows `1 Ask`, `2 Search`, `3 Paste snippets`; `2` opens Search.
-- [ ] Hotkey bar in a text field, then click elsewhere in that app and in another app: the bar closes (look for `overlay was not in front` if blur didn't fire). A Promises date picker or a select dropdown opened from a panel stays open.
-- [ ] Select text with an emoji or image in Chrome or Slack and Save: no "OBJ" in Search.
+- [x] Hotkey with nothing selected shows `1 Ask`, `2 Search`, `3 Paste snippets`; `2` opens Search.
+- [x] Hotkey bar in a text field, then click elsewhere in that app and in another app: the bar closes (look for `overlay was not in front` if blur didn't fire). A Promises date picker or a select dropdown opened from a panel stays open.
+- [x] Select text with an emoji or image in Chrome or Slack and Save: no "OBJ" in Search.
 - [ ] Discord tab with an unread count: "Don't show here (Discord)" stores "Discord" (General shows "Discord", no pipe), the rule covers other Discord chats and the Discord app; on the hotkey bar there the menu says "Show here (Discord)", which removes it. Rayan's old "Discord |" rule shows as "Discord" after the first launch (settings migration).
-- [ ] Change the hotkey with the recorder; Export.
+- [x] Change the hotkey with the recorder; Export.
 
 **Ask and paste**
-- [ ] Hotkey in an empty Gmail reply under a thread, Ask "what should I say?": the answer uses the thread. Over a page with nothing selected, Ask "summarize this". A password field gives no surroundings. Watch `context_caret` timing on a large Chromium page.
+- [x] Hotkey in an empty Gmail reply under a thread, Ask "what should I say?": the answer uses the thread. Over a page with nothing selected, Ask "summarize this". A password field gives no surroundings. Watch `context_caret` timing on a large Chromium page.
 - [ ] Gmail reply about something saved weeks ago: slot 4 is Write it for here, using only that snippet. Google Docs under a bulleted list: bullets. Slack: Paste snippets gives plain lines. As saved keeps line breaks.
-- [ ] Hotkey in an empty Notepad tab, Search, Enter types the item; the copy icon copies without inserting; over non-editable text Enter copies.
+- [x] Hotkey in an empty Notepad tab, Search, Enter types the item; the copy icon copies without inserting; over non-editable text Enter copies.
 
 **People**
-- [ ] Who on a real Outlook web email and a real Discord DM (the two fixtures in `who-judge.test.ts`): right people, no button labels, no shared inboxes, an address ending a sentence is found.
-- [ ] Switch away from Who and back: `who looked up {"cached":true}`.
-- [ ] A saved "Jordan Hale" and a message from "Jordan": Who asks "Is this the same Jordan?".
-- [ ] A contact card (name, role, email, phone) offers Who.
+- [x] (Step 21, on fictional look-alike pages; the real apps are still Rayan's to try) Who on a real Outlook web email and a real Discord DM (the two fixtures in `who-judge.test.ts`): right people, no button labels, no shared inboxes, an address ending a sentence is found.
+- [x] Switch away from Who and back: `who looked up {"cached":true}`.
+- [x] A saved "Jordan Hale" and a message from "Jordan": Who asks "Is this the same Jordan?".
+- [x] A contact card (name, role, email, phone) offers Who.
 - [ ] Three known people in a selection: "Jordan +2 others" badge.
-- [ ] Relationship select on a person card. Reply's "Add to people" opens the Who-style form (readable Create person button, Enter creates, Esc cancels, typing "n" doesn't open None of these). What did I promise shows the same fields per new person and saves them.
+- [x] Relationship select on a person card. Reply's "Add to people" opens the Who-style form (readable Create person button, Enter creates, Esc cancels, typing "n" doesn't open None of these). What did I promise shows the same fields per new person and saves them.
 
 **Reply**
 - [ ] Select a message on the reply-test page with its auto-focus-on-blur removed: Insert lands in the reply box (`field search {"found":true}`). An email-like page with a search box above and no reply box below copies instead.
@@ -156,9 +160,9 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Close the panel mid-stream and reopen: it resumes (`reply drafts {resumed:true}`); reopen later: cached.
 
 **Visualize, Settings, Metrics**
-- [ ] Visualize a table: the chart pick renders; switch to Ask and back: `visualized {"cached":true}`.
-- [ ] Settings > Saved: filter, search, move, copy, delete.
-- [ ] Metrics shows the Features table with real counts.
+- [x] Visualize a table: the chart pick renders; switch to Ask and back: `visualized {"cached":true}`.
+- [x] Settings > Saved: filter, search, move, copy, delete.
+- [x] Metrics shows the Features table with real counts.
 
 **Local models and privacy (Step 18)**
 - [x] First launch after the update: a stored Local only shows as Local only in General (settings migration), and `localOnly` is gone from the `settings` table.
@@ -168,11 +172,11 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] A local server at a LAN address: Keys warns, General's Local only line says it isn't used, and Ask refuses under Local only.
 
 **Tasks and events (Steps 19.1 and 19.2)**
-- [ ] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Tasks.
-- [ ] A reply that finishes one ("Here is the budget") and moves another ("can we push the review to Monday?"): rows tagged Mark done and New date with the old → new date; Save updates both (`promises_saved {updated: 2}`), no duplicates.
+- [x] A message from a saved person you have open tasks with (a fictional test person; remove them after): Tasks is offered in slot 3 or 4 even without promise words; the panel lists those tasks under "Already open with …"; Done and a new date there apply at once and show in Settings > Tasks.
+- [x] A reply that finishes one ("Here is the budget") and moves another ("can we push the review to Monday?"): rows tagged Mark done and New date with the old → new date; Save updates both (`promises_saved {updated: 2}`), no duplicates.
 - [ ] Restating an open task shows it as Already open, unchecked, and Space doesn't check it.
-- [ ] An invitation ("Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?" from a fictional sender): the bar offers Tasks and events; the panel has the event (day, 1 PM to 2 PM, place) and the task (bring the deck); Save adds both; the event shows in Calendar on its day, in Search, and on the sender's card if saved. A second event on that day shows under "Already that day".
-- [ ] "Send the report by Friday 5pm" gives a task, not an event. An all-day event ("offsite Oct 20") saves without times.
+- [x] An invitation ("Lunch Thursday at 1pm at Northwind Cafe? Can you bring the deck?" from a fictional sender): the bar offers Tasks and events; the panel has the event (day, 1 PM to 2 PM, place) and the task (bring the deck); Save adds both; the event shows in Calendar on its day, in Search, and on the sender's card if saved. A second event on that day shows under "Already that day".
+- [x] "Send the report by Friday 5pm" gives a task, not an event. An all-day event ("offsite Oct 20") saves without times.
 - [ ] Event reminders: a timed event 15 minutes ahead shows a toast once; an all-day one at 9:00 on its day (same toast caveat as tasks, Step 22).
 - [ ] Local only with no local model: the invitation gives the event and the task by patterns.
 - [ ] If one action feels too busy or the model mixes events and tasks up, note it: decision 37's fallback is two actions.
@@ -182,14 +186,14 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Settings window: every tab shows our controls and no native dropdown, date, time, or checkbox; the sidebar has the two groups; the window opens on Tasks; `#keys` and `#data` (an overlay "Add a key" button, a reminder click) land on Models and Privacy. Light and dark.
 - [ ] Popovers in the settings window: a Select, the date picker, and a due chip near the bottom of the window open above or scroll inside, stay attached while the page scrolls, close on Esc (focus back on the trigger) and on a click outside.
 - [ ] Overlay Tasks and events panel: the person Select, the due chips, and the event's day and time pickers. A picker near the bottom of the panel grows the window while open and shrinks it after, both with the bar below and above the selection. Esc closes only the picker, not the panel; Enter in a picker never saves the panel; Space and the arrows still work on rows.
-- [ ] Time picker: type "3pm", "15:30", "3:45p"; arrows and Enter; clearing the start makes the event all day; a new start keeps the event's length.
+- [x] Time picker: type "3pm", "15:30", "3:45p"; arrows and Enter; clearing the start makes the event all day; a new start keeps the event's length.
 - [ ] Bar buttons (slots, badges, menu, chips) look as before: no new outline.
 
 **Tasks and Calendar (Step 20.2)**
 - [ ] Tasks: quick add "Send Jordan the deck by Friday" (title without "by Friday", due Friday); filters and counts; person filter; edit a title; change and clear a date from the hover button; check one off (slides out, Undo works); Completed shows "Done today"; delete with the confirm; the sidebar count. A reminder click opens Tasks (a task) or Calendar (an event); `#agenda` lands on Tasks.
-- [ ] Calendar Week: drag on empty time to create (editor beside the draft), a plain click makes an hour; resize by the bottom edge; move within a day and to another day; overlapping events side by side; tasks in the all-day row check off; the red now line; opens scrolled to 7 AM.
-- [ ] Calendar editor: day, start (keeps the length), end, all day, place, add and remove people, save, delete with the confirm; pickers open over the editor and Esc closes only the top one.
-- [ ] Calendar Month and Agenda: chips, "N more" opens Agenda for that day, a click on a day adds an event; Agenda's range picker and arrows; the Tasks switch; the tab reopens on the last view.
+- [x] Calendar Week: drag on empty time to create (editor beside the draft), a plain click makes an hour; resize by the bottom edge; move within a day and to another day; overlapping events side by side; tasks in the all-day row check off; the red now line; opens scrolled to 7 AM.
+- [x] Calendar editor: day, start (keeps the length), end, all day, place, add and remove people, save, delete with the confirm; pickers open over the editor and Esc closes only the top one.
+- [x] Calendar Month and Agenda: chips, "N more" opens Agenda for that day, a click on a day adds an event; Agenda's range picker and arrows; the Tasks switch; the tab reopens on the last view.
 - [ ] Glass events in light and dark, on mica and without it; General > Week starts on Sunday changes Week, Month, and the date pickers in settings.
 - [ ] Migration 6 on Rayan's database: done tasks show "Done" without a date; tasks done from now on show when.
 

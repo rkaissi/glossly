@@ -101,7 +101,7 @@ Errors: `no_selection`, `password_field`.
 
 ### `context_caret`
 
-The surroundings when nothing is selected (the hotkey with no selection). In a field with a caret, the text around the caret inside its container, the way `context_container` centers a selection (a reply box inside its email thread, a paragraph in a document). Anywhere else, the text visible in the focused document or the one under the cursor (`GetVisibleRanges`).
+The surroundings when nothing is selected (the hotkey with no selection). In a field with a caret, the text around the caret inside its container, the way `context_container` centers a selection (a reply box inside its email thread, a paragraph in a document). A field that is its own text provider (a contenteditable or textarea in Chromium) also gets the text around it from the nearest text provider above it, within the nearest document, list, or pane that holds more than the field, three quarters of it before the field (Step 21: without this a Gmail-style reply box read only itself). Anywhere else, the text visible in the focused document or the one under the cursor (`GetVisibleRanges`).
 
 | Arg | Default | Range |
 | --- | --- | --- |

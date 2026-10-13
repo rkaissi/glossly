@@ -243,6 +243,11 @@ internal sealed class Uia : IDisposable
                 ctx = ContextAround(loc.Range, first.Before.Length, maxChars - first.Before.Length, clip);
             else if (half - first.After.Length > 0 && first.Before.Length == half)
                 ctx = ContextAround(loc.Range, maxChars - first.After.Length, first.After.Length, clip);
+            // A field with its own text provider (a contenteditable or textarea in Chromium) reads
+            // only itself; the thread above a reply box is in the page's document (Step 21).
+            var outer = OuterContext(loc, maxChars - ctx.Before.Length - ctx.After.Length);
+            if (outer != null)
+                return new CaretResult(outer.Value.Before + ctx.Before + ctx.After + outer.Value.After, outer.Value.Before.Length + ctx.Before.Length, "caret", outer.Value.Type, true);
             if (ctx.Before.Length + ctx.After.Length > 0)
                 return new CaretResult(ctx.Before + ctx.After, ctx.Before.Length, "caret", clip != null ? type : "none", true);
         }
@@ -268,6 +273,45 @@ internal sealed class Uia : IDisposable
             }
         }
         return new CaretResult("", -1, "none", "none", editable);
+    }
+
+    /// <summary>
+    /// The text before and after a field, read from the nearest text provider above it (the page's
+    /// document around a reply box), within the nearest document, list, or pane that holds more than
+    /// the field. Three quarters of the budget go before it: a thread sits above its reply box.
+    /// Null when nothing above the field provides text (Notepad, a native text box).
+    /// </summary>
+    private (string Before, string After, string Type)? OuterContext(Located loc, int budget)
+    {
+        if (budget < 100) return null;
+        var parent = Safe(() => _walker.GetParent(loc.Element));
+        var outer = parent != null ? PatternFrom(parent) : null;
+        if (outer == null) return null;
+        var field = Safe(() => outer.RangeFromChild(loc.Element));
+        if (field == null) return null;
+        int fieldLen = (Safe(() => field.GetText(-1)) ?? "").Length;
+
+        ITextRange? clip = null;
+        string type = "document";
+        for (var el = parent; el != null && clip == null; el = Safe(() => _walker.GetParent(el!)))
+        {
+            var ct = Safe(() => el.ControlType);
+            if (ct is ControlType.Document or ControlType.List or ControlType.Pane)
+            {
+                var current = el;
+                var range = Safe(() => outer.RangeFromChild(current));
+                if (range != null && (Safe(() => range.GetText(fieldLen + 1)) ?? "").Length > fieldLen)
+                {
+                    clip = range;
+                    type = ct.ToString()!.ToLowerInvariant();
+                }
+            }
+            if (ct == ControlType.Document) break;
+        }
+        int before = budget * 3 / 4;
+        var ctx = Safe(() => ContextAround(field, before, budget - before, clip));
+        if (ctx == null || ctx.Before.Length + ctx.After.Length == 0) return null;
+        return (ctx.Before, ctx.After, type);
     }
 
     /// <summary>The nearest TextPattern walking up from <paramref name="start"/>, selection or not.</summary>
