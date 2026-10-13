@@ -15,6 +15,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'settings:changed': true,
   'people:changed': true,
   'setup:tried': true,
+  'updates:state': true,
 };
 const PUSH = Object.keys(PUSH_CHANNELS) as PushChannel[];
 

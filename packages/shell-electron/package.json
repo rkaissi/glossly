@@ -11,11 +11,12 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "dist": "electron-vite build && electron-builder --win --publish never",
+    "dist": "electron-vite build && electron-builder --win --publish never --config electron-builder.config.cjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",
+    "electron-updater": "^6.8.9",
     "sqlite-vec": "^0.1.9"
   },
   "devDependencies": {

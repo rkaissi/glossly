@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
   REPLY_CHANNELS,
   REPLY_REDO_ASKS,
@@ -38,6 +38,7 @@ import { logger } from './log';
 import type { Overlay } from './overlay';
 import type { Services } from './services';
 import type { SettingsWindow } from './settings-window';
+import type { Updater } from './updater';
 
 const log = logger('ipc');
 
@@ -63,6 +64,7 @@ export interface IpcDeps {
   broadcastSettings: () => void;
   /** Tells every window that people or commitments changed. */
   broadcastPeople: () => void;
+  updater: Updater;
 }
 
 const num = (v: unknown): number => {
@@ -114,7 +116,7 @@ const replyRedo = (v: unknown): ReplyRedo | undefined => {
 };
 
 export function registerIpc(deps: IpcDeps): void {
-  const { services, overlay, capture, settingsWindow, hotkey, saveHotkey, syncSaveHotkey, broadcastSettings, broadcastPeople } = deps;
+  const { services, overlay, capture, settingsWindow, hotkey, saveHotkey, syncSaveHotkey, broadcastSettings, broadcastPeople, updater } = deps;
   const people = services.people;
 
   const trusted = (e: IpcMainInvokeEvent) => overlay.isOwnWindow(e.sender.id) || settingsWindow.isOwnWindow(e.sender.id);
@@ -597,5 +599,13 @@ export function registerIpc(deps: IpcDeps): void {
   handle('setup:try-it', (a, e) => {
     if (!settingsWindow.isOwnWindow(e.sender.id)) throw new Error('Settings window only');
     settingsWindow.setTryIt(obj(a).active === true);
+  });
+
+  // ---- updates (decision 70) ----
+  handle('updates:get', () => updater.view);
+  handle('updates:check', () => updater.check());
+  handle('updates:download', () => updater.download());
+  handle('updates:install', () => {
+    if (updater.requestRestart()) app.quit();
   });
 }

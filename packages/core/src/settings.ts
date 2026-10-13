@@ -182,6 +182,9 @@ export const SettingsSchema = z.object({
   /** Minutes before a timed calendar event its reminder shows; all-day events use `reminderHour`. */
   eventReminderMinutes: z.number().int().min(0).max(24 * 60).default(15),
 
+  /** Download new versions in the background and offer "Restart to update" (decision 70); off, the user downloads them from Settings. */
+  autoUpdate: z.boolean().default(true),
+
   /** Notices shown once in the bar, e.g. a role's model disappeared. */
   pendingNotice: z.string().nullable().default(null),
 });

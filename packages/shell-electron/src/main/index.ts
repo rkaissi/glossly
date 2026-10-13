@@ -8,6 +8,7 @@ import { Overlay } from './overlay';
 import { Reminders } from './reminders';
 import { dataDirArg, userDataPath } from './paths';
 import { Services } from './services';
+import { Updater } from './updater';
 import { SettingsWindow } from './settings-window';
 import { runSmoke } from './smoke';
 import { createTray } from './tray';
@@ -81,8 +82,11 @@ async function main(): Promise<void> {
     if (!overlay.win.isDestroyed()) overlay.win.webContents.send('people:changed', {});
   };
   services.embed.on('status', (s) => settingsWindow.send('embed:progress', s));
+  const updater = new Updater(() => services.settings.autoUpdate);
+  updater.on('state', (v) => settingsWindow.send('updates:state', v));
+  services.on('settings', () => updater.syncAutoDownload());
 
-  registerIpc({ services, overlay, capture, settingsWindow, hotkey, saveHotkey, syncSaveHotkey, broadcastSettings, broadcastPeople });
+  registerIpc({ services, overlay, capture, settingsWindow, hotkey, saveHotkey, syncSaveHotkey, broadcastSettings, broadcastPeople, updater });
 
   if (noCapture) log.info('capture off (GLOSSLY_NO_CAPTURE)');
   else {
@@ -103,6 +107,7 @@ async function main(): Promise<void> {
 
   const reminders = new Reminders(services, (tab) => settingsWindow.open(tab));
   reminders.start();
+  updater.start();
 
   if (services.embed.downloaded || services.settings.firstRunComplete) services.embed.start();
   services.refreshIfStale().catch((e: unknown) => log.warn('catalog refresh failed', errorInfo(e)));
@@ -124,7 +129,10 @@ async function main(): Promise<void> {
     services
       .shutdown()
       .catch(() => {})
-      .finally(() => app.exit(0));
+      // A downloaded update installs on the way out (decision 70).
+      .finally(() => {
+        if (!updater.finish()) app.exit(0);
+      });
   });
 
   if (process.env.GLOSSLY_SMOKE) void runSmoke({ helper, capture, services });

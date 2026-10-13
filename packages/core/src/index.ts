@@ -3,6 +3,7 @@
 export * from './types';
 export * from './settings';
 export * from './metrics';
+export * from './updates/errors';
 
 export * from './helper/protocol';
 export * from './helper/client';

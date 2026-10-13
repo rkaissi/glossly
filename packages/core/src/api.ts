@@ -540,6 +540,34 @@ export interface InvokeChannels {
    * otherwise ignored like every Glossly window). Cleared when the window closes.
    */
   'setup:try-it': { args: { active: boolean }; result: void };
+  /** The installed version and where updating stands (decision 70). */
+  'updates:get': { args: void; result: UpdateView };
+  /** Checks now; downloads too when `autoUpdate` is on. */
+  'updates:check': { args: void; result: UpdateView };
+  /** Downloads the update that was found (with `autoUpdate` off). */
+  'updates:download': { args: void; result: void };
+  /** Quits, installs the downloaded update, and starts Glossly again. */
+  'updates:install': { args: void; result: void };
+}
+
+/**
+ * Where updating stands. `unsupported` in a dev build (updates come with the installer);
+ * `none` also covers a release feed that isn't there (a private repo answers 404).
+ */
+export type UpdateState =
+  | { status: 'unsupported' }
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'none'; checkedAt: string }
+  | { status: 'available'; version: string }
+  | { status: 'downloading'; version: string; percent: number }
+  | { status: 'ready'; version: string }
+  | { status: 'error'; kind: 'offline' | 'failed' };
+
+export interface UpdateView {
+  /** The running version ("0.1.0"). */
+  current: string;
+  state: UpdateState;
 }
 
 /** What the setup's Try it step saw happen on its sample message, in the order a user meets them. */
@@ -561,6 +589,7 @@ export interface PushChannels {
   'people:changed': Record<string, never>;
   /** Only while setup's Try it step is showing: the pill, bar, or an action ran on its own window (decision 11). */
   'setup:tried': { step: TryItStep };
+  'updates:state': UpdateView;
 }
 
 export type InvokeChannel = keyof InvokeChannels;

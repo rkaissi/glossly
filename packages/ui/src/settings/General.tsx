@@ -1,10 +1,11 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { AppMode, Settings, SettingsKey, SettingsView } from '@glossly/core/api';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
+import type { AppMode, Settings, SettingsKey, SettingsView, UpdateView } from '@glossly/core/api';
 import { X } from 'lucide-react';
 import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
 import { ChoiceCards, Segmented, Switch } from '../controls/Toggles';
 import { formatAccelerator, normalizeAppKey, toAccelerator } from './format';
+import { updateLine } from './updates-logic';
 import { useAction } from './useAction';
 
 const MODE_LABELS: Record<AppMode, string> = { auto: 'Auto pill', hotkey: 'Hotkey only', off: 'Off' };
@@ -139,7 +140,7 @@ function SaveMode({ view }: { view: SettingsView }) {
   );
 }
 
-function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'debugView'; label: string; desc: string }) {
+function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'debugView' | 'autoUpdate'; label: string; desc: string }) {
   const { busy, error, set } = useSetting();
   return (
     <div className="field">
@@ -313,6 +314,57 @@ function WeekStartField({ view }: { view: SettingsView }) {
   );
 }
 
+/** The version, where updating stands, and its one button (decision 70). */
+function Updates({ view }: { view: SettingsView }) {
+  const [u, setU] = useState<UpdateView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const off = glossly.on('updates:state', setU);
+    void glossly.invoke('updates:get').then(setU);
+    return off;
+  }, []);
+  if (!u) return null;
+  const line = updateLine(u);
+  const act = async (action: 'check' | 'download' | 'install') => {
+    setError(null);
+    setBusy(true);
+    try {
+      if (action === 'check') setU(await glossly.invoke('updates:check'));
+      else if (action === 'download') await glossly.invoke('updates:download');
+      else await glossly.invoke('updates:install');
+    } catch {
+      setError("That didn't work. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <h3>Updates</h3>
+      <div className="field">
+        <div className="toggle">
+          <span>
+            <strong>Glossly {u.current}</strong>
+            <span className="muted small block" aria-live="polite">
+              {line.text}
+            </span>
+          </span>
+          {line.button && (
+            <button className={line.button.primary ? 'primary sm' : 'sm'} disabled={busy || line.button.disabled} onClick={() => void act(line.button!.action)}>
+              {line.button.label}
+            </button>
+          )}
+        </div>
+        {error && <p className="error small">{error}</p>}
+      </div>
+      {u.state.status !== 'unsupported' && (
+        <Toggle view={view} k="autoUpdate" label="Download updates automatically" desc="New versions download in the background, and you choose when to restart." />
+      )}
+    </>
+  );
+}
+
 export function GeneralTab({ view }: { view: SettingsView }) {
   return (
     <section>
@@ -323,6 +375,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
       <AppModes view={view} />
       <WeekStartField view={view} />
       <Toggle view={view} k="debugView" label="Debug view" desc="Technical details at the bottom of the bar." />
+      <Updates view={view} />
     </section>
   );
 }
