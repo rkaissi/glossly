@@ -752,9 +752,6 @@ button.add-people {
 .ee-foot .grow {
   flex: 1;
 }
-.ee-foot .invisible {
-  visibility: hidden;
-}
 @media (max-width: 720px) {
   .aday {
     grid-template-columns: 1fr;

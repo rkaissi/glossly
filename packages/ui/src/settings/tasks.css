@@ -179,13 +179,6 @@ button.collapse[aria-expanded='false'] svg {
 .task-row:hover {
   background: var(--surface-2);
 }
-.task-row.confirming {
-  background: color-mix(in srgb, var(--danger) 7%, transparent);
-}
-/* The question starts where the task's title did (past the 18 px check and its gap). */
-.task-row.confirming .confirm {
-  padding-left: 29px;
-}
 /* A row added while the tab is open rises in (the list itself comes with the page, decision 45);
    checking one off pops the check, then the row slides out (ease-in, no bounce). */
 .task-row.fresh {

@@ -2,7 +2,6 @@ import { type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, us
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, ExternalLink, Plus, Trash2, UsersRound } from 'lucide-react';
 import type { CommitmentView } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { InlineConfirm } from '../confirm';
 import { DatePicker } from '../controls/DatePicker';
 import { toDay } from '../controls/logic';
 import { ActionMenu } from '../controls/Menu';
@@ -47,12 +46,6 @@ function TaskRow({ t, today, showDue, fresh, onDone }: { t: CommitmentView; toda
     void run(() => glossly.invoke('commitments:update', { id: t.id, text: next }));
   };
 
-  if (confirming)
-    return (
-      <li className="task-row confirming">
-        <InlineConfirm prompt={`Delete "${t.text}"?`} confirm="Delete" busy={busy} onConfirm={() => void run(() => glossly.invoke('commitments:delete', { id: t.id }))} onCancel={() => setConfirming(false)} />
-      </li>
-    );
   return (
     <li className={`task-row${done ? ' done' : ''}${leaving ? ' leaving' : ''}${fresh ? ' fresh' : ''}`}>
       <TaskCheck
@@ -86,13 +79,31 @@ function TaskRow({ t, today, showDue, fresh, onDone }: { t: CommitmentView; toda
       )}
       <div className="row-acts">
         {!done && <DatePicker variant="icon" label={due ? 'Change date' : 'Add date'} value={due} onChange={setDue} disabled={busy} />}
-        <ActionMenu<'open' | 'delete'>
-          items={[
-            ...(t.person_id ? [{ value: 'open' as const, label: `Open ${(t.person_name ?? 'person').split(' ')[0]}`, icon: <ExternalLink size={16} strokeWidth={1.75} aria-hidden /> }] : []),
-            { value: 'delete', label: 'Delete', danger: true, separator: !!t.person_id, icon: <Trash2 size={16} strokeWidth={1.75} aria-hidden /> },
-          ]}
-          onPick={(a) => (a === 'open' ? (location.hash = `people/${t.person_id}`) : setConfirming(true))}
-        />
+        {/* Menu pick arms delete in place (decision 46's morph); blur or Esc backs out. */}
+        {confirming ? (
+          <button
+            type="button"
+            className="delete-btn armed"
+            title="Delete this task"
+            aria-label="Confirm: delete this task"
+            disabled={busy}
+            autoFocus
+            onClick={() => void run(() => glossly.invoke('commitments:delete', { id: t.id }))}
+            onBlur={() => setConfirming(false)}
+            onKeyDown={(e) => e.key === 'Escape' && setConfirming(false)}
+          >
+            <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+            <span>Delete</span>
+          </button>
+        ) : (
+          <ActionMenu<'open' | 'delete'>
+            items={[
+              ...(t.person_id ? [{ value: 'open' as const, label: `Open ${(t.person_name ?? 'person').split(' ')[0]}`, icon: <ExternalLink size={16} strokeWidth={1.75} aria-hidden /> }] : []),
+              { value: 'delete', label: 'Delete', danger: true, separator: !!t.person_id, icon: <Trash2 size={16} strokeWidth={1.75} aria-hidden /> },
+            ]}
+            onPick={(a) => (a === 'open' ? (location.hash = `people/${t.person_id}`) : setConfirming(true))}
+          />
+        )}
       </div>
     </li>
   );

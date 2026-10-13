@@ -82,6 +82,16 @@ const newDraft = (day: Day, start: number, end = start + 60): Draft => ({
   people: [],
 });
 
+const draftDirty = (a: Draft, b: Draft) =>
+  a.title !== b.title ||
+  a.day !== b.day ||
+  a.start !== b.start ||
+  a.end !== b.end ||
+  a.allDay !== b.allDay ||
+  a.location !== b.location ||
+  a.people.length !== b.people.length ||
+  a.people.some((p) => !b.people.some((q) => q.id === p.id));
+
 // ---------------------------------------------------------------- the editor
 
 function AddPeople({ taken, onAdd }: { taken: string[]; onAdd: (p: PersonSummary) => void }) {
@@ -200,8 +210,8 @@ function EventEditor({ anchor, draft: initial, onClose }: { anchor: HTMLElement;
           </div>
         </div>
         {error && <p className="error small">{error}</p>}
-        {/* Delete is one button that grows into the red confirm in place, so deleting is two clicks
-            on the same spot; Cancel stays where it was and backs out first (decision 46). */}
+        {/* Delete morphs in place; Cancel backs out first; Save stays visible but disabled while
+            armed or when an existing event is unchanged (decision 46, amended 66). */}
         <div className="ee-foot">
           {d.id && (
             <button
@@ -219,7 +229,7 @@ function EventEditor({ anchor, draft: initial, onClose }: { anchor: HTMLElement;
           <button type="button" className="ghost sm" onClick={() => (confirming ? setConfirming(false) : onClose(false))}>
             Cancel
           </button>
-          <button type="submit" className={`primary sm${confirming ? ' invisible' : ''}`} disabled={confirming} aria-hidden={confirming || undefined}>
+          <button type="submit" className="primary sm" disabled={confirming || (!!d.id && !draftDirty(d, initial))}>
             {d.id ? 'Save' : 'Add event'}
           </button>
         </div>
