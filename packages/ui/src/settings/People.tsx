@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Search, Trash2 } from 'lucide-react';
 import type { CommitmentView, PersonCard, PersonSummary } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
@@ -51,41 +51,68 @@ function PeopleList() {
   );
 }
 
-function Rename({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) => void }) {
+/** Name with pencil to rename and trash that morphs to delete (warning shows only when armed). */
+function RecordHead({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) => void }) {
   const [name, setName] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const { busy, error, run } = useAction();
-  if (name === null) {
+  const save = () =>
+    void run(async () => {
+      onChange(await glossly.invoke('people:update', { personId: card.id, name: name! }));
+      setName(null);
+    });
+  const del = () =>
+    void run(async () => {
+      await glossly.invoke('people:delete', { personId: card.id });
+      location.hash = 'people';
+    });
+  if (name !== null) {
     return (
       <div className="record-head">
-        <h2>{card.name}</h2>
-        <button className="ghost" onClick={() => setName(card.name)}>
-          Rename
+        <input
+          autoFocus
+          value={name}
+          maxLength={100}
+          aria-label="Name"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setName(null);
+          }}
+        />
+        <button className="primary" disabled={busy || !name.trim()} onClick={save}>
+          Save
         </button>
+        <button onClick={() => setName(null)}>Cancel</button>
+        {error && <span className="error small">{error}</span>}
       </div>
     );
   }
-  const save = () =>
-    void run(async () => {
-      onChange(await glossly.invoke('people:update', { personId: card.id, name }));
-      setName(null);
-    });
   return (
     <div className="record-head">
-      <input
-        autoFocus
-        value={name}
-        maxLength={100}
-        aria-label="Name"
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') save();
-          if (e.key === 'Escape') setName(null);
-        }}
-      />
-      <button className="primary" disabled={busy || !name.trim()} onClick={save}>
-        Save
+      <h2>{card.name}</h2>
+      <button type="button" className="icon-btn sm" title="Rename" aria-label="Rename" disabled={busy || confirming} onClick={() => setName(card.name)}>
+        <Pencil size={14} strokeWidth={1.75} aria-hidden />
       </button>
-      <button onClick={() => setName(null)}>Cancel</button>
+      <button
+        type="button"
+        className={`delete-btn${confirming ? ' armed' : ''}`}
+        title={confirming ? `Delete ${card.name}` : 'Delete person'}
+        aria-label={confirming ? `Confirm: delete ${card.name}` : 'Delete person'}
+        disabled={busy}
+        onClick={() => (confirming ? del() : setConfirming(true))}
+      >
+        <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+        <span>Delete</span>
+      </button>
+      {confirming && (
+        <>
+          <span className="muted small">Removes aliases, messages, and commitments. Saved items stay.</span>
+          <button type="button" className="ghost sm" disabled={busy} onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </>
+      )}
       {error && <span className="error small">{error}</span>}
     </div>
   );
@@ -100,75 +127,40 @@ function Merge({ card }: { card: PersonCard }) {
   const pick = others.find((p) => p.id === other);
   if (others.length === 0) return null;
   return (
-    <div className="field">
-      <div className="field-label">
-        <strong>Same person as someone else?</strong>
-        <p className="muted small">Merging moves their aliases, messages, and commitments into {card.name}'s record and removes the other record.</p>
-      </div>
-      <div className="row">
-        <Select
-          label="Person to merge"
-          value={other || null}
-          placeholder="Pick a person…"
-          onChange={(id) => {
-            setOther(id);
-            setConfirming(false);
-          }}
-          options={others.map((p) => ({ value: p.id, label: p.name, hint: p.aliases.length ? p.aliases.join(', ') : undefined }))}
-        />
-        <button className="danger" disabled={!pick || busy || confirming} onClick={() => setConfirming(true)}>
-          Merge…
-        </button>
-      </div>
-      {confirming && pick && (
-        <InlineConfirm
-          prompt={`Merge ${pick.name} into ${card.name}? This can't be undone.`}
-          confirm="Merge"
-          busy={busy}
-          onConfirm={() => void run(() => glossly.invoke('people:merge', { keepId: card.id, dropId: pick.id }))}
-          onCancel={() => setConfirming(false)}
-        />
-      )}
-      {error && <p className="error small">{error}</p>}
-    </div>
-  );
-}
-
-function Delete({ card }: { card: PersonCard }) {
-  const [confirming, setConfirming] = useState(false);
-  const { busy, error, run } = useAction();
-  const del = () =>
-    void run(async () => {
-      await glossly.invoke('people:delete', { personId: card.id });
-      location.hash = 'people';
-    });
-  return (
-    <div className="field">
-      <div className="field-label">
-        <strong>Delete {card.name}</strong>
-        <p className="muted small">Removes their aliases, messages, and commitments. Items you saved that mention them stay.</p>
-      </div>
-      {/* Same morph as events and Saved (decision 66); Cancel backs out. */}
-      <div className="row">
-        <button
-          type="button"
-          className={`delete-btn${confirming ? ' armed' : ''}`}
-          title={confirming ? `Delete ${card.name}` : 'Delete person'}
-          aria-label={confirming ? `Confirm: delete ${card.name}` : 'Delete person'}
-          disabled={busy}
-          onClick={() => (confirming ? del() : setConfirming(true))}
-        >
-          <Trash2 size={14} strokeWidth={1.75} aria-hidden />
-          <span>Delete</span>
-        </button>
-        {confirming && (
-          <button type="button" className="ghost sm" disabled={busy} onClick={() => setConfirming(false)}>
-            Cancel
+    <>
+      <h3>Manage</h3>
+      <div className="field">
+        <div className="field-label">
+          <strong>Same person as someone else?</strong>
+          <p className="muted small">Merging moves their aliases, messages, and commitments into {card.name}'s record and removes the other record.</p>
+        </div>
+        <div className="row">
+          <Select
+            label="Person to merge"
+            value={other || null}
+            placeholder="Pick a person…"
+            onChange={(id) => {
+              setOther(id);
+              setConfirming(false);
+            }}
+            options={others.map((p) => ({ value: p.id, label: p.name, hint: p.aliases.length ? p.aliases.join(', ') : undefined }))}
+          />
+          <button className="danger" disabled={!pick || busy || confirming} onClick={() => setConfirming(true)}>
+            Merge…
           </button>
+        </div>
+        {confirming && pick && (
+          <InlineConfirm
+            prompt={`Merge ${pick.name} into ${card.name}? This can't be undone.`}
+            confirm="Merge"
+            busy={busy}
+            onConfirm={() => void run(() => glossly.invoke('people:merge', { keepId: card.id, dropId: pick.id }))}
+            onCancel={() => setConfirming(false)}
+          />
         )}
+        {error && <p className="error small">{error}</p>}
       </div>
-      {error && <p className="error small">{error}</p>}
-    </div>
+    </>
   );
 }
 
@@ -191,7 +183,7 @@ function PersonRecord({ personId }: { personId: string }) {
         <p className="muted">This person no longer exists.</p>
       ) : (
         <>
-          <Rename card={card} onChange={setCard} />
+          <RecordHead card={card} onChange={setCard} />
           <p className="muted small">Added {formatDay(card.created_at)}</p>
           <div className="field">
             <PersonCardView card={card} onChange={setCard} removableAliases />
@@ -204,9 +196,7 @@ function PersonRecord({ personId }: { personId: string }) {
               </div>
             </>
           )}
-          <h3>Manage</h3>
           <Merge card={card} />
-          <Delete card={card} />
         </>
       )}
     </section>

@@ -292,7 +292,7 @@ button.delete-btn.armed:hover:not(:disabled) {
   background: var(--danger-solid-hover);
 }
 button.delete-btn.armed > span {
-  max-width: 64px;
+  max-width: 72px;
   opacity: 1;
 }
 /* Sits in the row it confirms (which may tint red); the red button is the warning, no outline. */

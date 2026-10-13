@@ -1,8 +1,7 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import type { Identity, ReplyChannel, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { InlineConfirm } from '../confirm';
 import { Select } from '../controls/Select';
 import { Switch } from '../controls/Toggles';
 import { parseEmail, parseHandle } from './format';
@@ -153,24 +152,29 @@ function VoiceSamples() {
   const sample = (v: VoiceSample) => (
     <li key={v.id}>
       <span className="grow voice-text">{v.text}</span>
-      {v.origin === 'pasted' && pendingId !== v.id && (
+      {v.origin === 'pasted' && (
         <Select<VoicePlatform>
           size="sm"
           className="voice-platform"
           label="Where you wrote this"
           value={v.channel ?? 'any'}
-          disabled={busy}
+          disabled={busy || pendingId === v.id}
           onChange={(p) => label(v.id, p)}
           options={VOICE_PLATFORMS}
         />
       )}
-      {pendingId === v.id ? (
-        <InlineConfirm prompt="Remove this sample?" confirm="Remove" busy={busy} onConfirm={() => remove(v.id)} onCancel={() => setPendingId(null)} />
-      ) : (
-        <button className="icon-btn sm danger" title="Remove" aria-label="Remove sample" disabled={busy} onClick={() => setPendingId(v.id)}>
-          <X size={14} strokeWidth={1.75} aria-hidden />
-        </button>
-      )}
+      <button
+        type="button"
+        className={`delete-btn${pendingId === v.id ? ' armed' : ''}`}
+        title={pendingId === v.id ? 'Remove this sample' : 'Remove sample'}
+        aria-label={pendingId === v.id ? 'Confirm: remove sample' : 'Remove sample'}
+        disabled={busy}
+        onClick={() => (pendingId === v.id ? remove(v.id) : setPendingId(v.id))}
+        onBlur={() => setPendingId(null)}
+      >
+        <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+        <span>Delete</span>
+      </button>
     </li>
   );
   return (
@@ -237,13 +241,18 @@ function LearnedStyle({ learning }: { learning: boolean }) {
         {text}
         {meta && <span className="muted small"> · {meta}</span>}
       </span>
-      {pending === key ? (
-        <InlineConfirm prompt="Forget this?" confirm="Forget" busy={busy} onConfirm={onRemove} onCancel={() => setPending(null)} />
-      ) : (
-        <button className="icon-btn sm danger" title="Forget" aria-label="Forget" disabled={busy} onClick={() => setPending(key)}>
-          <X size={14} strokeWidth={1.75} aria-hidden />
-        </button>
-      )}
+      <button
+        type="button"
+        className={`delete-btn${pending === key ? ' armed' : ''}`}
+        title={pending === key ? 'Forget this' : 'Forget'}
+        aria-label={pending === key ? 'Confirm: forget this' : 'Forget'}
+        disabled={busy}
+        onClick={() => (pending === key ? onRemove() : setPending(key))}
+        onBlur={() => setPending(null)}
+      >
+        <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+        <span>Forget</span>
+      </button>
     </li>
   );
   const prefs = view?.preferences ?? [];
