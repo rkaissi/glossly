@@ -183,6 +183,15 @@ Installer `Glossly-Setup-0.1.0.exe` (163 MB), installed silently (`/S`) and run 
 - Bitdefender showed "Disinfection in progress" while the unsigned exe first ran, and "Threat detected" toasts during the second pass, which quarantined one of Claude Code's own temporary output files; nothing of Glossly's was flagged. Worth watching on testers' machines alongside SmartScreen.
 - Subagent lesson again: focusing by title sometimes left the other window in front, and two clicks landed in the wrong window (one in the Claude app, no change). Have it confirm the front window with a screenshot before each input.
 
+### README screenshots and the demo GIF (Step 23)
+
+`docs/media/` holds the README's images: `hero.gif` (960 px, 15 fps, about 11 s), the bar in light and dark, Reply, Tasks and events, Visualize (dark), and the settings Tasks, Calendar (dark), and General tabs. They are the real UI rendered headlessly on fictional data, not desktop captures, so they never touch Rayan's screen or data. To redo them (after a UI change), brief a subagent with this recipe; the harness itself was a one-off in the session scratchpad:
+- Build the renderer elsewhere: `pnpm exec electron-vite build --outDir <scratch>/build` in `packages/shell-electron`.
+- A small Node server serves `build/renderer` (JavaScript as `text/javascript`), strips the CSP meta, and injects a `stub.js` before the bundle: `window.glossly` answering every invoke with fictional data (people Alex Morgan as the user, Jordan Hale, Casey Lin, Maya Chen; Acme), a `__push(channel, payload)` for `overlay:state`, `ask:chunk`, `reply:chunk`, and `overlay:resize` forwarded to the parent page. Log unknown channels and fill them.
+- A `scene.html` draws a fictional chat window ("Acme Team Chat") on a gradient wallpaper, highlights the selected words, and holds the overlay in an iframe (`/overlay.html?material=acrylic`) inside a frosted div (`backdrop-filter: blur(30px) saturate(1.4)`, 8 px radius) sized from `overlay:resize`, below the last selected word. Settings pages load `/settings.html?material=mica#<tab>` with `html{background:#f3f3f3}` (dark `#202020`) standing in for mica.
+- Headless Edge over CDP (a temporary `--user-data-dir`, killed by that name afterwards): `Emulation.setDeviceMetricsOverride` at scale 2, `Emulation.setEmulatedMedia` for light or dark, `Page.captureScreenshot`; ffmpeg downscales (lanczos) to 1200 or 1400 px. The GIF: about 170 frames with an interpolated cursor, then `palettegen` (160 colors) and `paletteuse` (bayer dither) at 960 px.
+- Keep each PNG under about 400 KB and the GIF under 3 MB. The current set is about 1.5 MB. The panel footers show a made-up model name ("acme:swift-large").
+
 ## Live-check backlog
 
 Built and unit tested, not yet seen in the real app. Run as one pass when Rayan is away from the machine (rebuild the helper first, so stop the running instance). Undo every test save.

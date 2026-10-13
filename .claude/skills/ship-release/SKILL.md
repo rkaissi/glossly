@@ -68,7 +68,7 @@ Builds the Windows installer for a new version and publishes it on GitHub Releas
     ```
     It verifies again, refuses if `main` isn't pushed, then creates the `v<version>` tag and the release with the three files (`--prerelease` for a version with a `-`).
 
-12. **Record it:** a row in `docs/history.md` (step, date, the tag, one line), the current version and release in `docs/HANDOFF.md`'s top paragraph, and a line in `STATUS.md` if it's a milestone. Link the release as "the repo's Releases page, tag `v<version>`", not a URL with the owner's handle. Commit, push, delete the notes file, and tell Rayan: the version, the release link, what's in it, and whether installed copies will see it (public repo and not a prerelease).
+12. **Record it:** the download badge in `README.md` (`badge/download-v<version>`, skipped for a prerelease), a row in `docs/history.md` (step, date, the tag, one line), the current version and release in `docs/HANDOFF.md`'s top paragraph, and a line in `STATUS.md` if it's a milestone. Link the release as "the repo's Releases page, tag `v<version>`", not a URL with the owner's handle. Commit, push, delete the notes file, and tell Rayan: the version, the release link, what's in it, and whether installed copies will see it (public repo and not a prerelease).
 
 ## If something fails
 
