@@ -247,10 +247,16 @@ function verbLike(name: string, corpus: string): boolean {
   return uses.length > 0 && uses.every((m) => (m.index === 0 || m[1] !== undefined) && (/^[a-z]/.test(m[2]!) || m[2]!.includes('@')));
 }
 
-export function acceptWhoRows(rows: WhoCandidate[], corpus: string, me: Identity): DetectedPerson[] {
+/**
+ * `speakers`: authors of messages the conversation read found and code accepted. They wrote in the
+ * selection, so a low model confidence doesn't drop them (Step 21: a WhatsApp group's two writers
+ * came back at 0.5 and Who listed nobody).
+ */
+export function acceptWhoRows(rows: WhoCandidate[], corpus: string, me: Identity, speakers: string[] = []): DetectedPerson[] {
   const flat = squash(corpus);
+  const spoke = new Set(speakers.map(canonicalize));
   const grounded = rows.filter((r) => {
-    if (confidenceOf(r.confidence) < WHO_MIN_CONFIDENCE) return false;
+    if (confidenceOf(r.confidence) < WHO_MIN_CONFIDENCE && !spoke.has(canonicalize(r.name))) return false;
     if (NOT_PEOPLE.has(canonicalize(r.name)) || verbLike(r.name, corpus)) return false;
     // A quote that spans a line break comes back with a space: compare with whitespace squashed.
     const evidence = squash(r.evidence);

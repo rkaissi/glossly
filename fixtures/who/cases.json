@@ -76,7 +76,7 @@
         "source_app": "slack.exe",
         "window_title": "Thread in #launch | Acme - Slack"
       },
-      "expected": { "messages": ["Casey Lin", "Jordan Hale", "me", "Maya Chen"], "author": "Maya Chen", "people": ["Maya Chen", "Casey Lin", "Jordan Hale"], "not_people": ["Alex Morgan", "Acme"], "target": { "starts": "Maya Chen", "excludes": "landing page copy" } }
+      "expected": { "messages": ["Casey Lin", "Jordan Hale", "me", "Maya Chen"], "author": "Maya Chen", "people": ["Maya Chen", "Casey Lin", "Jordan Hale"], "not_people": ["Alex Morgan", "Acme"], "target": { "starts": "Thanks both", "excludes": "landing page copy" } }
     },
     {
       "id": "slack-02",
@@ -98,7 +98,7 @@
         "source_app": "slack.exe",
         "window_title": "Maya Chen (DM) | Acme - Slack"
       },
-      "expected": { "messages": ["Maya Chen", "me", "Maya Chen"], "author": "Maya Chen", "people": ["Maya Chen"], "not_people": ["Alex Morgan"], "target": { "starts": "Maya Chen", "excludes": "yes!" } }
+      "expected": { "messages": ["Maya Chen", "me", "Maya Chen"], "author": "Maya Chen", "people": ["Maya Chen"], "not_people": ["Alex Morgan"], "target": { "starts": "great, I'll bring", "excludes": "yes!" } }
     },
     {
       "id": "teams-01",

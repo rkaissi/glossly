@@ -340,3 +340,12 @@ describe("verb-like names (Step 21)", () => {
         expect(people.map((p) => p.name)).toEqual(["Jordan Hale", "Sterling"]);
     });
 });
+
+describe("message writers (Step 21)", () => {
+    it("keeps a low-confidence row for someone the read found writing in the selection", () => {
+        const corpus = "[10/12/26, 6:10 PM] Maya Chen: who's bringing snacks Saturday?\n[10/12/26, 6:12 PM] Casey Lin: I can do drinks\n[10/12/26, 6:15 PM] You: I'll bring chips";
+        const rows = [row({ name: "Maya Chen", evidence: "Maya Chen", confidence: 0.5 }), row({ name: "Casey Lin", evidence: "Casey Lin", confidence: 0.5 })];
+        expect(acceptWhoRows(rows, corpus, me)).toEqual([]);
+        expect(acceptWhoRows(rows, corpus, me, ["Maya Chen", "Casey Lin"]).map((p) => p.name)).toEqual(["Maya Chen", "Casey Lin"]);
+    });
+});

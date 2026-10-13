@@ -185,8 +185,9 @@ export async function readWho(
     onModelError?.(e);
     return { people: localWho(input, settings.identity), messages: null, local: 'model_failed' };
   }
-  const people = acceptWhoRows(out.people, whoCorpus(input), settings.identity);
   const messages = acceptMessages(out.messages, input, settings.identity);
+  const speakers = (messages ?? []).flatMap((m) => (m.author && !m.user ? [m.author] : []));
+  const people = acceptWhoRows(out.people, whoCorpus(input), settings.identity, speakers);
   const by = readAuthor(messages, people);
   return { people: authorFirst(people, by?.author ?? null), messages, local: null };
 }
