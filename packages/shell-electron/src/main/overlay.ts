@@ -278,7 +278,7 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
    * left room for MAX_W on the right. If the content is still wider than the work area, the
    * window shrinks to fit instead of hanging off the screen.
    */
-  resize(sessionId: number, w: number, h: number): void {
+  resize(sessionId: number, w: number, h: number, popover = false): void {
     const s = this.state;
     if (sessionId !== s.sessionId || (s.mode !== 'bar' && s.mode !== 'panel' && s.mode !== 'toast')) return;
     if (!Number.isFinite(w) || !Number.isFinite(h)) return;
@@ -289,8 +289,9 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
     const from = s.placement?.rect ?? cur;
     // A panel stays inside the window the text came from when that leaves it enough room; the
     // renderer then scrolls the panel inside this height instead of covering what is below.
-    const room = s.mode === 'panel' ? sourceRoom(from, above ? 'above' : 'below', this.sourceBounds(), MIN_SOURCE_ROOM) : null;
-    if (room !== s.panelMaxH) {
+    // An open picker may reach past the source window (the panel keeps its cap and scroll).
+    const room = popover ? null : s.mode === 'panel' ? sourceRoom(from, above ? 'above' : 'below', this.sourceBounds(), MIN_SOURCE_ROOM) : null;
+    if (!popover && room !== s.panelMaxH) {
       this.patch({ panelMaxH: room });
       return;
     }

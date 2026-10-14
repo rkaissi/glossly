@@ -64,7 +64,7 @@ export function Popover({
   matchWidth?: boolean;
   /** Move focus into the popover on open (to `[data-autofocus]`, else the popover itself). */
   focus?: boolean;
-  /** A list that may scroll: it grows the overlay only when neither side shows four rows (decision 50). */
+  /** A list that may scroll: it grows the overlay only when neither side shows four rows (decision 50). Other popovers never scroll; they slide to fit. */
   scrolls?: boolean;
   className?: string;
   label?: string;
@@ -110,7 +110,7 @@ export function Popover({
           requestRoom(roomId.current, need);
         }
       }
-      const p = placePopover(toRect(ar), size, view, align);
+      const p = placePopover(toRect(ar), size, view, align, scrolls ? 'scroll' : 'shift');
       el.style.top = `${p.top}px`;
       el.style.left = `${p.left}px`;
       el.style.maxHeight = p.maxHeight === null ? '' : `${p.maxHeight}px`;
@@ -134,13 +134,18 @@ export function Popover({
       const above = stack.slice(stack.indexOf(el) + 1);
       if (!el.contains(t) && !a.contains(t) && !above.some((p) => p.contains(t))) closeRef.current(false);
     };
-    addEventListener('scroll', place, true);
+    // Its own scrolling (a long list) doesn't move it, and re-placing then would reset the list's
+    // scroll position (the "locked" scroll, Oct 14).
+    const onScroll = (e: Event) => {
+      if (!el.contains(e.target as Node)) place();
+    };
+    addEventListener('scroll', onScroll, true);
     addEventListener('resize', place);
     addEventListener('keydown', onKey, true);
     addEventListener('mousedown', onDown, true);
     return () => {
       ro.disconnect();
-      removeEventListener('scroll', place, true);
+      removeEventListener('scroll', onScroll, true);
       removeEventListener('resize', place);
       removeEventListener('keydown', onKey, true);
       removeEventListener('mousedown', onDown, true);

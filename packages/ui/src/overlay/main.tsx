@@ -148,22 +148,32 @@ function Expanded({ s }: { s: OverlayState }) {
       }),
     [],
   );
+  const cappedPanel = s.mode === 'panel' && s.panelMaxH !== null;
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const h = Math.max(0, ...[...room.values()].map((r) => (above ? r.above : r.below)));
+    // A capped panel keeps its height and scroll while the frame grows around it: a min-height
+    // alone beats the frame's max-height, so the panel would stretch, stop scrolling, and lose
+    // its scroll position (Oct 14).
+    const panel = cappedPanel ? el.querySelector<HTMLElement>(':scope > .panel') : null;
+    if (panel) panel.style.maxHeight = h ? `${panel.offsetHeight}px` : '';
+    el.style.maxHeight = h && panel ? 'none' : '';
     el.style.minHeight = h ? `${h}px` : '';
-  }, [room, above]);
+  }, [room, above, cappedPanel]);
 
-  // Main sizes the window; report the content's real size after every change.
+  // Main sizes the window; report the content's real size after every change. While a popover
+  // holds room, main lets the window past the source window's edge (a picker in a capped panel).
+  const popoverOpen = useRef(false);
+  popoverOpen.current = room.size > 0;
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el) void glossly.invoke('overlay:resize', { sessionId: id, w: el.offsetWidth, h: el.offsetHeight });
+    if (el) void glossly.invoke('overlay:resize', { sessionId: id, w: el.offsetWidth, h: el.offsetHeight, popover: popoverOpen.current });
   });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => void glossly.invoke('overlay:resize', { sessionId: id, w: el.offsetWidth, h: el.offsetHeight }));
+    const ro = new ResizeObserver(() => void glossly.invoke('overlay:resize', { sessionId: id, w: el.offsetWidth, h: el.offsetHeight, popover: popoverOpen.current }));
     ro.observe(el);
     return () => ro.disconnect();
   }, [id]);

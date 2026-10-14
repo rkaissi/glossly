@@ -138,7 +138,7 @@ export function registerIpc(deps: IpcDeps): void {
 
   // ---- overlay ----
   handle('overlay:get', () => capture.state);
-  handle('overlay:resize', (a) => overlay.resize(num(a.sessionId), num(a.w), num(a.h)));
+  handle('overlay:resize', (a) => overlay.resize(num(a.sessionId), num(a.w), num(a.h), a.popover === true));
   handle('bar:expand', (a) => capture.expand(num(a.sessionId)));
   handle('bar:run', (a) => {
     const o = obj(a);

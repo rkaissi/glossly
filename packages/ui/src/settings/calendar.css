@@ -72,10 +72,19 @@
 /* ---- toolbar: one shape in every view ---- */
 .cal-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-4);
+  gap: var(--s-2) var(--s-4);
   flex: none;
   padding-bottom: var(--s-3);
+}
+/* Agenda's range is a control, so it never shortens to "O…": at the minimum width the view
+   switch and New wrap to a second row instead (Oct 14). Week and month titles still ellipsize. */
+.cal-left:has(> .cal-title-range) {
+  min-width: max-content;
+}
+button.trigger.cal-title-range {
+  flex: none;
 }
 .cal-left {
   display: flex;

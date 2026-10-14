@@ -397,7 +397,7 @@ export type SettingsTab = 'tasks' | 'calendar' | 'people' | 'saved' | 'profile' 
 export interface InvokeChannels {
   'overlay:get': { args: void; result: OverlayState };
   /** Renderer measured its content; main resizes and re-places the window. */
-  'overlay:resize': { args: { sessionId: number; w: number; h: number }; result: void };
+  'overlay:resize': { args: { sessionId: number; w: number; h: number; popover?: boolean }; result: void };
 
   'bar:expand': { args: { sessionId: number }; result: void };
   /** Runs the action in a slot (1 to 4) or by id (from "More"). Opens its panel. */

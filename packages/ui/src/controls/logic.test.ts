@@ -45,6 +45,19 @@ describe('placePopover', () => {
     expect(q.maxHeight).toBe(486);
     expect(q.top).toBe(8);
   });
+  it('slides a picker over its anchor instead of scrolling when neither side fits', () => {
+    // The date picker under a button near the top of a short window (Oct 14): 460 tall, 120 above, 330 below.
+    const view = { w: 1000, h: 500 };
+    const p = placePopover(rect(100, 50), { w: 300, h: 460 }, view, 'start', 'shift');
+    expect(p).toEqual({ top: 500 - 8 - 460, left: 50, maxHeight: null, side: 'below' });
+    // Near the bottom it slides down from above.
+    const q = placePopover(rect(380, 50), { w: 300, h: 460 }, view, 'start', 'shift');
+    expect(q).toEqual({ top: 8, left: 50, maxHeight: null, side: 'above' });
+    // Only a window shorter than the picker caps it.
+    expect(placePopover(rect(100, 50), { w: 300, h: 600 }, view, 'start', 'shift')).toEqual({ top: 8, left: 50, maxHeight: 484, side: 'below' });
+    // When one side fits, it's the same as a list.
+    expect(placePopover(rect(100, 50), { w: 300, h: 200 }, view, 'start', 'shift')).toEqual(placePopover(rect(100, 50), { w: 300, h: 200 }, view));
+  });
   it('aligns to the right edge for end, and stays inside the window', () => {
     expect(placePopover(rect(100, 800), { w: 250, h: 100 }, VIEW, 'end').left).toBe(800 + 160 - 250);
     expect(placePopover(rect(100, 900), { w: 250, h: 100 }, VIEW).left).toBe(1000 - 250 - 8);

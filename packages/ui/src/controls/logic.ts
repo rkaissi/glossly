@@ -22,16 +22,32 @@ const GAP = 6;
 
 /**
  * Where a popover goes: below its anchor if it fits, else above if that fits, else on the
- * roomier side with a scrolling cap. Always inside the viewport (the window), with an 8 px margin.
+ * roomier side. There a list (`fit: 'scroll'`) scrolls inside the room it has; a picker
+ * (`fit: 'shift'`) never scrolls: it slides toward the other side, over its anchor if it must,
+ * and is capped only when the whole window is shorter than it (Rayan, Oct 14). Always inside the
+ * viewport (the window), with an 8 px margin.
  */
-export function placePopover(anchor: Rect, size: { w: number; h: number }, viewport: { w: number; h: number }, align: 'start' | 'end' | 'side' = 'start'): Placement {
+export function placePopover(
+  anchor: Rect,
+  size: { w: number; h: number },
+  viewport: { w: number; h: number },
+  align: 'start' | 'end' | 'side' = 'start',
+  fit: 'scroll' | 'shift' = 'scroll',
+): Placement {
   if (align === 'side') return placeBeside(anchor, size, viewport);
   const below = viewport.h - MARGIN - (anchor.bottom + GAP);
   const above = anchor.top - GAP - MARGIN;
   let side: Placement['side'];
   let maxHeight: number | null = null;
   let top: number;
-  if (size.h <= below || below >= above) {
+  if (fit === 'shift' && size.h > below && size.h > above) {
+    side = below >= above ? 'below' : 'above';
+    const room = viewport.h - 2 * MARGIN;
+    const h = Math.min(size.h, room);
+    if (size.h > room) maxHeight = Math.max(0, room);
+    const wantedTop = side === 'below' ? anchor.bottom + GAP : anchor.top - GAP - h;
+    top = Math.max(MARGIN, Math.min(wantedTop, viewport.h - MARGIN - h));
+  } else if (size.h <= below || below >= above) {
     side = 'below';
     top = anchor.bottom + GAP;
     if (size.h > below) maxHeight = Math.max(0, below);

@@ -45,7 +45,8 @@ export class SettingsWindow {
       width: 960,
       height: 700,
       minWidth: 720,
-      minHeight: 520,
+      // Tall enough for the date and range pickers, which slide to fit instead of scrolling.
+      minHeight: 600,
       show: false,
       title: 'Glossly',
       icon: appIconPath(),
