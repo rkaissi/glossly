@@ -16,7 +16,7 @@ Ask about it, save it, reply to it, find out who's in it, turn it into tasks and
 
 [Download](#install) · [Features](#features) · [Privacy](#privacy) · [Build from source](#build-from-source) · [Docs](#documentation)
 
-<img src="docs/media/hero.gif" width="860" alt="Selecting a chat message, opening Glossly, and inserting one of three reply drafts">
+<img src="docs/media/social-preview.png" width="860" alt="Glossly: highlight text anywhere on Windows, with the Reply panel open over a chat message">
 
 </div>
 
@@ -30,7 +30,9 @@ It works in any app that shows text: chat and email apps, browsers, documents, P
 
 ### Reply in your own voice
 
-Select a message and get three drafts that answer it, each taking a different line (say yes, ask a question, suggest another time). Glossly reads the conversation to know who wrote what and what's being asked, and learns your style from the drafts you pick and edit, separately for chat and email. **Insert** puts the reply in the message box; nothing is ever sent for you. (That's the demo at the top of this page.)
+Select a message and get three drafts that answer it, each taking a different line (say yes, ask a question, suggest another time). Glossly reads the conversation to know who wrote what and what's being asked, and learns your style from the drafts you pick and edit, separately for chat and email. **Insert** puts the reply in the message box; nothing is ever sent for you.
+
+<p align="center"><img src="docs/media/hero.gif" width="820" alt="Reply: three drafts for a selected chat message, one inserted into the message box"></p>
 
 ### Who is this
 
