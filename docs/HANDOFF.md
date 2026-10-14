@@ -43,9 +43,8 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 ## Next steps, in order
 
 1. **Ship the quit fix** as v0.1.2 (`ship-release`) when Rayan says so; the update from 0.1.1 will still show the error box once, since the old code runs that quit. Afterwards check a quit from the tray shows nothing and the `Glossly` Run value points at the installed exe with `--background`, and a sign-in start shows no window. If an error box comes back, look for `error while quitting` in `main.log`.
-2. **Rayan's hotkey:** Ctrl+Alt+Space is also the Claude desktop app's shortcut, so Glossly's doesn't register on his machine. He chose to keep it as the default (Oct 14) and change his own in Settings > General; the notice already tells others when it's taken.
-3. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the social preview uploaded on GitHub (Settings > General > Social preview), the live-check backlog in `docs/testing.md`, the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
-4. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
+2. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the social preview uploaded on GitHub (Settings > General > Social preview), the live-check backlog in `docs/testing.md`, the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
+3. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
 
 The build history (Steps 1 to 23, with commits) is in `docs/history.md`; the reasons behind each choice are in `docs/decisions.md`.
 
@@ -72,6 +71,7 @@ Everything else he was asked is answered and recorded in `docs/decisions.md`.
 - The app runs against Rayan's real data in `%APPDATA%\Glossly`. Undo every test save and remove every test row (people, commitments, voice samples, settings like `saveMode` or `identity`) a check creates.
 - Rayan may be at the machine. Check `main.log`, running instances, and DB counts before driving the desktop, and don't stop his instance without asking.
 - Desktop and end-to-end testing goes through a subagent (Composer or Grok in Cursor; Sonnet in Claude Code). See `docs/testing.md` for how to brief it and the `ui-drive.ps1` quirks.
+- Ctrl+Alt+Space never registers on his machine (the Claude app holds it) and he is keeping it that way: open the bar from the pill in live checks, and ignore `hotkey could not register`.
 - His debug view is off; diagnose pills from `main.log` (`pill shown`, `pill obstacles`, `overlay closed`, `routed`) and the `events` table.
 - His Windows theme is apps light, system dark (`1,0`). Restore it after dark-mode checks.
 - No `pnpm eval` unless he asks (Groq free tier, per model for the whole organisation: about 30 requests a minute, 1,000 a day, 8,000 tokens a minute, 200,000 tokens a day; cached prompt tokens don't count). Never `pnpm eval` with a key set at all: it runs every runner. Run one: `$env:GROQ_API_KEY = [Environment]::GetEnvironmentVariable('GROQ_API_KEY','User'); $env:GLOSSLY_EVAL_LIMIT='18'; pnpm exec vitest run --project evals evals/<name>.eval.ts`, then read `evals/results/<name>-<model>.json` (Vitest doesn't show the runners' console output here). Clear `GLOSSLY_EVAL_IDS`, `GLOSSLY_EVAL_MODEL`, and `GLOSSLY_EVAL_LIMIT` between runs.
@@ -157,7 +157,6 @@ pnpm eval                # only when Rayan asks
 
 ## Things Rayan has to do himself
 
-- Pick another hotkey in Settings > General (Ctrl+Alt+Space is the Claude app's).
 - Upload `docs/media/social-preview.png` in the repo's Settings > General > Social preview (the API can't).
 - Delete `%USERPROFILE%\glossly-history-backup-2026-10-13.bundle` once he's happy with the history rewrite (it still holds the old names); re-clone or reset any other copy of the repo to the new `main`.
 - Before the public launch: choose a license.
