@@ -127,6 +127,11 @@ async function main(): Promise<void> {
     if (quitting) return;
     e.preventDefault();
     quitting = true;
+    // Glossly is on its way out, so an error now shouldn't stop it with Electron's error box
+    // (seen once on "Restart to update"); log what it was instead.
+    process.on('uncaughtException', (err) => {
+      log.error('error while quitting', { ...errorInfo(err), message: err.message.slice(0, 200), at: err.stack?.split('\n')[1]?.trim().slice(0, 200) });
+    });
     capture.close('quit');
     reminders.stop();
     hotkey.dispose();

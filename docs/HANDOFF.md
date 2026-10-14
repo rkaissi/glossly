@@ -9,7 +9,7 @@ Last updated Oct 14, 2026. **Glossly v0.1.1 is out** (the repo's Releases page, 
 - *Going public:* the About section, topics, and a social preview image (`docs/media/social-preview.png`); three real names in old tests were rewritten out of the git history (`git filter-repo`, `main` and `v0.1.0` force-pushed once). The rest of the early history Rayan chose to keep as is.
 - *Evals and real use:* all done; the numbers are in `STATUS.md` and `docs/testing.md` ("Evals", "Real-use record").
 
-**Not verified yet:** the updater on a real update (Rayan's installed v0.1.0 should offer v0.1.1), and decision 71 on his machine (taskbar name and icon, the window on launch, the start at sign-in). Details under **Next** below.
+**The first real update worked** (Oct 14: Rayan's v0.1.0 updated itself to v0.1.1, `docs/testing.md`, "Installed app"), with two problems that came from this machine's leftovers, both fixed by hand: the installer relaunched the copy in `packages\shell-electron\dist\win-unpacked` (the Start Menu shortcut pointed there), and the taskbar showed Electron (a stale dev `Electron.lnk` with Glossly's app id). An Electron error box also showed at quit; errors while quitting are now logged (`error while quitting`) instead of shown. **Not verified yet:** the taskbar name and icon after the fix, and the start at sign-in.
 
 ## Start here
 
@@ -42,8 +42,8 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 
 ## Next steps, in order
 
-1. **Confirm the first real update.** When Rayan's installed v0.1.0 updates to v0.1.1, check his `main.log` for `update available`, `update downloaded`, and `installing update`, then decision 71 on his machine: the taskbar shows Glossly (right-click too), opening it shows the window, a `Glossly` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` with `--background`, and a start at sign-in with no window. If the update never shows, look at `[updates]` lines first.
-2. **Rayan's hotkey:** another app holds Ctrl+Alt+Space on his machine, so Glossly's hotkey doesn't register (`hotkey could not register`); he picks another one or frees it.
+1. **Back on the installed copy.** Rayan's Glossly was relaunched from `dist\win-unpacked` (Oct 14): quit it from the tray and start Glossly from the Start Menu, which now opens `%LOCALAPPDATA%\Programs\glossly`. Then check the taskbar shows Glossly (right-click too), the `Glossly` Run value points at the installed exe with `--background` (the app rewrites it on start), and a sign-in start shows no window. Don't run `pnpm dist` while the build-folder copy runs. If the taskbar still says Electron, Windows' cache for the app id needs a sign-out. If the quit error comes back, look for `error while quitting` in `main.log`.
+2. **Rayan's hotkey:** Ctrl+Alt+Space is also the Claude desktop app's shortcut, so Glossly's doesn't register on his machine. He chose to keep it as the default (Oct 14) and change his own in Settings > General; the notice already tells others when it's taken.
 3. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the social preview uploaded on GitHub (Settings > General > Social preview), the live-check backlog in `docs/testing.md`, the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
 4. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
 
@@ -157,8 +157,8 @@ pnpm eval                # only when Rayan asks
 
 ## Things Rayan has to do himself
 
-- Let his installed Glossly update to v0.1.1 (Settings > General > Updates, Restart to update), then check the taskbar shows Glossly.
-- Free Ctrl+Alt+Space or pick another hotkey in Settings > General.
+- Quit the Glossly running from the build folder (tray > Quit) and start it from the Start Menu, then check the taskbar shows Glossly.
+- Pick another hotkey in Settings > General (Ctrl+Alt+Space is the Claude app's).
 - Upload `docs/media/social-preview.png` in the repo's Settings > General > Social preview (the API can't).
 - Delete `%USERPROFILE%\glossly-history-backup-2026-10-13.bundle` once he's happy with the history rewrite (it still holds the old names); re-clone or reset any other copy of the repo to the new `main`.
 - Before the public launch: choose a license.
