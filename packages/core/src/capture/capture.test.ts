@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
-import { keyMatches, placeNameFor, resolveAppMode, siteKeyFor, stripBrowserSuffix } from './apps';
+import { keyMatches, placeNameFor, resolveAppMode, siteKeyFor, stripBrowserSuffix, enableTestViewer, isBrowser } from './apps';
 import { countWords, gateAutoSelection, mayCopyFallback } from './gating';
 import { classifyObstacles, type Popup } from './obstacles';
 import { foundAppToolbar, learnKeyFor, learnToolbarWait, pillWait, pollForToolbar, type PollOptions } from './pill-wait';
@@ -343,5 +343,20 @@ describe('pill wait', () => {
     const { o } = clock(10, null);
     let n = 0;
     expect(await pollForToolbar({ ...o, stale: () => ++n > 2 })).toBeNull();
+  });
+});
+
+describe('the live-check page viewer (dev builds)', () => {
+  const viewer = { process_name: 'electron.exe', title: '(3) Discord | #general | Test Server - Glossly Test Viewer' };
+  it('counts as a browser only when switched on, and only with its title suffix', () => {
+    expect(isBrowser(viewer)).toBe(false);
+    enableTestViewer();
+    try {
+      expect(isBrowser(viewer)).toBe(true);
+      expect(isBrowser({ process_name: 'electron.exe', title: 'Glossly' })).toBe(false);
+      expect(stripBrowserSuffix(viewer.title)).toBe('(3) Discord | #general | Test Server');
+    } finally {
+      enableTestViewer(false);
+    }
   });
 });

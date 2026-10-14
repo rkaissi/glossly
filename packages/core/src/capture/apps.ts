@@ -48,6 +48,8 @@ const BROWSER_SUFFIXES = [
   /\s+-\s+Vivaldi$/,
   /\s+-\s+Arc$/,
   /\s+-\s+Chromium$/,
+  // The live-check page viewer, when the dev build counts it as a browser (enableTestViewer).
+  /\s+-\s+Glossly Test Viewer$/,
   // Edge and Chrome add "and N more pages" / profile names in some locales.
   /\s+-\s+Personal$/,
   /\s+-\s+Work$/,
@@ -136,7 +138,23 @@ function barSiteKey(parts: string[]): string {
 
 const BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe', 'arc.exe'];
 
-export const isBrowser = (app: Pick<AppIdentity, 'process_name'>) => BROWSERS.includes(app.process_name.toLowerCase());
+/** The live-check page viewer's title suffix; its windows run as electron.exe. */
+export const TEST_VIEWER_SUFFIX = ' - Glossly Test Viewer';
+let testViewer = false;
+
+/**
+ * Dev builds only (`GLOSSLY_TEST_VIEWER=1`): the page viewer that live checks use instead of the
+ * owner's browsers counts as a browser, so test pages get site detection (AGENTS.md, Oct 14).
+ * Only electron.exe windows with the viewer's title suffix count, never Glossly's own.
+ */
+export function enableTestViewer(on = true): void {
+  testViewer = on;
+}
+
+export const isBrowser = (app: Pick<AppIdentity, 'process_name'> & { title?: string }) => {
+  const p = app.process_name.toLowerCase();
+  return BROWSERS.includes(p) || (testViewer && p === 'electron.exe' && Boolean(app.title?.endsWith(TEST_VIEWER_SUFFIX)));
+};
 
 /** The key "Don't show here" would store for this app: the site's part of the title for browsers, else the process name. */
 export function siteKeyFor(app: AppIdentity): string {

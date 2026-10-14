@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { enableTestViewer } from '@glossly/core';
 import { Capture } from './capture';
 import { HelperManager } from './helper-manager';
 import { HotkeyManager, SaveHotkey } from './hotkey';
@@ -25,6 +26,8 @@ const atLogin = process.argv.includes(LOGIN_ARG);
 const dataDir = dataDirArg(process.argv) ?? (!app.isPackaged ? process.env.GLOSSLY_USER_DATA : undefined);
 if (dataDir) app.setPath('userData', dataDir);
 const noCapture = !app.isPackaged && process.env.GLOSSLY_NO_CAPTURE === '1';
+// Live checks show test pages in a viewer, never the owner's browsers (AGENTS.md); dev builds only.
+if (!app.isPackaged && process.env.GLOSSLY_TEST_VIEWER === '1') enableTestViewer();
 const primary = app.requestSingleInstanceLock();
 
 let quitting = false;
