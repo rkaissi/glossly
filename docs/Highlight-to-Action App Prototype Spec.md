@@ -1,6 +1,6 @@
 # Glossly: Prototype Spec
 
-Oct 9, 2026 · @Rayan Kaissi
+Oct 9, 2026 · Rayan
 
 ## Overview and scope
 
