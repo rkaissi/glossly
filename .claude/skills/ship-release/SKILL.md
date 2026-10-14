@@ -40,7 +40,7 @@ Builds the Windows installer for a new version and publishes it on GitHub Releas
    ```bash
    node scripts/release.mjs tag <version>
    ```
-   It pushes `v<version>` on `origin/main`'s commit. The Release workflow then installs, runs the typecheck and unit tests, builds the helper and the installer, runs `verify`, and uploads the installer, its `.blockmap`, and `latest.yml` to a **draft** release (about 15 minutes). Follow it with `gh run watch` (pick the Release run) or `gh run list --workflow release.yml`; `node scripts/release.mjs status <version>` says when the draft has its three files. Draft the notes (step 8) meanwhile.
+   It pushes `v<version>` on `origin/main`'s commit. The Release workflow then installs, runs the typecheck and unit tests, builds the helper and the installer, runs `verify`, and uploads the installer, its `.blockmap`, and `latest.yml` to a **draft** release (about 5 minutes; the first trial run on Oct 14 took 4). Follow it with `gh run watch` (pick the Release run) or `gh run list --workflow release.yml`; `node scripts/release.mjs status <version>` says when the draft has its three files. Draft the notes (step 8) meanwhile.
 
 7. **Smoke test (recommended; required for a major version or packaging changes).** Download the draft's installer, install it silently, and start it on a throwaway profile, never Rayan's (decision 69):
    ```powershell
