@@ -16,7 +16,7 @@ Ask about it, save it, reply to it, find out who's in it, turn it into tasks and
 
 [Download](#install) · [Features](#features) · [Privacy](#privacy) · [Build from source](#build-from-source) · [Docs](#documentation)
 
-<img src="docs/media/social-preview.png" width="860" alt="Glossly: highlight text anywhere on Windows, with the Reply panel open over a chat message">
+<img src="docs/media/banner-hero.png" width="860" alt="Glossly: highlight text anywhere on Windows, with the bar and a reply draft over a selected message">
 
 </div>
 
@@ -26,13 +26,19 @@ Most of what you read on a computer asks something of you: a question to answer,
 
 It works in any app that shows text: chat and email apps, browsers, documents, PDFs, terminals. Nothing is sent anywhere until you pick an action, and you can keep everything on your computer with a local model.
 
+<p align="center"><img src="docs/media/banner-highlight.png" width="860" alt="A highlighted sentence with the Glossly bar beneath it: Ask, Save, Reply, Tasks and events"></p>
+
 ## Features
+
+<p align="center"><img src="docs/media/banner-actions.png" width="860" alt="The six actions around the Glossly icon: Ask, Reply, Who is this, Tasks and events, Save, Visualize"></p>
 
 ### Reply in your own voice
 
 Select a message and get three drafts that answer it, each taking a different line (say yes, ask a question, suggest another time). Glossly reads the conversation to know who wrote what and what's being asked, and learns your style from the drafts you pick and edit, separately for chat and email. **Insert** puts the reply in the message box; nothing is ever sent for you.
 
 <p align="center"><img src="docs/media/hero.gif" width="820" alt="Reply: three drafts for a selected chat message, one inserted into the message box"></p>
+
+<p align="center"><img src="docs/media/banner-reply-learns.png" width="820" alt="Reply learns how you write: an edited draft, the pick out of three, and the style it learned for chat and email"></p>
 
 ### Who is this
 
@@ -64,20 +70,30 @@ Select a table (from a spreadsheet, a web page, Markdown, or a CSV) and get a cl
 
 <p align="center"><img src="docs/media/visualize.gif" width="820" alt="Visualize: a chart made from a selected table, dark theme"></p>
 
+<p align="center"><img src="docs/media/banner-visualize.png" width="820" alt="One table drawn four ways: bars, a line, horizontal bars, and a scatter"></p>
+
 ### And more
+
+<p align="center"><img src="docs/media/banner-connected.png" width="820" alt="Recall, Search, Paste, People, Calendar, and Local only, connected"></p>
 
 - **Search** everything you saved, your people, and open tasks: press the hotkey with nothing selected.
 - **Paste snippets** you saved recently, or have Glossly **write them up** for the field you're typing in.
 - **Settings** has full Tasks and Calendar views, your people and saved items, model choices, privacy controls, and local usage metrics, in light and dark.
 
+<details>
+<summary>Settings: the Calendar and Tasks tabs</summary>
+<br>
 <p align="center"><img src="docs/media/settings-calendar.png" width="820" alt="The Calendar tab in Settings, dark theme"></p>
 <p align="center"><img src="docs/media/settings-tasks.png" width="820" alt="The Tasks tab in Settings"></p>
+</details>
 
 ## How it works
 
 1. **Select** text with the mouse, as you normally would. A small pill appears below the selection (or press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd>).
 2. **Open the bar.** Ask and Save are always there. The other two buttons are picked for this text: Reply and Who is this on a message from someone else, Tasks on a request with a date, Visualize on a table. Everything else is under More.
 3. **Act.** Each action opens a panel in place. Press <kbd>Esc</kbd> to step back, or just click away.
+
+<p align="center"><img src="docs/media/banner-outcomes.png" width="860" alt="One highlighted message turned into a reply draft, a calendar event, and a task"></p>
 
 Glossly reads selections through Windows UI Automation, so your clipboard stays untouched, and it never reads password fields or watches what you type. Apps that don't expose their text that way still work through the hotkey, which copies the selection and puts your clipboard back.
 
