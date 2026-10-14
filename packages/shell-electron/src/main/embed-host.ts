@@ -92,6 +92,8 @@ export class EmbedHost extends EventEmitter<{ status: [EmbedStatus] }> {
   private onMessage(msg: WorkerResponse): void {
     if (msg.type === 'progress') {
       const p = msg.progress;
+      // Reading an already downloaded model from the cache is loading, not a download.
+      if (p.status === 'downloading' && this.downloaded) return;
       this.setStatus({ state: p.status, progress: p.progress, message: p.message });
       if (p.status === 'error') log.error('embedder failed to load');
     } else if (msg.type === 'ready') {

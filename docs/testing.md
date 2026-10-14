@@ -298,6 +298,8 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [x] Models are ready matches the Models tab (Local only with no model: "Ready without a model"). Setting up search starts the download and shows progress; Continue works mid-download and the download finishes after setup.
 - [x] Try it: selecting in the sample ticks the first item (`pill shown` in `main.log`), hovering the pill or the hotkey ticks the second, an action ticks the third; nothing ticks from selections in other apps; leaving the step logs `try-it {active:false}`. Undo anything saved.
 
+- [ ] Setup's search model bar (Oct 14 fix) on a fresh `--data-dir` profile: starts at 0, only goes up to 100, then Loading and Ready; the "keeps downloading" note hides at Ready. Before the fix it showed full, then restarted at 0 per file.
+
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).
 - [ ] Phase 0 per-app table and toolbar overlap (`evals/capture.md`, Rayan's hand tests).

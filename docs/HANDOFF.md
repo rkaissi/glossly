@@ -42,9 +42,10 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 
 ## Next steps, in order
 
-1. **Finish checking v0.1.2:** the panel comes back to its place after a date picker that had to move it closes (`docs/testing.md`, the two open "(Oct 14 pass)" items), and a sign-in start shows no window. If an error box ever comes back at quit, look for `error while quitting` in `main.log`.
-2. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the rest of the live-check backlog in `docs/testing.md` (the Oct 14 pass did the settings and overlay checks; the content, privacy, and Ollama ones are left), the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
-3. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
+1. **Unreleased on `main` (ship with the next version):** setup's search model bar showed full, then jumped back to 0 and restarted per file (Rayan, Oct 14, on a fresh `--data-dir` profile). It now follows transformers.js's `progress_total` (all files, sized up front, never goes down; checked against a real download), the worker no longer reports "loading" at the start (that drew the full bar), a cached model's reads stay "Loading", and the "keeps downloading" note hides once the model is ready. Check it on a fresh profile after the release (`docs/testing.md`, Setup redesign).
+2. **Finish checking v0.1.2:** the panel comes back to its place after a date picker that had to move it closes (`docs/testing.md`, the two open "(Oct 14 pass)" items), and a sign-in start shows no window. If an error box ever comes back at quit, look for `error while quitting` in `main.log`.
+3. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the rest of the live-check backlog in `docs/testing.md` (the Oct 14 pass did the settings and overlay checks; the content, privacy, and Ollama ones are left), the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
+4. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
 
 The build history (Steps 1 to 23, with commits) is in `docs/history.md`; the reasons behind each choice are in `docs/decisions.md`.
 

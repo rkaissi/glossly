@@ -451,7 +451,7 @@ function SearchStep({ view }: { view: SettingsView }) {
           </div>
         )}
       </div>
-      <p className="note">You can continue now; it keeps downloading in the background.</p>
+      {e.state !== 'ready' && <p className="note">You can continue now; it keeps downloading in the background.</p>}
     </>
   );
 }

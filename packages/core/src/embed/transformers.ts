@@ -18,13 +18,17 @@ export async function createTransformersEmbedder(opts: TransformersEmbedderOptio
   env.allowRemoteModels = true;
   env.allowLocalModels = true;
 
-  opts.onProgress?.({ status: 'loading' });
+  // The host shows "loading" or "downloading" from the start; this only reports the download.
   let extractor: FeatureExtractionPipeline;
   try {
     extractor = (await pipeline('feature-extraction', opts.model, {
       dtype: 'fp32',
-      progress_callback: (p: { status: string; progress?: number; file?: string }) => {
-        if (p.status === 'progress') opts.onProgress?.({ status: 'downloading', progress: p.progress, file: p.file });
+      // `progress_total` covers every file, sized before any starts, so it only goes up; the
+      // per-file `progress` events restarted the bar for each file. Once all bytes are in, the
+      // model still has to load.
+      progress_callback: (p: { status: string; progress?: number }) => {
+        if (p.status !== 'progress_total' || p.progress === undefined) return;
+        opts.onProgress?.(p.progress >= 100 ? { status: 'loading' } : { status: 'downloading', progress: p.progress });
       },
     })) as FeatureExtractionPipeline;
   } catch (e) {
