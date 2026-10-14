@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `1021627` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `9db68a0` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `3f19bd0` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| — | Oct 14 | (this commit) | v0.1.2 confirmed on Rayan's machine: the update from 0.1.1 installed and relaunched from the install folder; quitting 0.1.2 shows no error box. |
 | 22h | Oct 14 | (tag `v0.1.2`) | v0.1.2 published: no error box on quit, the panel back in place after a picker, no stale hotkey notice; `--data-dir` runs leave the Start with Windows entry alone. Smoke-run from the build folder on a throwaway profile (which showed Electron takes over the Start Menu shortcut; decision 72). |
 | — | Oct 14 | `fb467ee` | Live-check pass on the backlog (settings and overlay checks); fixed the overlay panel staying moved after a picker (`anchoredTo`) and the stale "hotkey is taken" notice; `ui-drive.ps1 hotkey shift`. |
 | — | Oct 14 | `c58601a` | The quit error in v0.1.1 ("database is not open"): the embeddings worker's exit is ignored once Glossly stops it. |

@@ -9,7 +9,7 @@ Last updated Oct 14, 2026. **Glossly v0.1.2 is out** (the repo's Releases page, 
 - *Going public:* the About section, topics, and a social preview image (`docs/media/social-preview.png`); three real names in old tests were rewritten out of the git history (`git filter-repo`, `main` and `v0.1.0` force-pushed once). The rest of the early history Rayan chose to keep as is.
 - *Evals and real use:* all done; the numbers are in `STATUS.md` and `docs/testing.md` ("Evals", "Real-use record").
 
-**The first real update worked** (Oct 14: Rayan's v0.1.0 updated itself to v0.1.1, `docs/testing.md`, "Installed app"), with two problems that came from this machine's leftovers, both fixed by hand: the installer relaunched the copy in `packages\shell-electron\dist\win-unpacked` (the Start Menu shortcut pointed there), and the taskbar showed Electron (a stale dev `Electron.lnk` with Glossly's app id). The taskbar shows Glossly since (Rayan, Oct 14). **Every quit in v0.1.1 shows an Electron error box** ("database is not open"): the embeddings worker's exit handler read the store after shutdown had closed it. Fixed in v0.1.2 (`embed-host.ts`; errors while quitting are also logged as `error while quitting` instead of shown). **Not verified yet:** the start at sign-in.
+**Updates work on Rayan's machine** (Oct 14): v0.1.0 to v0.1.1, then v0.1.1 to v0.1.2, each restarting on the new version with his data. The 0.1.1 to 0.1.2 restart still showed the old "database is not open" error box (0.1.1's code runs that quit); quitting 0.1.2 shows nothing (Rayan), so the fix holds. The relaunch, the Start Menu shortcut, and the Start with Windows entry all point at `%LOCALAPPDATA%\Programs\glossly` (the build-folder mix-up is explained in decision 72). **Not verified yet:** the panel coming back after a picker, and a start at sign-in with no window.
 
 ## Start here
 
@@ -42,7 +42,7 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 
 ## Next steps, in order
 
-1. **Check v0.1.2 on Rayan's machine.** His installed 0.1.1 should offer it; the update's quit may show the old error box once (0.1.1 code). Then a quit from the tray shows nothing, the panel comes back after a picker closes (`docs/testing.md`, the two open "(Oct 14 pass)" items), `Glossly.lnk` and the `Glossly` Run value still point at `%LOCALAPPDATA%\Programs\glossly` with `--background`, and a sign-in start shows no window. If an error box comes back, look for `error while quitting` in `main.log`.
+1. **Finish checking v0.1.2:** the panel comes back to its place after a date picker that had to move it closes (`docs/testing.md`, the two open "(Oct 14 pass)" items), and a sign-in start shows no window. If an error box ever comes back at quit, look for `error while quitting` in `main.log`.
 2. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the rest of the live-check backlog in `docs/testing.md` (the Oct 14 pass did the settings and overlay checks; the content, privacy, and Ollama ones are left), the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
 3. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
 
