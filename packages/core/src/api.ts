@@ -363,6 +363,8 @@ export interface SettingsView {
   /** Saved items no model has looked for people and places in yet (decision 44). */
   entitiesPending: number;
   platform: 'win32' | 'darwin' | 'linux';
+  /** The installed app, not a dev build: starting at sign-in and updates only work there. */
+  installed: boolean;
   /** Built-in app lists, shown read-only next to the user's own entries. */
   builtins: { blockList: readonly string[]; hotkeyOnly: readonly string[] };
 }

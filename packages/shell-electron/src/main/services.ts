@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { app } from 'electron';
 import { getLoadablePath } from 'sqlite-vec';
 import {
   AiSdkLlm,
@@ -183,6 +184,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
       embed: this.embed.getStatus(),
       entitiesPending: this.store.countEntitiesPending(),
       platform: process.platform === 'darwin' ? 'darwin' : process.platform === 'linux' ? 'linux' : 'win32',
+      installed: app.isPackaged,
       builtins: { blockList: DEFAULT_BLOCK_LIST, hotkeyOnly: DEFAULT_HOTKEY_ONLY },
     };
   }

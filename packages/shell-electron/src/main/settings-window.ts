@@ -1,6 +1,6 @@
 import { BrowserWindow, nativeTheme, shell } from 'electron';
 import { logger } from './log';
-import { appIcoPath, appIconPath, hasWindowMaterial, preloadPath, rendererUrl } from './paths';
+import { appIconPath, hasWindowMaterial, preloadPath, rendererUrl, taskbarDetails } from './paths';
 import { hwndFromBuffer } from './view';
 
 const log = logger('settings-window');
@@ -60,8 +60,8 @@ export class SettingsWindow {
       },
     });
     win.setMenu(null);
-    // The taskbar button's icon comes from the relaunch icon, not the window's (paths.ts).
-    if (process.platform === 'win32') win.setAppDetails({ appId: 'com.glossly.app', appIconPath: appIcoPath(), appIconIndex: 0, relaunchDisplayName: 'Glossly' });
+    // The taskbar button's name and icon come from the relaunch details, not the window's (paths.ts).
+    if (process.platform === 'win32') win.setAppDetails(taskbarDetails());
     win.once('ready-to-show', () => win.show());
     // Mica keeps the old theme's tint when Windows switches between light and dark, leaving light
     // text on a pale window until something redraws it (Step 21); cycling the material redraws it.

@@ -8,6 +8,25 @@ const outMain = fileURLToPath(new URL('.', import.meta.url));
 
 export const isDev = !app.isPackaged;
 
+/**
+ * The Windows app id (AppUserModelID): the installer's Start Menu shortcut carries it, so the
+ * taskbar and toasts find Glossly's name and icon. Dev builds use their own, so electron.exe is
+ * never tied to the installed app's id (decision 71: the taskbar showed "Electron").
+ */
+export const APP_ID = app.isPackaged ? 'com.glossly.app' : 'com.glossly.app.dev';
+
+/** Started by Windows at sign-in (the login item passes it): stay in the tray, open no window. */
+export const LOGIN_ARG = '--background';
+
+/**
+ * What a taskbar button needs to show Glossly's name and icon whatever Windows has cached for
+ * the id: Windows uses the relaunch name and icon only when a relaunch command comes with them.
+ */
+export function taskbarDetails(): { appId: string; appIconPath: string; appIconIndex: number; relaunchCommand: string; relaunchDisplayName: string } {
+  const command = app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${app.getAppPath()}"`;
+  return { appId: APP_ID, appIconPath: appIcoPath(), appIconIndex: 0, relaunchCommand: command, relaunchDisplayName: 'Glossly' };
+}
+
 export function helperPath(): string {
   if (process.env.GLOSSLY_HELPER_PATH) return process.env.GLOSSLY_HELPER_PATH;
   if (app.isPackaged) return join(process.resourcesPath, 'helper', 'glossly-helper.exe');

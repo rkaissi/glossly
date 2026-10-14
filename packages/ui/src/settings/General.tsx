@@ -140,7 +140,7 @@ function SaveMode({ view }: { view: SettingsView }) {
   );
 }
 
-function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'debugView' | 'autoUpdate'; label: string; desc: string }) {
+function Toggle({ view, k, label, desc }: { view: SettingsView; k: 'debugView' | 'autoUpdate' | 'openAtLogin'; label: string; desc: string }) {
   const { busy, error, set } = useSetting();
   return (
     <div className="field">
@@ -370,6 +370,7 @@ export function GeneralTab({ view }: { view: SettingsView }) {
     <section>
       <h2>General</h2>
       <Hotkey view={view} />
+      {view.installed && <Toggle view={view} k="openAtLogin" label="Start with Windows" desc="Glossly starts in the tray when you sign in, ready when you select text." />}
       <KeyHintsField view={view} />
       <SaveMode view={view} />
       <AppModes view={view} />

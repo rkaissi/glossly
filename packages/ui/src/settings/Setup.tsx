@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode
 import { Bookmark, Check, Cloud, ExternalLink, Laptop, ListChecks, MessageCircle, Reply } from 'lucide-react';
 import type { KeyStatus, Privacy, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { Segmented } from '../controls/Toggles';
+import { Checkbox, Segmented } from '../controls/Toggles';
 import { GlassIcon } from '../icons';
 import { formatAccelerator, hasWorkingModel, pct } from './format';
 import { SETUP_STEPS, TRY_STEPS, canContinue, joinContacts, splitContacts, tickTry, type SetupStep } from './setup-logic';
@@ -495,6 +495,11 @@ function TryStep({ view, done, onTried }: { view: SettingsView; done: number; on
         ))}
       </ul>
       <p className="note">Things you save here are real; undo right after saving, or delete them later.</p>
+      {view.installed && (
+        <Checkbox checked={view.settings.openAtLogin} onChange={(on) => void glossly.invoke('settings:set', { key: 'openAtLogin', value: on })}>
+          Start Glossly when I sign in to Windows
+        </Checkbox>
+      )}
     </>
   );
 }

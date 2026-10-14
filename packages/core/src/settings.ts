@@ -182,6 +182,8 @@ export const SettingsSchema = z.object({
   /** Minutes before a timed calendar event its reminder shows; all-day events use `reminderHour`. */
   eventReminderMinutes: z.number().int().min(0).max(24 * 60).default(15),
 
+  /** Start Glossly in the background when the user signs in to Windows (decision 71). Installed builds only. */
+  openAtLogin: z.boolean().default(true),
   /** Download new versions in the background and offer "Restart to update" (decision 70); off, the user downloads them from Settings. */
   autoUpdate: z.boolean().default(true),
 

@@ -6,7 +6,7 @@ import { registerIpc } from './ipc';
 import { errorInfo, initLog, logger } from './log';
 import { Overlay } from './overlay';
 import { Reminders } from './reminders';
-import { dataDirArg, userDataPath } from './paths';
+import { APP_ID, dataDirArg, LOGIN_ARG, userDataPath } from './paths';
 import { Services } from './services';
 import { Updater } from './updater';
 import { SettingsWindow } from './settings-window';
@@ -15,7 +15,9 @@ import { createTray } from './tray';
 
 const log = logger('main');
 
-app.setAppUserModelId('com.glossly.app');
+app.setAppUserModelId(APP_ID);
+/** Windows started Glossly at sign-in: no window, just the tray (decision 71). */
+const atLogin = process.argv.includes(LOGIN_ARG);
 // A throwaway profile (the single-instance lock is per profile): `--data-dir=<folder>` in any
 // build, so the installed app can be tested without the real data (decision 69), or
 // GLOSSLY_USER_DATA in dev builds. Dev builds can also skip the helper and hotkey, so a test
@@ -112,7 +114,11 @@ async function main(): Promise<void> {
   if (services.embed.downloaded || services.settings.firstRunComplete) services.embed.start();
   services.refreshIfStale().catch((e: unknown) => log.warn('catalog refresh failed', errorInfo(e)));
   setInterval(() => services.pruneCallLog(), 86_400_000).unref();
+  // Opening Glossly opens its window, like any app; at sign-in it starts quietly in the tray.
+  syncLoginItem(services.settings.openAtLogin);
+  services.on('settings', () => syncLoginItem(services.settings.openAtLogin));
   if (!services.settings.firstRunComplete && !process.env.GLOSSLY_SMOKE) settingsWindow.open('setup');
+  else if (!atLogin && !process.env.GLOSSLY_SMOKE) settingsWindow.open();
 
   app.on('second-instance', () => settingsWindow.open());
   // A tray app: closing the settings window must not quit.
@@ -136,6 +142,19 @@ async function main(): Promise<void> {
   });
 
   if (process.env.GLOSSLY_SMOKE) void runSmoke({ helper, capture, services });
+}
+
+/**
+ * Starts Glossly at sign-in, in the tray (decision 71): a Run entry for this user. Installed builds
+ * only; a dev build would register electron.exe. Turning it off in Windows' Startup apps wins: Windows
+ * keeps it off however often this is written.
+ */
+let loginItem: boolean | null = null;
+function syncLoginItem(on: boolean): void {
+  if (!app.isPackaged || process.platform !== 'win32' || on === loginItem) return;
+  loginItem = on;
+  app.setLoginItemSettings({ openAtLogin: on, path: process.execPath, args: [LOGIN_ARG], name: 'Glossly' });
+  log.info('login item', { on });
 }
 
 // A second instance must not open the shared database or touch settings.
