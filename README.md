@@ -8,7 +8,7 @@
 
 Ask about it, save it, reply to it, find out who's in it, turn it into tasks and events, or chart it, without leaving the app you're in.
 
-[![Download](https://img.shields.io/badge/download-v0.1.0-0d0d0d?style=flat-square)](../../releases/latest)
+[![Download](https://img.shields.io/badge/download-v0.1.1-0d0d0d?style=flat-square)](../../releases/latest)
 ![Windows 11](https://img.shields.io/badge/Windows%2011-x64-0078D4?style=flat-square&logo=windows11&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-44-47848F?style=flat-square&logo=electron&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?style=flat-square&logo=typescript&logoColor=white)
