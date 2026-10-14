@@ -4,15 +4,21 @@
 //   node scripts/release.mjs check   <version>   is it a valid next version, and is the repo ready?
 //   node scripts/release.mjs bump    <version>   writes it into every package.json
 //   node scripts/release.mjs notes   <version>   commit subjects since the last release, to draft notes from
-//   node scripts/release.mjs verify  <version>   are the installer, .blockmap, and latest.yml built for it?
+//   node scripts/release.mjs tag     <version>   pushes the tag v<version>; GitHub Actions builds it into a draft release
+//   node scripts/release.mjs status  <version>   is the draft built, and with which files?
+//   node scripts/release.mjs download <version> <dir>   the draft's installer, for the smoke test
+//   node scripts/release.mjs verify  <version>   are the installer, .blockmap, and latest.yml built for it? (CI runs this)
 //   node scripts/release.mjs publish <version> --notes <file> --yes
-//                                                 creates and publishes the GitHub release (only after Rayan's go)
+//                                                 adds the notes to the draft and publishes it (only after Rayan's go)
+//
+// Releases are built by .github/workflows/release.yml on GitHub's Windows machines, not on this PC
+// (decision 73), so every release is built from the tagged commit in a clean checkout.
 //
 // Versions are semver ("0.1.1", "1.0.0", "2.3.0-beta.1"); a leading v is dropped ("v0.1.1" is 0.1.1), and the tag is v<version>.
 // A version with a "-" part is published as a prerelease, which installed copies don't update to.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -144,20 +150,64 @@ function verify(v) {
   ok(`built: Glossly-Setup-${v}.exe (${mb.toFixed(0)} MB), its .blockmap, latest.yml, and the update feed`);
 }
 
+/** Pushes the tag for a bumped, pushed version; the release workflow builds from it. */
+function tag(v) {
+  if (currentVersion() !== v) fail(`packages/shell-electron/package.json says ${currentVersion()}, not ${v}: bump, commit, and push first.`);
+  for (const rel of PACKAGES) if (readJson(rel).version !== v) fail(`${rel} isn't at ${v}.`);
+  if (run('git', ['status', '--porcelain'])) fail('The working tree has changes: commit them first.');
+  run('git', ['fetch', '-q', 'origin', 'main']);
+  if (run('git', ['rev-parse', 'HEAD']) !== run('git', ['rev-parse', 'origin/main'])) fail('HEAD must be origin/main: push (or pull) first, so the tag is on what GitHub has.');
+  if (run('git', ['tag', '--list', `v${v}`])) fail(`The tag v${v} already exists locally.`);
+  run('git', ['tag', '-a', `v${v}`, '-m', `Glossly ${v}`]);
+  run('git', ['push', 'origin', `v${v}`]);
+  ok(`pushed v${v}; GitHub Actions is building it (\`gh run watch\`, or \`node scripts/release.mjs status ${v}\`)`);
+}
+
+/** The release for v<version> as GitHub has it, or null. */
+function release(v) {
+  const r = tryRun('gh', ['release', 'view', `v${v}`, '--json', 'isDraft,isPrerelease,assets,url']);
+  return r.ok ? JSON.parse(r.out) : null;
+}
+
+function requireDraft(v) {
+  const r = release(v);
+  if (!r) fail(`No release for v${v} yet: the workflow may still be building (\`gh run list --workflow release.yml\`).`);
+  const names = r.assets.map((a) => a.name);
+  const want = files(v).map((f) => basename(f));
+  const missing = want.filter((n) => !names.includes(n));
+  if (missing.length) fail(`The release lacks ${missing.join(', ')}.`);
+  const exe = r.assets.find((a) => a.name === want[0]);
+  if (exe.size < 50e6) fail(`The installer is only ${(exe.size / 1e6).toFixed(0)} MB; the build looks incomplete.`);
+  return r;
+}
+
+function status(v) {
+  const r = requireDraft(v);
+  ok(`v${v} is ${r.isDraft ? 'a draft' : 'published'}${r.isPrerelease ? ' (prerelease)' : ''} with ${r.assets.map((a) => a.name).join(', ')}`);
+}
+
+function download(v, args) {
+  const dir = args[0];
+  if (!dir) fail('Give a folder to download the installer into.');
+  requireDraft(v);
+  run('gh', ['release', 'download', `v${v}`, '--pattern', `Glossly-Setup-${v}.exe`, '--dir', dir, '--clobber']);
+  ok(`downloaded ${join(dir, `Glossly-Setup-${v}.exe`)}`);
+}
+
 function publish(v, args) {
   const i = args.indexOf('--notes');
   const notesFile = i >= 0 ? args[i + 1] : null;
   if (!notesFile || !existsSync(notesFile)) fail('Pass --notes <file> with the release notes.');
   if (!args.includes('--yes')) fail('Publishing is outward-facing: pass --yes only after Rayan said to publish this version.');
-  verify(v);
-  if (run('git', ['rev-list', '--count', 'origin/main..HEAD']) !== '0') fail('Push main first: the tag is created on origin/main.');
-  const pre = parse(v).pre.length ? ['--prerelease'] : [];
-  const url = run('gh', ['release', 'create', `v${v}`, ...files(v), '--target', 'main', '--title', `Glossly ${v}`, '--notes-file', notesFile, ...pre]);
-  ok(`published ${url}`);
+  const r = requireDraft(v);
+  if (!r.isDraft) fail(`v${v} is already published; a published release is final (ship the next version instead).`);
+  const latest = parse(v).pre.length ? [] : ['--latest'];
+  run('gh', ['release', 'edit', `v${v}`, '--notes-file', notesFile, '--draft=false', ...latest]);
+  ok(`published ${release(v)?.url ?? `v${v}`}`);
 }
 
 const [cmd, version, ...rest] = process.argv.slice(2);
-const steps = { check, bump, notes, verify, publish };
+const steps = { check, bump, notes, tag, status, download, verify, publish };
 if (!steps[cmd]) fail(`Usage: node scripts/release.mjs <${Object.keys(steps).join('|')}> <version>`);
 const v = requireVersion(version);
 steps[cmd](v, rest);
