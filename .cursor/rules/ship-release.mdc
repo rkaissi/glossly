@@ -4,4 +4,4 @@ globs:
 alwaysApply: false
 ---
 
-Read and follow `.claude/skills/ship-release/SKILL.md` step by step. It is the one procedure for shipping a release in this repo (shared with Claude Code), and `scripts/release.mjs` runs its checks. Never publish without Rayan's explicit go for that version.
+Read and follow `.claude/skills/ship-release/SKILL.md` step by step. It is the one procedure for shipping a release in this repo (shared with Claude Code), and `scripts/release.mjs` runs its checks. In short: check, bump, commit and push, `release.mjs tag` (GitHub Actions builds the installer into a draft release, `.github/workflows/release.yml`), smoke test the draft's installer, draft the notes, then `release.mjs publish` turns the draft into the release. Never publish without Rayan's explicit go for that version.

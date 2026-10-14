@@ -10,7 +10,8 @@ Builds the Windows installer for a new version and publishes it on GitHub Releas
 ## Rules
 
 - **Read `AGENTS.md` and `docs/HANDOFF.md` first.** Their rules apply here, above all: nothing that identifies a real person in release notes, commits, or docs, and never add Rayan's handle, name, or email anywhere new (the repo owner for the update feed is read from the git remote at build time; don't write it into files or notes).
-- **Publishing is outward-facing.** Build and verify freely, but run `publish` only after Rayan approved this version and these notes in chat. A yes for one version isn't a yes for the next.
+- **Publishing is outward-facing.** Checking, bumping, tagging (which starts the GitHub build), and the draft it makes are fine once Rayan asked for the release; the tag is public, but the draft is seen only by people with write access and never by installed copies. Run `publish` only after Rayan approved this version and these notes in chat. A yes for one version isn't a yes for the next.
+- **Releases are built on GitHub, not here** (decision 73). Don't upload a locally built installer to a release; if the workflow fails, fix it and tag again (see the end of this file).
 - **Versions only go up.** Installed copies update only to a higher semver than theirs. A published release is final: never replace its files (`--clobber`) or delete and recreate it, since copies may have downloaded it already. To fix a bad release, ship the next patch version.
 - **A version with a `-` part** (`1.0.0-beta.1`) becomes a GitHub prerelease. Installed copies don't update to prereleases; use them for builds Rayan shares by hand.
 - **Drafts don't count:** the update feed reads published releases only.
