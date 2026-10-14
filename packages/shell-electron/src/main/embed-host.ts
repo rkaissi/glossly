@@ -59,6 +59,8 @@ export class EmbedHost extends EventEmitter<{ status: [EmbedStatus] }> {
     proc.stderr?.on('data', (d: Buffer) => log.warn(`worker stderr: ${d.toString().slice(0, 300)}`));
     proc.on('message', (msg: WorkerResponse) => this.onMessage(msg));
     proc.on('exit', (code) => {
+      // Stopped on purpose: Glossly is quitting and the store is closed (it showed an error box at quit).
+      if (this.proc !== proc) return;
       log.warn('worker exited', { code });
       this.proc = null;
       this.readyEmbedder = null;
@@ -73,9 +75,14 @@ export class EmbedHost extends EventEmitter<{ status: [EmbedStatus] }> {
     this.post({ type: 'init', model: this.model, dims: this.dims, cacheDir: this.cacheDir });
   }
 
+  /** At quit: ends the worker and drops what was waiting on it, without touching the store. */
   stop(): void {
-    this.proc?.kill();
+    const proc = this.proc;
     this.proc = null;
+    this.readyEmbedder = null;
+    for (const p of this.pending.values()) clearTimeout(p.timer);
+    this.pending.clear();
+    proc?.kill();
   }
 
   private post(msg: WorkerRequest): void {
