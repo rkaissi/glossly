@@ -2,7 +2,7 @@
   "name": "@glossly/shell-electron",
   "private": true,
   "productName": "Glossly",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Glossly: highlight text anywhere, act on it.",
   "author": "Glossly",

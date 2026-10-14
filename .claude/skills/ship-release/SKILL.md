@@ -49,6 +49,8 @@ Builds the Windows installer for a new version and publishes it on GitHub Releas
    Start-Process "packages\shell-electron\dist\Glossly-Setup-<version>.exe" -ArgumentList '/S' -Wait
    Start-Process "$env:LOCALAPPDATA\Programs\glossly\Glossly.exe" -ArgumentList "--data-dir=$env:TEMP\glossly-release-test"
    ```
+   Never start `dist\win-unpacked\Glossly.exe` on this machine: Electron points the Start Menu `Glossly.lnk` at whichever `Glossly.exe` runs, and the next update relaunches that build folder (decision 72). If it happened, point the shortcut back at `%LOCALAPPDATA%\Programs\glossly\Glossly.exe`.
+
    After about 10 s, `%TEMP%\glossly-release-test\logs\main.log` should show `starting {"version":"<version>"...}`, `helper ready`, and no ERROR lines. Then stop `Glossly.exe` and `glossly-helper.exe` and delete the throwaway folder. This replaces the copy installed on this machine, which is fine: it's the release. Anything that needs clicks (setup, the pill, Ask, Save) goes through a subagent (AGENTS.md; `docs/testing.md`, "Installed app"). Stop the test instance as soon as you're done: Rayan may be using the machine.
 
 8. **Commit and push the bump:** `git commit -am "Release v<version>"` (with the attribution line from the session) and `git push`. The tag is created on `origin/main`, so main must hold the bump first.

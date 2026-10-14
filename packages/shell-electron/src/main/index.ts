@@ -157,7 +157,9 @@ async function main(): Promise<void> {
  */
 let loginItem: boolean | null = null;
 function syncLoginItem(on: boolean): void {
-  if (!app.isPackaged || process.platform !== 'win32' || on === loginItem) return;
+  // A test profile (`--data-dir`) leaves it alone: a test run of a build outside the install
+  // folder would point the user's real entry at that build.
+  if (!app.isPackaged || dataDir || process.platform !== 'win32' || on === loginItem) return;
   loginItem = on;
   app.setLoginItemSettings({ openAtLogin: on, path: process.execPath, args: [LOGIN_ARG], name: 'Glossly' });
   log.info('login item', { on });
