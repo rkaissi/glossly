@@ -1,4 +1,4 @@
-// Visualize's chart step as it was before Step 16.13 (commit 567937f): the model writes a whole
+// Visualize's chart step as it was before Step 16.13 (commit 4fec2c6): the model writes a whole
 // Vega-Lite spec as a JSON string, and code checks it. Kept only so evals/visualize-compare.eval.ts
 // can compare it with the structured chart pick. Not used by the app.
 import { readFileSync } from 'node:fs';
