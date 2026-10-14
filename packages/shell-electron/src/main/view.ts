@@ -140,6 +140,14 @@ export function fitOnScreen(cur: Rect, w: number, h: number, area: Rect, above: 
 }
 
 /**
+ * The same size anchored where `from` was placed, before the screen clamp moved it. Kept as the
+ * placement, so a window pushed up by a tall picker comes back when the picker closes.
+ */
+export function anchoredTo(from: Rect, fitted: Rect, above: boolean): Rect {
+  return { x: from.x, y: above ? from.y + from.h - fitted.h : from.y, w: fitted.w, h: fitted.h };
+}
+
+/**
  * Grows the window from `from` to `size`, keeping its left edge and the edge next to the
  * selection fixed, so the buttons already on screen stay where they are. Placement picked
  * the left edge with room for the widest bar (overlay.ts MAX_W), so the clamp only shifts

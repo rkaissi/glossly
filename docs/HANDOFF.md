@@ -42,8 +42,8 @@ Glossly is a Windows tray app: highlight text anywhere and a small pill offers a
 
 ## Next steps, in order
 
-1. **Ship the quit fix** as v0.1.2 (`ship-release`) when Rayan says so; the update from 0.1.1 will still show the error box once, since the old code runs that quit. Afterwards check a quit from the tray shows nothing and the `Glossly` Run value points at the installed exe with `--background`, and a sign-in start shows no window. If an error box comes back, look for `error while quitting` in `main.log`.
-2. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the social preview uploaded on GitHub (Settings > General > Social preview), the live-check backlog in `docs/testing.md`, the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
+1. **Ship v0.1.2** (`ship-release`) when Rayan says so: the quit fix, plus two fixes from the Oct 14 live-check pass (the overlay panel returning to its place after a picker; the stale "hotkey is taken" notice). Recheck the picker fix in the released build (`docs/testing.md`, the two "(Oct 14 pass)" items still open). The update from 0.1.1 will still show the error box once, since the old code runs that quit. Afterwards check a quit from the tray shows nothing and the `Glossly` Run value points at the installed exe with `--background`, and a sign-in start shows no window. If an error box comes back, look for `error while quitting` in `main.log`.
+2. **Before the public launch (Rayan's plan: a few weeks of updates, then one launch day on Reddit and elsewhere, as 1.0.0):** a license (none yet; open-source communities expect one), the rest of the live-check backlog in `docs/testing.md` (the Oct 14 pass did the settings and overlay checks; the content, privacy, and Ollama ones are left), the real chat and mail apps, and `evals/capture.md`. Ship each improvement with the `ship-release` skill.
 3. **Later, from the roadmap in the README:** a code-signed installer, Google Calendar sync (parked below), macOS.
 
 The build history (Steps 1 to 23, with commits) is in `docs/history.md`; the reasons behind each choice are in `docs/decisions.md`.
@@ -109,7 +109,7 @@ Everything else he was asked is answered and recorded in `docs/decisions.md`.
 
 **Local models (Step 18)**
 - `@ai-sdk/openai-compatible` 3.0.67 with `supportsStructuredOutputs: true`: Ollama and LM Studio both take `response_format: json_schema` (LM Studio rejects `json_object`). Local models get `tools: false`, so Ask's remember tool is not offered on them.
-- Neither Ollama nor LM Studio is known to be installed here; the Step 21 pass needs one with a small model pulled (for example `ollama pull qwen3:4b`).
+- Ollama 0.40.3 is installed here (Oct 14) with `qwen3:0.6b` only: `qwen3:4b` (2.5 GB) didn't fit on the nearly full disk. It starts with Windows and serves on `127.0.0.1:11434`.
 
 **Known platform limits**
 - WinForms (.NET Framework) text boxes expose no TextPattern; those apps need the hotkey's copy fallback. WPF counts `\r\n` as one character (handled).
@@ -157,7 +157,6 @@ pnpm eval                # only when Rayan asks
 
 ## Things Rayan has to do himself
 
-- Upload `docs/media/social-preview.png` in the repo's Settings > General > Social preview (the API can't).
 - Delete `%USERPROFILE%\glossly-history-backup-2026-10-13.bundle` once he's happy with the history rewrite (it still holds the old names); re-clone or reset any other copy of the repo to the new `main`.
 - Before the public launch: choose a license.
 - Hand-test capture across the apps in `evals/capture.md`, and try Reply, Who, and Tasks in the real Discord, Slack, Gmail, and Outlook (including a whole quoted email chain), and a real trackpad (decision 56).

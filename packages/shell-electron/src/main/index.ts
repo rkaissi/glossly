@@ -94,6 +94,7 @@ async function main(): Promise<void> {
   else {
     helper.start();
     if (!hotkey.register(services.settings.hotkey)) {
+      // ipc.ts clears it when a new hotkey works, by this opening.
       services.setSetting('pendingNotice', `The hotkey ${services.settings.hotkey} is taken by another app. Pick another in Settings.`);
     }
     syncSaveHotkey();

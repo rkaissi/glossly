@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { ExpiringLru, Lru, replyCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
+import { anchoredTo, ExpiringLru, Lru, replyCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -133,6 +133,15 @@ describe('fitOnScreen', () => {
 
   it('keeps the bottom edge when the bar sits above the selection', () => {
     expect(fitOnScreen({ x: 100, y: 500, w: 200, h: 40 }, 400, 200, area, true, limits)).toEqual({ x: 100, y: 340, w: 400, h: 200 });
+  });
+
+  it('comes back to its place after the screen pushed it up for a tall picker', () => {
+    const placed = { x: 100, y: 300, w: 400, h: 500 };
+    const grown = fitOnScreen(placed, 400, 640, area, false, limits);
+    expect(grown.y).toBeLessThan(300);
+    const anchor = anchoredTo(placed, grown, false);
+    expect(anchor).toEqual({ x: 100, y: 300, w: 400, h: 640 });
+    expect(fitOnScreen(anchor, 400, 500, area, false, limits)).toEqual(placed);
   });
 });
 

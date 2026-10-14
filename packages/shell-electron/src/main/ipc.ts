@@ -490,6 +490,8 @@ export function registerIpc(deps: IpcDeps): void {
       }
       const err = hotkey.change(value);
       if (err) return { settings: services.settings, error: err };
+      // The start's "is taken" notice is stale once a hotkey works.
+      if (services.settings.pendingNotice?.startsWith('The hotkey ')) services.setSetting('pendingNotice', null);
     }
     if (key === 'saveHotkey' && services.settings.saveMode === 'hotkey') {
       const err = saveHotkey.change(str(a.value, 100), services.settings.hotkey);

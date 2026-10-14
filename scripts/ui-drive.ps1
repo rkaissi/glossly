@@ -8,7 +8,8 @@
 # key tips; send `key Esc` and click into the text before `selectall`.
 #   scripts/ui-drive.ps1 focus notepad      bring a process's window to the front
 #   scripts/ui-drive.ps1 focustitle Glossly bring a window to the front by exact title (Electron windows)
-#   scripts/ui-drive.ps1 selectall | hotkey (Ctrl+Alt+Space)
+#   scripts/ui-drive.ps1 selectall | hotkey (Ctrl+Alt+Space) | hotkey shift (Ctrl+Alt+Shift+Space, for a
+#                                           test profile when another app holds Ctrl+Alt+Space)
 #   scripts/ui-drive.ps1 key Enter|Tab|Esc|Left|Right|Up|Down|<digit or letter>
 #   scripts/ui-drive.ps1 type "text"        SendKeys syntax
 #   scripts/ui-drive.ps1 drag "x1,y1,x2,y2" | move "x,y" | click "x,y"
@@ -80,7 +81,7 @@ switch ($cmd) {
     $W::SetForegroundWindow($h) | Out-Null
   }
   'selectall' { Chord @(0x11) 0x41 }
-  'hotkey' { Chord @(0x11, 0x12) 0x20 }
+  'hotkey' { Chord $(if ($arg -eq 'shift') { @(0x11, 0x12, 0x10) } else { @(0x11, 0x12) }) 0x20 }
   'key' {
     $map = @{ Enter = 0x0D; Tab = 0x09; Esc = 0x1B; Right = 0x27; Left = 0x25; Up = 0x26; Down = 0x28 }
     Tap $(if ($map.ContainsKey($arg)) { $map[$arg] } else { [byte][char]$arg.ToUpper() })

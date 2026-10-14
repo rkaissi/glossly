@@ -3,7 +3,7 @@ import { BrowserWindow, screen } from 'electron';
 import type { OverlayMode, OverlayState, Placement, Rect, Size } from '@glossly/core';
 import { logger } from './log';
 import { hasWindowMaterial, preloadPath, rendererUrl } from './paths';
-import { fitOnScreen, hwndFromBuffer, sourceRoom } from './view';
+import { anchoredTo, fitOnScreen, hwndFromBuffer, sourceRoom } from './view';
 
 const log = logger('overlay');
 
@@ -285,16 +285,18 @@ export class Overlay extends EventEmitter<{ blur: [] }> {
     const cur = this.bounds();
     const display = screen.getDisplayMatching({ x: cur.x, y: cur.y, width: cur.w, height: cur.h }).workArea;
     const above = s.placement?.side === 'above';
+    // Grow from where the window was placed, not where the screen edge last pushed it.
+    const from = s.placement?.rect ?? cur;
     // A panel stays inside the window the text came from when that leaves it enough room; the
     // renderer then scrolls the panel inside this height instead of covering what is below.
-    const room = s.mode === 'panel' ? sourceRoom(cur, above ? 'above' : 'below', this.sourceBounds(), MIN_SOURCE_ROOM) : null;
+    const room = s.mode === 'panel' ? sourceRoom(from, above ? 'above' : 'below', this.sourceBounds(), MIN_SOURCE_ROOM) : null;
     if (room !== s.panelMaxH) {
       this.patch({ panelMaxH: room });
       return;
     }
-    const rect = fitOnScreen(cur, w, h, { x: display.x, y: display.y, w: display.width, h: display.height }, above, room ? { ...LIMITS, maxH: Math.min(LIMITS.maxH, room) } : LIMITS);
+    const rect = fitOnScreen(from, w, h, { x: display.x, y: display.y, w: display.width, h: display.height }, above, room ? { ...LIMITS, maxH: Math.min(LIMITS.maxH, room) } : LIMITS);
     if (rect.w === cur.w && rect.h === cur.h && rect.x === cur.x && rect.y === cur.y) return;
-    const placement: Placement | null = s.placement ? { ...s.placement, rect } : null;
+    const placement: Placement | null = s.placement ? { ...s.placement, rect: anchoredTo(from, rect, above) } : null;
     this.state = { ...s, placement };
     this.win.setBounds({ x: rect.x, y: rect.y, width: rect.w, height: rect.h });
   }

@@ -52,6 +52,7 @@ One line per step, so "Step N" in code comments, commits, and `STATUS.md` can be
 | 20.3e | Oct 11 | `1021627` | Rayan's review fixes: Reply and Who on chat messages, calmer page motion, popover exits, inline confirms without the outline, quick add's date mark and clearing, week view alignment, taskbar icon (decision 45). |
 | 20.3f | Oct 11 | `9db68a0` | Event delete morphs in place; the pill becomes the bar without Ask and Save replaying (decision 46). |
 | 20.3g | Oct 11 | `3f19bd0` | Reply answers only the other person: shared header parser (Discord server tags), selection trimmed to their messages, the user's headers marked, stricter prompt (decision 47). |
+| — | Oct 14 | (this commit) | Live-check pass on the backlog (settings and overlay checks); fixed the overlay panel staying moved after a picker (`anchoredTo`) and the stale "hotkey is taken" notice; `ui-drive.ps1 hotkey shift`. |
 | — | Oct 14 | `c58601a` | The quit error in v0.1.1 ("database is not open"): the embeddings worker's exit is ignored once Glossly stops it. |
 | — | Oct 14 | `2e72567` | The first real update (0.1.0 to 0.1.1) checked on Rayan's copy; errors while quitting are logged instead of shown; a stale dev `Electron.lnk` and a Start Menu shortcut into the build folder fixed by hand. |
 | — | Oct 14 | `8256fda` | HANDOFF condensed after v0.1.1: a short current state, the real next steps, current to-dos; the finished Step 19 to 23 plans dropped (they live in `decisions.md`, this file, and git history). |
