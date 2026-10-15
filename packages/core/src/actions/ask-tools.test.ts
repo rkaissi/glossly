@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '../settings';
 import type { SelectionPayload } from '../types';
 import { buildAskPrompt } from './ask';
-import { askTools, eventDraft, eventDraftLabel, taskDraft, taskDraftLabel, withAboutMe, type AskToolDeps, type ToolOutcome } from './ask-tools';
+import { askTools, eventDraft, eventDraftLabel, noteWithLine, taskDraft, taskDraftLabel, withAboutMe, type AskToolDeps, type ToolOutcome } from './ask-tools';
 
 // Wednesday, Oct 14 2026, 10 am.
 const NOW = new Date(2026, 9, 14, 10);
@@ -66,7 +66,7 @@ describe('askTools', () => {
     expect(await run(tools.update_person, { name: 'Casey Lin', add_to_note: 'Works at Acme', relationship: 'friend', asked: true })).toEqual({
       say: 'Updated Casey Lin: "Works at Acme", relationship: friend',
     });
-    expect(calls[0]!.arg).toEqual({ personId: 'p2', name: 'Casey Lin', addNote: 'Works at Acme', relationship: 'friend' });
+    expect(calls[0]!.arg).toEqual({ personId: 'p2', name: 'Casey Lin', addNote: 'Works at Acme', replaces: null, relationship: 'friend' });
     expect(await run(tools.update_person, { name: 'Riley Brooks', add_to_note: 'Finance', relationship: null, asked: true })).toEqual({
       say: "Riley Brooks isn't in your people yet, so nothing was changed.",
     });
@@ -80,6 +80,18 @@ describe('askTools', () => {
     expect(await run(tools.add_event, { title: 'Party', when: 'someday', end: null, location: null, attendees: [], asked: true })).toEqual({
       say: "I couldn't tell which day that is, so nothing was added.",
     });
+  });
+});
+
+describe('noteWithLine', () => {
+  it('swaps the line the model says it replaces, skips one already there, else adds', () => {
+    const note = 'College friend.\nCasey Lin is vegetarian';
+    expect(noteWithLine(note, 'Casey Lin is vegan now', 'Casey Lin is vegetarian.')).toBe('College friend.\nCasey Lin is vegan now');
+    expect(noteWithLine(note, 'casey lin is VEGETARIAN.')).toBe(note);
+    expect(noteWithLine(note, 'Plays in a Sunday league')).toBe(`${note}\nPlays in a Sunday league`);
+    // A "replaces" that isn't in the note adds instead of guessing.
+    expect(noteWithLine(note, 'Casey Lin is vegan now', 'Casey eats meat')).toBe(`${note}\nCasey Lin is vegan now`);
+    expect(noteWithLine(null, 'Works at Acme')).toBe('Works at Acme');
   });
 });
 

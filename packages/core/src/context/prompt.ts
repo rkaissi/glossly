@@ -6,7 +6,7 @@ import type { ContextEvent, ContextPerson, ContextTask, RetrievedContext } from 
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
-const MAX_PERSON_NOTE = 200;
+const MAX_PERSON_NOTE = 400;
 const MAX_LINE = 200;
 
 type Format = { format: (d: Date) => string };
@@ -87,7 +87,9 @@ export function nowLine(now: Date): string {
 }
 
 function personLine(p: ContextPerson): string {
-  const about = [p.relationship, p.note ? clip(oneLine(p.note), MAX_PERSON_NOTE) : null].filter(Boolean).join('; ');
+  // Note lines stay apart (" / "), so Ask's update_person can name the one a new line replaces.
+  const note = p.note ? p.note.split('\n').map(oneLine).filter(Boolean).join(' / ') : '';
+  const about = [p.relationship, note ? clip(note, MAX_PERSON_NOTE) : null].filter(Boolean).join('; ');
   return `- ${p.name}${about ? `: ${about}` : ''}`;
 }
 

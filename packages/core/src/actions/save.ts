@@ -166,7 +166,8 @@ export class SaveService {
     const { store } = this.deps;
     const close = await this.closeMemory(input.text).catch(() => null);
     if (close) {
-      if (!this.reworded.has(close.id)) this.reworded.set(close.id, close.text);
+      // Undo takes back this rewording only: the wording just before it (a live check found the oldest coming back).
+      this.reworded.set(close.id, close.text);
       store.updateItemText(close.id, input.text);
       const undoUntil = this.now() + this.deps.settings().save.undoSeconds * 1000;
       this.undoDeadlines.set(close.id, undoUntil);

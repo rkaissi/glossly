@@ -39,7 +39,7 @@ Streams an answer on the Chat role (`actions/ask.ts`, `prompts/ask.md`). The pro
 
 Answers are tidied for display: no-break and narrow spaces become plain spaces, and "a.m.." loses its extra stop (decision 44).
 
-Status: live (first token about 0.7 s, remember and Undo, Local only). Not live: `Ctrl+C`, surroundings with nothing selected, the text tidying, and all of the saved data (unit tests and the local context eval only; in the live-check backlog).
+Status: live (first token about 0.7 s, remember and Undo, Local only). Saved data, memories, Ask's tools, and duplicate checks were live-checked on a throwaway profile (Oct 15, Step 25.8; `docs/testing.md`). Not live: `Ctrl+C`, surroundings with nothing selected, the text tidying.
 
 ## Save and save modes
 

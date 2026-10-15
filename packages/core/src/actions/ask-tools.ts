@@ -39,6 +39,8 @@ export interface PersonEdit {
   name: string;
   /** A line to add to their note. */
   addNote: string | null;
+  /** The line of their note that `addNote` makes out of date, as the model copied it; null to add. */
+  replaces: string | null;
   relationship: Relationship | null;
 }
 
@@ -133,7 +135,11 @@ export function askTools(deps: AskToolDeps) {
         'Add to what the person knows about someone already in their saved people (by full name): a line for their note (their role, where they work, how they know them), or their relationship. Never for someone not saved.',
       inputSchema: z.object({
         name: z.string().describe('The saved person\'s full name.'),
-        add_to_note: z.string().nullable().describe('One short line to add to their note, or null.'),
+        add_to_note: z.string().nullable().describe('One short, self-contained line for their note, naming them ("Casey Lin is vegan"), or null.'),
+        replaces: z
+          .string()
+          .nullable()
+          .describe('When the new line changes something their note already says, that old line copied exactly as shown (note lines are separated by " / "); else null.'),
         relationship: z.enum(RELATIONSHIPS).nullable().describe('Their relationship to the person asking, when it is clear, or null.'),
         asked: z.boolean().describe('True when they asked you to.'),
       }),
@@ -143,7 +149,8 @@ export function askTools(deps: AskToolDeps) {
         const addNote = clean(input.add_to_note, 300) || null;
         if (!addNote && !input.relationship) return { say: input.asked ? 'There was nothing to change.' : '' };
         const what = [addNote && `"${addNote}"`, input.relationship && `relationship: ${input.relationship}`].filter(Boolean).join(', ');
-        const o = await deps.editPerson({ personId: p.id, name: p.name, addNote, relationship: input.relationship }, input.asked, `${p.name}: ${what}`);
+        const replaces = clean(input.replaces, 300) || null;
+        const o = await deps.editPerson({ personId: p.id, name: p.name, addNote, replaces, relationship: input.relationship }, input.asked, `${p.name}: ${what}`);
         return said(input.asked, o, (l) => `Updated ${l}`);
       },
     }),
@@ -162,6 +169,23 @@ export function askTools(deps: AskToolDeps) {
       },
     }),
   };
+}
+
+/**
+ * A person's note with a new line from `update_person` (decision 78): it takes the place of the
+ * line the model said it replaces (`replaces`, copied from the note: "Casey Lin is vegan now"
+ * for "Casey Lin is vegetarian"), is dropped when it's already there word for word, and is
+ * added at the end otherwise. Meaning can't pick the line: on the local model short note lines
+ * about one person score alike whether or not they're about the same thing (25.8 live check).
+ */
+export function noteWithLine(note: string | null, line: string, replaces: string | null = null): string {
+  const lines = (note ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const key = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  if (lines.some((l) => key(l) === key(line))) return lines.join('\n');
+  const at = replaces ? lines.findIndex((l) => key(l) === key(replaces)) : -1;
+  if (at >= 0) lines[at] = line;
+  else lines.push(line);
+  return lines.join('\n');
 }
 
 /** Adds a fact to the user's list unless it's already there (same words); null when it is. */

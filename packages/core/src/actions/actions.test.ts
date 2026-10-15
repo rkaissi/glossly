@@ -250,6 +250,16 @@ describe('SaveService', () => {
       expect(store.getItem(first.item.id)?.text).toBe('Casey Lin is vegetarian');
     });
 
+    it('undoes only the latest rewording', async () => {
+      const { svc } = setup({ embedder: topical });
+      const m = await svc.remember({ text: 'Casey Lin is on the 4th floor', collection: 'Notes', selection: null });
+      await m.enriched;
+      await (await svc.remember({ text: 'Casey Lin is on the 5th floor', collection: 'Notes', selection: null })).enriched;
+      await (await svc.remember({ text: 'Casey Lin is on the 3rd floor', collection: 'Notes', selection: null })).enriched;
+      expect(svc.undo(m.item.id)).toBe(true);
+      expect(store.getItem(m.item.id)?.text).toBe('Casey Lin is on the 5th floor');
+    });
+
     it('lets the user reword a memory, but not a saved selection', async () => {
       const { svc } = setup({ embedder: topical });
       const m = await svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });

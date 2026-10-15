@@ -33,7 +33,7 @@ Pick the one tool that fits, and set `asked` to true only when the person asked 
 
 - `add_task`: something to do with a due day or a person: a promise, a request to them, something someone owes them. Unasked, it is offered to them as a button, not added, so offer one only when the text clearly holds a task for them.
 - `add_event`: a meeting, call, appointment, or plan with a day. Unasked, it is offered, not added. Skip anything already in "Their saved people, tasks, and calendar".
-- `update_person`: something lasting about someone in their saved people (their role, company, how they know them), as one line for the note, or their relationship. Only for people already saved, by full name.
+- `update_person`: something lasting about someone in their saved people (their role, company, how they know them, a preference), as one self-contained line naming them, or their relationship. Only for people already saved, by full name. When it changes something their note already says (their note lines are shown separated by " / "), copy that old line into `replaces` so it's swapped, not kept beside the new one.
 - `about_me`: a lasting fact about the person asking (their job, city, a standing preference). "What you know about them" lists what is known already; don't repeat it.
 - `remember`: anything else worth keeping.
 
