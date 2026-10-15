@@ -154,6 +154,25 @@ export const SettingsSchema = z.object({
     })
     .prefault({}),
 
+  /** What Ask and Reply get from the user's saved data (decision 77). */
+  context: z
+    .object({
+      /**
+       * Cosine similarity a person, task, or event needs to count as close in meaning (evals/context.eval.ts,
+       * Oct 14: expected tasks scored 0.45 and up, wrong ones that pass the date filters 0.39 at most; expected
+       * events 0.455 and up, wrong ones 0.44, so events keep a tight margin).
+       */
+      personSimilarity: z.number().min(0).max(1).default(0.45),
+      taskSimilarity: z.number().min(0).max(1).default(0.42),
+      eventSimilarity: z.number().min(0).max(1).default(0.45),
+      /** At most this many of each in one prompt. */
+      maxNotes: z.number().int().min(0).max(10).default(3),
+      maxPeople: z.number().int().min(0).max(10).default(3),
+      maxTasks: z.number().int().min(0).max(20).default(6),
+      maxEvents: z.number().int().min(0).max(20).default(6),
+    })
+    .prefault({}),
+
   paste: z
     .object({
       /** How many recent snippets the paste actions use, and how far back they look. */

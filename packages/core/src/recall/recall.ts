@@ -60,10 +60,10 @@ function toHit(item: Item & { collection: string | null }, reason: RecallReason,
   };
 }
 
-async function nearest(deps: RecallDeps, text: string, k: number, min: number): Promise<{ item_id: string; similarity: number }[] | null> {
+async function nearest(deps: RecallDeps, text: string, k: number, min: number, vector?: Float32Array): Promise<{ item_id: string; similarity: number }[] | null> {
   const embedder = deps.embedder();
   if (!embedder || !deps.store.hasVectors) return null;
-  const [v] = await embedder.embed([text.slice(0, MAX_QUERY_CHARS)]);
+  const [v] = vector ? [vector] : await embedder.embed([text.slice(0, MAX_QUERY_CHARS)]);
   if (!v) return null;
   return deps.store.searchVectors(v, k).filter((r) => r.similarity >= min);
 }
@@ -73,7 +73,7 @@ async function nearest(deps: RecallDeps, text: string, k: number, min: number): 
  * company, product, or place with it, then items similar in meaning above `minSimilarity`.
  * An item with the same text as the selection (it was saved from here) is left out.
  */
-export async function recall(deps: RecallDeps, input: { text: string; personIds?: string[] }): Promise<RecallHit[]> {
+export async function recall(deps: RecallDeps, input: { text: string; personIds?: string[]; vector?: Float32Array }): Promise<RecallHit[]> {
   const { store } = deps;
   const settings = deps.settings().recall;
   const max = settings.maxResults;
@@ -99,7 +99,7 @@ export async function recall(deps: RecallDeps, input: { text: string; personIds?
   }
   const entityIds = [...picked.entries()].sort((a, b) => a[1].rank - b[1].rank).map(([id]) => id);
 
-  const similar = (await nearest(deps, input.text, max * 3, settings.minSimilarity)) ?? [];
+  const similar = (await nearest(deps, input.text, max * 3, settings.minSimilarity, input.vector)) ?? [];
   for (const r of similar) {
     if (!picked.has(r.item_id)) picked.set(r.item_id, { reason: 'similar_topic', term: null, similarity: r.similarity, rank: KIND_ORDER.length });
   }

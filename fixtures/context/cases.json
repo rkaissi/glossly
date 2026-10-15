@@ -1,0 +1,60 @@
+{
+  "$comment": "Context cases for evals/context.eval.ts (decision 77). Fictional people, tasks, events, and saved notes, and conversations with what Ask or Reply should get from them. Today is Wednesday, Oct 14 2026, 10 am. Times are local. given: people already resolved (the message's author). expect: must come back; ok: may also come back; anything else of that kind is a false hit. Kinds: people, tasks, events, notes.",
+  "now": "2026-10-14T10:00",
+  "people": [
+    { "id": "p_jordan", "name": "Jordan Hale", "relationship": "colleague", "note": "Design lead at Acme; runs the Q4 offsite planning." },
+    { "id": "p_casey", "name": "Casey Lin", "relationship": "friend", "note": "College friend; plays in a Sunday soccer league." },
+    { "id": "p_maya", "name": "Maya Chen", "relationship": "professional", "note": "My dentist at Brightsmile Dental." },
+    { "id": "p_alex", "name": "Alex Morgan", "relationship": "professional", "note": "Recruiter at Northwind, hiring for a product designer role." },
+    { "id": "p_sam", "name": "Sam Patel", "relationship": "family", "note": "My brother; lives in Toronto." },
+    { "id": "p_riley", "name": "Riley Brooks", "relationship": "colleague", "note": "Finance team; handles expense reports and reimbursements." }
+  ],
+  "tasks": [
+    { "id": "t1", "owner": "me", "person": "p_jordan", "text": "Send the offsite venue shortlist", "due": "2026-10-16" },
+    { "id": "t2", "owner": "them", "person": "p_jordan", "text": "Share the Q4 budget numbers" },
+    { "id": "t3", "owner": "me", "text": "Practice answers for the Northwind interview", "due": "2026-10-19" },
+    { "id": "t4", "owner": "me", "text": "Renew passport", "due": "2026-10-30" },
+    { "id": "t5", "owner": "me", "person": "p_riley", "text": "Submit the September expense report" },
+    { "id": "t6", "owner": "me", "person": "p_casey", "text": "Pay Casey back for the concert tickets" },
+    { "id": "t7", "owner": "me", "text": "Book a dentist cleaning", "done": "2026-10-12T16:00" },
+    { "id": "t8", "owner": "me", "person": "p_sam", "text": "Call Sam about Mom's birthday dinner", "due": "2026-10-17" },
+    { "id": "t9", "owner": "me", "text": "Print the old tax forms", "done": "2026-09-20T12:00" }
+  ],
+  "events": [
+    { "id": "e1", "title": "Meeting with Casey", "start": "2026-10-15T13:00", "end": "2026-10-15T17:00", "attendees": ["Casey Lin"] },
+    { "id": "e2", "title": "Interview with Northwind", "start": "2026-10-20T11:00", "end": "2026-10-20T12:00", "attendees": ["Alex Morgan"] },
+    { "id": "e3", "title": "Dentist cleaning", "start": "2026-10-22T09:00", "location": "Brightsmile Dental", "attendees": ["Maya Chen"] },
+    { "id": "e4", "title": "Q4 offsite planning", "start": "2026-10-16T10:00", "end": "2026-10-16T11:00", "attendees": ["Jordan Hale"] },
+    { "id": "e5", "title": "Soccer game", "start": "2026-10-18T10:00", "attendees": ["Casey Lin"] },
+    { "id": "e6", "title": "Mom's birthday dinner", "start": "2026-10-24T19:00", "location": "Northwind Cafe", "attendees": ["Sam Patel"] },
+    { "id": "e7", "title": "Flight to Toronto", "start": "2026-11-06T08:00" },
+    { "id": "e8", "title": "Team retro", "start": "2026-09-20T15:00" }
+  ],
+  "notes": [
+    { "id": "n1", "text": "Casey prefers texting over calls and is vegetarian." },
+    { "id": "n2", "text": "Northwind interview: a panel with the design team. Bring two portfolio case studies." },
+    { "id": "n3", "text": "Offsite venue options: Lisbon, Porto, or Madrid." },
+    { "id": "n4", "text": "Brightsmile Dental is on 5th Street, with parking behind the building." },
+    { "id": "n5", "text": "Expense reports are due on the 5th of each month." }
+  ],
+  "cases": [
+    { "id": "c01", "texts": ["are you free Thursday?"], "given": ["p_jordan"], "expect": { "people": ["p_jordan"], "events": ["e1"] }, "ok": { "tasks": ["t1", "t2"], "events": ["e4"] } },
+    { "id": "c02", "texts": ["When is my interview with Northwind?"], "expect": { "events": ["e2"], "tasks": ["t3"], "notes": ["n2"] }, "ok": { "people": ["p_alex"] } },
+    { "id": "c03", "texts": ["what do I have going on this weekend?"], "expect": { "events": ["e5"], "tasks": ["t8"] }, "ok": {} },
+    { "id": "c04", "texts": ["Did I book the dentist yet?"], "expect": { "tasks": ["t7"], "events": ["e3"] }, "ok": { "people": ["p_maya"], "notes": ["n4"] } },
+    { "id": "c05", "texts": ["Can you send me the venue list before Friday?"], "given": ["p_jordan"], "expect": { "people": ["p_jordan"], "tasks": ["t1"], "events": ["e4"] }, "ok": { "tasks": ["t2"], "notes": ["n3"] } },
+    { "id": "c06", "texts": ["Where are we going for Mom's birthday dinner?"], "expect": { "events": ["e6"], "tasks": ["t8"] }, "ok": { "people": ["p_sam"] } },
+    { "id": "c07", "texts": ["How much do I owe you for the tickets?"], "given": ["p_casey"], "expect": { "people": ["p_casey"], "tasks": ["t6"] }, "ok": { "events": ["e1", "e5"], "notes": ["n1"] } },
+    { "id": "c08", "texts": ["When is my flight to Toronto?"], "expect": { "events": ["e7"] }, "ok": { "people": ["p_sam"] } },
+    { "id": "c09", "texts": ["Reminder: September expenses are due soon"], "expect": { "tasks": ["t5"] }, "ok": { "people": ["p_riley"], "notes": ["n5"] } },
+    { "id": "c10", "texts": ["What should I prepare for the panel?", "Northwind interview prep"], "expect": { "notes": ["n2"] }, "ok": { "tasks": ["t3"], "events": ["e2"], "people": ["p_alex"] } },
+    { "id": "c11", "texts": ["The new logo colors look great"], "expect": {}, "ok": {} },
+    { "id": "c12", "texts": ["lunch sometime next week?"], "given": ["p_casey"], "expect": { "people": ["p_casey"] }, "ok": { "events": ["e1", "e5"], "tasks": ["t6"], "notes": ["n1"] } },
+    { "id": "c13", "texts": ["Is the team retro still on?"], "expect": {}, "ok": {} },
+    { "id": "c14", "texts": ["Can we move our 1pm tomorrow?"], "given": ["p_casey"], "expect": { "people": ["p_casey"], "events": ["e1"] }, "ok": { "tasks": ["t6"], "events": ["e5"], "notes": ["n1"] } },
+    { "id": "c15", "texts": ["what's my passport renewal deadline"], "expect": { "tasks": ["t4"] }, "ok": {} },
+    { "id": "c16", "texts": ["Jordan Hale: did you get a chance to look at the budget?"], "expect": { "people": ["p_jordan"], "tasks": ["t2"] }, "ok": { "tasks": ["t1"], "events": ["e4"], "notes": ["n3"] } },
+    { "id": "c17", "texts": ["Did I already print the tax forms?"], "expect": {}, "ok": {} },
+    { "id": "c18", "texts": ["who's my dentist again?"], "expect": { "people": ["p_maya"] }, "ok": { "events": ["e3"], "tasks": ["t7"], "notes": ["n4"] } }
+  ]
+}
