@@ -53,16 +53,38 @@ export function sameItem(a: BarItem | undefined, b: BarItem): boolean {
   return 'slot' in a ? 'slot' in b && a.slot === b.slot : 'action' in b && a.action === b.action;
 }
 
+/** The slot a number key runs, by its position on the bar (`slotKey`). */
+function slotAt(items: BarItem[], key: string): BarItem | undefined {
+  return /^[1-4]$/.test(key) ? items.filter((i) => 'slot' in i)[Number(key) - 1] : undefined;
+}
+
+/**
+ * Maps a key press in an open panel to a command, or null to let it through to the panel. The
+ * plain number keys type into the panel's box (the empty bar opens on Search, focused), so
+ * Alt+1 to 4 opens another slot from there; Esc back to the bar makes the plain ones work again.
+ * The open panel's own slot does nothing.
+ */
+export function panelKey(k: KeyInput, items: BarItem[], openSlot: 1 | 2 | 3 | 4 | null): BarCommand | null {
+  if (!k.alt || k.ctrl || k.meta) return null;
+  const target = slotAt(items, k.key);
+  return target && !('slot' in target && target.slot === openSlot) ? { kind: 'run', target } : null;
+}
+
 /** Maps a key press in the bar to a command, or null to let it through. */
 export function barKey(k: KeyInput, c: BarKeyContext): BarCommand | null {
-  if (k.ctrl || k.alt || k.meta) return null;
+  if (k.ctrl || k.meta) return null;
+  // Alt+number works on the bar too, the same as in a panel.
+  if (k.alt) {
+    const target = slotAt(c.items, k.key);
+    return target ? { kind: 'run', target } : null;
+  }
   const n = c.items.length;
   switch (k.key) {
     case '1':
     case '2':
     case '3':
     case '4': {
-      const target = c.items.filter((i) => 'slot' in i)[Number(k.key) - 1];
+      const target = slotAt(c.items, k.key);
       return target ? { kind: 'run', target } : null;
     }
     case 'Enter': {

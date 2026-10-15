@@ -752,7 +752,7 @@ export class Capture {
             selection: {
               text: thread.text,
               context_before: thread.before,
-              context_after: '',
+              context_after: thread.after,
               source_app: fg.process_name,
               window_title: fg.title,
               captured_at: isoNow(),

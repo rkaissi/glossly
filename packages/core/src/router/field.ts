@@ -20,10 +20,14 @@ export interface FieldInput {
   window_title: string;
 }
 
-/** The messages a reply box sits under: `text` is what to answer, `before` the thread above it. */
+/**
+ * The messages a reply box sits under: `text` is what to answer, `before` the thread above it,
+ * `after` the older emails a quoted one quotes in turn.
+ */
 export interface FieldThread {
   text: string;
   before: string;
+  after: string;
 }
 
 /** The text before the caret needs this many words to hold a message worth answering. */
@@ -31,6 +35,9 @@ const MIN_WORDS = 8;
 /** About the size of a highlighted message and its tier-1 context (decision 48). */
 const MESSAGE_CHARS = 2500;
 const BEFORE_CHARS = 2000;
+const AFTER_CHARS = 1000;
+/** A quoted email starting this close after the caret is the one the box answers (a typed draft and a signature fit). */
+const QUOTE_NEAR = 600;
 /** The most a model score with nothing in the text or app to back it can be (as decision 51). */
 const UNBACKED = 0.45;
 /** Titles of a reply, a thread, or a comment page ("Re: Lunch", "Reply to Alex", "Inbox (3)"). */
@@ -48,15 +55,34 @@ function lastLines(s: string, n: number): string {
 }
 
 /**
+ * The quoted email right after the caret, cut at the older email it quotes in turn (that one goes
+ * to `after`), so its From: line is the only one and names whoever is being answered.
+ */
+function quotedBelow(after: string, near = QUOTE_NEAR): FieldThread | null {
+  const quote = QUOTE_HEADER.exec(after);
+  if (!quote || quote.index > near) return null;
+  const rest = after.slice(quote.index);
+  // The header block ends at the first blank line; an older quote can only start in the body.
+  const blank = /\n[ \t>]*\n/.exec(rest);
+  const older = blank ? QUOTE_HEADER.exec(rest.slice(blank.index)) : null;
+  const end = Math.min(older && blank ? blank.index + older.index : rest.length, MESSAGE_CHARS);
+  const text = rest.slice(0, end).trim();
+  return countWords(text) >= MIN_WORDS ? { text, before: '', after: rest.slice(end, end + AFTER_CHARS) } : null;
+}
+
+/**
  * The messages around the caret to answer. Most reply boxes sit under the thread (chat composers,
- * Gmail), so it's the text before the caret; Outlook writes above the quoted message, so with
- * little before it, a quoted header after the caret marks the message instead. Null when the
+ * Gmail), so it's the text before the caret. Outlook writes above the quoted message, so a quoted
+ * header just after the caret marks the message instead, whatever page text sits above the box
+ * (Step 24's live check: a toolbar and subject line above the box hid the quote). Null when the
  * caret isn't in a field or nothing around it reads like something to answer.
  */
 export function fieldThread(sur: Surroundings | null): FieldThread | null {
   if (!sur || sur.source !== 'caret') return null;
   const caret = sur.caret >= 0 ? Math.min(sur.caret, sur.text.length) : sur.text.length;
   const before = sur.text.slice(0, caret);
+  const below = quotedBelow(sur.text.slice(caret));
+  if (below) return below;
   if (countWords(before) >= MIN_WORDS) {
     let text = lastLines(before, MESSAGE_CHARS);
     // A chat composer answers the last speaker: their run of messages is the message, and the
@@ -68,13 +94,10 @@ export function fieldThread(sur: Surroundings | null): FieldThread | null {
       const start = text.split('\n').slice(0, hs[i]!.line).reduce((n, l) => n + l.length + 1, 0);
       if (countWords(text.slice(start)) >= MIN_WORDS) text = text.slice(start);
     }
-    return { text: text.trim(), before: lastLines(before.slice(0, before.length - text.length), BEFORE_CHARS) };
+    return { text: text.trim(), before: lastLines(before.slice(0, before.length - text.length), BEFORE_CHARS), after: '' };
   }
-  const after = sur.text.slice(caret);
-  const quote = QUOTE_HEADER.exec(after);
-  if (!quote) return null;
-  const text = after.slice(quote.index, quote.index + MESSAGE_CHARS).trim();
-  return countWords(text) >= MIN_WORDS ? { text, before: '' } : null;
+  // Little before the caret: a quoted email anywhere after it is the message.
+  return quotedBelow(sur.text.slice(caret), Infinity);
 }
 
 /** What the rules know about the field: its thread's features and what backs it being a reply box. */

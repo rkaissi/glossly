@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 import { buildReplyPrompt } from '../actions/reply';
+import { authorFrom } from '../actions/who';
+import { detectPeople } from '../people/detect';
 import type { ChatRequest, LlmProvider } from '../llm/types';
 import { DEFAULT_SETTINGS, type Identity } from '../settings';
 import type { SelectionPayload, Surroundings } from '../types';
@@ -50,6 +52,27 @@ describe('fieldThread', () => {
     expect(t.text).toMatch(/^Jordan Hale/);
     expect(t.text).not.toContain('build is green');
     expect(t.before).toContain('Maya Chen');
+  });
+
+  it('answers the quoted email right under the box, whatever page text sits above it', () => {
+    const chrome = 'Lunch\nReply  Reply all  Forward  Discard  Send\nTo: Alex Morgan\nSubject: RE: Lunch\n';
+    const t = fieldThread(at(`${chrome}|\n\n${OUTLOOK.surroundings!.text.trim()}`))!;
+    expect(t.text).toMatch(/^From: Alex Morgan/);
+    expect(t.before).toBe('');
+    // A draft the user typed far above a quote further down is still answered from before the caret.
+    const far = fieldThread(at(`${chrome}|${'\n'.repeat(2)}${'Notes from the meeting about the venue. '.repeat(20)}\n\n${OUTLOOK.surroundings!.text.trim()}`))!;
+    expect(far.text).not.toMatch(/^From:/);
+  });
+
+  it('names the quoted email’s sender, not the sender of the older email it quotes', () => {
+    const older = '\n\nFrom: Jordan Hale <jordan@example.com>\nSent: Monday, October 12, 2026 4:02 PM\nTo: Alex Morgan\nSubject: Lunch\n\nShould we invite Casey to lunch this week?';
+    const t = fieldThread(at(`|\n\n${OUTLOOK.surroundings!.text.trim()}${older}`))!;
+    expect(t.text).toMatch(/^From: Alex Morgan/);
+    expect(t.text).not.toContain('Jordan');
+    expect(t.after).toMatch(/From: Jordan Hale/);
+    // How startReply finds the author: the local parser, unless the conversation read names one.
+    const sel = { text: t.text, before: t.before, after: t.after, source_app: 'olk.exe', window_title: 'Lunch - Message (HTML)' };
+    expect(authorFrom(null, detectPeople(sel, me)).author).toMatchObject({ name: 'Alex Morgan', email: 'alex@example.com' });
   });
 
   it('needs a caret in a field and enough text to answer', () => {

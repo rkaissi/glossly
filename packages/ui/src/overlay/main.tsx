@@ -14,7 +14,7 @@ import './overlay.css';
 import { AskPanel } from './AskPanel';
 import { Debug } from './Debug';
 import { shownBadges } from './badges';
-import { barItems, barKey, sameItem, slotKey, type BarItem } from './keys';
+import { barItems, barKey, panelKey, sameItem, slotKey, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
 import { PastePanel } from './PastePanel';
 import { PromisesPanel } from './PromisesPanel';
@@ -196,6 +196,15 @@ function Expanded({ s }: { s: OverlayState }) {
           e.preventDefault();
           if (menuOpen) setMenuOpen(false);
           else void glossly.invoke('bar:back', { sessionId: id });
+          return;
+        }
+        const slotActions = [s.slots?.slot1?.action ?? 'ask', s.slots?.slot2?.action ?? 'save', s.slots?.slot3?.action, s.slots?.slot4?.action];
+        const open = slotActions.indexOf(s.panel ?? undefined) + 1;
+        const cmd = panelKey({ key: e.key, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey, shift: e.shiftKey }, items, open ? (open as 1 | 2 | 3 | 4) : null);
+        if (cmd?.kind === 'run') {
+          e.preventDefault();
+          setMenuOpen(false);
+          run(id, cmd.target);
         }
         return;
       }

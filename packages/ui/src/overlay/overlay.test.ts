@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SlotsView, SlotView } from '@glossly/core/api';
-import { barItems, barKey, slotKey, type BarKeyContext, type KeyInput } from './keys';
+import { barItems, barKey, panelKey, slotKey, type BarKeyContext, type KeyInput } from './keys';
 import { parseInline, parseMarkdown, tidyText } from './markdown';
 
 const slot = (action: SlotView['action'], available = false): SlotView => ({ action, label: action, available });
@@ -76,6 +76,31 @@ describe('barKey', () => {
   it('lets modified keys through', () => {
     expect(barKey(key('1', { ctrl: true }), ctx())).toBeNull();
     expect(barKey(key('c', { ctrl: true }), ctx())).toBeNull();
+    expect(barKey(key('Enter', { alt: true }), ctx())).toBeNull();
+  });
+  it('runs slots with Alt and a number too', () => {
+    expect(barKey(key('3', { alt: true }), ctx())).toEqual({ kind: 'run', target: { slot: 3 } });
+  });
+});
+
+describe('panelKey', () => {
+  // The empty bar in a reply box: Ask, Reply, Search, with the Search panel open and its box focused.
+  const field: SlotsView = { ...slots, slot3: slot('reply', true), slot4: slot('search', true), more: [] };
+  const items = barItems(field, false, false);
+
+  it('leaves plain number keys to the panel, so they type into the search box', () => {
+    expect(panelKey(key('2'), items, 4)).toBeNull();
+    expect(panelKey(key('1'), items, 4)).toBeNull();
+  });
+  it('opens another slot with Alt and its number', () => {
+    expect(slotKey(items, 3)).toBe(2);
+    expect(panelKey(key('2', { alt: true }), items, 4)).toEqual({ kind: 'run', target: { slot: 3 } });
+    expect(panelKey(key('1', { alt: true }), items, 4)).toEqual({ kind: 'run', target: { slot: 1 } });
+  });
+  it('does nothing for the open panel’s own slot or a missing one', () => {
+    expect(panelKey(key('3', { alt: true }), items, 4)).toBeNull();
+    expect(panelKey(key('4', { alt: true }), items, 4)).toBeNull();
+    expect(panelKey(key('2', { alt: true, ctrl: true }), items, 4)).toBeNull();
   });
 });
 
