@@ -78,11 +78,9 @@
   flex: none;
   padding-bottom: var(--s-3);
 }
-/* Agenda's range is a control, so it never shortens to "O…": at the minimum width the view
-   switch and New wrap to a second row instead (Oct 14). Week and month titles still ellipsize. */
-.cal-left:has(> .cal-title-range) {
-  min-width: max-content;
-}
+/* The title never shortens ("Oct 1…" in Week view at the minimum width, Oct 15): Today, the
+   arrows, and the title keep their size, and the tasks switch, the view switch, and New wrap to a
+   second row instead. The Oct 14 fix did this for Agenda's range only. */
 button.trigger.cal-title-range {
   flex: none;
 }
@@ -90,8 +88,8 @@ button.trigger.cal-title-range {
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 auto;
+  min-width: max-content;
 }
 .cal-today {
   margin-right: var(--s-1);
@@ -147,11 +145,6 @@ button.trigger.cal-title-range .trigger-value > svg {
   .cal-title,
   button.trigger.cal-title-range {
     font-size: 18px;
-  }
-}
-@container (max-width: 560px) {
-  .cal-today {
-    display: none;
   }
 }
 
@@ -361,9 +354,30 @@ button.more:hover:not(:disabled) {
   display: flex;
   align-items: baseline;
   gap: 6px;
+  min-width: 0;
+  overflow: hidden;
   padding: 6px 8px;
   font-size: 12px;
   color: var(--muted);
+}
+/* Narrow columns (the minimum window is about 60 px a day): the weekday sits over the date
+   instead of beside it, so "Mon 12" never runs into "Tue 13" (Oct 15). */
+@container (max-width: 640px) {
+  .wk-head > div {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 4px 2px;
+    font-size: 11px;
+  }
+  .wk-head b {
+    font-size: 15px;
+  }
+  .wk-head .today b {
+    min-width: 24px;
+    height: 24px;
+    font-size: 13px;
+  }
 }
 .wk-head b {
   font: 600 18px var(--font-display);
