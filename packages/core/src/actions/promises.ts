@@ -18,6 +18,7 @@ import type { PeopleRepo } from '../store/people';
 import { isoNow, type ContainerContext, type SelectionPayload } from '../types';
 import { ExtractedEventSchema, rulesEvents, toEventRows, type ExtractedEvent } from '../calendar/events';
 import type { CalendarEvent, EventCandidate } from '../calendar/types';
+import { findDuplicateEvent, type Similarity } from '../calendar/duplicates';
 import type { CalendarRepo } from '../store/calendar';
 import { contextWindow } from './context';
 import { describeSource } from '../people/reply-style';
@@ -388,6 +389,8 @@ export async function extractPromises(
   now: Date = new Date(),
   detected: Promise<DetectedPerson[]> | DetectedPerson[] = [],
   calendar?: CalendarRepo,
+  /** Breaks ties between an event and a saved one in the same slot (decision 78); words alone without it. */
+  similarity?: Similarity,
 ): Promise<PromisesExtract> {
   const sourceApp = input.selection.source_app;
   const ids = exactIds(people, [input.author, ...(input.people ?? [])], sourceApp);
@@ -447,6 +450,15 @@ export async function extractPromises(
   const events = toEventRows(check ? (out.events ?? []).filter((e) => inSelection(check.selection, e.title, e.when)) : (out.events ?? []), people, sourceApp, now);
   const days = [...new Set(events.flatMap((e) => (e.starts_at ? [e.starts_at.slice(0, 10)] : [])))];
   const sameDay = calendar ? days.flatMap((d) => calendar.list({ from: d, to: d })) : [];
+  // An event that looks already saved starts unchecked, with what it matched (decision 78).
+  for (const e of events) {
+    if (!e.starts_at) continue;
+    const dup = await findDuplicateEvent({ title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, all_day: e.all_day }, sameDay, similarity);
+    if (dup) {
+      e.duplicate = { id: dup.id, title: dup.title, starts_at: dup.starts_at, ends_at: dup.ends_at, all_day: dup.all_day };
+      e.selected = false;
+    }
+  }
   return { rows, events, sameDay, open: rest, byRules };
 }
 

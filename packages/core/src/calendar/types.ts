@@ -31,6 +31,8 @@ export interface EventCandidate {
   people: { personId: string; name: string }[];
   confidence: number;
   selected: boolean;
+  /** A saved event that looks like this one (decision 78); the row then starts unchecked. */
+  duplicate?: Pick<CalendarEvent, 'id' | 'title' | 'starts_at' | 'ends_at' | 'all_day'> | null;
 }
 
 /** A reviewed row to save. */

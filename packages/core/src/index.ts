@@ -39,6 +39,7 @@ export * from './store/people';
 export * from './store/calendar';
 export type * from './calendar/types';
 export * from './calendar/when';
+export * from './calendar/duplicates';
 export * from './calendar/events';
 
 export * from './llm/types';
