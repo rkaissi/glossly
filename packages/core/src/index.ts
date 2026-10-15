@@ -18,6 +18,7 @@ export * from './capture/pill-wait';
 export * from './router/types';
 export * from './router/features';
 export * from './router/rules';
+export * from './router/field';
 export * from './router/slots';
 export * from './router/llm-decision';
 export * from './router/router';

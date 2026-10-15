@@ -76,8 +76,8 @@ export interface DecisionProvider {
 export const CONTEXTUAL_ACTIONS = ['reply', 'who', 'promises', 'visualize'] as const;
 export type ContextualAction = (typeof CONTEXTUAL_ACTIONS)[number];
 
-/** The actions for the bar with nothing selected (hotkey): search, and pasting recent snippets. */
-export const EMPTY_ACTIONS = ['search', 'paste_list', 'paste_summary'] as const;
+/** The actions for the bar with nothing selected (hotkey): Reply from a reply box (decision 75), search, and pasting recent snippets. */
+export const EMPTY_ACTIONS = ['reply', 'search', 'paste_list', 'paste_summary'] as const;
 export type EmptyAction = (typeof EMPTY_ACTIONS)[number];
 
 /**

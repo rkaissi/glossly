@@ -42,6 +42,10 @@ import {
   recall as recallFor,
   visualize,
   assignEmptySlots,
+  decideField,
+  fieldThread,
+  type FieldInput,
+  type FieldRoute,
   pasteAsSaved,
   pasteList,
   composePaste as composeForHere,
@@ -182,6 +186,13 @@ interface Session {
   focusEditable: boolean | null;
   /** Hotkey with nothing selected: the text around the caret, or what is visible (helper context_caret). */
   surroundings: Surroundings | null;
+  /**
+   * Hotkey with nothing selected and the caret in a field with a thread around it: what the
+   * router reads, and the thread as a selection for Reply (decision 75). Null otherwise.
+   */
+  field: { input: FieldInput; selection: SelectionPayload } | null;
+  /** Whether that field answers someone, once routed. */
+  fieldRoute: FieldRoute | null;
   /** The running paste summary. */
   pasteCtl: AbortController | null;
   /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
@@ -204,6 +215,9 @@ const WITHOUT_SELECTION: readonly ActionId[] = ['ask', 'search', 'paste_list', '
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const ms = (t: number) => Math.round(performance.now() - t);
+const round2 = (n: number) => Math.round(n * 100) / 100;
+/** What Reply answers: the selection, or with nothing selected, the messages around the reply box (decision 75). */
+const replySelection = (s: Session): SelectionPayload | null => s.selection ?? s.field?.selection ?? null;
 
 function toDipRect(r: Rect): Rect {
   const d = screen.screenToDipRect(null, { x: r.x, y: r.y, width: r.w, height: r.h });
@@ -532,6 +546,8 @@ export class Capture {
         askRelated: null,
         focusEditable: null,
         surroundings: null,
+        field: null,
+        fieldRoute: null,
         pasteCtl: null,
         saved: null,
         savedSettled: false,
@@ -726,6 +742,28 @@ export class Capture {
       }
     }
 
+    // Nothing selected and the caret in a field with messages around it: maybe a reply box, and
+    // the messages are what Reply answers (decision 75).
+    const thread = !selection && fg ? fieldThread(surroundings) : null;
+    const field: Session['field'] =
+      fg && thread
+        ? {
+            input: { surroundings, editable: focusEditable, source_app: fg.process_name, window_title: fg.title },
+            selection: {
+              text: thread.text,
+              context_before: thread.before,
+              context_after: '',
+              source_app: fg.process_name,
+              window_title: fg.title,
+              captured_at: isoNow(),
+              method: 'uia',
+              trigger: 'hotkey',
+              is_editable: false,
+              foreground_handle: fg.handle,
+            },
+          }
+        : null;
+
     this.endSession();
     const bounds = physBounds ? toDipRect(physBounds) : cursorRect(cursor);
     const session: Session = {
@@ -755,6 +793,8 @@ export class Capture {
       askRelated: null,
       focusEditable,
       surroundings,
+      field,
+      fieldRoute: null,
       pasteCtl: null,
       saved: null,
       savedSettled: false,
@@ -789,12 +829,19 @@ export class Capture {
     if (selection) {
       this.overlay.update({ ...common, mode: 'bar', placement, slots: this.initialSlots(quick) }, placement.rect);
     } else {
-      // Nothing selected: the search box opens at once, under Ask and Search.
+      // Nothing selected: the search box opens at once, under Ask and Search. In a field that may
+      // be a reply box, slots 3 and 4 wait for the model's read, as the bar's do (decision 75).
+      const router = this.router();
+      session.fieldRoute = field ? router.quickField(field.input) : null;
+      const awaitModel = field !== null && router.fieldWillCallModel(field.input);
+      const view = emptySlotsView(this.emptySlots(session));
       const rect = growFrom(placement.rect, placement.side, SIZES.panel, workArea(session.anchor));
       this.overlay.update(
-        { ...common, mode: 'panel', panel: 'search', placement: { mode: 'pill', side: placement.side, rect }, slots: emptySlotsView(this.emptySlots(session)) },
+        { ...common, mode: 'panel', panel: 'search', placement: { mode: 'pill', side: placement.side, rect }, slots: awaitModel ? holdForRoute(view) : view },
         rect,
       );
+      if (awaitModel) void this.routeField(session, router);
+      else if (session.fieldRoute) log.info('field routed', { provider: 'rules', score: round2(session.fieldRoute.score) });
     }
     this.services.metrics.record('bar_shown', { trigger: 'hotkey', ms: timings.total, has_selection: Boolean(selection) });
     if (selection) this.tried(session, 'bar');
@@ -900,9 +947,38 @@ export class Capture {
         recent: recentSnippets(this.services.store, settings).length,
         summaryModel: this.services.llm.hasModel('chat'),
         writing: s.surroundings?.source === 'caret' && s.surroundings.text.trim().length > 0 && this.services.store.collectionCounts().total > 0,
+        reply: s.fieldRoute?.score ?? 0,
       },
       settings.router,
     );
+  }
+
+  /** Nothing selected: the model's read of whether the field answers someone, then slots 3 and 4 (decision 75). */
+  private async routeField(s: Session, router: Router): Promise<void> {
+    if (!s.field) return;
+    const ctl = new AbortController();
+    s.routeCtl = ctl;
+    try {
+      const r = await router.routeField(s.field.input, ctl.signal);
+      if (!this.current(s.id) || ctl.signal.aborted) return;
+      s.fieldRoute = r;
+      const stage = r.fallback ? 'rules_fallback' : 'model';
+      this.overlay.patch({ slots: { ...emptySlotsView(this.emptySlots(s)), stage, provider: r.fallback ? 'rules' : 'llm_structured', fallback: r.fallback, route_ms: Math.round(r.ms) } });
+      const routed = {
+        provider: r.fallback ? 'rules' : 'llm_structured',
+        fallback: r.fallback ?? 'none',
+        fell_back: r.fellBack,
+        ms: Math.round(r.ms),
+        score: round2(r.score),
+        rules: round2(r.read?.rules ?? 0),
+      };
+      this.services.metrics.record('field_routed', routed);
+      log.info('field routed', routed);
+    } catch (e) {
+      log.error('field route failed', errorInfo(e));
+    } finally {
+      if (s.routeCtl === ctl) s.routeCtl = null;
+    }
   }
 
   /** True when Router.route will spend a model call. Rules then wait instead of flashing. */
@@ -918,8 +994,10 @@ export class Capture {
 
   private router(): Router {
     const sv = this.services;
+    const model = sv.llm.hasModel('decision');
     return new Router({
-      decision: sv.llm.hasModel('decision') ? new LlmStructuredDecision(sv.llm) : null,
+      decision: model ? new LlmStructuredDecision(sv.llm) : null,
+      field: model ? (input, signal, onFallback) => decideField(sv.llm, input, signal, onFallback) : null,
       settings: () => sv.settings,
       collections: () => sv.collections(),
       people: () => sv.store.listKnownPeople(),
@@ -983,7 +1061,8 @@ export class Capture {
     if (!s) return;
     const action = 'slot' in target ? actionForSlot(this.state.slots, target.slot) : target.action;
     if (!action) return;
-    if (!s.selection && !WITHOUT_SELECTION.includes(action)) return;
+    // Reply from a reply box answers the messages around it (decision 75).
+    if (!s.selection && !WITHOUT_SELECTION.includes(action) && !(action === 'reply' && s.field)) return;
     if (action === 'save' && s.saved) {
       this.undoSaved(sessionId);
       return;
@@ -1162,13 +1241,14 @@ export class Capture {
     };
     const fail = (code: AskErrorEvent['code'], message: string) => send<AskErrorEvent>('reply:error', { requestId, code, message });
     const s = this.current(sessionId);
-    if (!s?.selection) {
+    const sel = s && replySelection(s);
+    if (!s || !sel) {
       setTimeout(() => fail('no_selection', 'Select a message first.'), 0);
       return { requestId, to: { name: null, email: null, handle: null, personId: null, match: 'none', authorIsMe: false }, identitySet, channel: 'other' };
     }
     const container = (await s.container) ?? null;
     const people = this.services.people;
-    const readInput = detectInputFor(s.selection, container);
+    const readInput = detectInputFor(sel, container);
     const det = detectPeople(readInput, identity, this.services.store.listKnownPeople());
     // The conversation read (decision 48): who wrote what, shared with Who and Tasks (often cached
     // by now). The panel says "Reading the conversation…" until this answers. A failed read leaves the parser's.
@@ -1178,7 +1258,7 @@ export class Capture {
     const by = authorFrom(read, det);
     const a = by.author;
     const author = by.authorIsMe ? 'me' : (a?.email ?? (a?.handle ? `@${a.handle}` : null) ?? a?.name ?? null);
-    const key = replyCacheKey({ place: s.siteKey ?? s.selection.source_app, author, text: s.selection.text });
+    const key = replyCacheKey({ place: s.siteKey ?? sel.source_app, author, text: sel.text });
     // The panel was closed and opened again while the drafts were still being written: carry on
     // with that run. The text so far comes back with this answer; the rest streams under the same id.
     const running = s.reply;
@@ -1191,7 +1271,7 @@ export class Capture {
     const state: NonNullable<Session['reply']> = { requestId, ctl, personId: null, done: false, used: false, learned: false, key, raw: '', start: null };
     s.reply = state;
 
-    const match = a ? resolvePerson(people, a, s.selection.source_app) : null;
+    const match = a ? resolvePerson(people, a, sel.source_app) : null;
     const person = match?.kind === 'exact' ? people.card(match.personId) : null;
     state.personId = person?.id ?? null;
     const to: ReplyTo = {
@@ -1203,15 +1283,16 @@ export class Capture {
       authorIsMe: by.authorIsMe,
     };
     // Samples, preferences, and notes for this person, their relationship, and this kind of platform (Profile > How you write).
-    const channel = replyChannel(s.selection.source_app, s.selection.window_title);
+    const channel = replyChannel(sel.source_app, sel.window_title);
     const audience = { channel, personId: state.personId, relationship: person?.relationship ?? null };
     const learning = this.settings.replyLearning;
     const preferences = learning
       ? preferencesFor(people.styleSignals(), audience).map((p) => preferenceLine(p, p.scope === 'person' ? person?.name : null))
       : [];
     const input = {
-      selection: s.selection,
+      selection: sel,
       container,
+      field: !s.selection,
       author: a,
       authorIsMe: by.authorIsMe,
       person,
@@ -1298,10 +1379,11 @@ export class Capture {
    */
   private learnFromReply(s: Session, final: string, personId: string | null, pick: ReplyPick): void {
     const r = s.reply;
-    if (!r || r.learned || !s.selection || !this.settings.replyLearning) return;
+    const sel = replySelection(s);
+    if (!r || r.learned || !sel || !this.settings.replyLearning) return;
     r.learned = true;
     const people = this.services.people;
-    const channel = replyChannel(s.selection.source_app, s.selection.window_title);
+    const channel = replyChannel(sel.source_app, sel.window_title);
     const own = pick.chosen === WROTE_OWN;
     const original = own ? undefined : pick.drafts[pick.chosen]?.text;
     if (!own && original === undefined) return;
@@ -1363,12 +1445,13 @@ export class Capture {
    */
   async insertReply(sessionId: number, text: string, edited: boolean, personId?: string, pick?: ReplyPick): Promise<ReplyInsertResult> {
     const s = this.current(sessionId);
-    if (!s?.selection || !s.fg) throw new Error('This selection is gone. Select the message again.');
+    const sel = s && replySelection(s);
+    if (!s || !sel || !s.fg) throw new Error('This selection is gone. Select the message again.');
     const draft = text.trim();
     if (!draft) throw new Error('The draft is empty.');
     const people = this.services.people;
     const pid = personId && people.get(personId) ? personId : (s.reply?.personId ?? null);
-    const sourceApp = s.selection.source_app;
+    const sourceApp = sel.source_app;
     const record = (how: 'inserted' | 'copied') => {
       if (s.reply) s.reply.used = true;
       if (pick) this.learnFromReply(s, draft, pid, pick);
@@ -1376,7 +1459,8 @@ export class Capture {
       this.services.metrics.record('reply_inserted', { how, edited, own: pick?.chosen === WROTE_OWN, person: Boolean(pid), ms: ms(s.t0) });
     };
     // The selected message is usually read-only, so the reply goes into the page's reply box.
-    return this.insertText(s, draft, 'reply', record, { findField: true });
+    // From the reply box itself (decision 75), the caret is already there.
+    return this.insertText(s, draft, 'reply', record, { findField: Boolean(s.selection) });
   }
 
   /**
@@ -1783,6 +1867,8 @@ ${s.selection.text}`;
       askRelated: null,
       focusEditable: null,
       surroundings: null,
+      field: null,
+      fieldRoute: null,
       pasteCtl: null,
       saved,
       savedSettled: true,

@@ -52,7 +52,7 @@ function groundedAuthor(author: string, input: DetectInput): boolean {
 }
 
 /** The line that starts a quoted earlier email: "On Tue, … wrote:", "-----Original Message-----", or a From: line followed by Sent:. */
-const QUOTE_HEADER = /^[ \t>]*(?:On\b[^\n]{0,200}\bwrote:|-{2,}\s*Original Message\s*-{2,}|From:[^\n]*\n[ \t>]*Sent:)/im;
+export const QUOTE_HEADER = /^[ \t>]*(?:On\b[^\n]{0,200}\bwrote:|-{2,}\s*Original Message\s*-{2,}|From:[^\n]*\n[ \t>]*Sent:)/im;
 
 /**
  * Where an email chain's quoted history starts in the selection, or -1. An email quotes older

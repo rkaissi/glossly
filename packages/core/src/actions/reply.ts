@@ -30,6 +30,8 @@ export interface ReplyInput {
   messages?: ReadMessage[] | null;
   /** The kind of platform, for the output cap; email gets room for full emails. */
   channel?: ReplyChannel;
+  /** Opened from the reply box with nothing selected: the message is the text around the box (decision 75). */
+  field?: boolean;
 }
 
 const REDO_LINES: Record<ReplyRedoAsk, string> = {
@@ -51,6 +53,9 @@ export const REPLY_MAX_OUTPUT: Record<ReplyChannel, number> = { messaging: 450, 
 const SELECTION_MARK = '[SELECTION]';
 const PLATFORM: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', other: 'other app' };
 const TARGET_MARK = '[REPLY TO THIS]';
+/** Nothing was selected, so the message is the text around the reply box, which may end with the user's own start of a reply. */
+const FIELD_NOTE =
+  "The user opened Reply from the reply box itself, with nothing selected, so the messages below are the text around the box. Their last lines may be the user's own unfinished reply: never answer those, and keep any point they started.";
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const day = (iso: string) => {
@@ -218,6 +223,7 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     '',
     '## App',
     describeSource(selection.source_app, selection.window_title),
+    ...(input.field ? ['', '## Where the user is', FIELD_NOTE] : []),
     '',
     '## Today',
     now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
