@@ -32,6 +32,8 @@ export interface StoreOptions {
   vecExtensionPath?: string;
 }
 
+const CONTEXT_SYNCED_KEY = 'context_synced_clock';
+
 const vecBytes = (v: Float32Array | number[]) => {
   const f = v instanceof Float32Array ? v : new Float32Array(v);
   return new Uint8Array(f.buffer, f.byteOffset, f.byteLength);
@@ -365,6 +367,22 @@ export class Store {
       `CREATE VIRTUAL TABLE context_vectors USING vec0(doc_id TEXT PRIMARY KEY, kind TEXT PARTITION KEY, embedding FLOAT[${Math.trunc(dims)}] distance_metric=cosine)`,
     );
     this.db.exec('DELETE FROM context_docs');
+    this.db.prepare('DELETE FROM meta WHERE key = ?').run(CONTEXT_SYNCED_KEY);
+  }
+
+  /** Goes up on every write to people, aliases, messages, tasks, or events (migration 10's triggers). */
+  contextClock(): number {
+    return (this.db.prepare('SELECT n FROM context_clock').get() as { n: number } | undefined)?.n ?? 0;
+  }
+
+  /** The clock as of the last finished sync, or null when everything must be checked. */
+  contextSyncedAt(): number | null {
+    const v = this.getMeta(CONTEXT_SYNCED_KEY);
+    return v === null ? null : Number(v);
+  }
+
+  setContextSyncedAt(clock: number): void {
+    this.setMeta(CONTEXT_SYNCED_KEY, String(clock));
   }
 
   /**
@@ -555,7 +573,7 @@ export class Store {
   deleteAll(): void {
     this.tx(() => {
       for (const t of USER_DATA_TABLES) this.db.exec(`DELETE FROM ${t}`);
-      this.db.exec("DELETE FROM meta WHERE key IN ('style_notes_removed', 'style_edits_pending')");
+      this.db.exec(`DELETE FROM meta WHERE key IN ('style_notes_removed', 'style_edits_pending', '${CONTEXT_SYNCED_KEY}')`);
       if (this.hasVectors && this.vectorTableExists()) this.db.exec('DELETE FROM item_vectors');
       if (this.hasVectors && this.contextTableExists()) this.db.exec('DELETE FROM context_vectors');
     });

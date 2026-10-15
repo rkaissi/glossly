@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { utilityProcess, type UtilityProcess } from 'electron';
-import { ContextSyncer, embedText, type CalendarRepo, type Embedder, type EmbedStatus, type PeopleRepo, type Store } from '@glossly/core';
+import { ContextSyncer, embedText, type Embedder, type EmbedStatus, type Store } from '@glossly/core';
 import type { WorkerRequest, WorkerResponse } from './embed-protocol';
 import { logger } from './log';
 import { embedWorkerPath } from './paths';
@@ -34,10 +34,9 @@ export class EmbedHost extends EventEmitter<{ status: [EmbedStatus] }> {
     private readonly model: string,
     private readonly dims: number,
     private readonly cacheDir: string,
-    repos: { people: PeopleRepo; calendar: CalendarRepo },
   ) {
     super();
-    this.context = new ContextSyncer({ store, ...repos, embedder: () => this.readyEmbedder });
+    this.context = new ContextSyncer({ store, embedder: () => this.readyEmbedder });
     const downloaded = store.getMeta('embed_downloaded') === model;
     this.status = { model, dims, state: downloaded ? 'loading' : 'not_downloaded' };
   }

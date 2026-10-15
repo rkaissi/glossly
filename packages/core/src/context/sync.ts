@@ -1,17 +1,14 @@
-// Keeps context_vectors in step with people, tasks, and events (decision 77). Rather than every
-// write marking rows dirty, a sync rebuilds each row's text, embeds the ones whose hash changed,
-// and drops the ones that are gone; at one person's scale (hundreds of rows) that is a few queries
-// and hashes when nothing changed. It runs when the embedder is ready, and before each retrieval.
+// Keeps context_vectors in step with people, tasks, and events (decision 77). Triggers count every
+// write to their tables (context_clock, migration 10), so a sync with nothing new is one read.
+// Otherwise it rebuilds each row's text, embeds the ones whose hash changed, and drops the ones
+// that are gone (about 20 ms for 1,700 rows with nothing to embed). It runs when the embedder is
+// ready, and before each retrieval.
 import type { Embedder } from '../embed/types';
-import type { CalendarRepo } from '../store/calendar';
-import type { PeopleRepo } from '../store/people';
 import type { Store } from '../store/store';
 import { contextDocs, docHash, type ContextDoc } from './docs';
 
 export interface ContextSyncDeps {
   store: Store;
-  people: PeopleRepo;
-  calendar: CalendarRepo;
   embedder: () => Embedder | null;
 }
 
@@ -27,9 +24,12 @@ export async function syncContext(deps: ContextSyncDeps): Promise<ContextSyncRes
   const { store } = deps;
   const embedder = deps.embedder();
   if (!embedder || !store.hasVectors) return null;
+  // Nothing written since the last finished sync: one read instead of rebuilding every text.
+  const clock = store.contextClock();
+  if (store.contextSyncedAt() === clock) return { embedded: 0, removed: 0 };
 
   const stored = store.contextHashes();
-  const docs = contextDocs(deps.people, deps.calendar);
+  const docs = contextDocs(store);
   const live = new Set(docs.map((d) => d.id));
   const gone = [...stored.keys()].filter((id) => !live.has(id));
   store.deleteContextDocs(gone);
@@ -48,6 +48,8 @@ export async function syncContext(deps: ContextSyncDeps): Promise<ContextSyncRes
       if (v) store.setContextVector(c.doc.id, c.doc.kind, c.hash, v);
     });
   }
+  // The clock as read before the texts: writes made while embedding get the next sync.
+  store.setContextSyncedAt(clock);
   return { embedded: changed.length, removed: gone.length };
 }
 

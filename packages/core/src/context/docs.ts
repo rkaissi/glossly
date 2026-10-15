@@ -2,10 +2,8 @@
 // own vectors (item_vectors, `embedText`); this covers the rest of what the user has saved.
 import { createHash } from 'node:crypto';
 import type { CalendarEvent } from '../calendar/types';
-import type { CommitmentView, Interaction, Person } from '../people/types';
-import type { CalendarRepo } from '../store/calendar';
-import type { PeopleRepo } from '../store/people';
-import type { ContextKind } from '../store/store';
+import type { CommitmentView, Interaction, Person, PersonAlias } from '../people/types';
+import type { ContextKind, Store } from '../store/store';
 
 export interface ContextDoc {
   /** The person's, task's, or event's own id. */
@@ -23,13 +21,20 @@ const MAX_MESSAGE_CHARS = 160;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 
+// Made once: toLocaleDateString builds a new formatter on every call, which was most of a sync's time.
+let formats: { day: Intl.DateTimeFormat; time: Intl.DateTimeFormat } | null = null;
+
 /** "Thursday, Oct 16" for a day, with "1:00 PM" added for a time. Local time, like the Calendar tab. */
 export function dayWords(iso: string): string {
   const dateOnly = iso.length === 10;
   const d = new Date(dateOnly ? `${iso}T12:00:00` : iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const day = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-  return dateOnly ? day : `${day}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  formats ??= {
+    day: new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+    time: new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }),
+  };
+  const day = formats.day.format(d);
+  return dateOnly ? day : `${day}, ${formats.time.format(d)}`;
 }
 
 /**
@@ -69,16 +74,59 @@ export function eventDoc(e: Pick<CalendarEvent, 'id' | 'title' | 'starts_at' | '
   return { id: e.id, kind: 'event', text: clip(lines.join('\n'), MAX_DOC_CHARS) };
 }
 
-/** Every person, task (open or finished), and event, as the text to embed. */
-export function contextDocs(people: PeopleRepo, calendar: CalendarRepo): ContextDoc[] {
-  const docs: ContextDoc[] = [];
-  for (const s of people.list()) {
-    const p = people.get(s.id);
-    if (p) docs.push(personDoc(p, people.interactions(p.id, RECENT_MESSAGES)));
+/**
+ * Every person, task (open or finished), and event, as the text to embed. Five queries in all
+ * rather than the repos' per-row reads: a sync runs this whole on every change.
+ */
+export function contextDocs(store: Store): ContextDoc[] {
+  const { db } = store;
+  const aliases = new Map<string, PersonAlias[]>();
+  for (const a of db.prepare("SELECT person_id, kind, value FROM person_aliases WHERE kind = 'name' ORDER BY value").all() as unknown as (PersonAlias & { person_id: string })[]) {
+    let list = aliases.get(a.person_id);
+    if (!list) aliases.set(a.person_id, (list = []));
+    list.push({ kind: a.kind, value: a.value });
   }
-  for (const c of people.commitments()) docs.push(taskDoc(c));
-  for (const e of calendar.list({ limit: 100_000 })) docs.push(eventDoc(e));
+  const recent = new Map<string, Pick<Interaction, 'direction' | 'text'>[]>();
+  const messages = db
+    .prepare(
+      `SELECT person_id, direction, text FROM (
+         SELECT person_id, direction, text, ROW_NUMBER() OVER (PARTITION BY person_id ORDER BY occurred_at DESC, rowid DESC) AS n FROM interactions
+       ) WHERE n <= ? ORDER BY person_id, n`,
+    )
+    .all(RECENT_MESSAGES) as (Pick<Interaction, 'direction' | 'text'> & { person_id: string })[];
+  for (const m of messages) {
+    let list = recent.get(m.person_id);
+    if (!list) recent.set(m.person_id, (list = []));
+    list.push({ direction: m.direction, text: m.text });
+  }
+
+  const docs: ContextDoc[] = [];
+  const people = db.prepare('SELECT id, name, note, relationship FROM people').all() as Pick<Person, 'id' | 'name' | 'note' | 'relationship'>[];
+  for (const p of people) docs.push(personDoc({ ...p, aliases: aliases.get(p.id) ?? [] }, recent.get(p.id) ?? []));
+  const tasks = db
+    .prepare('SELECT c.id, c.owner, c.text, c.due_at, p.name AS person_name FROM commitments c LEFT JOIN people p ON p.id = c.person_id')
+    .all() as Pick<CommitmentView, 'id' | 'owner' | 'text' | 'due_at' | 'person_name'>[];
+  for (const c of tasks) docs.push(taskDoc(c));
+  const events = db.prepare('SELECT id, title, starts_at, ends_at, all_day, location, attendees FROM calendar_events').all() as {
+    id: string;
+    title: string;
+    starts_at: string;
+    ends_at: string | null;
+    all_day: number;
+    location: string | null;
+    attendees: string;
+  }[];
+  for (const e of events) docs.push(eventDoc({ ...e, all_day: e.all_day === 1, attendees: parseAttendees(e.attendees) }));
   return docs;
+}
+
+function parseAttendees(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((a): a is string => typeof a === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 /** What context_docs stores to tell whether a row's text changed since it was embedded. */

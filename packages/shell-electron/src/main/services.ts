@@ -119,7 +119,7 @@ export class Services extends EventEmitter<{ settings: [Settings] }> {
 
     const { model, dims } = this.settingsCache.embeddings;
     store.ensureVectorModel(model, dims);
-    this.embed = new EmbedHost(store, model, dims, userDataPath('models'), { people: this.people, calendar: this.calendar });
+    this.embed = new EmbedHost(store, model, dims, userDataPath('models'));
     this.save = new SaveService({
       store,
       llm: this.llm,

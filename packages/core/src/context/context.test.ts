@@ -89,12 +89,18 @@ describe('context docs', () => {
   });
 
   it('covers every person, task, and event, done tasks included', () => {
-    const { people, calendar } = setup(false);
-    const p = people.create({ name: 'Casey Lin' });
+    const { store, people, calendar } = setup(false);
+    const p = people.create({ name: 'Casey Lin', aliases: [{ kind: 'name', value: 'Case' }, { kind: 'email', value: 'casey@example.com' }] });
+    for (const text of ['one', 'two', 'three', 'four']) people.addInteraction({ person_id: p.id, direction: 'inbound', text, occurred_at: `2026-10-1${text.length}T10:00:00Z` });
     const t = people.addCommitment({ person_id: p.id, owner: 'me', text: 'Send the deck', due_at: null });
     people.setCommitmentStatus(t.id, 'done');
-    calendar.add({ title: 'Lunch', starts_at: at(15, 12), ends_at: null, all_day: false, location: null, attendees: [], personIds: [] }, null);
-    expect(contextDocs(people, calendar).map((d) => d.kind)).toEqual(['person', 'task', 'event']);
+    calendar.add({ title: 'Lunch', starts_at: at(15, 12), ends_at: null, all_day: false, location: null, attendees: ['Casey Lin'], personIds: [] }, null);
+    const docs = contextDocs(store);
+    expect(docs.map((d) => d.kind)).toEqual(['person', 'task', 'event']);
+    // Read in bulk, the same as one at a time: other names, the three newest messages, attendees.
+    expect(docs[0]).toEqual(personDoc(people.get(p.id)!, people.interactions(p.id, 3)));
+    expect(docs[1]!.text).toBe('Task: Send the deck\nThe user owes Casey Lin');
+    expect(docs[2]!.text).toContain('With Casey Lin');
   });
 });
 
@@ -119,6 +125,19 @@ describe('syncContext', () => {
     expect(await syncContext(deps)).toEqual({ embedded: 0, removed: 1 });
     expect(store.contextHashes().has(e.id)).toBe(false);
     expect(store.searchContextVectors(new Float32Array([1, 0, 0, 0]), 'event')).toEqual([]);
+  });
+
+  it('skips the rebuild until people, tasks, or events are written to', async () => {
+    const { store, people, deps } = setup();
+    const p = people.create({ name: 'Jordan Hale' });
+    await syncContext(deps);
+    // A vector lost behind the triggers' back isn't noticed while nothing was written...
+    store.db.exec('DELETE FROM context_docs');
+    expect(await syncContext(deps)).toEqual({ embedded: 0, removed: 0 });
+    // ...and is back with the next write, which the triggers count.
+    people.addInteraction({ person_id: p.id, direction: 'inbound', text: 'See you at lunch' });
+    expect(await syncContext(deps)).toEqual({ embedded: 1, removed: 0 });
+    expect(store.contextSyncedAt()).toBe(store.contextClock());
   });
 
   it('searches inside one kind', async () => {

@@ -189,13 +189,24 @@ export const MIGRATIONS: string[] = [
   `,
   /* 10: Which people, tasks, and events have a vector in context_vectors, and the hash of the text
      each was embedded from, so a row is embedded again only when that text changes (decision 77).
-     Derived data: cleared with the data, never exported. */ `
+     Derived data: cleared with the data, never exported. context_clock counts every write to the
+     tables those texts come from, through triggers, so a sync with nothing new skips the rebuild;
+     its one row is never deleted. */ `
   CREATE TABLE context_docs (
     doc_id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,
     hash TEXT NOT NULL,
     embedded_at TEXT NOT NULL
   );
+  CREATE TABLE context_clock (n INTEGER NOT NULL);
+  INSERT INTO context_clock (n) VALUES (0);
+  ${['people', 'person_aliases', 'interactions', 'commitments', 'calendar_events']
+    .flatMap((t) =>
+      ['INSERT', 'UPDATE', 'DELETE'].map(
+        (op) => `CREATE TRIGGER context_clock_${t}_${op.toLowerCase()} AFTER ${op} ON ${t} BEGIN UPDATE context_clock SET n = n + 1; END;`,
+      ),
+    )
+    .join('\n  ')}
   `,
 ];
 
