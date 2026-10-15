@@ -180,12 +180,12 @@ button.collapse[aria-expanded='false'] svg {
   background: var(--surface-2);
 }
 /* A row added while the tab is open rises in (the list itself comes with the page, decision 45);
-   checking one off pops the check, then the row slides out (ease-in, no bounce). */
+   checking one off pops the check while the row slides out (ease-in, no bounce). */
 .task-row.fresh {
   animation: rise-in var(--spring-soft-ms) var(--spring-soft) both;
 }
 .task-row.leaving {
-  animation: task-leave 420ms var(--ease-in) 200ms forwards;
+  animation: task-leave 420ms var(--ease-in) forwards;
 }
 @keyframes task-leave {
   0% {

@@ -49,7 +49,7 @@ function CommitmentRow({ c, showPerson }: { c: CommitmentView; showPerson?: bool
               setLeaving(false);
               throw e;
             }));
-          }, 620);
+          }, 420);
         }}
       />
       <span className="grow">

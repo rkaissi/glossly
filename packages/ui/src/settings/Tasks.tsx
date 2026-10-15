@@ -54,9 +54,9 @@ function TaskRow({ t, today, showDue, fresh, onDone }: { t: CommitmentView; toda
         label={done ? 'Reopen' : 'Mark done'}
         disabled={busy || leaving}
         onChange={(on) => {
-          // The check pops, the row slides out, then the list moves it (Completed or back).
+          // The check pops while the row slides out, then the list moves it (Completed or back).
           setLeaving(true);
-          setTimeout(() => onDone(t, on), 620);
+          setTimeout(() => onDone(t, on), 420);
         }}
       />
       <div className="task-title">
