@@ -195,6 +195,22 @@ export interface AskSaved {
   /** The memory, clipped. */
   text: string;
 }
+/**
+ * Something Ask did or offers to do with its tools (decision 78): a task, an event, a line on a
+ * person's note, or a fact about the user. Applied ones have Undo; offered ones a one-click Add.
+ */
+export interface AskAction {
+  requestId: string;
+  /** For `ask:action-accept` and `ask:action-undo`. */
+  id: string;
+  kind: 'task' | 'event' | 'person' | 'about';
+  state: 'applied' | 'offered' | 'undone';
+  /** "Send the deck to Jordan Hale, due tomorrow", "Lunch with Jordan, tomorrow, 1:00 PM to 2:00 PM". */
+  label: string;
+  /** Epoch ms; Undo works until then. Null while offered. */
+  undoUntil: number | null;
+}
+
 /** One saved row that went into a prompt (decision 77), for the "Used N" chip. */
 export interface ContextUsed {
   kind: 'note' | 'person' | 'task' | 'event';
@@ -433,6 +449,10 @@ export interface InvokeChannels {
 
   'ask:start': { args: AskStartArgs; result: { requestId: string } };
   'ask:cancel': { args: { requestId: string }; result: void };
+  /** Adds a task or event Ask offered (decision 78). Null when the offer is gone (the bar closed). */
+  'ask:action-accept': { args: { sessionId: number; id: string }; result: AskAction | null };
+  /** Undoes something Ask did, inside its undo window. */
+  'ask:action-undo': { args: { sessionId: number; id: string }; result: { undone: boolean } };
   /** "Not related" on a row of the "Used N" chip: left out of later prompts in this session, and logged (kind and reason only). */
   'context:dismiss': { args: { sessionId: number; kind: ContextUsed['kind']; id: string }; result: void };
 
@@ -610,6 +630,7 @@ export interface PushChannels {
   'ask:error': AskErrorEvent;
   'ask:saved': AskSaved;
   'ask:context': AskContext;
+  'ask:action': AskAction;
   'reply:chunk': AskChunk;
   'reply:done': AskDone;
   'reply:error': AskErrorEvent;

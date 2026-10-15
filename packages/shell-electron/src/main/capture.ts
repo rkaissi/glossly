@@ -66,6 +66,10 @@ import {
   type AskErrorEvent,
   type AskSaved,
   type AskContext,
+  type AskAction,
+  type AskToolDeps,
+  type ToolOutcome,
+  withAboutMe,
   type ContextUsed,
   type RetrievedContext,
   contextUsed,
@@ -139,6 +143,16 @@ const KEY_HIDE_GRACE_MS = 400;
 
 type Foreground = CommandResult<'foreground'>;
 
+/** One thing Ask's tools did or offered (decision 78): how to do it, and how to take it back once done. */
+interface AskActionEntry {
+  action: AskAction;
+  /** Applies it and returns how to undo it. */
+  run: () => () => void;
+  undo: (() => void) | null;
+  /** The panel the row lives in, for pushes after an accept. */
+  send: (a: AskAction) => void;
+}
+
 interface Session {
   id: number;
   trigger: Trigger;
@@ -189,6 +203,8 @@ interface Session {
   askRelated: string[] | null;
   /** Rows of the "Used N" chip marked "Not related" ("kind:id"), left out of later prompts in this session. */
   contextDismissed: Set<string>;
+  /** What Ask's tools did or offered in this session (decision 78), by action id. */
+  askActions: Map<string, AskActionEntry>;
   /** Hotkey with nothing selected: whether the focused control takes text (null when unknown). */
   focusEditable: boolean | null;
   /** Hotkey with nothing selected: the text around the caret, or what is visible (helper context_caret). */
@@ -551,6 +567,7 @@ export class Capture {
         recall: null,
         recallDismissed: new Set(),
         contextDismissed: new Set(),
+        askActions: new Map(),
         askRelated: null,
         focusEditable: null,
         surroundings: null,
@@ -799,6 +816,7 @@ export class Capture {
       recall: null,
       recallDismissed: new Set(),
       contextDismissed: new Set(),
+      askActions: new Map(),
       askRelated: null,
       focusEditable,
       surroundings,
@@ -1882,6 +1900,7 @@ ${s.selection.text}`;
       recall: null,
       recallDismissed: new Set(),
       contextDismissed: new Set(),
+      askActions: new Map(),
       askRelated: null,
       focusEditable: null,
       surroundings: null,
@@ -2005,6 +2024,90 @@ ${s.selection.text}`;
     }
   }
 
+  /**
+   * What Ask's tools do here (decision 78). Tasks and events asked for are added at once, and
+   * noticed ones are offered; edits to a person and facts about the user apply at once. Every
+   * applied one gets Undo for the save window.
+   */
+  private askToolDeps(s: Session, requestId: string, sourceApp: string | null, send: (a: AskAction) => void): AskToolDeps {
+    const sv = this.services;
+    const register = (kind: AskAction['kind'], label: string, apply: boolean, run: () => () => void): ToolOutcome => {
+      const entry: AskActionEntry = { action: { requestId, id: randomUUID(), kind, state: 'offered', label, undoUntil: null }, run, undo: null, send };
+      s.askActions.set(entry.action.id, entry);
+      if (apply) this.applyAskAction(entry);
+      else send(entry.action);
+      log.info('ask action', { kind, applied: apply });
+      sv.metrics.record('ask_action', { kind, applied: apply });
+      return { ok: true, label };
+    };
+    const fail = (reason: string): ToolOutcome => ({ ok: false, reason });
+    return {
+      personByName: (name) => {
+        const id = sv.people.byName(name);
+        const p = id ? sv.people.get(id) : null;
+        return p ? { id: p.id, name: p.name } : null;
+      },
+      addTask: (t, asked, label) =>
+        register('task', label, asked, () => {
+          const c = sv.people.addCommitment({ person_id: t.person_id, owner: t.owner, text: t.person_id || !t.person_name ? t.text : `${t.text} (${t.person_name})`, due_at: t.due_at });
+          return () => sv.people.deleteCommitment(c.id);
+        }),
+      addEvent: (e, asked, label) =>
+        register('event', label, asked, () => {
+          const row = sv.calendar.add({ title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, all_day: e.all_day, location: e.location, attendees: e.attendees, personIds: e.personIds }, sourceApp);
+          return () => sv.calendar.delete(row.id);
+        }),
+      editPerson: (p, _asked, label) => {
+        const before = sv.people.get(p.personId);
+        if (!before) return fail(`${p.name} isn't in your people any more.`);
+        return register('person', label, true, () => {
+          const note = p.addNote ? (before.note?.trim() ? `${before.note.trim()}\n${p.addNote}` : p.addNote) : before.note;
+          sv.people.update(p.personId, { note, relationship: p.relationship ?? before.relationship });
+          return () => {
+            if (sv.people.get(p.personId)) sv.people.update(p.personId, { note: before.note, relationship: before.relationship });
+          };
+        });
+      },
+      addAboutMe: (fact) => {
+        const id = randomUUID();
+        if (!withAboutMe(this.settings.aboutMe, fact, id, isoNow())) return fail('You told me that already.');
+        return register('about', fact, true, () => {
+          const next = withAboutMe(this.settings.aboutMe, fact, id, isoNow());
+          if (next) sv.setSetting('aboutMe', next);
+          return () => sv.setSetting('aboutMe', this.settings.aboutMe.filter((f) => f.id !== id));
+        });
+      },
+    };
+  }
+
+  private applyAskAction(entry: AskActionEntry): AskAction {
+    entry.undo = entry.run();
+    entry.action = { ...entry.action, state: 'applied', undoUntil: Date.now() + this.settings.save.undoSeconds * 1000 };
+    entry.send(entry.action);
+    if (entry.action.kind !== 'about') this.services.emit('people');
+    return entry.action;
+  }
+
+  /** "Add" on a task or event Ask offered. */
+  acceptAskAction(sessionId: number, id: string): AskAction | null {
+    const entry = this.current(sessionId)?.askActions.get(id);
+    if (!entry || entry.action.state !== 'offered') return null;
+    this.services.metrics.record('ask_action_accepted', { kind: entry.action.kind });
+    return this.applyAskAction(entry);
+  }
+
+  /** Undo on something Ask did, inside the save window (plus a short grace). */
+  undoAskAction(sessionId: number, id: string): { undone: boolean } {
+    const entry = this.current(sessionId)?.askActions.get(id);
+    if (!entry?.undo || entry.action.state !== 'applied' || Date.now() > (entry.action.undoUntil ?? 0) + 2000) return { undone: false };
+    entry.undo();
+    entry.undo = null;
+    entry.action = { ...entry.action, state: 'undone', undoUntil: null };
+    if (entry.action.kind !== 'about') this.services.emit('people');
+    this.services.metrics.record('ask_action_undone', { kind: entry.action.kind });
+    return { undone: true };
+  }
+
   /** "Not related" on a row of Ask's or Reply's "Used N" chip: left out of later prompts in this session. */
   dismissContext(sessionId: number, kind: ContextUsed['kind'], id: string): void {
     const s = this.current(sessionId);
@@ -2073,7 +2176,8 @@ ${s.selection.text}`;
           : (context?.notes ?? []).map((h) => ({ id: h.itemId, text: h.text, why: h.why, created_at: h.created_at }));
         const used = contextUsed(context ?? { people: [], tasks: [], events: [] }, notes, new Date());
         if (used.length) send<AskContext>('ask:context', { requestId, used });
-        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: notes, context, remember, surroundings: s.selection ? null : s.surroundings }, ctl.signal);
+        const tools = this.askToolDeps(s, requestId, selection.source_app || null, (a) => send<AskAction>('ask:action', a));
+        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: notes, context, remember, tools, surroundings: s.selection ? null : s.surroundings }, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
           send('ask:chunk', { requestId, text });

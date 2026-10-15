@@ -51,6 +51,7 @@ export * from './embed/types';
 
 export * from './actions/context';
 export * from './actions/ask';
+export * from './actions/ask-tools';
 export * from './actions/save';
 export * from './actions/who';
 export * from './actions/promises';

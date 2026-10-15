@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import askPrompt from '../../prompts/ask.md?raw';
+import { askTools, type AskToolDeps } from './ask-tools';
 import { contextLines, nowLine } from '../context/prompt';
 import type { RetrievedContext } from '../context/retrieve';
 import type { LlmProvider, StreamResult } from '../llm/types';
@@ -24,6 +25,8 @@ export interface AskInput {
   context?: Pick<RetrievedContext, 'people' | 'tasks' | 'events'> | null;
   /** Lets Ask save a note when the question asks it to remember something. */
   remember?: RememberDeps;
+  /** Lets Ask add tasks and events, edit saved people, and note facts about the user (decision 78). */
+  tools?: AskToolDeps;
   /** Nothing selected: the text around the caret, or what is on screen. */
   surroundings?: Surroundings | null;
 }
@@ -110,7 +113,22 @@ export function noteLabels(items: Pick<Item, 'created_at'>[]): string[] {
   });
 }
 
-type AskSettings = Pick<Settings, 'ask' | 'capture' | 'identity'>;
+type AskSettings = Pick<Settings, 'ask' | 'capture' | 'identity'> & Partial<Pick<Settings, 'aboutMe'>>;
+
+/** Facts about the user Ask always gets (decision 78): the newest that fit. */
+const MAX_ABOUT_ME = 20;
+const MAX_ABOUT_ME_CHARS = 1500;
+
+function aboutMeLines(list: Settings['aboutMe'] | undefined): string[] {
+  const out: string[] = [];
+  let used = 0;
+  for (const f of [...(list ?? [])].reverse()) {
+    if (out.length >= MAX_ABOUT_ME || used + f.text.length > MAX_ABOUT_ME_CHARS) break;
+    out.unshift(`- ${f.text}`);
+    used += f.text.length;
+  }
+  return out;
+}
 
 export function buildAskPrompt(settings: AskSettings, input: AskInput): { question: string; prompt: string } {
   const question = input.question?.trim() || settings.ask.defaultQuestion;
@@ -128,6 +146,10 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
     // Without this the model reads a message in the selection as the asker's own.
     '## The person asking',
     me ? `${me}. They are reading the selection; they did not write it unless it is signed by or attributed to them.` : 'Unknown. They are reading the selection and most likely did not write it.',
+    ...(() => {
+      const facts = aboutMeLines(settings.aboutMe);
+      return facts.length ? ['What you know about them:', ...facts] : [];
+    })(),
     '',
     // For "when is that?" and "how long ago" (decision 54); with the time, so "in 3 hours" and "past" in the saved data read right (decision 77).
     '## Now',
@@ -180,6 +202,6 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
 /** Streams an answer to a question about the selection, on the Chat role. */
 export function ask(llm: LlmProvider, settings: AskSettings, input: AskInput, signal?: AbortSignal): StreamResult {
   const { prompt } = buildAskPrompt(settings, input);
-  const tools = input.remember ? { remember: rememberTool(input.remember) } : undefined;
+  const tools = input.remember || input.tools ? { ...(input.remember && { remember: rememberTool(input.remember) }), ...(input.tools && askTools(input.tools)) } : undefined;
   return llm.stream({ role: 'chat', action: 'ask', instructions: askPrompt, prompt, signal, maxOutputTokens: 800, ...(tools && { tools, continueAfterTools: answerAfterUnaskedSave }) });
 }

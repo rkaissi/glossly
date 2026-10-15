@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUp, Check, Copy } from 'lucide-react';
-import type { AskErrorEvent, AskSaved, ContextUsed, OverlayState } from '@glossly/core/api';
+import type { AskAction, AskErrorEvent, AskSaved, ContextUsed, OverlayState } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { AnswerText } from './AnswerText';
+import { AskActionRow } from './AskActionRow';
 import { MemoryNote } from './MemoryNote';
 import { UsedChip } from './UsedChip';
 
@@ -35,6 +36,9 @@ export function AskPanel({ s }: { s: OverlayState }) {
   const [copied, setCopied] = useState(false);
   /** The memories Ask saved for this answer, asked for or on its own (decision 78). */
   const [saved, setSaved] = useState<AskSaved[]>([]);
+  /** Tasks, events, and edits Ask did or offers for this answer (decision 78), in order, by id. */
+  const [actions, setActions] = useState<AskAction[]>([]);
+  const upsertAction = (a: AskAction) => setActions((list) => (list.some((x) => x.id === a.id) ? list.map((x) => (x.id === a.id ? a : x)) : [...list, a]));
   /** What the answer drew on from saved data (decision 77). */
   const [used, setUsed] = useState<ContextUsed[]>([]);
   const input = useRef<HTMLInputElement>(null);
@@ -61,6 +65,9 @@ export function AskPanel({ s }: { s: OverlayState }) {
       glossly.on('ask:saved', (p) => {
         if (p.requestId === current.current || waiting.current) setSaved((list) => [...list, p]);
       }),
+      glossly.on('ask:action', (p) => {
+        if (p.requestId === current.current || waiting.current) upsertAction(p);
+      }),
       // Sent once, before the answer streams; usually while ask:start is still returning.
       glossly.on('ask:context', (p) => {
         if (p.requestId === current.current || waiting.current) setUsed(p.used);
@@ -81,6 +88,7 @@ export function AskPanel({ s }: { s: OverlayState }) {
     setAnswer({ status: 'starting' });
     setCopied(false);
     setSaved([]);
+    setActions([]);
     setUsed([]);
     const { requestId } = await glossly.invoke('ask:start', { sessionId: s.sessionId, question });
     waiting.current = false;
@@ -156,6 +164,9 @@ export function AskPanel({ s }: { s: OverlayState }) {
 
       {saved.map((m) => (
         <MemoryNote key={`${m.itemId}:${m.undoUntil}`} saved={m} />
+      ))}
+      {actions.map((a) => (
+        <AskActionRow key={a.id} sessionId={s.sessionId} action={a} onChange={upsertAction} />
       ))}
 
       <div className="panel-foot">

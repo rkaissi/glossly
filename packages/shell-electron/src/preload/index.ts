@@ -9,6 +9,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'ask:error': true,
   'ask:saved': true,
   'ask:context': true,
+  'ask:action': true,
   'reply:chunk': true,
   'reply:done': true,
   'reply:error': true,

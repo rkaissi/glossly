@@ -625,6 +625,10 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .inline-note svg {
   flex: none;
 }
+/* A task or event Ask only offered (decision 78) waits for Add: a shade stronger than the done ones. */
+.ask-action.offered {
+  color: var(--fg);
+}
 /* A memory Ask kept on its own shows its text: one line, the rest in the tooltip. */
 .memory-text {
   min-width: 0;

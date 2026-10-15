@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { Pencil, Trash2, X } from 'lucide-react';
 import type { Identity, ReplyChannel, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
@@ -285,6 +285,83 @@ function LearnedStyle({ learning }: { learning: boolean }) {
   );
 }
 
+/**
+ * What Glossly knows about you (decision 78): facts Ask noted, always in its prompt. Ask adds
+ * them; here they can be reworded or removed, since a wrong one would color every answer.
+ */
+function AboutMe({ facts }: { facts: SettingsView['settings']['aboutMe'] }) {
+  const { busy, error, run } = useAction();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const write = (next: SettingsView['settings']['aboutMe']) =>
+    run(async () => {
+      const r = await glossly.invoke('settings:set', { key: 'aboutMe', value: next });
+      if (r.error) throw new Error(r.error);
+    });
+  const saveEdit = () => {
+    const text = editing?.text.replace(/\s+/g, ' ').trim();
+    if (!editing || !text) return;
+    void write(facts.map((f) => (f.id === editing.id ? { ...f, text: text.slice(0, 300) } : f))).then(() => setEditing(null));
+  };
+  return (
+    <div className="field">
+      <div className="field-label">
+        <strong>What Glossly knows about you</strong>
+        <p className="muted small">Ask adds what you tell it about yourself, and uses it in every answer. Reword or remove anything that's wrong.</p>
+      </div>
+      {facts.length === 0 && <p className="muted small">Nothing yet. Tell Ask something about yourself, like where you work.</p>}
+      {facts.length > 0 && (
+        <ul className="list">
+          {facts.map((f) =>
+            editing?.id === f.id ? (
+              <li key={f.id}>
+                <input
+                  className="grow"
+                  value={editing.text}
+                  maxLength={300}
+                  autoFocus
+                  aria-label="Fact about you"
+                  onChange={(e) => setEditing({ id: f.id, text: e.target.value })}
+                  onKeyDown={(e: KeyboardEvent) => {
+                    if (e.key === 'Enter') saveEdit();
+                    else if (e.key === 'Escape') setEditing(null);
+                  }}
+                />
+                <button disabled={busy} onClick={() => setEditing(null)}>
+                  Cancel
+                </button>
+                <button className="primary" disabled={busy || !editing.text.trim()} onClick={saveEdit}>
+                  Save
+                </button>
+              </li>
+            ) : (
+              <li key={f.id}>
+                <span className="grow">{f.text}</span>
+                <button className="icon-btn sm" title="Reword" aria-label="Reword" disabled={busy} onClick={() => setEditing({ id: f.id, text: f.text })}>
+                  <Pencil size={14} strokeWidth={1.75} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={`delete-btn${pendingId === f.id ? ' armed' : ''}`}
+                  title={pendingId === f.id ? 'Remove this' : 'Remove'}
+                  aria-label={pendingId === f.id ? 'Confirm: remove this' : 'Remove'}
+                  disabled={busy}
+                  onClick={() => (pendingId === f.id ? void write(facts.filter((x) => x.id !== f.id)) : setPendingId(f.id))}
+                  onBlur={() => setPendingId(null)}
+                >
+                  <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+                  <span>Delete</span>
+                </button>
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
 export function ProfileTab({ view }: { view: SettingsView }) {
   const saved = view.settings.identity;
   const [draft, setDraft] = useState<Identity>(saved);
@@ -327,6 +404,7 @@ export function ProfileTab({ view }: { view: SettingsView }) {
           {error && <span className="error small">{error}</span>}
         </div>
       </div>
+      <AboutMe facts={view.settings.aboutMe} />
       <VoiceSamples />
       <LearnedStyle learning={view.settings.replyLearning} />
     </section>

@@ -95,3 +95,11 @@ By topic: stack 1–8 · capture and overlay 9, 11, 16–18 · data and privacy 
 - Links to people use full or saved names only, never a first name alone; the prompt asks for full names.
 - The user can reword a memory in the Saved tab and delete it as before.
 - There is no memory switch yet (parked).
+
+*Built in 25.6* (`actions/ask-tools.ts`):
+- Ask's other tools are `add_task`, `add_event`, `update_person`, and `about_me`, each with `asked`.
+- Tasks and events asked for are added at once with Undo; noticed ones are offered as a row with Add. Person edits and facts about the user apply at once with Undo, asked or not. Asked, the tool says what it did in the answer; otherwise it's quiet and the panel row shows it.
+- People are matched exactly (`byName`). A task for someone not saved keeps their name in the text. `update_person` never creates anyone and says so when asked. It adds a line to the note rather than replacing it, so nothing the user wrote is lost, and Undo puts the note and relationship back.
+- Days are read in code (`resolveDue`, `resolveEventTime`); an event with no readable day isn't added, and Ask says so.
+- What Glossly knows about the user is a new setting, `aboutMe` (facts with an id), shown and editable on Profile. Ask's prompt always gets the newest 20 that fit in 1,500 characters, under "The person asking". It's a setting rather than memories so it's always there, not found by relevance.
+- Undo lasts the save window (`save.undoSeconds`). The Tasks and People tabs refresh through a new `people` event on `Services`.

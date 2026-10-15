@@ -86,6 +86,7 @@ async function main(): Promise<void> {
     settingsWindow.send('people:changed', {});
     if (!overlay.win.isDestroyed()) overlay.win.webContents.send('people:changed', {});
   };
+  services.on('people', broadcastPeople);
   services.embed.on('status', (s) => settingsWindow.send('embed:progress', s));
   const updater = new Updater(() => services.settings.autoUpdate);
   updater.on('state', (v) => settingsWindow.send('updates:state', v));

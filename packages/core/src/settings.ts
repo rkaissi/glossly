@@ -80,6 +80,14 @@ export const SettingsSchema = z.object({
   /** The debug block under the bar. Off for new profiles (Step 21): testers shouldn't start with it. */
   debugView: z.boolean().default(false),
   identity: IdentitySchema.prefault({}),
+  /**
+   * What Glossly knows about the user, one fact each (decision 78): added by Ask, shown on
+   * Profile where the user can reword or remove them, and always in Ask's prompt.
+   */
+  aboutMe: z
+    .array(z.object({ id: z.string().max(64), text: z.string().max(300), at: z.string().max(40) }))
+    .max(50)
+    .default([]),
 
   /** Keys are process names ("slack.exe") or window-title suffixes ("- Google Docs"). */
   appModes: z.record(z.string(), AppModeSchema).default({}),

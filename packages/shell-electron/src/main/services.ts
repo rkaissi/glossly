@@ -54,7 +54,8 @@ function vecPath(): string {
  * Everything the main process owns besides windows and capture: the store, settings, keys,
  * the model catalog and roles, the LLM provider, Save, embeddings, and metrics.
  */
-export class Services extends EventEmitter<{ settings: [Settings] }> {
+/** `people`: tasks, events, or people changed outside an IPC handler (Ask's tools, decision 78). */
+export class Services extends EventEmitter<{ settings: [Settings]; people: [] }> {
   readonly store: Store;
   readonly metrics: Metrics;
   readonly keys: KeyStore;
