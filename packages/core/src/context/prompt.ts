@@ -11,7 +11,8 @@ const MAX_LINE = 200;
 
 type Format = { format: (d: Date) => string };
 /** Intl puts a narrow no-break space before AM and PM; prompts and the chip get a plain one. */
-const plain = (f: Intl.DateTimeFormat): Format => ({ format: (d) => f.format(d).replace(/[  ]/g, ' ') });
+const ODD_SPACES = new RegExp(`[${String.fromCharCode(0x202f, 0xa0)}]`, 'g');
+const plain = (f: Intl.DateTimeFormat): Format => ({ format: (d) => f.format(d).replace(ODD_SPACES, ' ') });
 let fmt: { day: Format; time: Format; full: Format; short: Format } | null = null;
 const formats = () =>
   (fmt ??= {
