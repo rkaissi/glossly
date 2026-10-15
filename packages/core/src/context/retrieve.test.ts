@@ -7,7 +7,7 @@ import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { isoNow } from '../types';
 import { namedDays } from './days';
-import { namedPeople, retrieveContext } from './retrieve';
+import { linkNamedPeople, namedPeople, retrieveContext } from './retrieve';
 import { syncContext } from './sync';
 
 const require = createRequire(import.meta.url);
@@ -158,6 +158,19 @@ describe('retrieveContext', () => {
     expect(r.semantic).toBe(false);
     expect(r.people.map((p) => p.id)).toEqual([jordan.id]);
     expect(r.events.map((x) => x.id)).toEqual([e.id]);
+  });
+});
+
+describe('linkNamedPeople', () => {
+  it("links a memory to the people it names by full name, so it's on their card", () => {
+    const { store, people } = setup();
+    const casey = people.create({ name: 'Casey Lin' });
+    const jordan = people.create({ name: 'Jordan Hale' });
+    const notes = store.collectionByName('Notes')!;
+    const item = store.insertItem({ collection_id: notes.id, kind: 'note', text: 'Casey Lin is vegetarian; Jordan knows', why: null, source_app: null, window_title: null, data_json: null });
+    expect(linkNamedPeople(store, people, item.id, item.text)).toEqual([casey.id]);
+    expect(people.card(casey.id)!.items.map((i) => i.id)).toEqual([item.id]);
+    expect(people.card(jordan.id)!.items).toEqual([]);
   });
 });
 

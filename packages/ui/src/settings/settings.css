@@ -666,6 +666,22 @@ button.filter.on .muted {
   align-items: center;
   gap: 8px;
 }
+/* Rewording a memory in place (decision 78). */
+.saved-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.saved-edit textarea {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.5;
+}
+.saved-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
 .saved-meta .trigger {
   max-width: 200px;
 }

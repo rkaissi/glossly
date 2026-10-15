@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { app, clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
+  linkNamedPeople,
   REPLY_CHANNELS,
   REPLY_REDO_ASKS,
   STYLE_DIMENSIONS,
@@ -211,6 +212,13 @@ export function registerIpc(deps: IpcDeps): void {
     const deleted = services.save.remove(str(a.itemId, 100));
     if (deleted) log.info('item deleted');
     return { deleted };
+  });
+  handle('items:edit', (a) => {
+    const itemId = str(a.itemId, 100);
+    const text = str(a.text, 2000);
+    const edited = services.save.editMemory(itemId, text);
+    if (edited) linkNamedPeople(services.store, services.people, itemId, text);
+    return { edited };
   });
   handle('items:move', (a) => {
     const name = str(a.collection, 100).trim();

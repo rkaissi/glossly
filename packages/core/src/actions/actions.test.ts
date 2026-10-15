@@ -217,6 +217,67 @@ describe('SaveService', () => {
     return { svc, llm, embedder };
   }
 
+  describe('remember (decision 78)', () => {
+    /** Texts about Casey point one way, about Mom another, the rest a third. */
+    const topical: Embedder = {
+      model: 'fake',
+      dims: 4,
+      embed: async (texts) =>
+        texts.map((t) => {
+          const v = new Float32Array(4);
+          v[/casey/i.test(t) ? 0 : /mom/i.test(t) ? 1 : 2] = 1;
+          return v;
+        }),
+    };
+
+    it('rewords the memory about the same fact instead of adding a copy, and Undo puts the old wording back', async () => {
+      const { svc } = setup({ embedder: topical });
+      const first = await svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });
+      await first.enriched;
+      expect(first.updated).toBe(false);
+      const mom = await svc.remember({ text: "Mom's birthday is May 3", collection: 'Notes', selection: null });
+      await mom.enriched;
+      expect(mom.updated).toBe(false);
+
+      const again = await svc.remember({ text: 'Casey Lin is vegan now', collection: 'Ideas', selection: null });
+      await again.enriched;
+      expect(again).toMatchObject({ updated: true, item: { id: first.item.id, text: 'Casey Lin is vegan now' } });
+      expect(store.listItems().filter((i) => i.kind === 'note')).toHaveLength(2);
+      // It stays in its collection.
+      expect(store.getItem(first.item.id)?.collection_id).toBe(store.collectionByName('Notes')!.id);
+
+      expect(svc.undo(first.item.id)).toBe(true);
+      expect(store.getItem(first.item.id)?.text).toBe('Casey Lin is vegetarian');
+    });
+
+    it('lets the user reword a memory, but not a saved selection', async () => {
+      const { svc } = setup({ embedder: topical });
+      const m = await svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });
+      await m.enriched;
+      expect(svc.editMemory(m.item.id, '  Casey Lin is   vegan ')).toBe(true);
+      expect(store.getItem(m.item.id)?.text).toBe('Casey Lin is vegan');
+      expect(svc.editMemory(m.item.id, '   ')).toBe(false);
+      const sel = svc.save({ selection: selection(), collection: 'Notes' });
+      expect(svc.editMemory(sel.item.id, 'changed')).toBe(false);
+      await svc.idle();
+    });
+
+    it('never rewords a saved selection, and saves new memories without the embedder', async () => {
+      const { svc } = setup({ embedder: topical });
+      const sel = svc.save({ selection: { ...selection(), text: 'Casey sent the menu' }, collection: 'Notes' });
+      await sel.enriched;
+      const r = await svc.remember({ text: 'Casey Lin likes the menu', collection: 'Notes', selection: null });
+      expect(r.updated).toBe(false);
+      expect(store.getItem(sel.item.id)?.text).toBe('Casey sent the menu');
+
+      const off = setup({ embedder: null });
+      const a = await off.svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });
+      const b = await off.svc.remember({ text: 'Casey Lin is vegan now', collection: 'Notes', selection: null });
+      expect([a.updated, b.updated]).toEqual([false, false]);
+      expect(b.item.id).not.toBe(a.item.id);
+    });
+  });
+
   it('inserts at once with an excerpt, then embeds and links entities', async () => {
     const llm = new FakeLlm(() => ({
       entities: [

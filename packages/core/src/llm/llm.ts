@@ -302,6 +302,13 @@ export class AiSdkLlm implements LlmProvider {
             temperature: req.temperature,
             maxRetries: 0,
             ...(tools && { tools }),
+            ...(tools &&
+              req.continueAfterTools && {
+                stopWhen: ({ steps }: { steps: { text: string; toolCalls: { input: unknown }[] }[] }) => {
+                  const last = steps.at(-1);
+                  return steps.length >= 2 || !last || !req.continueAfterTools!({ text: last.text, toolInputs: last.toolCalls.map((c) => c.input) });
+                },
+              }),
             ...(providerOptions && { providerOptions }),
           });
           for await (const part of result.stream) {

@@ -199,6 +199,11 @@ export class Store {
     this.db.prepare('UPDATE items SET why = ? WHERE id = ?').run(why, id);
   }
 
+  /** A memory's new wording (decision 78); its vector is redone by the caller. */
+  updateItemText(id: string, text: string): void {
+    this.db.prepare('UPDATE items SET text = ? WHERE id = ?').run(text, id);
+  }
+
   /** Items with their collection's name, in the order of `ids`. Missing ids are skipped. */
   itemsWithCollection(ids: string[]): (Item & { collection: string | null })[] {
     if (ids.length === 0) return [];

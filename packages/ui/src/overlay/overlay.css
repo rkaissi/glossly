@@ -625,6 +625,13 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
 .inline-note svg {
   flex: none;
 }
+/* A memory Ask kept on its own shows its text: one line, the rest in the tooltip. */
+.memory-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .inline-note button {
   height: var(--h-xs);
   padding: 0 9px;

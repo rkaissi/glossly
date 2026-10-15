@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Bookmark, Check, Copy, Undo2 } from 'lucide-react';
+import { ArrowUp, Check, Copy } from 'lucide-react';
 import type { AskErrorEvent, AskSaved, ContextUsed, OverlayState } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { AnswerText } from './AnswerText';
-import { useSecondsLeft } from './SavedToast';
+import { MemoryNote } from './MemoryNote';
 import { UsedChip } from './UsedChip';
 
 type Answer =
@@ -33,9 +33,8 @@ export function AskPanel({ s }: { s: OverlayState }) {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [copied, setCopied] = useState(false);
-  /** A note Ask saved because the question asked it to remember something. */
-  const [saved, setSaved] = useState<(AskSaved & { undone?: boolean }) | null>(null);
-  const undoLeft = useSecondsLeft(saved && !saved.undone ? saved.undoUntil : null);
+  /** The memories Ask saved for this answer, asked for or on its own (decision 78). */
+  const [saved, setSaved] = useState<AskSaved[]>([]);
   /** What the answer drew on from saved data (decision 77). */
   const [used, setUsed] = useState<ContextUsed[]>([]);
   const input = useRef<HTMLInputElement>(null);
@@ -58,9 +57,9 @@ export function AskPanel({ s }: { s: OverlayState }) {
       glossly.on('ask:chunk', (p) => route(p.requestId, { kind: 'chunk', text: p.text })),
       glossly.on('ask:done', (p) => route(p.requestId, { kind: 'done', model: p.model })),
       glossly.on('ask:error', (p) => route(p.requestId, { kind: 'error', code: p.code, message: p.message })),
-      // Saving happens once per request, so it is matched on the id when it arrives or right after ask:start returns.
+      // Memories are matched on the id when they arrive or right after ask:start returns; an answer can save several.
       glossly.on('ask:saved', (p) => {
-        if (p.requestId === current.current || waiting.current) setSaved(p);
+        if (p.requestId === current.current || waiting.current) setSaved((list) => [...list, p]);
       }),
       // Sent once, before the answer streams; usually while ask:start is still returning.
       glossly.on('ask:context', (p) => {
@@ -81,7 +80,7 @@ export function AskPanel({ s }: { s: OverlayState }) {
     early.current.clear();
     setAnswer({ status: 'starting' });
     setCopied(false);
-    setSaved(null);
+    setSaved([]);
     setUsed([]);
     const { requestId } = await glossly.invoke('ask:start', { sessionId: s.sessionId, question });
     waiting.current = false;
@@ -155,23 +154,9 @@ export function AskPanel({ s }: { s: OverlayState }) {
 
       {answer && answer.status !== 'error' && <UsedChip key={used.map((u) => u.id).join()} sessionId={s.sessionId} used={used} />}
 
-      {saved && (
-        <div className="inline-note">
-          <Bookmark size={14} strokeWidth={1.75} aria-hidden />
-          <span>{saved.undone ? `Removed from ${saved.collection}.` : `Saved to ${saved.collection}.`}</span>
-          {!saved.undone && undoLeft > 0 && (
-            <button
-              className="ghost"
-              onClick={() =>
-                void glossly.invoke('save:undo', { itemId: saved.itemId }).then((r) => r.undone && setSaved({ ...saved, undone: true }))
-              }
-            >
-              <Undo2 size={14} strokeWidth={1.75} aria-hidden />
-              Undo ({undoLeft}s)
-            </button>
-          )}
-        </div>
-      )}
+      {saved.map((m) => (
+        <MemoryNote key={`${m.itemId}:${m.undoUntil}`} saved={m} />
+      ))}
 
       <div className="panel-foot">
         {answer?.status === 'done' && <span>{answer.model}</span>}

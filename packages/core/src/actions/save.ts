@@ -63,7 +63,7 @@ export interface SaveServiceDeps {
   llm: LlmProvider;
   /** Null until the local model is downloaded and loaded; items are embedded later. */
   embedder: () => Embedder | null;
-  settings: () => Pick<Settings, 'save'>;
+  settings: () => Pick<Settings, 'save'> & { ask?: Pick<Settings['ask'], 'memoryUpdateSimilarity'> };
   metrics?: Pick<Metrics, 'record'>;
   now?: () => number;
 }
@@ -96,6 +96,8 @@ export function formatExtractPrompt(item: Item): string {
 /** Save: insert at once, then embed and extract entities in the background. */
 export class SaveService {
   private readonly undoDeadlines = new Map<string, number>();
+  /** Memories reworded by `remember`, with their wording before, so Undo puts it back instead of deleting. */
+  private readonly reworded = new Map<string, string>();
   private readonly running = new Map<string, { ctl: AbortController; done: Promise<EnrichResult> }>();
 
   constructor(private readonly deps: SaveServiceDeps) {}
@@ -132,8 +134,8 @@ export class SaveService {
   }
 
   /**
-   * Saves a note Ask wrote when the user asked it to remember something: an item of kind
-   * "note", embedded and enriched like any save, with the same undo window.
+   * Saves a new memory from Ask (asked for or not, decision 78): an item of kind "note" (shown as
+   * "Memory"), embedded and enriched like any save, with the same undo window.
    */
   saveNote(input: { text: string; collection: string; selection: SelectionPayload | null }): SaveResult {
     const { store } = this.deps;
@@ -153,6 +155,55 @@ export class SaveService {
     this.undoDeadlines.set(item.id, undoUntil);
     this.deps.metrics?.record('save_done', { via: 'ask', has_why: false });
     return { item, undoUntil, enriched: this.startEnrich(item) };
+  }
+
+  /**
+   * A memory from Ask (decision 78): rewords the saved memory closest in meaning when it is at
+   * least `ask.memoryUpdateSimilarity` alike (the same fact, said again or changed), else saves a
+   * new one with `saveNote`. Undo puts the old wording back, or deletes the new memory.
+   */
+  async remember(input: { text: string; collection: string; selection: SelectionPayload | null }): Promise<SaveResult & { updated: boolean }> {
+    const { store } = this.deps;
+    const close = await this.closeMemory(input.text).catch(() => null);
+    if (close) {
+      if (!this.reworded.has(close.id)) this.reworded.set(close.id, close.text);
+      store.updateItemText(close.id, input.text);
+      const undoUntil = this.now() + this.deps.settings().save.undoSeconds * 1000;
+      this.undoDeadlines.set(close.id, undoUntil);
+      this.deps.metrics?.record('memory_updated');
+      const item = store.getItem(close.id)!;
+      return { item, undoUntil, enriched: this.startEnrich(item), updated: true };
+    }
+    return { ...this.saveNote(input), updated: false };
+  }
+
+  /** The user rewords a memory in the Saved tab (decision 78): new text, then embedded and enriched again. Memories only. */
+  editMemory(itemId: string, text: string): boolean {
+    const { store } = this.deps;
+    const clean = text.replace(/\s+/g, ' ').trim().slice(0, 1000);
+    const item = store.getItem(itemId);
+    if (!clean || item?.kind !== 'note') return false;
+    this.running.get(itemId)?.ctl.abort();
+    store.updateItemText(itemId, clean);
+    void this.startEnrich(store.getItem(itemId)!);
+    this.deps.metrics?.record('memory_edited');
+    return true;
+  }
+
+  /** The saved memory (kind "note") closest in meaning to `text`, if close enough to be the same fact. */
+  private async closeMemory(text: string): Promise<Item | null> {
+    const { store } = this.deps;
+    const min = this.deps.settings().ask?.memoryUpdateSimilarity;
+    const embedder = this.deps.embedder();
+    if (min === undefined || !embedder || !store.hasVectors) return null;
+    const [v] = await embedder.embed([text]);
+    if (!v) return null;
+    for (const hit of store.searchVectors(v, 5)) {
+      if (hit.similarity < min) break;
+      const item = store.getItem(hit.item_id);
+      if (item?.kind === 'note') return item;
+    }
+    return null;
   }
 
   /**
@@ -196,13 +247,25 @@ export class SaveService {
     return deleted;
   }
 
-  /** Deletes the item if still inside the undo window. Returns whether it was undone. */
+  /**
+   * Deletes the item if still inside the undo window, or puts back a reworded memory's old
+   * wording. Returns whether it was undone.
+   */
   undo(itemId: string): boolean {
     const until = this.undoDeadlines.get(itemId);
+    const previous = this.reworded.get(itemId);
+    this.reworded.delete(itemId);
     if (until === undefined) return false;
     this.undoDeadlines.delete(itemId);
     if (this.now() > until + UNDO_GRACE_MS) return false;
     this.running.get(itemId)?.ctl.abort();
+    if (previous !== undefined) {
+      this.deps.store.updateItemText(itemId, previous);
+      const item = this.deps.store.getItem(itemId);
+      if (item) void this.embed(item).catch(() => false);
+      this.deps.metrics?.record('save_undone', { reworded: true });
+      return Boolean(item);
+    }
     const deleted = this.deps.store.deleteItem(itemId);
     if (deleted) this.deps.metrics?.record('save_undone');
     return deleted;

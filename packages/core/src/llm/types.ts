@@ -23,6 +23,11 @@ export interface ChatRequest {
    * Left out for models whose capabilities say they have no tools.
    */
   tools?: ToolSet;
+  /**
+   * After a step that called tools: true lets the model write once more (at most two steps), for
+   * a step that only saved a memory nobody asked for and hasn't answered yet (decision 78).
+   */
+  continueAfterTools?: (step: { text: string; toolInputs: unknown[] }) => boolean;
   /** Called when the call moves to a fallback model, with that model (the router's budget grows then; decision 60). */
   onFallback?: (to: ModelRef) => void;
 }

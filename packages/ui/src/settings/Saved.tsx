@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Search, Trash2 } from 'lucide-react';
+import { Check, Copy, Pencil, Search, Trash2 } from 'lucide-react';
 import type { LibraryItem, LibraryResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
@@ -7,7 +7,8 @@ import { appName, formatDay } from '../dates';
 import { useAction } from './useAction';
 
 const PAGE = 30;
-const KIND_LABEL: Record<LibraryItem['kind'], string | null> = { selection: null, note: 'Note', chart: 'Chart' };
+// Ask's notes are memories, asked for or saved on its own (decision 78).
+const KIND_LABEL: Record<LibraryItem['kind'], string | null> = { selection: null, note: 'Memory', chart: 'Chart' };
 
 /** One saved item: the text, where and when it was saved, and Copy, Move, and Delete (trash morphs in place). */
 function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collections: string[]; onChanged: () => void }) {
@@ -33,10 +34,48 @@ function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collect
       await glossly.invoke('items:delete', { itemId: item.itemId });
       onChanged();
     });
+  // Memories can be reworded (decision 78); a wrong one would feed every later answer.
+  const [editing, setEditing] = useState<string | null>(null);
+  const saveEdit = () =>
+    void run(async () => {
+      const text = editing?.trim();
+      if (!text) throw new Error('A memory needs some text.');
+      const r = await glossly.invoke('items:edit', { itemId: item.itemId, text });
+      if (!r.edited) throw new Error('That memory is gone.');
+      setEditing(null);
+      onChanged();
+    });
   return (
     <li className="saved-row">
-      <p className={`saved-text${open ? '' : ' clip4'}`}>{item.text}</p>
-      {long && (
+      {editing === null ? (
+        <p className={`saved-text${open ? '' : ' clip4'}`}>{item.text}</p>
+      ) : (
+        <div className="saved-edit">
+          <textarea
+            rows={3}
+            value={editing}
+            maxLength={1000}
+            autoFocus
+            aria-label="Memory"
+            onChange={(e) => setEditing(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                saveEdit();
+              } else if (e.key === 'Escape') setEditing(null);
+            }}
+          />
+          <div className="saved-edit-actions">
+            <button disabled={busy} onClick={() => setEditing(null)}>
+              Cancel
+            </button>
+            <button className="primary" disabled={busy || !editing.trim()} onClick={saveEdit}>
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+      {long && editing === null && (
         <button className="link small" onClick={() => setOpen((o) => !o)}>
           {open ? 'Show less' : item.clipped ? 'Show more (Copy copies all of it)' : 'Show more'}
         </button>
@@ -51,6 +90,11 @@ function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collect
         </span>
         <span className="spacer" />
         <Select size="sm" label="Collection" value={item.collection} placeholder="No collection" disabled={busy} onChange={move} options={collections.map((c) => ({ value: c, label: c }))} />
+        {item.kind === 'note' && (
+          <button className="icon-btn sm" title="Edit this memory" aria-label="Edit this memory" disabled={busy || editing !== null} onClick={() => setEditing(item.text)}>
+            <Pencil size={14} strokeWidth={1.75} aria-hidden />
+          </button>
+        )}
         <button className="icon-btn sm" title="Copy" aria-label="Copy" disabled={busy} onClick={copy}>
           {copied ? <Check size={14} strokeWidth={1.75} aria-hidden /> : <Copy size={14} strokeWidth={1.75} aria-hidden />}
         </button>

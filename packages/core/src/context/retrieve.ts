@@ -86,6 +86,27 @@ export function namedPeople(people: Pick<PeopleRepo, 'nameIndex'>, texts: string
     .map((p) => p.personId);
 }
 
+/**
+ * Links a saved item to every saved person named in its text by a full or saved name, so it shows
+ * on their card at once (decision 78). The entities pass may add more later; a link is never
+ * made from a first name alone. Returns the people linked.
+ */
+export function linkNamedPeople(store: Store, people: Pick<PeopleRepo, 'nameIndex' | 'get'>, itemId: string, text: string): string[] {
+  const linked: string[] = [];
+  for (const id of namedPeople(people, [text])) {
+    const p = people.get(id);
+    if (!p) continue;
+    let entity = p.entity_id;
+    if (!entity) {
+      entity = store.upsertEntity('person', p.name);
+      store.setPersonEntity(p.id, entity);
+    }
+    store.linkItemEntity(itemId, entity);
+    linked.push(id);
+  }
+  return linked;
+}
+
 /** Nearest rows of one kind over every query vector, best similarity per row, above `min`. */
 function nearestOf(store: Store, vectors: Float32Array[], kind: ContextKind, k: number, min: number): Map<string, number> {
   const best = new Map<string, number>();

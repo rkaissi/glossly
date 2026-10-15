@@ -9,7 +9,7 @@ import { AiSdkLlm, isFallbackError, LOCAL_UNREACHABLE_MESSAGE, privacyChain, REA
 import { isLoopbackUrl, LocalProvider, normalizeBaseUrl, PROVIDERS, ProviderKeyError } from './providers';
 import { modelChain, updateLocalModel, updateRoles } from './roles';
 import { LlmError } from './types';
-import { rememberTool } from '../actions/ask';
+import { answerAfterUnaskedSave, rememberTool } from '../actions/ask';
 
 const usage = {
   inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
@@ -577,26 +577,59 @@ describe('AiSdkLlm.stream with a tool', () => {
   it('runs Ask\'s remember tool once, says what it saved, and makes no second call', async () => {
     const parts: LanguageModelV4StreamPart[] = [
       { type: 'stream-start', warnings: [] },
-      { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Maya prefers  mornings', collection: 'notes' }) },
+      { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Maya prefers  mornings', collection: 'notes', asked: true }) },
       { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
     ];
     const model = new MockLanguageModelV4({ doStream: { stream: convertArrayToReadableStream(parts) } });
     const { llm } = llmWith({ [CHAT.model]: model }, roles({ chat: { ...CHAT, fallback: null } }));
-    const saved: [string, string][] = [];
+    const saved: [string, string, boolean][] = [];
     const tools = {
       remember: rememberTool({
         collections: ['Notes', 'Reading'],
         suggested: 'Reading',
-        save: (note, collection) => {
-          saved.push([note, collection]);
-          return { collection };
+        save: (note, collection, asked) => {
+          saved.push([note, collection, asked]);
+          return { collection, updated: false };
         },
       }),
     };
-    const r = llm.stream({ role: 'chat', action: 'ask', instructions: 'i', prompt: 'p', tools });
+    const r = llm.stream({ role: 'chat', action: 'ask', instructions: 'i', prompt: 'p', tools, continueAfterTools: answerAfterUnaskedSave });
     expect(await collect(r.textStream)).toBe('Saved to Notes: "Maya prefers mornings"');
-    expect(saved).toEqual([['Maya prefers mornings', 'Notes']]);
+    expect(saved).toEqual([['Maya prefers mornings', 'Notes', true]]);
     expect(model.doStreamCalls).toHaveLength(1);
+  });
+
+  it('saves a memory nobody asked for quietly, then lets the model answer (decision 78)', async () => {
+    const steps: LanguageModelV4StreamPart[][] = [
+      [
+        { type: 'stream-start', warnings: [] },
+        { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Casey Lin is vegetarian', collection: 'Notes', asked: false }) },
+        { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
+      ],
+      [
+        { type: 'stream-start', warnings: [] },
+        { type: 'text-start', id: 't' },
+        { type: 'text-delta', id: 't', delta: 'Try the veggie place.' },
+        { type: 'text-end', id: 't' },
+        { type: 'finish', usage, finishReason: { unified: 'stop', raw: 'stop' } },
+      ],
+    ];
+    let call = 0;
+    const model = new MockLanguageModelV4({ doStream: async () => ({ stream: convertArrayToReadableStream(steps[Math.min(call++, 1)]!) }) });
+    const { llm } = llmWith({ [CHAT.model]: model }, roles({ chat: { ...CHAT, fallback: null } }));
+    const saved: boolean[] = [];
+    const tools = { remember: rememberTool({ collections: ['Notes'], suggested: 'Notes', save: (_n, collection, asked) => (saved.push(asked), { collection, updated: false }) }) };
+    const r = llm.stream({ role: 'chat', action: 'ask', instructions: 'i', prompt: 'p', tools, continueAfterTools: answerAfterUnaskedSave });
+    expect(await collect(r.textStream)).toBe('Try the veggie place.');
+    expect(saved).toEqual([false]);
+    expect(model.doStreamCalls).toHaveLength(2);
+  });
+
+  it('decides when to answer after saving', () => {
+    expect(answerAfterUnaskedSave({ text: '', toolInputs: [{ asked: false }] })).toBe(true);
+    expect(answerAfterUnaskedSave({ text: 'Here you go.', toolInputs: [{ asked: false }] })).toBe(false);
+    expect(answerAfterUnaskedSave({ text: '', toolInputs: [{ asked: true }] })).toBe(false);
+    expect(answerAfterUnaskedSave({ text: '', toolInputs: [{ asked: false }, { asked: true }] })).toBe(false);
   });
 });
 

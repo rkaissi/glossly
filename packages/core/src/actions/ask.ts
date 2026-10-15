@@ -33,32 +33,50 @@ export interface RememberDeps {
   collections: string[];
   /** The collection the router picked for this selection, offered as the default. */
   suggested: string;
-  /** Saves the note and returns where it went. */
-  save: (note: string, collection: string) => { collection: string };
+  /** Saves the memory, or rewords a close one (decision 78), and says where it went. */
+  save: (note: string, collection: string, asked: boolean) => Promise<{ collection: string; updated: boolean }> | { collection: string; updated: boolean };
 }
 
 const MAX_NOTE = 1000;
 
+interface RememberInput {
+  note: string;
+  collection: string;
+  asked: boolean;
+}
+
 /**
- * The `remember` tool on the Ask stream: saves a note into a collection and reports it in the
- * answer ("Saved to Notes: ..."), with no second model call (see ChatRequest.tools).
+ * The `remember` tool on the Ask stream (decisions 24 and 78): saves a memory into a collection,
+ * when asked or when the conversation shows something worth keeping. Asked, it reports the save
+ * in the answer ("Saved to Notes: ...") and the stream ends there; unasked, it says nothing (the
+ * panel shows it with Undo) and the model goes on to answer if it hadn't (`continueAfterTools`).
  */
 export function rememberTool(deps: RememberDeps) {
   const names = deps.collections.length ? deps.collections : [deps.suggested];
   return tool({
-    description: `Save a note for the person when they ask you to remember, save, keep, or note something. Collections: ${names.join(', ')}.`,
+    description:
+      `Save a memory for the person: when they ask you to remember, save, keep, or note something, and also on your own when the conversation shows something worth knowing later ` +
+      `(a fact about them or someone they know, a preference, a plan with a date). Not for passing details, things only true right now, or secrets such as passwords or card or ID numbers. Collections: ${names.join(', ')}.`,
     inputSchema: z.object({
-      note: z.string().describe('What to remember: short and self-contained, with the names and dates it needs.'),
+      note: z.string().describe('What to remember: short and self-contained, with the full names and dates it needs.'),
       collection: z.string().describe(`One of: ${names.join(', ')}. Use ${deps.suggested} when unsure.`),
+      asked: z.boolean().describe('True when the person asked you to remember this; false when you chose to.'),
     }),
-    execute: async ({ note, collection }) => {
+    execute: async ({ note, collection, asked }: RememberInput) => {
       const text = note.replace(/\s+/g, ' ').trim().slice(0, MAX_NOTE);
-      if (!text) return { say: 'There was nothing to save.' };
+      if (!text) return { say: asked ? 'There was nothing to save.' : '' };
       const known = names.find((n) => n.toLowerCase() === collection.trim().toLowerCase()) ?? deps.suggested;
-      const saved = deps.save(text, known);
-      return { say: `Saved to ${saved.collection}: "${clip(text, 160)}"` };
+      const saved = await deps.save(text, known, asked !== false);
+      if (asked === false) return { say: '' };
+      return { say: `${saved.updated ? 'Updated in' : 'Saved to'} ${saved.collection}: "${clip(text, 160)}"` };
     },
   });
+}
+
+/** After a tools step: write the answer when the only saves were unasked ones and nothing was said yet. */
+export function answerAfterUnaskedSave(step: { text: string; toolInputs: unknown[] }): boolean {
+  if (step.text.trim()) return false;
+  return step.toolInputs.length > 0 && step.toolInputs.every((i) => (i as Partial<RememberInput> | null)?.asked === false);
 }
 
 const MAX_SELECTION = 12_000;
@@ -163,5 +181,5 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
 export function ask(llm: LlmProvider, settings: AskSettings, input: AskInput, signal?: AbortSignal): StreamResult {
   const { prompt } = buildAskPrompt(settings, input);
   const tools = input.remember ? { remember: rememberTool(input.remember) } : undefined;
-  return llm.stream({ role: 'chat', action: 'ask', instructions: askPrompt, prompt, signal, maxOutputTokens: 800, ...(tools && { tools }) });
+  return llm.stream({ role: 'chat', action: 'ask', instructions: askPrompt, prompt, signal, maxOutputTokens: 800, ...(tools && { tools, continueAfterTools: answerAfterUnaskedSave }) });
 }

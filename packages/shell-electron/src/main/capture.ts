@@ -69,6 +69,7 @@ import {
   type ContextUsed,
   type RetrievedContext,
   contextUsed,
+  linkNamedPeople,
   retrieveContext,
   type ClassifiedObstacle,
   type CommandResult,
@@ -2050,12 +2051,17 @@ ${s.selection.text}`;
         const remember = {
           collections: this.services.collections(),
           suggested: s.route?.decisions.best_collection ?? 'Notes',
-          save: (note: string, collection: string) => {
-            const saved = this.services.save.saveNote({ text: note, collection, selection: s.selection });
+          // A memory (decision 78): asked for or not, a close one reworded, linked to the saved people it names.
+          save: async (note: string, collection: string, asked: boolean) => {
+            const sv = this.services;
+            const saved = await sv.save.remember({ text: note, collection, selection: s.selection });
+            const where = saved.updated ? (sv.store.itemsWithCollection([saved.item.id])[0]?.collection ?? collection) : collection;
+            const linked = linkNamedPeople(sv.store, sv.people, saved.item.id, note);
             void saved.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
-            send<AskSaved>('ask:saved', { requestId, itemId: saved.item.id, collection, undoUntil: saved.undoUntil });
-            log.info('ask remembered');
-            return { collection };
+            send<AskSaved>('ask:saved', { requestId, itemId: saved.item.id, collection: where, undoUntil: saved.undoUntil, updated: saved.updated, asked, text: note.slice(0, 200) });
+            log.info('ask remembered', { asked, updated: saved.updated, people: linked.length });
+            sv.metrics.record('ask_remembered', { asked, updated: saved.updated, people: linked.length });
+            return { collection: where, updated: saved.updated };
           },
         };
         const context = await this.askContext(s, q);

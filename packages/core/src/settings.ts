@@ -139,6 +139,12 @@ export const SettingsSchema = z.object({
   ask: z
     .object({
       defaultQuestion: z.string().default('Explain this briefly.'),
+      /**
+       * A new memory at least this close in meaning to a saved one replaces its text instead of
+       * adding a near copy (decision 78). On all-MiniLM-L6-v2, paraphrases of one fact scored 0.85
+       * to 0.97 and look-alike facts ("Mom's birthday" and "Dad's birthday") 0.44 to 0.67 (Oct 14).
+       */
+      memoryUpdateSimilarity: z.number().min(0).max(1).default(0.8),
     })
     .prefault({}),
 

@@ -181,13 +181,19 @@ export interface AskDone {
   /** The model that answered, after any fallback. */
   model: ModelRef;
 }
-/** Ask saved a note because the question asked it to remember something. */
+/** Ask saved a memory: asked to remember it, or on its own (decision 78). One per save; an answer can have several. */
 export interface AskSaved {
   requestId: string;
   itemId: string;
   collection: string;
   /** Epoch ms. */
   undoUntil: number;
+  /** A saved memory about the same fact was reworded instead of adding a copy; Undo puts the old wording back. */
+  updated: boolean;
+  /** False when Ask saved it without being asked (the answer doesn't mention it, so the panel shows the text). */
+  asked: boolean;
+  /** The memory, clipped. */
+  text: string;
 }
 /** One saved row that went into a prompt (decision 77), for the "Used N" chip. */
 export interface ContextUsed {
@@ -480,6 +486,8 @@ export interface InvokeChannels {
   'library:query': { args: LibraryQuery; result: LibraryResult };
   /** Deletes a saved item for good (the Saved tab asks first), with its vector and orphaned entities. */
   'items:delete': { args: { itemId: string }; result: { deleted: boolean } };
+  /** Rewords a memory (decision 78; memories only), then embeds it again. False when it's gone or not a memory. */
+  'items:edit': { args: { itemId: string; text: string }; result: { edited: boolean } };
   /** Moves a saved item to another collection (created if needed). Null when the item is gone. */
   'items:move': { args: { itemId: string; collection: string }; result: { collection: string | null } };
   /** Pastes a search result into the focused field (only offered when `canInsert`), else the clipboard. */
