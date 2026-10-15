@@ -9,6 +9,9 @@ import type { LlmCallRow } from './llm-call-row';
 
 export type EntityKind = 'person' | 'company' | 'product' | 'place' | 'other';
 
+/** What context_vectors holds besides saved items (decision 77). */
+export type ContextKind = 'person' | 'task' | 'event';
+
 export interface StoredModel {
   provider: string;
   model_id: string;
@@ -351,21 +354,78 @@ export class Store {
     return Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'item_vectors'").get());
   }
 
+  private contextTableExists(): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'context_vectors'").get());
+  }
+
+  /** People, tasks, and events, one partition per kind so a search stays inside one (decision 77). */
+  private createContextVectors(dims: number): void {
+    this.db.exec('DROP TABLE IF EXISTS context_vectors');
+    this.db.exec(
+      `CREATE VIRTUAL TABLE context_vectors USING vec0(doc_id TEXT PRIMARY KEY, kind TEXT PARTITION KEY, embedding FLOAT[${Math.trunc(dims)}] distance_metric=cosine)`,
+    );
+    this.db.exec('DELETE FROM context_docs');
+  }
+
   /**
-   * Makes sure item_vectors matches the embedding model. Returns true when the table was
-   * (re)created and every item needs re-embedding.
+   * Makes sure item_vectors and context_vectors match the embedding model. Returns true when
+   * item_vectors was (re)created and every item needs re-embedding.
    */
   ensureVectorModel(model: string, dims: number): boolean {
     if (!this.hasVectors) return false;
     const same = this.getMeta('embedding_model') === model && this.getMeta('embedding_dims') === String(dims);
-    if (same && this.vectorTableExists()) return false;
+    if (same && this.vectorTableExists()) {
+      // Databases from before migration 10 have item vectors but no context table yet.
+      if (!this.contextTableExists()) this.tx(() => this.createContextVectors(dims));
+      return false;
+    }
     this.tx(() => {
       this.db.exec('DROP TABLE IF EXISTS item_vectors');
       this.db.exec(`CREATE VIRTUAL TABLE item_vectors USING vec0(item_id TEXT PRIMARY KEY, embedding FLOAT[${Math.trunc(dims)}] distance_metric=cosine)`);
+      this.createContextVectors(dims);
       this.setMeta('embedding_model', model);
       this.setMeta('embedding_dims', String(dims));
     });
     return true;
+  }
+
+  /** Every embedded person, task, and event with the hash of the text it was embedded from. */
+  contextHashes(): Map<string, { kind: ContextKind; hash: string }> {
+    if (!this.hasVectors || !this.contextTableExists()) return new Map();
+    const rows = this.db.prepare('SELECT doc_id, kind, hash FROM context_docs').all() as { doc_id: string; kind: ContextKind; hash: string }[];
+    return new Map(rows.map((r) => [r.doc_id, { kind: r.kind, hash: r.hash }]));
+  }
+
+  setContextVector(docId: string, kind: ContextKind, hash: string, v: Float32Array | number[]): void {
+    if (!this.hasVectors || !this.contextTableExists()) return;
+    this.tx(() => {
+      this.db.prepare('DELETE FROM context_vectors WHERE doc_id = ?').run(docId);
+      this.db.prepare('INSERT INTO context_vectors (doc_id, kind, embedding) VALUES (?, ?, ?)').run(docId, kind, vecBytes(v));
+      this.db
+        .prepare('INSERT INTO context_docs (doc_id, kind, hash, embedded_at) VALUES (?, ?, ?, ?) ON CONFLICT(doc_id) DO UPDATE SET kind = excluded.kind, hash = excluded.hash, embedded_at = excluded.embedded_at')
+        .run(docId, kind, hash, isoNow());
+    });
+  }
+
+  deleteContextDocs(docIds: string[]): void {
+    if (!this.hasVectors || !this.contextTableExists() || docIds.length === 0) return;
+    this.tx(() => {
+      const vec = this.db.prepare('DELETE FROM context_vectors WHERE doc_id = ?');
+      const doc = this.db.prepare('DELETE FROM context_docs WHERE doc_id = ?');
+      for (const id of docIds) {
+        vec.run(id);
+        doc.run(id);
+      }
+    });
+  }
+
+  /** Nearest people, tasks, or events (one kind) by cosine similarity (1 = identical). */
+  searchContextVectors(v: Float32Array | number[], kind: ContextKind, k = 5): { doc_id: string; similarity: number }[] {
+    if (!this.hasVectors || !this.contextTableExists()) return [];
+    const rows = this.db
+      .prepare('SELECT doc_id, distance FROM context_vectors WHERE embedding MATCH ? AND k = ? AND kind = ? ORDER BY distance')
+      .all(vecBytes(v), k, kind) as { doc_id: string; distance: number }[];
+    return rows.map((r) => ({ doc_id: r.doc_id, similarity: 1 - r.distance }));
   }
 
   setVector(itemId: string, v: Float32Array | number[]): void {
@@ -497,6 +557,7 @@ export class Store {
       for (const t of USER_DATA_TABLES) this.db.exec(`DELETE FROM ${t}`);
       this.db.exec("DELETE FROM meta WHERE key IN ('style_notes_removed', 'style_edits_pending')");
       if (this.hasVectors && this.vectorTableExists()) this.db.exec('DELETE FROM item_vectors');
+      if (this.hasVectors && this.contextTableExists()) this.db.exec('DELETE FROM context_vectors');
     });
     this.db.exec('VACUUM');
     this.ensureDefaultCollections();

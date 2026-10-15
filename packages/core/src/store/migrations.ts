@@ -187,6 +187,16 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX llm_calls_at ON llm_calls(at);
   `,
+  /* 10: Which people, tasks, and events have a vector in context_vectors, and the hash of the text
+     each was embedded from, so a row is embedded again only when that text changes (decision 77).
+     Derived data: cleared with the data, never exported. */ `
+  CREATE TABLE context_docs (
+    doc_id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    embedded_at TEXT NOT NULL
+  );
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */
@@ -212,5 +222,8 @@ export const DATA_TABLES = [
 /** Logs kept on this computer only: cleared with the data, never exported (decision 61). */
 export const LOG_TABLES = ['llm_calls'] as const;
 
+/** Built from the user's data and rebuilt from it: cleared with the data, never exported (decision 77). */
+export const DERIVED_TABLES = ['context_docs'] as const;
+
 /** What "Delete all data" clears: everything but settings and the model list (and meta). */
-export const USER_DATA_TABLES = [...DATA_TABLES.filter((t) => t !== 'models' && t !== 'settings'), ...LOG_TABLES];
+export const USER_DATA_TABLES = [...DATA_TABLES.filter((t) => t !== 'models' && t !== 'settings'), ...LOG_TABLES, ...DERIVED_TABLES];

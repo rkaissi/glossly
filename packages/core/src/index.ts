@@ -59,6 +59,8 @@ export * from './actions/style-notes';
 export * from './actions/paste';
 
 export * from './recall/recall';
+export * from './context/docs';
+export * from './context/sync';
 export * from './visualize/table';
 export * from './visualize/visualize';
 export type * from './visualize/types';

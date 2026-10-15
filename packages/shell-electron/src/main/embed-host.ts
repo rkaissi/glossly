@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { utilityProcess, type UtilityProcess } from 'electron';
-import { embedText, type Embedder, type EmbedStatus, type Store } from '@glossly/core';
+import { ContextSyncer, embedText, type CalendarRepo, type Embedder, type EmbedStatus, type PeopleRepo, type Store } from '@glossly/core';
 import type { WorkerRequest, WorkerResponse } from './embed-protocol';
 import { logger } from './log';
 import { embedWorkerPath } from './paths';
@@ -26,14 +26,18 @@ export class EmbedHost extends EventEmitter<{ status: [EmbedStatus] }> {
   private readonly pending = new Map<number, Pending>();
   private readyEmbedder: Embedder | null = null;
   private backfilling = false;
+  /** Vectors for people, tasks, and events (decision 77). */
+  private readonly context: ContextSyncer;
 
   constructor(
     private readonly store: Store,
     private readonly model: string,
     private readonly dims: number,
     private readonly cacheDir: string,
+    repos: { people: PeopleRepo; calendar: CalendarRepo },
   ) {
     super();
+    this.context = new ContextSyncer({ store, ...repos, embedder: () => this.readyEmbedder });
     const downloaded = store.getMeta('embed_downloaded') === model;
     this.status = { model, dims, state: downloaded ? 'loading' : 'not_downloaded' };
   }
@@ -147,6 +151,21 @@ export class EmbedHost extends EventEmitter<{ status: [EmbedStatus] }> {
     } finally {
       this.backfilling = false;
       if (done > 0) log.info('backfill done', { items: done });
+    }
+    await this.syncContext();
+  }
+
+  /**
+   * Embeds the people, tasks, and events whose text changed and drops deleted ones. Runs after
+   * the item backfill, and before anything searches them. Never throws.
+   */
+  async syncContext(): Promise<void> {
+    const t = performance.now();
+    try {
+      const r = await this.context.sync();
+      if (r && (r.embedded > 0 || r.removed > 0)) log.info('context synced', { ...r, ms: Math.round(performance.now() - t) });
+    } catch (e) {
+      log.error('context sync stopped', { message: (e as Error).message.slice(0, 100) });
     }
   }
 
