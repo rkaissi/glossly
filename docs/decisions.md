@@ -103,3 +103,10 @@ By topic: stack 1–8 · capture and overlay 9, 11, 16–18 · data and privacy 
 - Days are read in code (`resolveDue`, `resolveEventTime`); an event with no readable day isn't added, and Ask says so.
 - What Glossly knows about the user is a new setting, `aboutMe` (facts with an id), shown and editable on Profile. Ask's prompt always gets the newest 20 that fit in 1,500 characters, under "The person asking". It's a setting rather than memories so it's always there, not found by relevance.
 - Undo lasts the save window (`save.undoSeconds`). The Tasks and People tabs refresh through a new `people` event on `Services`.
+
+*Built in 25.7* (`calendar/duplicates.ts`):
+- **Events.** An event is already saved when it sits in the same slot as a saved one (overlapping times, or the same day when either is all day) and the titles share a distinctive word. Kind-of-event words like "lunch", "call", or "flight" don't count alone, and the shared words must make half of the shorter title.
+- **Meaning only breaks ties,** at 0.85 and between timed events. On 16 fictional title pairs, true matches scored 0.47 to 0.97 and different events in one slot up to 0.55 ("Lunch with Jordan" vs. "Lunch with Casey"), so meaning alone can't decide. The words do.
+- **Tasks** use the same words against the longer title, since tasks lead with verbs ("Renew car insurance" isn't "Renew passport"), for the same person or none.
+- **Where it applies.** In the Tasks panel, such an event starts unchecked and says "Already saved: …". In Ask, a duplicate task or event is offered with Add, even when asked for, and the answer says it looks already saved.
+- **People** keep `resolvePerson`'s rules (exact, a first name against a saved full name as "Is this the same X?", Jaro-Winkler in the same app). Embeddings of names add nothing, and nothing merges on its own.

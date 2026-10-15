@@ -87,6 +87,8 @@ interface EventDraft {
   personIds: string[];
   when_phrase: string | null;
   selected: boolean;
+  /** The saved event this looks like (decision 78), as "Lunch with Jordan (Thu · 1:00 PM – 2:00 PM)". */
+  duplicate: string | null;
 }
 
 function toEventDraft(e: EventCandidate): EventDraft {
@@ -102,6 +104,7 @@ function toEventDraft(e: EventCandidate): EventDraft {
     personIds: e.people.map((p) => p.personId),
     when_phrase: e.when_phrase,
     selected: e.selected,
+    duplicate: e.duplicate ? `${e.duplicate.title} (${formatEventTime(e.duplicate)})` : null,
   };
 }
 
@@ -162,6 +165,7 @@ function EventRowView({ d, onChange }: { d: EventDraft; onChange: (patch: Partia
           <input className="event-place" placeholder="Where" aria-label="Where" tabIndex={-1} value={d.location} maxLength={300} onChange={(e) => onChange({ location: e.target.value })} />
           {d.attendees.length > 0 && <span className="muted small clip1">With {d.attendees.join(', ')}</span>}
         </div>
+        {d.duplicate && <div className="promise-meta muted small clip1">Already saved: {d.duplicate}</div>}
       </div>
     </li>
   );

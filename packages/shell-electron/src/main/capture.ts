@@ -69,6 +69,9 @@ import {
   type AskAction,
   type AskToolDeps,
   type ToolOutcome,
+  type Similarity,
+  findDuplicateEvent,
+  findDuplicateTask,
   withAboutMe,
   type ContextUsed,
   type RetrievedContext,
@@ -1705,6 +1708,7 @@ ${s.selection.text}`;
         new Date(),
         read?.people ?? [],
         this.services.calendar,
+        this.similarity,
       );
       this.services.metrics.record('promises_extracted', { count: rows.length, events: events.length, with_details: rows.filter((r) => r.details).length, ms: ms(t), open: open.length, changes: rows.filter((r) => r.change !== 'new').length, ...(byRules && { by_rules: byRules }) });
       return {
@@ -1923,6 +1927,14 @@ ${s.selection.text}`;
 
   // ---- Recall and search ----
 
+  /** Cosine similarity of `a` to each of `b` on the local embedder; none (words only) until it's ready. Duplicate checks (decision 78). */
+  private readonly similarity: Similarity = async (a, b) => {
+    const embedder = this.services.embed.embedder();
+    if (!embedder || b.length === 0) return [];
+    const [q, ...vs] = await embedder.embed([a, ...b]);
+    return vs.map((v) => q!.reduce((n, x, i) => n + x * v[i]!, 0));
+  };
+
   private recallDeps() {
     const sv = this.services;
     return { store: sv.store, embedder: () => sv.embed.embedder(), settings: () => sv.settings };
@@ -2047,16 +2059,24 @@ ${s.selection.text}`;
         const p = id ? sv.people.get(id) : null;
         return p ? { id: p.id, name: p.name } : null;
       },
-      addTask: (t, asked, label) =>
-        register('task', label, asked, () => {
+      // One that looks already saved is offered (Add adds it anyway), even when asked for (decision 78).
+      addTask: (t, asked, label) => {
+        const dup = findDuplicateTask(t, sv.people.commitments({ status: 'open' }));
+        const outcome = register('task', dup ? `${label} (looks like "${dup.text}", already in Tasks)` : label, asked && !dup, () => {
           const c = sv.people.addCommitment({ person_id: t.person_id, owner: t.owner, text: t.person_id || !t.person_name ? t.text : `${t.text} (${t.person_name})`, due_at: t.due_at });
           return () => sv.people.deleteCommitment(c.id);
-        }),
-      addEvent: (e, asked, label) =>
-        register('event', label, asked, () => {
+        });
+        return dup ? fail(`That looks like it's already in your tasks: "${dup.text}". If it's a different one, add it below.`) : outcome;
+      },
+      addEvent: async (e, asked, label) => {
+        const day = e.starts_at.slice(0, 10);
+        const dup = await findDuplicateEvent(e, sv.calendar.list({ from: day, to: day }), this.similarity);
+        const outcome = register('event', dup ? `${label} (looks like "${dup.title}", already on your calendar)` : label, asked && !dup, () => {
           const row = sv.calendar.add({ title: e.title, starts_at: e.starts_at, ends_at: e.ends_at, all_day: e.all_day, location: e.location, attendees: e.attendees, personIds: e.personIds }, sourceApp);
           return () => sv.calendar.delete(row.id);
-        }),
+        });
+        return dup ? fail(`That looks like it's already on your calendar: "${dup.title}". If it's a different one, add it below.`) : outcome;
+      },
       editPerson: (p, _asked, label) => {
         const before = sv.people.get(p.personId);
         if (!before) return fail(`${p.name} isn't in your people any more.`);

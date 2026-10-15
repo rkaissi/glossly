@@ -375,6 +375,21 @@ describe('events from the same call (decision 37)', () => {
     expect(r.events[0]!.starts_at!.slice(0, 16)).toBe('2026-10-15T13:00');
     expect(r.events[0]!.ends_at!.slice(0, 16)).toBe('2026-10-15T14:30');
     expect(r.sameDay.map((e) => e.title)).toEqual(['Dentist']);
+    expect(r.events[0]!.duplicate ?? null).toBeNull();
+  });
+
+  it('starts an event that looks already saved unchecked, with what it matched (decision 78)', async () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const calendar = new CalendarRepo(store);
+    const saved = calendar.add({ title: 'Jordan lunch', starts_at: '2026-10-15T13:30:00' + isoNow(now).slice(19), ends_at: null, all_day: false, location: null, attendees: [], personIds: [] }, null);
+    const llm = new FakeLlm(() => ({
+      commitments: [],
+      events: [{ title: 'Lunch with Jordan', when: 'Thursday 1pm', end: '', duration_minutes: 90, location: '', people: [], confidence: 0.9 }],
+    }));
+    const invite: SelectionPayload = { ...selection, text: 'Lunch with Jordan Thursday at 1pm?' };
+    const r = await extractPromises(llm, people, settings, { selection: invite, author: null, authorIsMe: false }, undefined, now, [], calendar);
+    expect(r.events[0]).toMatchObject({ selected: false, duplicate: { id: saved.id, title: 'Jordan lunch' } });
   });
 
   it('without a model, an invitation is an event and its request is a task', async () => {
