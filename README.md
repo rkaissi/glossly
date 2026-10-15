@@ -34,7 +34,7 @@ It works in any app that shows text: chat and email apps, browsers, documents, P
 
 ### Reply in your own voice
 
-Select a message and get three drafts that answer it, each taking a different line (say yes, ask a question, suggest another time). Glossly reads the conversation to know who wrote what and what's being asked, and learns your style from the drafts you pick and edit, separately for chat and email. **Insert** puts the reply in the message box; nothing is ever sent for you.
+Select a message and get three drafts that answer it, each taking a different line (say yes, ask a question, suggest another time). Glossly reads the conversation to know who wrote what and what's being asked, and learns your style from the drafts you pick and edit, separately for chat and email. Drafts know your calendar and tasks: asked "are you free Thursday?", they answer from what's saved, sharing only what suits who's asking. Press the hotkey in a reply box with nothing selected to answer the thread above it. **Insert** puts the reply in the message box; nothing is ever sent for you.
 
 <p align="center"><img src="docs/media/hero.gif" width="820" alt="Reply: three drafts for a selected chat message, one inserted into the message box"></p>
 
@@ -54,7 +54,7 @@ Promises, requests, and todos ("could you send the deck before then?") become ta
 
 ### Ask
 
-Ask anything about what you selected and get the answer right below it. Glossly brings in the text around your selection and your related saved notes, and "remember that…" saves a note for later.
+Ask anything about what you selected, or anything at all, and get the answer right below it. Glossly brings in the text around your selection and the notes, people, tasks, and events you saved that relate to it, so "when is my interview?" just works, and each answer shows what it used. Ask also remembers what's worth keeping, adds tasks and events when you ask (or offers them when it spots one), updates the people you saved, and keeps what it learns about you on your Profile. Everything it does has Undo.
 
 <p align="center"><img src="docs/media/ask.gif" width="820" alt="Ask: a question about a selected message, answered in place"></p>
 
@@ -131,6 +131,7 @@ Glossly is built so you decide what leaves your computer.
 - **Nothing is sent until you act.** Selecting text shows the pill and nothing else. Opening the bar sends the selection to your model provider to pick actions; choosing an action sends what that action needs.
 - **Local only mode** keeps everything on your computer: a local model does the work, and features that would need a cloud model say so instead.
 - **Your data stays local.** Saved items, people, tasks, the calendar, and search embeddings live in a SQLite database in `%APPDATA%\Glossly`. Search runs on a small embedding model on your computer.
+- **Only the saved data that fits goes out.** Ask and Reply send just the few saved notes, people, tasks, and events closest to the question, show what they used, and Settings > Privacy turns this off.
 - **Keys are encrypted** with Windows' data protection (Electron `safeStorage`) and only ever sent to their own provider.
 - **No password fields, no keylogging.** Password fields are never read, and the keyboard is never hooked.
 - **No telemetry.** Usage metrics are counts and timings, stored locally and shown in Settings > Metrics. Logs hold codes and timings, never your text.
@@ -192,6 +193,7 @@ docs/              Architecture, decisions, features, testing, and design notes
 - [x] Visualize
 - [x] Local models and Local only mode
 - [x] Installer and automatic updates
+- [x] Memory: answers that use what you saved, and Ask that remembers and acts
 - [ ] Code-signed installer
 - [ ] Google Calendar sync
 - [ ] macOS
