@@ -151,6 +151,24 @@ button.chip-x.danger:hover:not(:disabled) {
   color: var(--muted);
   text-decoration: line-through;
 }
+/* Like the Tasks tab: checking one off (or reopening it) pops the check, the row slides out
+   (ease-in, no bounce), and it rises in where it lands. Defined here because the overlay's Who
+   panel shows this card too and doesn't load tasks.css. */
+.commitment.leaving {
+  animation: commitment-leave 420ms var(--ease-in) 200ms forwards;
+}
+.commitment.fresh {
+  animation: rise-in var(--spring-soft-ms) var(--spring-soft) both;
+}
+@keyframes commitment-leave {
+  0% {
+    background: var(--hover);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
 .due {
   flex: none;
   font-size: 12px;

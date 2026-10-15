@@ -304,6 +304,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 
 - [x] Pickers never scroll (Oct 14, Rayan saw a squeezed, scroll-locked date picker near the top of the window): the date picker, the range picker, and the event editor slide to fit inside the settings window instead (over their own button if they must); only lists scroll, and scrolling inside them no longer snaps back. The settings window's minimum is 720×600. Checked at the minimum, a medium size, and maximized, near the top and the bottom of the screen, light and dark: the date picker (about 315×482, 522 with No date) and the range picker never cut off and never scrolled; the time list scrolled smoothly; a scrolled page kept an open picker attached. Not tried: Add people (no people on a fresh profile). Notes: in dark the picker is see-through glass by design (text behind shows faintly); a window partly off the screen still places pickers by the window, not the screen.
 - [ ] Agenda's range label at the minimum window width (Oct 14 fix, not seen live): it read "O…"; it now keeps its full text and the view switch and New wrap to a second row.
+- [ ] Person card tasks (Oct 14 fix, not seen live; Rayan saw them jump between "You owe" and "Done"): ticking one in People (or the overlay's Who panel) pops the check, slides the row out, and it rises in under Done; unticking it in Done does the same back to You owe. A failed save brings the row back.
 
 **Later steps**
 - [ ] Reminder toast and its click (Step 22, installed build).

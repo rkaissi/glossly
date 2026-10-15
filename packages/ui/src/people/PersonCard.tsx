@@ -13,17 +13,44 @@ import { useAction } from '../settings/useAction';
 import { RELATIONSHIP_OPTIONS } from './relationship';
 import './people.css';
 
+/**
+ * Tasks just checked or reopened here, so the row rises in where it lands (Done, or back under
+ * You owe), even in a list that only appears with it. The rest of the card comes unanimated
+ * (decision 45).
+ */
+const justMoved = new Map<string, number>();
+
 function CommitmentRow({ c, showPerson }: { c: CommitmentView; showPerson?: boolean }) {
   const { busy, run } = useAction();
+  const [leaving, setLeaving] = useState(false);
+  const [fresh] = useState(() => {
+    const at = justMoved.get(c.id);
+    justMoved.delete(c.id);
+    return at !== undefined && Date.now() - at < 3000;
+  });
   const due = formatDue(c.due_at);
   const done = c.status !== 'open';
   return (
-    <li className={`commitment${done ? ' done' : ''}`}>
+    <li className={`commitment${done ? ' done' : ''}${leaving ? ' leaving' : ''}${fresh ? ' fresh' : ''}`}>
       <TaskCheck
-        checked={done}
+        checked={done !== leaving}
         label={done ? 'Mark as open' : 'Mark as done'}
-        disabled={busy}
-        onChange={(on) => void run(() => glossly.invoke('commitments:set-status', { id: c.id, status: on ? 'done' : 'open' }))}
+        disabled={busy || leaving}
+        onChange={(on) => {
+          // Like the Tasks tab: the check pops, the row slides out, then it moves to the other list
+          // (Done or back), where it rises in.
+          setLeaving(true);
+          setTimeout(() => {
+            justMoved.set(c.id, Date.now());
+            // The card reloads from the people broadcast after the save; only a failed save keeps
+            // the row here, so show it again then.
+            void run(() => glossly.invoke('commitments:set-status', { id: c.id, status: on ? 'done' : 'open' }).catch((e: unknown) => {
+              justMoved.delete(c.id);
+              setLeaving(false);
+              throw e;
+            }));
+          }, 620);
+        }}
       />
       <span className="grow">
         {c.text}
