@@ -232,6 +232,8 @@ export interface ReplyStart {
   channel: ReplyChannel;
   /** Set when this picks up drafts still being written for the same highlight: the text so far. */
   resumed?: string;
+  /** What the drafts drew on from saved data (decision 77), for the "Used N" chip. */
+  used?: ContextUsed[];
 }
 export interface ReplyInsertArgs {
   sessionId: number;

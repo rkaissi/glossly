@@ -1,6 +1,8 @@
 // Reply (spec: Actions, Reply with context): three intent-labeled drafts, streamed on the Chat
 // role, written with what the user knows about the person and in the user's own voice.
 import replyPrompt from '../../prompts/reply.md?raw';
+import { contextLines, nowLine } from '../context/prompt';
+import type { RetrievedContext } from '../context/retrieve';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import { quoteStart, type ReadMessage } from '../people/conversation';
 import type { DetectedPerson } from '../people/detect';
@@ -32,6 +34,8 @@ export interface ReplyInput {
   channel?: ReplyChannel;
   /** Opened from the reply box with nothing selected: the message is the text around the box (decision 75). */
   field?: boolean;
+  /** Saved people, tasks, events, and notes close to the message (decision 77); the author's own record is `person`. */
+  context?: Pick<RetrievedContext, 'people' | 'tasks' | 'events'> & { notes: { text: string }[] } | null;
 }
 
 const REDO_LINES: Record<ReplyRedoAsk, string> = {
@@ -190,6 +194,30 @@ export function replyThread(selection: SelectionPayload, container: ContainerCon
   return `${lastLines(before, THREAD_BEFORE)}${head}${restOfMessage(after, me)}`;
 }
 
+const MAX_SAVED_NOTE = 400;
+
+/**
+ * "What the user has saved": people, tasks, events, and notes close to the message (decision 77),
+ * private to the user. The author's own record and open tasks are already in the person section,
+ * so they aren't repeated here.
+ */
+function savedSection(input: ReplyInput, now: Date): string[] {
+  const ctx = input.context;
+  if (!ctx) return [];
+  const authorId = input.person?.id ?? null;
+  const lines = contextLines(
+    {
+      people: ctx.people.filter((p) => p.id !== authorId),
+      tasks: ctx.tasks.filter((c) => !(authorId && c.person_id === authorId && c.status === 'open')),
+      events: ctx.events,
+    },
+    now,
+  );
+  const notes = ctx.notes.slice(0, 3).map((n) => `<note>${clip(n.text.replace(/\s+/g, ' ').trim(), MAX_SAVED_NOTE)}</note>`);
+  if (!lines.length && !notes.length) return [];
+  return ['', "## What the user has saved (private to the user; labels in brackets are worked out from now)", ...lines, ...(notes.length ? ['Notes:', ...notes] : [])];
+}
+
 export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: ReplyInput, now: Date = new Date()): string {
   const { selection } = input;
   const target = input.authorIsMe ? null : messagesToAnswer(selection.text, around(selection, input.container).before, settings.identity, input.messages);
@@ -225,8 +253,9 @@ export function buildReplyPrompt(settings: Pick<Settings, 'identity'>, input: Re
     describeSource(selection.source_app, selection.window_title),
     ...(input.field ? ['', '## Where the user is', FIELD_NOTE] : []),
     '',
-    '## Today',
-    now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+    '## Now',
+    nowLine(now),
+    ...savedSection(input, now),
     '',
     input.authorIsMe ? "## The user's message (write a follow-up)" : '## Their messages to answer',
     '<message>',

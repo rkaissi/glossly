@@ -299,7 +299,7 @@ export class Capture {
   /** A people read still running, so Who and Promises opened together share the one call. */
   private readonly whoPending = new Map<string, Promise<WhoRead>>();
   /** Finished Reply drafts per highlight (`replyCacheKey`), so switching panels doesn't write them again. */
-  private readonly replyCache = new ExpiringLru<string, { raw: string; model: ModelRef }>(MODEL_CACHE_SIZE, REPLY_CACHE_MS);
+  private readonly replyCache = new ExpiringLru<string, { raw: string; model: ModelRef; used: ContextUsed[] }>(MODEL_CACHE_SIZE, REPLY_CACHE_MS);
   private readonly visualCache = new Lru<string, Extract<VisualizeResult, { ok: true }>>(MODEL_CACHE_SIZE);
 
   /**
@@ -1325,6 +1325,7 @@ export class Capture {
     state.start = start;
     const hit = redo ? undefined : this.replyCache.get(key);
     if (hit) {
+      start.used = hit.used;
       setTimeout(() => {
         if (s.reply !== state) return;
         state.done = true;
@@ -1335,13 +1336,20 @@ export class Capture {
       return start;
     }
 
+    // Saved data for the drafts (decision 77): the message and the lines just before it, with the author and the people known in it.
+    const context = await this.savedContext(s, 'reply', [sel.text.slice(-1500), sel.context_before.slice(-600)], [state.personId, ...(s.route?.features.knownPeople ?? [])].filter((x): x is string => Boolean(x)));
+    if (s.reply !== state || ctl.signal.aborted) return start;
+    const used = context ? contextUsed(context, context.notes.map((n) => ({ id: n.itemId, text: n.text })), new Date()) : [];
+    start.used = used;
+    const withContext = { ...input, context: context && { ...context, notes: context.notes.map((n) => ({ text: n.text })) } };
+
     log.info('reply drafts', { cached: false, redo: Boolean(redo), author: Boolean(author), read: read ? (read.local ?? 'model') : 'failed', read_cached: got?.cached ?? false, messages: read?.messages?.length ?? 0, read_ms: ms(tRead) });
     void (async () => {
       const t = performance.now();
       let firstMs: number | null = null;
       let raw = '';
       try {
-        const r = reply(this.services.llm, this.settings, input, ctl.signal);
+        const r = reply(this.services.llm, this.settings, withContext, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
           raw += text;
@@ -1350,7 +1358,7 @@ export class Capture {
         }
         const model = await r.model;
         state.done = true;
-        if (raw.trim()) this.replyCache.set(key, { raw, model });
+        if (raw.trim()) this.replyCache.set(key, { raw, model, used });
         send('reply:done', { requestId, model });
         this.services.metrics.record('reply_drafts', { first_token_ms: firstMs ?? -1, total_ms: ms(t), person: Boolean(person) });
       } catch (e) {
@@ -1956,23 +1964,28 @@ ${s.selection.text}`;
     return librarySaved(this.recallDeps(), q);
   }
 
-  /**
-   * What Ask gets from saved data (decision 77): the people, tasks, events, and notes closest to
-   * the question and the text, without the rows marked "Not related" in this session. Null when
-   * it's off (Privacy) or fails; Ask then goes on without it.
-   */
-  private async askContext(s: Session, question: string): Promise<RetrievedContext | null> {
-    if (!this.settings.context.enabled) return null;
-    const sv = this.services;
+  /** What Ask gets from saved data: the question, then the selection or the text around the cursor. */
+  private askContext(s: Session, question: string): Promise<RetrievedContext | null> {
     const around = s.surroundings;
     const near = around ? (around.caret >= 0 ? around.text.slice(Math.max(0, around.caret - 1000), around.caret + 300) : around.text.slice(0, 1300)) : '';
-    const texts = [question, s.selection?.text ?? near].filter((t) => t.trim());
+    return this.savedContext(s, 'ask', [question, s.selection?.text ?? near], s.route?.features.knownPeople ?? []);
+  }
+
+  /**
+   * The people, tasks, events, and notes closest to these texts (decision 77), without the rows
+   * marked "Not related" in this session. Null when it's off (Privacy), there's no text, or it
+   * fails; the action then goes on without it.
+   */
+  private async savedContext(s: Session, action: 'ask' | 'reply', query: string[], personIds: string[]): Promise<RetrievedContext | null> {
+    if (!this.settings.context.enabled) return null;
+    const sv = this.services;
+    const texts = query.filter((t) => t.trim());
     if (texts.length === 0) return null;
     const t = performance.now();
     try {
       const r = await retrieveContext(
         { store: sv.store, people: sv.people, calendar: sv.calendar, embedder: () => sv.embed.embedder(), settings: () => sv.settings, sync: () => sv.embed.syncContext() },
-        { texts, personIds: s.route?.features.knownPeople ?? [] },
+        { texts, personIds: [...new Set(personIds)] },
       );
       const keep = (kind: ContextUsed['kind'], id: string) => !s.contextDismissed.has(`${kind}:${id}`);
       const ctx: RetrievedContext = {
@@ -1982,16 +1995,16 @@ ${s.selection.text}`;
         tasks: r.tasks.filter((c) => keep('task', c.id)),
         events: r.events.filter((e) => keep('event', e.id)),
       };
-      log.info('ask context', { notes: ctx.notes.length, people: ctx.people.length, tasks: ctx.tasks.length, events: ctx.events.length, days: ctx.days.length, semantic: ctx.semantic, ms: ms(t) });
-      sv.metrics.record('ask_context', { notes: ctx.notes.length, people: ctx.people.length, tasks: ctx.tasks.length, events: ctx.events.length, ms: ms(t) });
+      log.info(`${action} context`, { notes: ctx.notes.length, people: ctx.people.length, tasks: ctx.tasks.length, events: ctx.events.length, days: ctx.days.length, semantic: ctx.semantic, ms: ms(t) });
+      sv.metrics.record(`${action}_context`, { notes: ctx.notes.length, people: ctx.people.length, tasks: ctx.tasks.length, events: ctx.events.length, ms: ms(t) });
       return ctx;
     } catch (e) {
-      log.warn('ask context failed', errorInfo(e));
+      log.warn(`${action} context failed`, errorInfo(e));
       return null;
     }
   }
 
-  /** "Not related" on a row of Ask's "Used N" chip: left out of later prompts in this session. */
+  /** "Not related" on a row of Ask's or Reply's "Used N" chip: left out of later prompts in this session. */
   dismissContext(sessionId: number, kind: ContextUsed['kind'], id: string): void {
     const s = this.current(sessionId);
     if (!s) return;

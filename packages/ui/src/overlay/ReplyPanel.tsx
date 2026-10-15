@@ -6,6 +6,7 @@ import { siteLabel } from '../dates';
 import { CreatePerson } from '../people/PersonForm';
 import { draftFrom } from '../people/draft';
 import { parseDrafts } from './drafts';
+import { UsedChip } from './UsedChip';
 
 type Stream =
   | { status: 'starting' }
@@ -183,6 +184,8 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
   const onKeyDown = (e: KeyboardEvent) => {
     // The add-person form handles its own keys (Enter creates, Esc cancels); typing there is not a shortcut.
     if (e.target instanceof HTMLElement && e.target.closest('.create-person')) return;
+    // Enter and Space on the "Used N" chip press its buttons, not the focused draft's Insert.
+    if (e.target instanceof HTMLElement && e.target.closest('.used') && (e.key === 'Enter' || e.key === ' ')) return;
     const inEditor = e.target === editor.current || e.target === ownEditor.current;
     if (redoOpen && e.target instanceof HTMLElement && e.target.closest('.redo')) {
       if (e.key === 'Enter') {
@@ -342,6 +345,7 @@ export function ReplyPanel({ s }: { s: OverlayState }) {
           )}
         </ul>
       )}
+      {drafts.length > 0 && start?.used && start.used.length > 0 && <UsedChip key={start.requestId} sessionId={s.sessionId} used={start.used} />}
       {done && drafts.length > 0 && !redoOpen && (
         <div className="inline-note">
           <span className="muted">Your picks, edits, and own replies teach Reply how you write (Profile).</span>

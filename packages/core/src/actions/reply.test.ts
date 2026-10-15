@@ -56,6 +56,48 @@ describe('Reply', () => {
     expect(p).not.toContain('Daniel Park');
   });
 
+  it("adds what the user saved, without repeating the author's record (decision 77)", () => {
+    const at = (d: number, h: number) => new Date(2026, 9, d, h).toISOString();
+    const p = buildReplyPrompt(
+      settings,
+      {
+        selection,
+        author,
+        authorIsMe: false,
+        person: maya,
+        voice: [],
+        context: {
+          people: [
+            { id: 'p1', name: 'Maya Lin', relationship: 'colleague', note: null, reason: 'given', similarity: null },
+            { id: 'p2', name: 'Casey Lin', relationship: 'friend', note: 'College friend', reason: 'similar', similarity: 0.5 },
+          ],
+          tasks: [
+            { id: 'c1', owner: 'me', text: 'send the onboarding deck', due_at: '2026-10-16', status: 'open', completed_at: null, person_id: 'p1', person_name: 'Maya Lin', reason: 'person', similarity: null },
+            { id: 'c3', owner: 'me', text: 'Finish the slides', due_at: '2026-10-15', status: 'open', completed_at: null, person_id: null, person_name: null, reason: 'similar', similarity: 0.6 },
+          ],
+          events: [
+            { id: 'e1', title: 'Meeting with Casey', starts_at: at(16, 13), ends_at: at(16, 17), all_day: false, location: null, attendees: ['Casey Lin'], people: [], source_app: null, created_at: at(1, 9), reason: 'day', similarity: null },
+          ],
+          notes: [{ text: 'Maya   prefers decks as PDF.' }],
+        },
+      },
+      now,
+    );
+    const saved = p.slice(p.indexOf('## What the user has saved'), p.indexOf('## Their messages to answer'));
+    expect(saved).toContain('People:\n- Casey Lin: friend; College friend');
+    expect(saved).not.toContain('Maya Lin: colleague');
+    expect(saved).toContain("- [open, due tomorrow] The user's own task: Finish the slides");
+    expect(saved).not.toContain('onboarding deck');
+    expect(saved).toContain('- [Fri, Oct 16 (in 2 days), 1:00 PM to 5:00 PM] Meeting with Casey (with Casey Lin)');
+    expect(saved).toContain('Notes:\n<note>Maya prefers decks as PDF.</note>');
+    expect(p.indexOf('## Now')).toBeLessThan(p.indexOf('## What the user has saved'));
+  });
+
+  it('has no saved section when nothing was found', () => {
+    const p = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: maya, voice: [], context: { people: [], tasks: [], events: [], notes: [] } }, now);
+    expect(p).not.toContain('## What the user has saved');
+  });
+
   it('handles no person record, no samples, and the user as the author', () => {
     const p = buildReplyPrompt(settings, { selection, author: null, authorIsMe: true, person: null, voice: [] }, now);
     expect(p).toContain('The user wrote the selected message; draft a follow-up');
@@ -131,7 +173,7 @@ describe('Reply', () => {
     const q = buildReplyPrompt(settings, { selection, author, authorIsMe: false, person: null, voice: [long] }, now);
     expect(q).toContain(`${'x'.repeat(300)}…`);
     expect(q).not.toContain('x'.repeat(301));
-    const order = ['## The user', '## Voice samples', '## What you know about', '## Replying to', '## App', '## Today', '## Their messages to answer', '## Thread'].map((h) => p.indexOf(h));
+    const order = ['## The user', '## Voice samples', '## What you know about', '## Replying to', '## App', '## Now', '## Their messages to answer', '## Thread'].map((h) => p.indexOf(h));
     expect(order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1]!))).toBe(true);
   });
 

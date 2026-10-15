@@ -84,8 +84,8 @@ export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: 
 }
 
 /**
- * Whether Ask sends the saved notes, people, tasks, and events closest to the question along
- * with it (decision 77). On by default; under Local only it stays on this computer anyway.
+ * Whether Ask and Reply send the saved notes, people, tasks, and events closest to the question
+ * or message along with it (decision 77). On by default; under Local only it stays on this computer anyway.
  */
 export function SavedInAnswers({ view }: { view: SettingsView }) {
   const { busy, error, run } = useAction();
@@ -101,7 +101,7 @@ export function SavedInAnswers({ view }: { view: SettingsView }) {
         <span>
           <strong>Use what you've saved in answers</strong>
           <span className="muted small block">
-            Ask gets the notes, people, tasks, and events closest to your question, so it can answer things like "when is my interview?". They go to the model with the question, and each answer lists what it used.
+            Ask and Reply get the notes, people, tasks, and events closest to the question or message, so they can answer things like "are you free Thursday?". They go to the model with it, and each answer lists what it used.
           </span>
         </span>
         <Switch label="Use what you've saved in answers" checked={ctx.enabled} disabled={busy} onChange={set} />
