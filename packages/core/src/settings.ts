@@ -157,6 +157,8 @@ export const SettingsSchema = z.object({
   /** What Ask and Reply get from the user's saved data (decision 77). */
   context: z
     .object({
+      /** Privacy > "Use what you've saved in answers". Off: only the notes picked with "Ask about these". */
+      enabled: z.boolean().default(true),
       /**
        * Cosine similarity a person, task, or event needs to count as close in meaning (evals/context.eval.ts,
        * Oct 14: expected tasks scored 0.45 and up, wrong ones that pass the date filters 0.39 at most; expected

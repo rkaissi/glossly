@@ -65,6 +65,11 @@ import {
   type AppMode,
   type AskErrorEvent,
   type AskSaved,
+  type AskContext,
+  type ContextUsed,
+  type RetrievedContext,
+  contextUsed,
+  retrieveContext,
   type ClassifiedObstacle,
   type CommandResult,
   type ContainerContext,
@@ -99,7 +104,6 @@ import {
   type WhoRead,
   type DetectInput,
   type WhoView,
-  type Item,
   type Surroundings,
 } from '@glossly/core';
 import type { HelperManager } from './helper-manager';
@@ -182,6 +186,8 @@ interface Session {
   recallDismissed: Set<string>;
   /** "Ask about these": the saved items Ask uses instead of the top recall hits. */
   askRelated: string[] | null;
+  /** Rows of the "Used N" chip marked "Not related" ("kind:id"), left out of later prompts in this session. */
+  contextDismissed: Set<string>;
   /** Hotkey with nothing selected: whether the focused control takes text (null when unknown). */
   focusEditable: boolean | null;
   /** Hotkey with nothing selected: the text around the caret, or what is visible (helper context_caret). */
@@ -543,6 +549,7 @@ export class Capture {
         reply: null,
         recall: null,
         recallDismissed: new Set(),
+        contextDismissed: new Set(),
         askRelated: null,
         focusEditable: null,
         surroundings: null,
@@ -790,6 +797,7 @@ export class Capture {
       reply: null,
       recall: null,
       recallDismissed: new Set(),
+      contextDismissed: new Set(),
       askRelated: null,
       focusEditable,
       surroundings,
@@ -1864,6 +1872,7 @@ ${s.selection.text}`;
       reply: null,
       recall: null,
       recallDismissed: new Set(),
+      contextDismissed: new Set(),
       askRelated: null,
       focusEditable: null,
       surroundings: null,
@@ -1947,10 +1956,47 @@ ${s.selection.text}`;
     return librarySaved(this.recallDeps(), q);
   }
 
-  /** Saved notes for Ask: the cards picked with "Ask about these", else the top recall hits. */
-  private askNotes(s: Session): Item[] {
-    const ids = s.askRelated ?? this.visibleRecall(s).slice(0, 3).map((h) => h.itemId);
-    return this.services.store.itemsWithCollection(ids);
+  /**
+   * What Ask gets from saved data (decision 77): the people, tasks, events, and notes closest to
+   * the question and the text, without the rows marked "Not related" in this session. Null when
+   * it's off (Privacy) or fails; Ask then goes on without it.
+   */
+  private async askContext(s: Session, question: string): Promise<RetrievedContext | null> {
+    if (!this.settings.context.enabled) return null;
+    const sv = this.services;
+    const around = s.surroundings;
+    const near = around ? (around.caret >= 0 ? around.text.slice(Math.max(0, around.caret - 1000), around.caret + 300) : around.text.slice(0, 1300)) : '';
+    const texts = [question, s.selection?.text ?? near].filter((t) => t.trim());
+    if (texts.length === 0) return null;
+    const t = performance.now();
+    try {
+      const r = await retrieveContext(
+        { store: sv.store, people: sv.people, calendar: sv.calendar, embedder: () => sv.embed.embedder(), settings: () => sv.settings, sync: () => sv.embed.syncContext() },
+        { texts, personIds: s.route?.features.knownPeople ?? [] },
+      );
+      const keep = (kind: ContextUsed['kind'], id: string) => !s.contextDismissed.has(`${kind}:${id}`);
+      const ctx: RetrievedContext = {
+        ...r,
+        notes: r.notes.filter((n) => keep('note', n.itemId)),
+        people: r.people.filter((p) => keep('person', p.id)),
+        tasks: r.tasks.filter((c) => keep('task', c.id)),
+        events: r.events.filter((e) => keep('event', e.id)),
+      };
+      log.info('ask context', { notes: ctx.notes.length, people: ctx.people.length, tasks: ctx.tasks.length, events: ctx.events.length, days: ctx.days.length, semantic: ctx.semantic, ms: ms(t) });
+      sv.metrics.record('ask_context', { notes: ctx.notes.length, people: ctx.people.length, tasks: ctx.tasks.length, events: ctx.events.length, ms: ms(t) });
+      return ctx;
+    } catch (e) {
+      log.warn('ask context failed', errorInfo(e));
+      return null;
+    }
+  }
+
+  /** "Not related" on a row of Ask's "Used N" chip: left out of later prompts in this session. */
+  dismissContext(sessionId: number, kind: ContextUsed['kind'], id: string): void {
+    const s = this.current(sessionId);
+    if (!s) return;
+    s.contextDismissed.add(`${kind}:${id}`);
+    this.services.metrics.record('context_dismissed', { kind });
   }
 
   // ---- Ask and Save ----
@@ -1999,7 +2045,16 @@ ${s.selection.text}`;
             return { collection };
           },
         };
-        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: this.askNotes(s), remember, surroundings: s.selection ? null : s.surroundings }, ctl.signal);
+        const context = await this.askContext(s, q);
+        if (ctl.signal.aborted) throw new LlmError('aborted', 'Cancelled.');
+        // "Ask about these" picks the notes; otherwise the retriever's.
+        const picked = s.askRelated ? this.services.store.itemsWithCollection(s.askRelated) : null;
+        const notes = picked
+          ? picked.map((it) => ({ id: it.id, text: it.text, why: it.why, created_at: it.created_at }))
+          : (context?.notes ?? []).map((h) => ({ id: h.itemId, text: h.text, why: h.why, created_at: h.created_at }));
+        const used = contextUsed(context ?? { people: [], tasks: [], events: [] }, notes, new Date());
+        if (used.length) send<AskContext>('ask:context', { requestId, used });
+        const r = ask(this.services.llm, this.settings, { selection, container, question: q, related: notes, context, remember, surroundings: s.selection ? null : s.surroundings }, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
           send('ask:chunk', { requestId, text });

@@ -4,7 +4,7 @@ import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { pct } from './format';
 import { BlockList } from './General';
-import { CallLog, PrivacyChoice } from './Privacy';
+import { CallLog, PrivacyChoice, SavedInAnswers } from './Privacy';
 import { useAction } from './useAction';
 
 const EMBED_STATE: Record<EmbedStatus['state'], string> = {
@@ -176,6 +176,7 @@ export function PrivacyDataTab({ view }: { view: SettingsView }) {
       <p className="muted">Everything Glossly keeps stays on this computer. Only model calls leave it.</p>
       <PrivacyChoice view={view} onSetUp={() => (location.hash = 'models')} />
       <BlockList view={view} />
+      <SavedInAnswers view={view} />
       <CallLog view={view} />
       <h3>Your data</h3>
       <Export />

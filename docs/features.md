@@ -31,11 +31,11 @@ Status: live (Step 13 and 16 checks). Not live: numbering by position, the Step 
 
 ## Ask
 
-Streams an answer on the Chat role (`actions/ask.ts`, `prompts/ask.md`). The prompt has the asker's identity (so it doesn't treat the reader as a message's author), the selection, surrounding text with a `[SELECTION]` mark, and up to 3 saved notes from Recall ("From your note, Oct 10"). With nothing selected it uses the surroundings: "Around their cursor" with a `[CURSOR]` mark, or "What is on their screen". Asking to remember something calls the `remember` tool, which saves a note with Undo (decision 24). `Ctrl+C` copies the answer. Errors offer "Add a key", or under Local only with no local model "Use all models and ask" and "Set up a local model".
+Streams an answer on the Chat role (`actions/ask.ts`, `prompts/ask.md`). The prompt has the asker's identity (so it doesn't treat the reader as a message's author), the date, time, and time zone, the selection, and surrounding text with a `[SELECTION]` mark. **Saved data** (Step 25.3, decision 77): `retrieveContext` runs on the question and the selection, or the text around the cursor. It finds the saved people, tasks, and events closest to them, each task and event with a label worked out from now ("open, due tomorrow", "today, 1:00 PM to 5:00 PM, in 3 hours", "done Oct 13"), and up to 3 saved notes ("From your note, Oct 10"); "Ask about these" picks the notes instead. A "Used 2 notes · 1 event" chip under the answer (`UsedChip.tsx`) opens to the list, and "Not related" leaves a row out of later answers in that bar session. Privacy > "Use what you've saved in answers" (`context.enabled`, on by default) turns it off; then only notes picked with "Ask about these" go in. With nothing selected it uses the surroundings: "Around their cursor" with a `[CURSOR]` mark, or "What is on their screen". Asking to remember something calls the `remember` tool, which saves a note with Undo (decision 24). `Ctrl+C` copies the answer. Errors offer "Add a key", or under Local only with no local model "Use all models and ask" and "Set up a local model".
 
 Answers are tidied for display: no-break and narrow spaces become plain spaces, and "a.m.." loses its extra stop (decision 44).
 
-Status: live (first token about 0.7 s, remember and Undo, Local only). Not live: `Ctrl+C`, surroundings with nothing selected, the text tidying.
+Status: live (first token about 0.7 s, remember and Undo, Local only). Not live: `Ctrl+C`, surroundings with nothing selected, the text tidying, and all of the saved data (unit tests and the local context eval only; in the live-check backlog).
 
 ## Save and save modes
 

@@ -63,6 +63,7 @@ export * from './context/docs';
 export * from './context/sync';
 export * from './context/days';
 export * from './context/retrieve';
+export * from './context/prompt';
 export * from './visualize/table';
 export * from './visualize/visualize';
 export type * from './visualize/types';

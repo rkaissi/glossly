@@ -1,6 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import askPrompt from '../../prompts/ask.md?raw';
+import { contextLines, nowLine } from '../context/prompt';
+import type { RetrievedContext } from '../context/retrieve';
 import type { LlmProvider, StreamResult } from '../llm/types';
 import { describeIdentity } from '../people/names';
 import { describeSource } from '../people/reply-style';
@@ -16,8 +18,10 @@ export interface AskInput {
   now?: Date;
   /** Empty or missing means settings.ask.defaultQuestion. */
   question?: string;
-  /** Top recall results, or the cards picked with "Ask about these". */
-  related?: Item[];
+  /** Saved notes: the retriever's, or the cards picked with "Ask about these". */
+  related?: Pick<Item, 'text' | 'why' | 'created_at'>[];
+  /** Saved people, tasks, and events close to the question (decision 77). */
+  context?: Pick<RetrievedContext, 'people' | 'tasks' | 'events'> | null;
   /** Lets Ask save a note when the question asks it to remember something. */
   remember?: RememberDeps;
   /** Nothing selected: the text around the caret, or what is on screen. */
@@ -98,6 +102,7 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
     win.text.slice(0, win.selection_start) + SELECTION_MARK + win.text.slice(win.selection_start + win.selection_length);
 
   const me = describeIdentity(settings.identity);
+  const now = input.now ?? new Date();
   const parts = [
     '## Question',
     question,
@@ -106,9 +111,9 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
     '## The person asking',
     me ? `${me}. They are reading the selection; they did not write it unless it is signed by or attributed to them.` : 'Unknown. They are reading the selection and most likely did not write it.',
     '',
-    // For "when is that?" and "how long ago" (decision 54).
-    '## Today',
-    (input.now ?? new Date()).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }),
+    // For "when is that?" and "how long ago" (decision 54); with the time, so "in 3 hours" and "past" in the saved data read right (decision 77).
+    '## Now',
+    nowLine(now),
     '',
   ];
   const where = describeSource(selection.source_app, selection.window_title);
@@ -136,6 +141,10 @@ export function buildAskPrompt(settings: AskSettings, input: AskInput): { questi
       surrounding,
       '</context>',
     );
+  }
+  const saved = input.context ? contextLines(input.context, now) : [];
+  if (saved.length > 0) {
+    parts.push('', '## Their saved people, tasks, and calendar (labels in brackets are worked out from now)', ...saved);
   }
   const notes = (input.related ?? []).slice(0, MAX_NOTES);
   if (notes.length > 0) {

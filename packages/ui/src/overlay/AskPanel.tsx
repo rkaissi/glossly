@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUp, Bookmark, Check, Copy, Undo2 } from 'lucide-react';
-import type { AskErrorEvent, AskSaved, OverlayState } from '@glossly/core/api';
+import type { AskErrorEvent, AskSaved, ContextUsed, OverlayState } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { AnswerText } from './AnswerText';
 import { useSecondsLeft } from './SavedToast';
+import { UsedChip } from './UsedChip';
 
 type Answer =
   | { status: 'starting' }
@@ -35,6 +36,8 @@ export function AskPanel({ s }: { s: OverlayState }) {
   /** A note Ask saved because the question asked it to remember something. */
   const [saved, setSaved] = useState<(AskSaved & { undone?: boolean }) | null>(null);
   const undoLeft = useSecondsLeft(saved && !saved.undone ? saved.undoUntil : null);
+  /** What the answer drew on from saved data (decision 77). */
+  const [used, setUsed] = useState<ContextUsed[]>([]);
   const input = useRef<HTMLInputElement>(null);
   /** The live request id; null while ask:start is in flight. */
   const current = useRef<string | null>(null);
@@ -59,6 +62,10 @@ export function AskPanel({ s }: { s: OverlayState }) {
       glossly.on('ask:saved', (p) => {
         if (p.requestId === current.current || waiting.current) setSaved(p);
       }),
+      // Sent once, before the answer streams; usually while ask:start is still returning.
+      glossly.on('ask:context', (p) => {
+        if (p.requestId === current.current || waiting.current) setUsed(p.used);
+      }),
     ];
     return () => {
       offs.forEach((off) => off());
@@ -75,6 +82,7 @@ export function AskPanel({ s }: { s: OverlayState }) {
     setAnswer({ status: 'starting' });
     setCopied(false);
     setSaved(null);
+    setUsed([]);
     const { requestId } = await glossly.invoke('ask:start', { sessionId: s.sessionId, question });
     waiting.current = false;
     current.current = requestId;
@@ -144,6 +152,8 @@ export function AskPanel({ s }: { s: OverlayState }) {
           )}
         </div>
       )}
+
+      {answer && answer.status !== 'error' && <UsedChip key={used.map((u) => u.id).join()} sessionId={s.sessionId} used={used} />}
 
       {saved && (
         <div className="inline-note">

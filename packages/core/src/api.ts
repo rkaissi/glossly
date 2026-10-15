@@ -189,6 +189,21 @@ export interface AskSaved {
   /** Epoch ms. */
   undoUntil: number;
 }
+/** One saved row that went into a prompt (decision 77), for the "Used N" chip. */
+export interface ContextUsed {
+  kind: 'note' | 'person' | 'task' | 'event';
+  /** The item's, person's, task's, or event's id. */
+  id: string;
+  /** Short: a name, a title, or the start of a note. */
+  label: string;
+  /** "colleague", "open, due tomorrow", "today, 1:00 PM to 5:00 PM", or null. */
+  detail: string | null;
+}
+/** What Ask put in the prompt from saved data; sent before the answer streams. */
+export interface AskContext {
+  requestId: string;
+  used: ContextUsed[];
+}
 export interface AskErrorEvent {
   requestId: string;
   code: 'no_model' | 'local_only' | 'invalid_output' | 'provider' | 'aborted' | 'timeout' | 'no_selection';
@@ -410,6 +425,8 @@ export interface InvokeChannels {
 
   'ask:start': { args: AskStartArgs; result: { requestId: string } };
   'ask:cancel': { args: { requestId: string }; result: void };
+  /** "Not related" on a row of the "Used N" chip: left out of later prompts in this session, and logged (kind and reason only). */
+  'context:dismiss': { args: { sessionId: number; kind: ContextUsed['kind']; id: string }; result: void };
 
   'save:save': { args: SaveArgs; result: SaveDone };
   'save:setWhy': { args: { itemId: string; why: string }; result: boolean };
@@ -582,6 +599,7 @@ export interface PushChannels {
   'ask:done': AskDone;
   'ask:error': AskErrorEvent;
   'ask:saved': AskSaved;
+  'ask:context': AskContext;
   'reply:chunk': AskChunk;
   'reply:done': AskDone;
   'reply:error': AskErrorEvent;

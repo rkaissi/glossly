@@ -84,6 +84,34 @@ export function PrivacyChoice({ view, onSetUp }: { view: SettingsView; onSetUp: 
 }
 
 /**
+ * Whether Ask sends the saved notes, people, tasks, and events closest to the question along
+ * with it (decision 77). On by default; under Local only it stays on this computer anyway.
+ */
+export function SavedInAnswers({ view }: { view: SettingsView }) {
+  const { busy, error, run } = useAction();
+  const ctx = view.settings.context;
+  const set = (enabled: boolean) =>
+    void run(async () => {
+      const r = await glossly.invoke('settings:set', { key: 'context', value: { ...ctx, enabled } });
+      if (r.error) throw new Error(r.error);
+    });
+  return (
+    <div className="field">
+      <div className="toggle">
+        <span>
+          <strong>Use what you've saved in answers</strong>
+          <span className="muted small block">
+            Ask gets the notes, people, tasks, and events closest to your question, so it can answer things like "when is my interview?". They go to the model with the question, and each answer lists what it used.
+          </span>
+        </span>
+        <Switch label="Use what you've saved in answers" checked={ctx.enabled} disabled={busy} onChange={set} />
+      </div>
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
+/**
  * The model call log (decision 61): every call's prompt (with the selected text), answer, model,
  * and timing, kept 30 days in the local database to see what the models saw. Turning it off
  * deletes it, so that asks first.

@@ -191,6 +191,10 @@ export function registerIpc(deps: IpcDeps): void {
   handle('recall:get', (a) => capture.recallHits(num(a.sessionId)));
   handle('recall:dismiss', (a) => capture.dismissRecall(num(a.sessionId), str(a.itemId, 100)));
   handle('recall:ask', (a) => capture.askAboutRecall(num(a.sessionId)));
+  handle('context:dismiss', (a) => {
+    const kind = (['note', 'person', 'task', 'event'] as const).find((k) => k === a.kind);
+    if (kind) capture.dismissContext(num(a.sessionId), kind, str(a.id, 100));
+  });
   handle('search:query', (a) => capture.search(str(a.query ?? '', 500)));
   handle('items:copy', (a) => {
     const item = services.store.getItem(str(a.itemId, 100));

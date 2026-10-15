@@ -6,7 +6,7 @@ import { LlmError, type ChatRequest, type LlmProvider } from '../llm/types';
 import { Metrics } from '../metrics';
 import { DEFAULT_SETTINGS } from '../settings';
 import { Store } from '../store/store';
-import type { Item, SelectionPayload } from '../types';
+import { isoNow, type Item, type SelectionPayload } from '../types';
 import { ask, buildAskPrompt, noteLabel, noteLabels } from './ask';
 import { contextWindow } from './context';
 import { SaveService, type SelectionItemData } from './save';
@@ -123,9 +123,33 @@ describe('Ask', () => {
     expect(prompt).not.toContain('Saved notes');
   });
 
-  it('knows today and where the text came from (decision 54)', () => {
+  it('knows the day and time and where the text came from (decisions 54 and 77)', () => {
     const { prompt } = buildAskPrompt(DEFAULT_SETTINGS, { selection: selection(), now: new Date(2026, 9, 14, 10, 0) });
-    expect(prompt).toContain('## Today\nWednesday, October 14, 2026');
+    expect(prompt).toMatch(/## Now\nWednesday, October 14, 2026(,| at) 10:00\sAM/);
+    expect(prompt).not.toContain('## Their saved');
+  });
+
+  it('adds saved people, tasks, and events with labels worked out from now (decision 77)', () => {
+    const now = new Date(2026, 9, 14, 10, 0);
+    const local = (d: number, h: number) => isoNow(new Date(2026, 9, d, h));
+    const { prompt } = buildAskPrompt(DEFAULT_SETTINGS, {
+      selection: selection(),
+      now,
+      context: {
+        people: [{ id: 'p', name: 'Casey Lin', relationship: 'friend', note: 'College friend', reason: 'named', similarity: null }],
+        tasks: [
+          { id: 't', owner: 'me', text: 'Pay Casey back', due_at: '2026-10-12', status: 'open', completed_at: null, person_id: 'p', person_name: 'Casey Lin', reason: 'person', similarity: null },
+          { id: 'u', owner: 'me', text: 'Practice for the interview', due_at: null, status: 'done', completed_at: local(13, 18), person_id: null, person_name: null, reason: 'similar', similarity: 0.6 },
+        ],
+        events: [
+          { id: 'e', title: 'Meeting with Casey', starts_at: local(14, 13), ends_at: local(14, 17), all_day: false, location: null, attendees: ['Casey Lin'], people: [], source_app: null, created_at: local(1, 9), reason: 'day', similarity: null },
+        ],
+      },
+    });
+    expect(prompt).toContain('People:\n- Casey Lin: friend; College friend');
+    expect(prompt).toContain('- [open, overdue by 2 days (was due Oct 12)] The user owes Casey Lin: Pay Casey back');
+    expect(prompt).toContain("- [done Oct 13] The user's own task: Practice for the interview");
+    expect(prompt).toMatch(/- \[today, 1:00\sPM to 5:00\sPM, in 3 hours\] Meeting with Casey \(with Casey Lin\)/);
   });
 
   it('prefers tier-2 context and cites saved notes by label', () => {

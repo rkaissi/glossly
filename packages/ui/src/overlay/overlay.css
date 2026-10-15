@@ -547,6 +547,74 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   padding-right: 4px;
   user-select: text;
 }
+/* "Used 2 notes · 1 event" under an answer (decision 77). */
+.used {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.used-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.used-toggle:hover:not(:disabled) {
+  color: var(--fg-2);
+  background: var(--hover);
+}
+.used-toggle svg {
+  transition: transform var(--fade) var(--ease-out);
+}
+.used-toggle svg.flip {
+  transform: rotate(180deg);
+}
+.used-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.used-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--h-xs);
+  font-size: 12.5px;
+  color: var(--fg-2);
+}
+.used-list li > svg {
+  flex: none;
+  color: var(--muted);
+}
+.used-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.used-detail {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+.used-list button {
+  margin-left: auto;
+  flex: none;
+  height: var(--h-xs);
+  padding: 0 9px;
+  font-size: 12.5px;
+}
+
 .inline-note {
   display: flex;
   align-items: center;
