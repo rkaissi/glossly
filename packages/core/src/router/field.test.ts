@@ -45,6 +45,13 @@ describe('fieldThread', () => {
     expect(outlook?.before).toBe('');
   });
 
+  it('in a chat, answers the last speaker’s messages and keeps the earlier ones as context', () => {
+    const t = fieldThread(at('Maya Chen — Today at 10:31 AM\nmorning all, the build is green again after the fix\nJordan Hale — Today at 10:42 AM\nare you coming to the launch review tomorrow? can you bring the deck\n'))!;
+    expect(t.text).toMatch(/^Jordan Hale/);
+    expect(t.text).not.toContain('build is green');
+    expect(t.before).toContain('Maya Chen');
+  });
+
   it('needs a caret in a field and enough text to answer', () => {
     expect(fieldThread(at('Jordan Hale — Today at 10:42 AM\nare you coming to the review tomorrow?', 'visible'))).toBeNull();
     expect(fieldThread(at('ok thanks'))).toBeNull();

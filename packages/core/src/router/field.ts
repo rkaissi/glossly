@@ -8,7 +8,7 @@ import { QUOTE_HEADER } from '../people/conversation';
 import { describeSource, replyChannel } from '../people/reply-style';
 import type { Identity } from '../settings';
 import type { Surroundings } from '../types';
-import { extractFeatures, type Features } from './features';
+import { extractFeatures, headers, type Features } from './features';
 import type { KnownPerson } from './types';
 
 /** What the hotkey read with nothing selected. */
@@ -58,7 +58,16 @@ export function fieldThread(sur: Surroundings | null): FieldThread | null {
   const caret = sur.caret >= 0 ? Math.min(sur.caret, sur.text.length) : sur.text.length;
   const before = sur.text.slice(0, caret);
   if (countWords(before) >= MIN_WORDS) {
-    const text = lastLines(before, MESSAGE_CHARS);
+    let text = lastLines(before, MESSAGE_CHARS);
+    // A chat composer answers the last speaker: their run of messages is the message, and the
+    // earlier messages are context (live check, Oct 14: a draft answered an older message).
+    const hs = headers(text);
+    if (hs.length) {
+      let i = hs.length - 1;
+      while (i > 0 && hs[i - 1]!.name === hs[i]!.name) i--;
+      const start = text.split('\n').slice(0, hs[i]!.line).reduce((n, l) => n + l.length + 1, 0);
+      if (countWords(text.slice(start)) >= MIN_WORDS) text = text.slice(start);
+    }
     return { text: text.trim(), before: lastLines(before.slice(0, before.length - text.length), BEFORE_CHARS) };
   }
   const after = sur.text.slice(caret);
