@@ -22,7 +22,7 @@ import { findDuplicateEvent, type Similarity } from '../calendar/duplicates';
 import type { CalendarRepo } from '../store/calendar';
 import { contextWindow } from './context';
 import { describeSource } from '../people/reply-style';
-import { matchOpenTasks, rulesCommitments } from './promise-rules';
+import { matchOpenTasks, rulesCommitments, rulesReschedules } from './promise-rules';
 
 /** An open task shown to the model under a short key ("t1"), so its answer can point at it. */
 export interface OpenTaskRef {
@@ -405,7 +405,9 @@ export async function extractPromises(
   if (!llm.hasModel('fast')) {
     const author = { name: input.authorIsMe ? null : (input.author?.name ?? null), isMe: input.authorIsMe };
     const text = input.selection.text.slice(0, MAX_SELECTION);
-    out = { ...matchOpenTasks(rulesCommitments(text, author, now), open), events: rulesEvents(text, author) };
+    const matched = matchOpenTasks(rulesCommitments(text, author, now), open);
+    const used = new Set(matched.commitments.flatMap((c) => (c.open_task && c.open_task !== 'none' ? [c.open_task] : [])));
+    out = { commitments: [...matched.commitments, ...rulesReschedules(text, open, used, now)], events: rulesEvents(text, author) };
     found = await detected;
     byRules = settings.privacy === 'local' ? 'local_only' : 'no_model';
   } else {

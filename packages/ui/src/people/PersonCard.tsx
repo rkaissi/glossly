@@ -228,13 +228,16 @@ export function PersonCardView({
   onChange,
   compact,
   removableAliases,
+  hasMore,
 }: {
   card: PersonCard;
   onChange: (c: PersonCard) => void;
   compact?: boolean;
   removableAliases?: boolean;
+  /** The settings record lists more below the card (done tasks), so it isn't empty. */
+  hasMore?: boolean;
 }) {
-  const empty = !card.youOwe.length && !card.theyOwe.length && !card.events.length && !card.interactions.length && !card.items.length;
+  const empty = !hasMore && !card.youOwe.length && !card.theyOwe.length && !card.events.length && !card.interactions.length && !card.items.length;
   return (
     <div className={`person${compact ? ' compact' : ''}`}>
       {compact && (

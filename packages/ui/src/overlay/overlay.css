@@ -300,6 +300,11 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   min-height: 0;
   overflow-y: auto;
 }
+/* The panel scrolls, not its parts: a list that scrolls on its own (Tasks and events' rows) would
+   otherwise shrink to a sliver in a short window. */
+.frame.capped > .panel > * {
+  flex-shrink: 0;
+}
 /* Decision 41: the overlay's glass is the window itself, so containers stay put and what's
    inside moves: a panel's parts rise in one after another, bar actions pop in. */
 .panel > * {

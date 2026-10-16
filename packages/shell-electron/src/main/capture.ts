@@ -52,6 +52,7 @@ import {
   pasteSnippets,
   pasteTarget,
   recentSnippets,
+  richEditor,
   search as searchSaved,
   library as librarySaved,
   placeBar,
@@ -1632,7 +1633,7 @@ ${s.selection.text}`;
     const base = { count: items.length, total: items.length, target, reason: picked.reason };
     if (kind === 'list') {
       this.services.metrics.record('paste_composed', { kind, count: items.length, target, reason: picked.reason, ms: ms(t) });
-      return { ok: true, ...base, text: pasteList(items, target), asSaved: pasteAsSaved(items) };
+      return { ok: true, ...base, text: pasteList(items, target, richEditor(s.fg?.process_name ?? '', s.fg?.title ?? '')), asSaved: pasteAsSaved(items) };
     }
     s.pasteCtl?.abort();
     const ctl = new AbortController();

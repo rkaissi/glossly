@@ -75,7 +75,7 @@ const MESSENGER_TITLES = /(?:- Gmail|- Outlook|Outlook$|- Slack|Discord|WhatsApp
 const CODE_EDITORS = ['code.exe', 'cursor.exe', 'devenv.exe', 'idea64.exe', 'pycharm64.exe', 'webstorm64.exe', 'rider64.exe', 'sublime_text.exe', 'notepad++.exe', 'zed.exe'];
 
 const COMMITMENT =
-  /\b(?:I'll|I will|send me|let's|need you to|make sure|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|remember to|don't forget|do not forget|to-?do|reminder|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you)\b/gi;
+  /\b(?:I'll|I will|send me|let's|need you to|make sure|I'm going to|I am going to|we'll|we will|will do|I can|can you|could you|would you|please|let me know|remember to|don't forget|do not forget|to-?do|reminder|get back to (?:you|me)|follow up|remind me|send (?:you|over|it)|by (?:eod|end of (?:day|week|month)|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week)|due|deadline|promise|owe you|(?:push|move|bump)(?: \w+){0,3} to|reschedule|postpone)\b/gi;
 const DATE_WORD =
   /\b(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|end of (?:day|week|month)|eod|eow|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{1,2}(?::\d{2})?\s?[ap]m)\b/i;
 const AUTOMATED =

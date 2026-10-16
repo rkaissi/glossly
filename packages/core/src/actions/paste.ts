@@ -113,10 +113,25 @@ export async function pasteSnippets(deps: PasteDeps, input: { surroundings: Surr
   return { items: recent, reason: 'recent' };
 }
 
-/** The snippets as a list for the target: plain lines in a chat, "- " bullets elsewhere. Keeps the given order. */
-export function pasteList(items: Pick<Item, 'text'>[], target: PasteTarget = 'other'): string {
+const RICH_PROCESSES = ['winword.exe', 'wordpad.exe', 'onenote.exe', 'onenoteim.exe', 'notion.exe', 'evernote.exe', 'soffice.bin'];
+const RICH_TITLES = /(?:- Google Docs|- Word\b|Notion\b|- OneNote|Confluence|Dropbox Paper|Coda\b|Quip\b)/i;
+
+/**
+ * A rich-text editor (Docs, Word, OneNote, Notion…): each pasted line takes the formatting of
+ * the paragraph at the caret, so inside a bulleted list every line becomes a bullet on its own,
+ * and a typed "- " would show as "• - …".
+ */
+export function richEditor(app: string, title: string): boolean {
+  return RICH_PROCESSES.includes(app.toLowerCase()) || RICH_TITLES.test(title);
+}
+
+/**
+ * The snippets as a list for the target: plain lines in a chat and in a rich-text editor (which
+ * keeps its own bullets), "- " bullets elsewhere. Keeps the given order.
+ */
+export function pasteList(items: Pick<Item, 'text'>[], target: PasteTarget = 'other', rich = false): string {
   const lines = items.map((it) => clip(oneLine(cleanText(it.text)), MAX_LIST_ITEM));
-  return target === 'chat' ? lines.join('\n') : lines.map((l) => `- ${l}`).join('\n');
+  return target === 'chat' || rich ? lines.join('\n') : lines.map((l) => `- ${l}`).join('\n');
 }
 
 /** The snippets as they were saved (cleaned of capture artifacts), in the given order, a blank line between them. */

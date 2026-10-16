@@ -5,7 +5,7 @@ import type { ChatRequest, LlmProvider } from '../llm/types';
 import { DEFAULT_SETTINGS } from '../settings';
 import { assignEmptySlots, scoreEmptyActions } from '../router/slots';
 import { Store } from '../store/store';
-import { buildPastePrompt, composePaste, pasteAsSaved, pasteList, pasteSnippets, pasteTarget, recentSnippets } from './paste';
+import { buildPastePrompt, composePaste, pasteAsSaved, pasteList, pasteSnippets, pasteTarget, recentSnippets, richEditor } from './paste';
 
 const require = createRequire(import.meta.url);
 const vecExtensionPath = (require('sqlite-vec') as { getLoadablePath(): string }).getLoadablePath();
@@ -57,6 +57,10 @@ describe('paste', () => {
       const ordered = [...items].reverse();
       expect(pasteList(ordered)).toBe('- The launch moved to Thursday\n- Budget is 40k');
       expect(pasteList(ordered, 'chat')).toBe('The launch moved to Thursday\nBudget is 40k');
+      // A rich editor keeps its own bullets: no "• - …" inside a list.
+      expect(pasteList(ordered, 'document', true)).toBe('The launch moved to Thursday\nBudget is 40k');
+      expect(richEditor('chrome.exe', 'Plan - Google Docs - Google Chrome')).toBe(true);
+      expect(richEditor('notepad.exe', 'notes.txt')).toBe(false);
       expect(pasteAsSaved(ordered)).toBe('The launch moved\nto Thursday\n\nBudget is 40k');
     } finally {
       store.close();

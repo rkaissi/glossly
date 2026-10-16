@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { app, clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import {
   linkNamedPeople,
+  namedPeople,
   REPLY_CHANNELS,
   REPLY_REDO_ASKS,
   STYLE_DIMENSIONS,
@@ -438,8 +439,12 @@ export function registerIpc(deps: IpcDeps): void {
     const due = a.due_at === null ? null : str(a.due_at, 40);
     if (due && !DUE.test(due)) throw new Error('Invalid date');
     // Quick add with the person filter set: the user owes that person (Step 21). An unknown id is ignored.
-    const personId = typeof a.person_id === 'string' && people.get(a.person_id) ? a.person_id : null;
-    people.addCommitment({ person_id: personId, owner: 'me', text: str(a.text, 300), due_at: due, source_interaction_id: null });
+    // Without the filter, a title naming one saved person by a full or saved name ("Send Casey
+    // Lin the notes") is owed to them; a first name alone, or two people, links no one.
+    const text = str(a.text, 300);
+    const named = namedPeople(people, [text]);
+    const personId = typeof a.person_id === 'string' && people.get(a.person_id) ? a.person_id : named.length === 1 ? named[0]! : null;
+    people.addCommitment({ person_id: personId, owner: 'me', text, due_at: due, source_interaction_id: null });
     broadcastPeople();
   });
   handle('commitments:delete', (a) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CommitmentView } from '../people/types';
-import { matchOpenTasks, rulesCommitments, splitDue } from './promise-rules';
+import { matchOpenTasks, rulesCommitments, rulesReschedules, splitDue } from './promise-rules';
 
 // Wednesday, Oct 14 2026.
 const now = new Date(2026, 9, 14, 10, 0);
@@ -76,5 +76,21 @@ describe('matchOpenTasks', () => {
       // Same words, other owner, and t2 is taken: new.
       ['new', 'none'],
     ]);
+  });
+
+  it('finds a new date for an open task of either owner ("push the deck to Monday")', () => {
+    const tasks = [
+      { key: 't1', task: task('a', 'me', 'send the deck to Jordan') },
+      { key: 't2', task: task('b', 'them', 'review the contract') },
+    ];
+    const out = rulesReschedules('can we push the deck to Monday? And move the contract review to Friday.', tasks, new Set(), now);
+    expect(out.map((c) => [c.open_task, c.change, c.owner, c.due_phrase])).toEqual([
+      ['t1', 'moved', 'me', 'Monday'],
+      ['t2', 'moved', 'them', 'Friday'],
+    ]);
+    // Nothing open that matches, no date, or the task already matched: no row.
+    expect(rulesReschedules('push the launch party to Monday', tasks, new Set(), now)).toEqual([]);
+    expect(rulesReschedules('can we push the deck?', tasks, new Set(), now)).toEqual([]);
+    expect(rulesReschedules('push the deck to Monday', tasks, new Set(['t1']), now)).toEqual([]);
   });
 });

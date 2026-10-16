@@ -125,14 +125,23 @@ const VOICE_PLATFORMS: { value: VoicePlatform; label: string }[] = [
 ];
 
 /** Reply's voice samples: up to 5 pasted here, plus replies you edited before inserting or copying. */
+/**
+ * Loads now and again whenever the settings window gets focus back: Reply learns and adds
+ * samples while the user is in another app, and nothing pushes those changes here.
+ * Returns the cleanup for an effect.
+ */
+function reloadOnFocus(load: () => void): () => void {
+  load();
+  window.addEventListener('focus', load);
+  return () => window.removeEventListener('focus', load);
+}
+
 function VoiceSamples() {
   const [samples, setSamples] = useState<VoiceSample[] | null>(null);
   const [text, setText] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
   const { busy, error, run } = useAction();
-  useEffect(() => {
-    void glossly.invoke('voice:list').then(setSamples);
-  }, []);
+  useEffect(() => reloadOnFocus(() => void glossly.invoke('voice:list').then(setSamples)), []);
   const pasted = (samples ?? []).filter((v) => v.origin === 'pasted');
   const inserted = (samples ?? []).filter((v) => v.origin !== 'pasted');
   const remove = (id: string) =>
@@ -216,9 +225,7 @@ function LearnedStyle({ learning }: { learning: boolean }) {
   const [view, setView] = useState<StyleView | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const { busy, error, run } = useAction();
-  useEffect(() => {
-    void glossly.invoke('style:get').then(setView);
-  }, [learning]);
+  useEffect(() => reloadOnFocus(() => void glossly.invoke('style:get').then(setView)), [learning]);
   const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.personId ?? `${p.relationship ?? ''}:${p.channel}`}`;
   const forget = (p: StylePreferenceView) =>
     void run(async () => {

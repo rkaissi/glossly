@@ -165,11 +165,15 @@ function Merge({ card }: { card: PersonCard }) {
 }
 
 function PersonRecord({ personId }: { personId: string }) {
-  const loaded = useLive(useCallback(() => glossly.invoke('people:card', { personId }), [personId]));
-  const all = useLive(useCallback(() => glossly.invoke('commitments:list', {}), []));
+  // One load for both, so a ticked task leaves You owe and lands in Done in the same render
+  // (two loads let the card show empty, and Manage jump, in between).
+  const both = useLive(
+    useCallback(() => Promise.all([glossly.invoke('people:card', { personId }), glossly.invoke('commitments:list', {})]), [personId]),
+  );
+  const loaded = both?.[0];
   const [card, setCard] = useState<PersonCard | null>(null);
-  useEffect(() => setCard(loaded ?? null), [loaded]);
-  const closed = (all ?? []).filter((c: CommitmentView) => c.person_id === personId && c.status !== 'open');
+  useEffect(() => setCard(both ? both[0] : null), [both]);
+  const closed = (both?.[1] ?? []).filter((c: CommitmentView) => c.person_id === personId && c.status !== 'open');
 
   return (
     <section>
@@ -186,7 +190,7 @@ function PersonRecord({ personId }: { personId: string }) {
           <RecordHead card={card} onChange={setCard} />
           <p className="muted small">Added {formatDay(card.created_at)}</p>
           <div className="field">
-            <PersonCardView card={card} onChange={setCard} removableAliases />
+            <PersonCardView card={card} onChange={setCard} removableAliases hasMore={closed.length > 0} />
           </div>
           {closed.length > 0 && (
             <>

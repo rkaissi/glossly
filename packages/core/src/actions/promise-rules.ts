@@ -5,7 +5,7 @@
 import { resolveDue } from '../people/dates';
 import { isEventSentence } from '../calendar/events';
 import { canonicalize } from '../people/names';
-import type { ExtractedCommitments, OpenTaskRef } from './promises';
+import type { ExtractedCommitment, ExtractedCommitments, OpenTaskRef } from './promises';
 
 /** The speaker commits to something, or notes something they have to do: it binds the author. */
 const PROMISE = /\b(?:i'll|i will|i'm going to|i am going to|i'm gonna|let me|i promise to|i can|i need to|i have to|i must)\s+(.+)/i;
@@ -94,6 +94,43 @@ function overlap(a: string, b: string): number {
   let n = 0;
   for (const w of x) if (y.has(w)) n++;
   return n / Math.min(x.size, y.size);
+}
+
+/** A new date for something already planned: "can we push the deck to Monday?", "let's move the review to Friday". */
+const RESCHEDULE = /\b(?:push|move|bump|reschedule|postpone|delay)\s+(.+)/i;
+
+/**
+ * Without a model, "push the deck to Monday" names an open task and its new date. Unlike a
+ * promise it says nothing about who owes it, so it matches an open task of either owner, and it
+ * is dropped when none matches. Tasks already matched (`used`) are left alone.
+ */
+export function rulesReschedules(text: string, open: OpenTaskRef[], used: Set<string>, now: Date = new Date(), minOverlap = 0.6): ExtractedCommitment[] {
+  const out: ExtractedCommitment[] = [];
+  for (const sentence of text.replace(/[’‘]/g, "'").split(/(?<=[.!?])\s+|\n+/)) {
+    const m = RESCHEDULE.exec(sentence.trim());
+    if (!m) continue;
+    const { task, due } = splitDue(m[1]!, now);
+    if (!due) continue;
+    // "the deck to" after the date is cut off: the trailing "to" or "back to" goes too.
+    const clean = cleanTask(task.replace(/\s+(?:back\s+)?(?:to|until|till)$/i, ''));
+    const hit = open
+      .filter((o) => !used.has(o.key))
+      .map((o) => ({ o, score: overlap(clean, o.task.text) }))
+      .filter((h) => h.score >= minOverlap)
+      .sort((a, b) => b.score - a.score)[0];
+    if (!hit) continue;
+    used.add(hit.o.key);
+    out.push({
+      owner: hit.o.task.owner === 'me' ? 'me' : 'them',
+      person_name: hit.o.task.person_name ?? '',
+      text: hit.o.task.text,
+      due_phrase: due,
+      confidence: 0.6,
+      change: 'moved',
+      open_task: hit.o.key,
+    });
+  }
+  return out;
 }
 
 /**
