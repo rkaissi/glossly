@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Write here redesign</title>
+<!-- packages/ui/src/theme.css, inlined so the page renders anywhere -->
+<style>
+/*
+ * Shared tokens for the overlay and the settings window (Step 13 redesign, Step 20.1 scale).
+ * Monochrome: no accent color anywhere (Rayan kept it in Step 20.1, decision 39). Light and dark follow the system theme. The windows themselves are
+ * Windows 11 acrylic (overlay) and mica (settings); `--glass` is the tint laid over them so
+ * text stays readable on busy backgrounds.
+ */
+:root {
+  color-scheme: light;
+  --fg: #0d0d0d;
+  --fg-2: #4b4b4b;
+  --muted: #7a7a7a;
+  --faint: #a3a3a3;
+  --glass: rgba(255, 255, 255, 0.58);
+  /* Used where there is no acrylic or mica behind (Windows 10, the dot). */
+  --glass-solid: rgba(250, 250, 250, 0.97);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(0, 0, 0, 0.035);
+  --hover: rgba(0, 0, 0, 0.055);
+  --pressed: rgba(0, 0, 0, 0.09);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --primary: #0d0d0d;
+  --primary-fg: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ring: rgba(0, 0, 0, 0.42);
+  --select: rgba(0, 0, 0, 0.12);
+  --danger: #b42318;
+  --ok: #1f7a43;
+  --warn: #8a5a00;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --danger-solid: #c2463a;
+  --danger-solid-hover: #b03e33;
+  --border-hover: rgba(0, 0, 0, 0.34);
+  --toggle-on-hover: #404040;
+  --seg-thumb: #ffffff;
+  --popover: rgba(252, 252, 252, 0.94);
+  --popover-blur: saturate(1.6) blur(28px);
+  --shadow-lg: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12);
+  /* The scale (Step 20.1): a 4 px grid, three control heights, two icon sizes, one radius scale. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --h-sm: 28px;
+  /* Quiet buttons inside the overlay's dense panel rows (Copy, Edit, Redo, Undo). */
+  --h-xs: 26px;
+  --h-md: 32px;
+  --h-lg: 36px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --row-h: 40px;
+  --row-px: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --fade: 150ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /*
+   * Motion (Step 20.3, decision 41): damped springs sampled into linear() curves (the spring()
+   * generator is in docs/design/mockups/20-3-design-pass.html). Soft for things that appear,
+   * pop for small things (checks, presses), gentle for big things (panels). Exits ease in, fast,
+   * with no bounce.
+   */
+  --spring-soft: linear(0, 0.019, 0.067, 0.136, 0.218, 0.306, 0.395, 0.483, 0.566, 0.642, 0.711, 0.772, 0.825, 0.871, 0.909, 0.94, 0.965, 0.985, 1, 1.011, 1.019, 1.024, 1.027, 1.028, 1.028, 1.027, 1.025, 1.023, 1.02, 1.018, 1.015, 1.013, 1.011, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+  --spring-soft-ms: 470ms; /* 2.8% overshoot */
+  --spring-pop: linear(0, 0.03, 0.108, 0.216, 0.338, 0.464, 0.586, 0.697, 0.794, 0.876, 0.942, 0.992, 1.029, 1.054, 1.069, 1.075, 1.075, 1.071, 1.064, 1.055, 1.046, 1.036, 1.028, 1.02, 1.013, 1.007, 1.003, 0.999, 0.997, 0.995, 0.995, 0.994, 0.994, 0.995, 0.995, 0.996, 0.997, 0.998, 0.998, 0.999, 1);
+  --spring-pop-ms: 510ms; /* 7.5% overshoot */
+  --spring-gentle: linear(0, 0.021, 0.073, 0.146, 0.231, 0.321, 0.411, 0.498, 0.578, 0.651, 0.717, 0.774, 0.823, 0.865, 0.899, 0.928, 0.95, 0.969, 0.983, 0.993, 1.001, 1.006, 1.01, 1.012, 1.013, 1.013, 1.013, 1.012, 1.011, 1.01, 1.009, 1.008, 1.006, 1.005, 1.004, 1.004, 1.003, 1.002, 1.002, 1.001, 1);
+  --spring-gentle-ms: 580ms; /* 1.3% overshoot */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mono: 'Cascadia Mono', ui-monospace, Consolas, monospace;
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font: 14px/1.45 var(--font);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fg: #ececec;
+    --fg-2: #c2c2c2;
+    --muted: #949494;
+    --faint: #6b6b6b;
+    --glass: rgba(28, 28, 28, 0.5);
+    --glass-solid: rgba(36, 36, 36, 0.97);
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-2: rgba(255, 255, 255, 0.045);
+    --hover: rgba(255, 255, 255, 0.075);
+    --pressed: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --primary: #ececec;
+    --primary-fg: #0d0d0d;
+    --primary-hover: #ffffff;
+    --ring: rgba(255, 255, 255, 0.5);
+    --select: rgba(255, 255, 255, 0.16);
+    --danger: #ff8a80;
+    --ok: #7fd6a0;
+    --warn: #e8c070;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    --border-hover: rgba(255, 255, 255, 0.4);
+    --toggle-on-hover: #c4c4c4;
+    --seg-thumb: rgba(255, 255, 255, 0.12);
+    --popover: rgba(40, 40, 40, 0.92);
+    --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 16px rgba(0, 0, 0, 0.3), 0 24px 48px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] { color-scheme: dark; --fg:#ececec; --fg-2:#c2c2c2; --muted:#949494; --faint:#6b6b6b; --glass:rgba(28,28,28,.5); --glass-solid:rgba(36,36,36,.97); --surface:rgba(255,255,255,.055); --surface-2:rgba(255,255,255,.045); --hover:rgba(255,255,255,.075); --pressed:rgba(255,255,255,.12); --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.18); --primary:#ececec; --primary-fg:#0d0d0d; --ring:rgba(255,255,255,.5); --seg-thumb:rgba(255,255,255,.12); --popover:rgba(40,40,40,.92); --shadow-lg:0 0 0 1px rgba(255,255,255,.08),0 8px 16px rgba(0,0,0,.3),0 24px 48px rgba(0,0,0,.4); }
+:root[data-theme="light"] { color-scheme: light; --fg:#0d0d0d; --fg-2:#4b4b4b; --muted:#7a7a7a; --faint:#a3a3a3; --glass-solid:rgba(250,250,250,.97); --surface:rgba(255,255,255,.78); --surface-2:rgba(0,0,0,.035); --hover:rgba(0,0,0,.055); --pressed:rgba(0,0,0,.09); --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.16); --primary:#0d0d0d; --primary-fg:#fff; --ring:rgba(0,0,0,.42); --seg-thumb:#fff; --shadow-lg:0 0 0 1px rgba(0,0,0,.06),0 8px 16px rgba(0,0,0,.08),0 24px 48px rgba(0,0,0,.12); }
+body { margin:0; background:#e9e9e7; color:var(--fg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body { background:#161616; } }
+:root[data-theme="dark"] body { background:#161616; }
+button { font:inherit; color:inherit; height:var(--h-md); padding:0 12px; border-radius:var(--radius-sm); border:none; background:transparent; box-shadow:inset 0 0 0 1px var(--border-strong); display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap; }
+button:hover { background:var(--hover); }
+button.primary { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+button.ghost { box-shadow:none; color:var(--fg-2); }
+kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; background:color-mix(in srgb,var(--fg) 7%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fg) 14%,transparent); color:var(--fg-2); }
+code { font:12px var(--mono); }
+svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+svg.i.sm { width:14px; height:14px; }
+
+/* page */
+.page { max-width:1180px; margin:0 auto; padding:32px 24px 80px; }
+header.top { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+header.top h1 { font:600 26px/1.2 var(--font-display); margin:0; }
+.toggle-theme { margin-left:auto; }
+.lede { color:var(--fg-2); max-width:760px; margin:0 0 28px; }
+section.board { margin:44px 0 0; }
+section.board > h2 { font:600 18px/1.3 var(--font-display); margin:0 0 4px; }
+section.board > p.what { color:var(--fg-2); margin:0 0 16px; max-width:780px; }
+.pair { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr)); gap:24px; align-items:start; }
+.label { font:600 11px/1 var(--font); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+.notes { margin:12px 0 0; padding-left:18px; color:var(--fg-2); font-size:13px; }
+.notes li { margin:4px 0; }
+
+/* the app behind the overlay, always light so it reads as "some other app" */
+.app { background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.1); overflow:hidden; font-size:13px; color:#222; }
+.app .chrome { height:30px; display:flex; align-items:center; padding:0 10px; gap:8px; background:#f3f3f3; font-size:12px; color:#777; }
+.app .body { padding:12px 14px 34px; line-height:1.5; }
+.app .field { border:1px solid rgba(0,0,0,.12); border-radius:6px; padding:8px 10px; min-height:60px; }
+.caret { display:inline-block; width:1.5px; height:15px; background:currentColor; vertical-align:-3px; animation:blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.quoted { color:#888; border-left:2px solid rgba(0,0,0,.12); padding-left:8px; margin-top:8px; }
+.stage .frame { margin:-26px 0 0 36px; position:relative; }
+
+/* the overlay */
+.frame { width:460px; max-width:100%; background:var(--glass-solid); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden; }
+.frame > :not(.row) { border-top:1px solid var(--border); }
+.frame > .panel:first-child { border-top:none; }
+.row { height:40px; display:flex; align-items:center; gap:4px; padding:4px; overflow:hidden; }
+.slot { height:32px; padding:0 10px; gap:7px; box-shadow:none; color:var(--fg); flex:0 1 auto; min-width:0; }
+.slot span { overflow:hidden; text-overflow:ellipsis; }
+.slot.later { color:var(--fg-2); }
+.slot.highlight { background:var(--hover); box-shadow:inset 0 0 0 1.5px var(--ring); }
+.panel { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.panel h2 { margin:0; font:600 15px/1.35 var(--font-display); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.panel h2 .muted { font-weight:400; }
+.muted { color:var(--muted); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { height:28px; padding:0 12px; border-radius:999px; font-size:13px; }
+.chip.selected { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.chip.sug { gap:6px; color:var(--fg-2); }
+.chip.sug svg { color:var(--muted); }
+.seg { display:inline-flex; padding:2px; border-radius:var(--radius-sm); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); }
+.seg button { height:24px; padding:0 10px; font-size:12.5px; box-shadow:none; border-radius:6px; color:var(--fg-2); }
+.seg button.on { background:var(--seg-thumb); color:var(--fg); box-shadow:var(--shadow-sm); }
+.draft { background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 10px; line-height:1.55; white-space:pre-wrap; min-height:80px; }
+.draft .cur { display:inline-block; width:7px; height:14px; background:var(--fg-2); vertical-align:-2px; border-radius:1px; animation:blink 1s steps(1) infinite; }
+.composer { display:flex; align-items:center; gap:6px; height:40px; padding:0 4px 0 12px; background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-md); }
+.composer.small { height:34px; }
+.composer .ph { flex:1; color:var(--faint); }
+.send { width:28px; height:28px; padding:0; border-radius:50%; justify-content:center; background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.composer.small .send { width:24px; height:24px; }
+.used { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:999px; font-size:12.5px; color:var(--fg-2); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); align-self:flex-start; }
+.panel-foot { display:flex; align-items:center; gap:8px; min-height:24px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+.panel-foot button { height:var(--h-xs); padding:0 10px; font-size:12.5px; }
+.spacer { flex:1; }
+.srcs { display:flex; flex-direction:column; border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+.src { display:flex; align-items:flex-start; gap:10px; padding:8px 10px; font-size:13px; }
+.src + .src { border-top:1px solid var(--border); }
+.src .k { flex:none; width:76px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding-top:2px; }
+.src .t { flex:1; min-width:0; }
+.src .why { display:block; font-size:12px; color:var(--muted); }
+.src .x { height:22px; width:22px; padding:0; justify-content:center; box-shadow:none; color:var(--muted); }
+.src.off .t > :first-child, .src.off .t { color:var(--faint); }
+.src.off .t s { text-decoration-color:var(--faint); }
+.check { width:16px; height:16px; flex:none; border-radius:4px; background:var(--primary); color:var(--primary-fg); display:inline-flex; align-items:center; justify-content:center; margin-top:2px; }
+.check.no { background:transparent; box-shadow:inset 0 0 0 1.5px var(--border-strong); }
+.note { display:flex; gap:8px; align-items:center; font-size:12.5px; color:var(--fg-2); flex-wrap:wrap; }
+.cmp { display:grid; grid-template-columns:120px 1fr 1fr; border:1px solid var(--border-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--glass-solid); font-size:13px; }
+.cmp > div { padding:8px 12px; border-top:1px solid var(--border); }
+.cmp > div:nth-child(-n+3) { border-top:none; font-weight:600; background:var(--surface-2); }
+.cmp > div:nth-child(3n+1) { color:var(--muted); }
+.tag { font-size:11px; padding:1px 6px; border-radius:4px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); color:var(--fg-2); }
+@media (max-width:560px) { .page { padding:24px 16px 60px; } .stage .frame { margin:-20px 0 0 0; } .cmp { grid-template-columns:80px 1fr 1fr; font-size:12px; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ask" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="reply" viewBox="0 0 24 24"><path d="M9 17l-5-5 5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></symbol>
+  <symbol id="enter" viewBox="0 0 24 24"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="task" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="redo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+</svg>
+<div class="page">
+<header class="top">
+  <h1>Write here</h1>
+  <span class="muted">Step 27 proposal: Paste snippets and Write it for here become one action</span>
+  <button class="toggle-theme ghost" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
+</header>
+<p class="lede">One empty-bar action that writes at the caret from everything you've saved (snippets, memories, people, tasks, and events) in your voice, the way Reply and Ask already do. The plain snippet list stays inside it as a view, and it's what you get with no model. All people, companies, and text below are made up.</p>
+
+<!-- 1 -->
+<section class="board">
+  <h2>1. The empty bar</h2>
+  <p class="what">Two paste actions become one. That frees a slot, so in a reply box Reply and Write here both fit on the bar instead of pasting hiding under More.</p>
+  <div class="pair">
+    <div>
+      <p class="label">Today</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span><kbd>2</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#clip"/></svg><span>Paste snippets</span><kbd>3</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#pen"/></svg><span>Write it for here</span><kbd>4</kbd></button>
+      </div></div>
+      <ul class="notes"><li>Two buttons for one intent, so people have to guess which one.</li><li>In a reply box, Reply takes slot 3 and pasting falls under More.</li></ul>
+    </div>
+    <div>
+      <p class="label">Proposed: writing in a document</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span><kbd>2</kbd></button>
+        <button class="slot highlight"><svg class="i"><use href="#pen"/></svg><span>Write here</span><kbd>3</kbd></button>
+      </div></div>
+      <p class="label" style="margin-top:16px">Proposed: in a reply box</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span><kbd>2</kbd></button>
+        <button class="slot highlight"><svg class="i"><use href="#reply"/></svg><span>Reply</span><kbd>3</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#pen"/></svg><span>Write here</span><kbd>4</kbd></button>
+      </div></div>
+      <ul class="notes"><li>Reply answers their message (three drafts). Write here continues what <em>you</em> started, from what you saved.</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="board">
+  <h2>2. Mid-sentence: it writes straight away</h2>
+  <p class="what">With text before the caret, the panel opens writing, streamed. It reads the same saved context Ask and Reply use (decision 77): close notes and memories, the people named or written to, their open tasks, nearby events, plus your voice samples and style notes.</p>
+  <div class="pair">
+    <div class="stage">
+      <div class="app">
+        <div class="chrome">Re: Acme launch deck · Mail</div>
+        <div class="body"><div class="field">Hi Jordan,<br><br>Thanks for the nudge. Quick status on the deck: <span class="caret"></span></div>
+          <div class="quoted">From: Jordan Hale · Where are we with the Acme deck? Need it before Thursday's review.</div></div>
+      </div>
+      <div class="frame">
+        <div class="row">
+          <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span></button>
+          <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span></button>
+          <button class="slot later"><svg class="i"><use href="#reply"/></svg><span>Reply</span></button>
+          <button class="slot highlight"><svg class="i"><use href="#pen"/></svg><span>Write here</span></button>
+        </div>
+        <div class="panel">
+          <h2><svg class="i"><use href="#pen"/></svg>Writing for this email <span class="muted">· to Jordan</span><span class="spacer"></span>
+            <span class="seg"><button class="on">Written</button><button>Snippets</button></span></h2>
+          <div class="draft">the pricing slides are done and Casey is finishing the customer quotes today. I'll send you the full deck by Wednesday 5 pm, ahead of Thursday's 10:00 review.<span class="cur"></span></div>
+          <span class="used"><svg class="i sm"><use href="#chev"/></svg>Used 1 memory · 1 task · 1 event · Jordan</span>
+          <div class="chips">
+            <button class="chip">Shorter</button><button class="chip">Longer</button><button class="chip">More casual</button><button class="chip">More formal</button>
+          </div>
+          <div class="composer small"><span class="ph">Tell it what to change…</span><button class="send"><svg class="i sm"><use href="#up"/></svg></button></div>
+          <div class="panel-foot"><span><kbd>Enter</kbd> paste · <kbd>Esc</kbd> back</span><span class="spacer"></span>
+            <button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button>
+            <button class="primary"><svg class="i sm"><use href="#enter"/></svg>Paste</button></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="label">New against today</p>
+      <ul class="notes">
+        <li><b>Context like Reply.</b> Today it only sees saved items. Here the task "Send Jordan the Acme deck (due Wed)", the event "Acme review, Thu 10:00", and the memory "Casey owns customer quotes" feed it.</li>
+        <li><b>Who it's for.</b> The recipient comes from the quoted email or the To line (Reply's reader), so their card counts.</li>
+        <li><b>Your voice.</b> Voice samples and Profile style notes for this platform, as in Reply.</li>
+        <li><b>Continues the sentence.</b> Starts lowercase mid-sentence; no greeting or sign-off when the email has one.</li>
+        <li><b>Refine without starting over.</b> Reply's redo chips, plus a free-text box ("mention the budget").</li>
+        <li><b>Written / Snippets</b> is the top-level switch; List / As saved moves inside Snippets. The box stays editable.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="board">
+  <h2>3. Empty field: it asks what to write</h2>
+  <p class="what">With nothing before the caret there's no clue, so it doesn't spend a call guessing. It shows a box and suggestions built locally from what's coming up and what you saved lately (no model call to show them).</p>
+  <div class="pair">
+    <div class="stage">
+      <div class="app">
+        <div class="chrome">Untitled document · Docs</div>
+        <div class="body"><div class="field" style="min-height:90px"><span class="caret"></span></div></div>
+      </div>
+      <div class="frame">
+        <div class="row">
+          <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span></button>
+          <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span></button>
+          <button class="slot highlight"><svg class="i"><use href="#pen"/></svg><span>Write here</span></button>
+        </div>
+        <div class="panel">
+          <h2><svg class="i"><use href="#pen"/></svg>Write in this document</h2>
+          <div class="composer"><span class="ph">What should it write?</span><button class="send"><svg class="i sm"><use href="#up"/></svg></button></div>
+          <div class="chips">
+            <button class="chip sug"><svg class="i sm"><use href="#cal"/></svg>Agenda for Thu's Acme review</button>
+            <button class="chip sug"><svg class="i sm"><use href="#task"/></svg>Status of 3 open Acme tasks</button>
+            <button class="chip sug"><svg class="i sm"><use href="#note"/></svg>Notes from 5 newest snippets</button>
+          </div>
+          <div class="panel-foot"><span><kbd>Enter</kbd> write · <kbd>↓</kbd> suggestions · <kbd>Esc</kbd> back</span><span class="spacer"></span>
+            <button class="ghost"><svg class="i sm"><use href="#clip"/></svg>Just my snippets</button></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="label">After "Agenda for Thu's Acme review"</p>
+      <div class="frame"><div class="panel">
+        <h2><svg class="i"><use href="#pen"/></svg>Agenda for Thu's Acme review<span class="spacer"></span><span class="seg"><button class="on">Written</button><button>Snippets</button></span></h2>
+        <div class="draft">Acme launch review · Thu 10:00
+1. Pricing slides (done)
+2. Customer quotes (Casey)
+3. Launch date: still Nov 12?
+4. Who sends the final deck to Jordan</div>
+        <span class="used"><svg class="i sm"><use href="#chev"/></svg>Used 1 event · 3 tasks · 2 snippets</span>
+        <div class="panel-foot"><span class="spacer"></span><button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button><button class="primary"><svg class="i sm"><use href="#enter"/></svg>Paste</button></div>
+      </div></div>
+      <ul class="notes"><li>Numbered because the spot is a document and the ask is an agenda; in a rich editor the lines go in plain so its own list style applies (<code>richEditor</code>).</li><li>The same request box sits under the draft in board 2, so you can redirect any time.</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="board">
+  <h2>4. What went in, and taking things out</h2>
+  <p class="what">The "Used" chip opens the sources, like Ask's. New here: drop one and it rewrites without it, so a wrong memory or an old task never leaks into an email.</p>
+  <div class="pair">
+    <div class="frame"><div class="panel">
+      <h2><svg class="i"><use href="#pen"/></svg>Writing for this email <span class="muted">· to Jordan</span></h2>
+      <div class="srcs">
+        <div class="src"><span class="k">Person</span><span class="t">Jordan Hale<span class="why">written to · Acme, client</span></span><button class="x" title="Leave out"><svg class="i sm"><use href="#x"/></svg></button></div>
+        <div class="src"><span class="k">Task</span><span class="t">Send Jordan the Acme deck<span class="why">you owe · due Wed</span></span><button class="x" title="Leave out"><svg class="i sm"><use href="#x"/></svg></button></div>
+        <div class="src"><span class="k">Event</span><span class="t">Acme review<span class="why">Thu 10:00 · named in the email</span></span><button class="x" title="Leave out"><svg class="i sm"><use href="#x"/></svg></button></div>
+        <div class="src"><span class="k">Memory</span><span class="t">Casey owns the customer quotes<span class="why">close in meaning</span></span><button class="x" title="Leave out"><svg class="i sm"><use href="#x"/></svg></button></div>
+        <div class="src off"><span class="k">Snippet</span><span class="t"><s>Q3 pricing tiers: Starter $12, Team $29</s><span class="why">left out</span></span><button class="x" title="Put back"><svg class="i sm"><use href="#redo"/></svg></button></div>
+      </div>
+      <div class="panel-foot"><span>1 left out</span><span class="spacer"></span><button class="primary"><svg class="i sm"><use href="#redo"/></svg>Rewrite</button></div>
+    </div></div>
+    <ul class="notes">
+      <li>The list is what retrieval passed in, not what the model says it used, so it's honest even when the model ignores one.</li>
+      <li>Facts about you (Profile) go in only when they fit the text, the same rule as Reply's "What the user has saved".</li>
+      <li>Left-out items are remembered for this panel only; nothing is deleted.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="board">
+  <h2>5. Snippets view, and no model</h2>
+  <p class="what">Today's Paste snippets, kept as the second view: instant, no model. The panel opens here when there's no model for Chat. New: tick which snippets go in.</p>
+  <div class="pair">
+    <div class="frame"><div class="panel">
+      <h2><svg class="i"><use href="#clip"/></svg>Snippets that fit this email <span class="muted">· 3</span><span class="spacer"></span>
+        <span class="seg"><button>Written</button><button class="on">Snippets</button></span></h2>
+      <div class="srcs">
+        <div class="src"><span class="check"><svg class="i sm"><use href="#tick"/></svg></span><span class="t">Deck review moved to Thursday 10:00, Room 4B<span class="why">saved Mon · Notes</span></span></div>
+        <div class="src"><span class="check"><svg class="i sm"><use href="#tick"/></svg></span><span class="t">Launch target: Nov 12, pending legal sign-off<span class="why">saved Oct 9 · Notes</span></span></div>
+        <div class="src"><span class="check no"></span><span class="t">Q3 pricing tiers: Starter $12, Team $29<span class="why">saved Oct 2 · Reading</span></span></div>
+      </div>
+      <div class="chips"><button class="chip selected">List</button><button class="chip">As saved</button></div>
+      <div class="draft" style="min-height:0">- Deck review moved to Thursday 10:00, Room 4B
+- Launch target: Nov 12, pending legal sign-off</div>
+      <div class="panel-foot"><span><kbd>Space</kbd> tick · <kbd>Enter</kbd> paste</span><span class="spacer"></span><button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button><button class="primary"><svg class="i sm"><use href="#enter"/></svg>Paste</button></div>
+    </div></div>
+    <div>
+      <p class="label">No model (Local only, nothing local)</p>
+      <div class="frame"><div class="panel">
+        <h2><svg class="i"><use href="#clip"/></svg>Your recent snippets <span class="muted">· 5</span></h2>
+        <div class="note"><span class="muted">Writing needs a model. Here are your snippets.</span><span class="spacer"></span><button class="ghost">Set up a local model</button></div>
+        <div class="draft" style="min-height:0">- Deck review moved to Thursday 10:00, Room 4B
+- Launch target: Nov 12, pending legal sign-off
+- …</div>
+      </div></div>
+      <ul class="notes"><li>No Written / Snippets switch here, since there's only one.</li><li>Nothing saved and nothing to write from: not offered, as today.</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="board">
+  <h2>6. Write here next to Reply</h2>
+  <p class="what">One engine for context and voice; different jobs.</p>
+  <div class="cmp">
+    <div></div><div>Reply</div><div>Write here</div>
+    <div>For</div><div>Answering someone's message</div><div>Continuing what you're writing, or writing what you ask for</div>
+    <div>Output</div><div>3 drafts with intents</div><div>1 text, shaped for the spot</div>
+    <div>Saved context</div><div>Author's card, closest notes, tasks, events</div><div>Same retrieval, queried with the text before the caret and your request</div>
+    <div>Voice</div><div>Samples and style notes</div><div>Same</div>
+    <div>Learns from</div><div>Picks, edits, redo asks</div><div>Edits, Shorter / Longer / tone asks, what you tell it, sources you drop or tick <span class="tag">new</span></div>
+    <div>Uses what's learned</div><div>From Reply and Write here</div><div>From Reply and Write here <span class="tag">new</span></div>
+    <div>Model call</div><div>Streamed, Chat role</div><div>Streamed, Chat role (today: one structured call)</div>
+    <div>No model</div><div>Not offered</div><div>Snippets view</div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="board">
+  <h2>7. One style that learns from both</h2>
+  <p class="what">Reply and Write here feed one store of what you like, kept per place: email, messaging, work chat, documents. A habit seen in two or more places becomes "everywhere"; one seen in only one place stays there, so a Word doc never picks up chat habits.</p>
+  <div class="pair">
+    <div>
+      <p class="label">What each thing you do teaches</p>
+      <div class="srcs" style="background:var(--glass-solid)">
+        <div class="src"><span class="k">Edit</span><span class="t">You change the text before Paste<span class="why">measured traits (length, capitals, dashes…) at weight 2, as Reply's edits; 15%+ changed → voice sample for this place</span></span></div>
+        <div class="src"><span class="k">Ask</span><span class="t">Shorter, Longer, More casual, More formal<span class="why">a vote for that side, weight 1, like a pick in Reply</span></span></div>
+        <div class="src"><span class="k">Tell</span><span class="t">"no em dashes", "always add the ticket link"<span class="why">kept with the place and person; the style-notes call turns repeats into notes about how you write and what you include</span></span></div>
+        <div class="src"><span class="k">Sources</span><span class="t">You drop memories, keep tasks<span class="why">a kind dropped in 3 of your last 5 writes in a place starts left out there (one click puts it back)</span></span></div>
+        <div class="src"><span class="k">Ticks</span><span class="t">Snippets you tick or untick<span class="why">collections you keep for a place rank higher there</span></span></div>
+        <div class="src"><span class="k">Paste</span><span class="t">Pasted as written<span class="why">teaches nothing about voice (it's the model's text, decision 27), but counts as the asks and sources being right</span></span></div>
+      </div>
+    </div>
+    <div>
+      <p class="label">Settings › Profile › What Glossly learned</p>
+      <div class="frame" style="width:100%"><div class="panel">
+        <h2>What Glossly learned <span class="spacer"></span><span class="seg"><button class="on">All</button><button>Email</button><button>Chat</button><button>Docs</button></span></h2>
+        <div class="srcs">
+          <div class="src"><span class="k">Everywhere</span><span class="t">No em dashes<span class="why">8 of 9 · email and documents · Reply and Write here</span></span><button class="x" title="Forget"><svg class="i sm"><use href="#x"/></svg></button></div>
+          <div class="src"><span class="k">Email</span><span class="t">Shorter than drafted<span class="why">6 of 7 · Reply</span></span><button class="x" title="Forget"><svg class="i sm"><use href="#x"/></svg></button></div>
+          <div class="src"><span class="k">Docs</span><span class="t">Numbered lists over bullets<span class="why">4 of 5 · Write here</span></span><button class="x" title="Forget"><svg class="i sm"><use href="#x"/></svg></button></div>
+          <div class="src"><span class="k">Email</span><span class="t">Status updates to Acme include the launch date<span class="why">note from what you told it, 3 times</span></span><button class="x" title="Forget"><svg class="i sm"><use href="#x"/></svg></button></div>
+          <div class="src"><span class="k">Chat</span><span class="t">Leaves out memories<span class="why">dropped 4 of the last 5 times · Write here</span></span><button class="x" title="Forget"><svg class="i sm"><use href="#x"/></svg></button></div>
+        </div>
+        <div class="panel-foot"><span>Learn from what I pick, edit, and ask for</span><span class="spacer"></span><span class="seg"><button class="on">On</button><button>Off</button></span></div>
+      </div></div>
+      <ul class="notes">
+        <li>Priority stays person, then relationship on a platform, then place; "everywhere" comes last, so a place's own habit always wins.</li>
+        <li>The existing switch covers both actions; its label widens from "drafts I pick and edit".</li>
+        <li>Ask stays out: it writes to you, not as you.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</div>
+</body>
+</html>
