@@ -40,7 +40,7 @@ describe('barKey', () => {
     expect(barKey(key('2'), ctx({ items: barItems(null, false, false) }))).toBeNull();
   });
   it('numbers the buttons by position, so the empty bar has no gap where Save would be', () => {
-    const empty: SlotsView = { ...slots, slot3: slot('search', true), slot4: slot('paste_list', true), more: [] };
+    const empty: SlotsView = { ...slots, slot3: slot('search', true), slot4: slot('write', true), more: [] };
     const items = barItems(empty, false, false);
     expect([slotKey(items, 1), slotKey(items, 3), slotKey(items, 4)]).toEqual([1, 2, 3]);
     expect(barKey(key('2'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 3 } });

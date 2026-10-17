@@ -16,7 +16,7 @@ import { Debug } from './Debug';
 import { shownBadges } from './badges';
 import { barItems, barKey, panelKey, sameItem, slotKey, type BarItem } from './keys';
 import { LaterPanel } from './LaterPanel';
-import { PastePanel } from './PastePanel';
+import { WritePanel } from './WritePanel';
 import { PromisesPanel } from './PromisesPanel';
 import { RecallPanel } from './RecallPanel';
 import { ReplyPanel } from './ReplyPanel';
@@ -405,8 +405,8 @@ function Expanded({ s }: { s: OverlayState }) {
             <RecallPanel key="recall" s={s} />
           ) : s.panel === 'visualize' ? (
             <VisualizePanel key="visualize" s={s} />
-          ) : s.panel === 'paste_list' || s.panel === 'paste_summary' ? (
-            <PastePanel key={s.panel} s={s} kind={s.panel === 'paste_list' ? 'list' : 'summary'} />
+          ) : s.panel === 'write' ? (
+            <WritePanel key="write" s={s} />
           ) : (
             <LaterPanel key={s.panel} action={s.panel} sessionId={id} keyboard={s.keyboard} />
           ))}

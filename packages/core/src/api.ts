@@ -15,7 +15,7 @@ import type { BarAction, ContentType, DecisionProviderId } from './router/types'
 import type { ApiStyle, AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
-import type { PasteFormat, PasteTarget } from './actions/paste-types';
+import type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
 import type { PromisesByRules } from './actions/promises';
 import type { CalendarEvent, EventPatch, EventCandidate, EventSaveRow } from './calendar/types';
 import type { LibraryQuery, LibraryResult, RecallHit, SearchResults } from './recall/types';
@@ -32,7 +32,7 @@ export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
 export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePreference } from './people/reply-style';
 export type { Relationship } from './people/relationship';
-export type { PasteFormat, PasteTarget } from './actions/paste-types';
+export type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
 export type { PromisesByRules } from './actions/promises';
 export type * from './calendar/types';
 export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
@@ -45,7 +45,7 @@ export type { AppMode, Identity, ModelRef, Privacy, RoleName, Settings, Settings
 export type ActionId = 'ask' | 'save' | BarAction | 'recall';
 
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
-export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'visualize' | 'search' | 'recall' | 'paste_list' | 'paste_summary';
+export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'visualize' | 'search' | 'recall' | 'write';
 
 /** `toast`: the small "Saved to Notes · Undo" strip after the save hotkey; it never takes focus. */
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel' | 'toast';
@@ -293,27 +293,52 @@ export interface StyleView {
 /** inserted: pasted into the source app. copied: on the clipboard instead (focus failed, or the focused field doesn't take text). */
 export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; reason: 'focus' | 'not_editable' | 'paste' };
 
-// ---- Paste (nothing selected) ----
+// ---- Write here (nothing selected, decision 81) ----
 
-export type PasteKind = 'list' | 'summary';
-export type PasteCompose =
-  | {
-      ok: true;
-      text: string;
-      /** List only: the snippets in full, as saved, for "As saved" in the panel. */
-      asSaved?: string;
-      /** Snippets used. */
-      count: number;
-      /** Snippets that were offered (the summary may use fewer). */
-      total: number;
-      /** Where the cursor is: email, chat, document, code, or other. */
-      target: PasteTarget;
-      /** `related`: picked by meaning against the text around the cursor; `recent`: the newest ones. */
-      reason: 'related' | 'recent';
-      /** Summary only: the shape the model wrote. */
-      format?: PasteFormat;
-    }
-  | { ok: false; code: AskErrorEvent['code']; message: string };
+/** A saved snippet for the Snippets view, in the order to paste it. */
+export interface WriteSnippet {
+  id: string;
+  /** One line for the List form, already shaped for the place ("- " bullets or a plain line). */
+  line: string;
+  /** The snippet as saved (cleaned), for the As saved form. */
+  full: string;
+  /** "Notes · Oct 9": its collection and the day it was saved. */
+  detail: string;
+}
+
+/** What the panel needs before anything is written: answered at once, with no model call. */
+export interface WriteOpen {
+  /** Where the cursor is: email, chat, document, code, or other. */
+  target: PasteTarget;
+  /** A Chat model is available; without one the panel shows only the Snippets view. */
+  model: boolean;
+  /** What a model call would refuse with (no key, Local only), to explain it in the Snippets view. */
+  noModel: { code: AskErrorEvent['code']; message: string } | null;
+  /** Text before the caret: the panel writes at once instead of asking what to write. */
+  writing: boolean;
+  /** Who the text goes to, when the field sits under someone's message. */
+  to: string | null;
+  /** For an empty field: things to write, built from saved data in code. */
+  suggestions: WriteSuggestion[];
+  snippets: WriteSnippet[];
+  /** `related`: picked by meaning against the text around the cursor; `recent`: the newest ones. */
+  reason: 'related' | 'recent';
+}
+
+export interface WriteStartArgs {
+  sessionId: number;
+  /** What to write ("agenda for Thursday"); left out to continue the text at the caret. */
+  request?: string;
+  /** Rewrite the text written before: chips and/or typed words. */
+  change?: { previous: string; asks: WriteAsk[]; note?: string };
+}
+export interface WriteStart {
+  /** Chunks, done, and errors arrive on write:chunk, write:done, and write:error with this id. */
+  requestId: string;
+  /** What the text drew on from saved data (decision 77), for the "Used N" chip. */
+  used: ContextUsed[];
+  to: string | null;
+}
 
 // ---- Tasks (formerly What did I promise) ----
 
@@ -542,10 +567,13 @@ export interface InvokeChannels {
   /** Ctrl+C or the Copy button: counted for metrics only. */
   'reply:copied': { args: { sessionId: number; text?: string; pick?: ReplyPick; personId?: string }; result: void };
 
-  /** The recent snippets as a plain list, or a summary from the Chat role. Nothing is pasted yet. */
-  'paste:compose': { args: { sessionId: number; kind: PasteKind }; result: PasteCompose };
+  /** Write here: the place, the snippets that fit, and suggestions for an empty field. No model call. */
+  'write:open': { args: { sessionId: number }; result: WriteOpen };
+  /** Streams the text (Chat role) to the sender's write:* channels: continuing the caret's text, a request, or a change. */
+  'write:start': { args: WriteStartArgs; result: WriteStart };
+  'write:cancel': { args: { requestId: string }; result: void };
   /** Pastes the (possibly edited) text through the insert path, like Reply. */
-  'paste:insert': { args: { sessionId: number; kind: PasteKind; text: string; edited: boolean }; result: ReplyInsertResult };
+  'write:insert': { args: { sessionId: number; mode: 'written' | 'snippets'; text: string; edited: boolean }; result: ReplyInsertResult };
 
   /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
   'promises:extract': { args: { sessionId: number }; result: PromisesResult };
@@ -702,6 +730,9 @@ export interface PushChannels {
   'reply:chunk': AskChunk;
   'reply:done': AskDone;
   'reply:error': AskErrorEvent;
+  'write:chunk': AskChunk;
+  'write:done': AskDone;
+  'write:error': AskErrorEvent;
   'embed:progress': EmbedStatus;
   'settings:changed': SettingsView;
   /** People, aliases, commitments, or interactions changed; views re-fetch. */

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CalendarDays, ChevronDown, CircleCheck, FileText, User, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, CircleCheck, FileText, RotateCcw, User, X } from 'lucide-react';
 import type { ContextUsed } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { usedSummary } from './used';
@@ -9,8 +9,9 @@ const ICONS = { note: FileText, person: User, task: CircleCheck, event: Calendar
 /**
  * "Used 2 notes · 1 event" under an answer (decision 77): what went into the prompt from saved
  * data. Opens into the list; "Not related" leaves a row out of later answers in this session.
+ * With `onRewrite` (Write here, decision 81), a Rewrite button writes again without them.
  */
-export function UsedChip({ sessionId, used }: { sessionId: number; used: ContextUsed[] }) {
+export function UsedChip({ sessionId, used, onRewrite }: { sessionId: number; used: ContextUsed[]; onRewrite?: () => void }) {
   const [open, setOpen] = useState(false);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const shown = used.filter((u) => !gone.has(`${u.kind}:${u.id}`));
@@ -44,6 +45,15 @@ export function UsedChip({ sessionId, used }: { sessionId: number; used: Context
             );
           })}
           {shown.length === 0 && <li className="muted">Left out of the next answers here.</li>}
+          {onRewrite && gone.size > 0 && (
+            <li className="used-rewrite">
+              <span className="muted">{gone.size} left out</span>
+              <button className="primary" onClick={onRewrite}>
+                <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
+                Rewrite
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

@@ -244,7 +244,7 @@ section.board > p.what { color:var(--fg-2); margin:0 0 16px; max-width:780px; }
 <!-- 1 -->
 <section class="board">
   <h2>1. The empty bar</h2>
-  <p class="what">Two paste actions become one. That frees a slot, so in a reply box Reply and Write here both fit on the bar instead of pasting hiding under More.</p>
+  <p class="what">Two paste actions become one, so the bar reads the same everywhere: Ask, Search, Write here. In a reply box Reply takes Write here's place and Write here waits under More.</p>
   <div class="pair">
     <div>
       <p class="label">Today</p>
@@ -266,11 +266,11 @@ section.board > p.what { color:var(--fg-2); margin:0 0 16px; max-width:780px; }
       <p class="label" style="margin-top:16px">Proposed: in a reply box</p>
       <div class="frame"><div class="row">
         <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
-        <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span><kbd>2</kbd></button>
-        <button class="slot highlight"><svg class="i"><use href="#reply"/></svg><span>Reply</span><kbd>3</kbd></button>
-        <button class="slot later"><svg class="i"><use href="#pen"/></svg><span>Write here</span><kbd>4</kbd></button>
+        <button class="slot highlight"><svg class="i"><use href="#reply"/></svg><span>Reply</span><kbd>2</kbd></button>
+        <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span><kbd>3</kbd></button>
+        <button class="slot later" style="padding:0 8px"><span>More</span></button>
       </div></div>
-      <ul class="notes"><li>Reply answers their message (three drafts). Write here continues what <em>you</em> started, from what you saved.</li></ul>
+      <ul class="notes"><li>Reply answers their message (three drafts). Write here continues what <em>you</em> started, from what you saved; in a reply box it waits under More, since the empty bar has two slots after Ask and Search's box is already open (as built in 27b).</li></ul>
     </div>
   </div>
 </section>

@@ -16,14 +16,12 @@ import type { CommitmentView, PersonCard, VoiceForPrompt } from '../people/types
 import type { Settings } from '../settings';
 import type { Item, Surroundings } from '../types';
 import { markCursor } from './ask';
-import type { PasteTarget } from './paste-types';
+import type { PasteTarget, WriteAsk, WriteSuggestion } from './paste-types';
 import { personSection } from './reply';
 
-/** What the user can ask of a written text without typing (the panel's chips). */
-export const WRITE_ASKS = ['shorter', 'longer', 'casual', 'formal'] as const;
-export type WriteAsk = (typeof WRITE_ASKS)[number];
+export { WRITE_ASKS, type WriteAsk, type WriteSuggestion } from './paste-types';
 
-/** The model's answer when nothing useful can be written (no request, no clue, nothing that fits). */
+/** The model's answer when nothing useful can be written (no request, no clue, nothing that fits). The panel's `written.ts` hides it. */
 export const NOTHING_TO_WRITE = '[nothing to write]';
 
 const MAX_SURROUNDINGS = 3000;
@@ -179,29 +177,6 @@ export function write(llm: LlmProvider, settings: Pick<Settings, 'identity'>, in
     maxOutputTokens: WRITE_MAX_OUTPUT[input.target],
     reasoning: 'low',
   });
-}
-
-/**
- * The streamed text as it can be pasted: without a fence or quotes the model wrapped it in, and
- * empty for the "nothing to write" answer (also while it is still arriving, so the panel never
- * flashes it).
- */
-export function writtenText(raw: string): string {
-  let t = raw.trim();
-  if (NOTHING_TO_WRITE.startsWith(t) || t.startsWith(NOTHING_TO_WRITE)) return '';
-  const fence = /^```[\w-]*\n([\s\S]*?)(?:\n```)?$/.exec(t);
-  if (fence) t = fence[1]!.trim();
-  if (t.length > 1 && /^["“]/.test(t) && /["”]$/.test(t) && !/["“”]/.test(t.slice(1, -1))) t = t.slice(1, -1).trim();
-  return t;
-}
-
-/** A ready-made request for an empty field, built from saved data with no model call. */
-export interface WriteSuggestion {
-  kind: 'event' | 'task' | 'snippets';
-  /** What the chip says ("Agenda for Thu's Acme review"). */
-  label: string;
-  /** What is sent as the request when it's picked. */
-  request: string;
 }
 
 export interface SuggestInput {

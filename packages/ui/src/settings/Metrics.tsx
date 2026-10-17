@@ -14,6 +14,8 @@ const ACTION_NAMES: Record<string, string> = {
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',
+  write: 'Write here',
+  // Before Write here (decision 81), kept for older rows.
   paste_list: 'Paste snippets',
   paste_summary: 'Write it for here',
 };
@@ -139,7 +141,7 @@ function Features({ m }: { m: MetricsSummary }) {
     ['Reply draft sets written', f.reply.drafts],
     ['Reply inserted unedited / edited / own', `${unedited} / ${f.reply.edited - f.reply.own} / ${f.reply.own}`],
     ['Reply copied / discarded / "None of these"', `${f.reply.copied} / ${f.reply.discarded} / ${f.reply.redo}`],
-    ['Paste composed / pasted', `${f.paste.composed} / ${f.paste.inserted}`],
+    ['Write here written / pasted', `${f.paste.composed} / ${f.paste.inserted}`],
     ['Search results typed in', f.search.inserted],
     ['Tasks looked for / saved', `${f.promises.extracted} / ${f.promises.saved}`],
     ['Model calls that failed / switched to a fallback', `${f.errors} / ${f.fallbacks}`],

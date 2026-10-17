@@ -11,11 +11,10 @@ export const ACTION_LABELS: Record<ActionId, string> = {
   visualize: 'Visualize',
   search: 'Search',
   recall: 'Related',
-  paste_list: 'Paste snippets',
-  paste_summary: 'Write it for here',
+  write: 'Write here',
 };
 
-const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
+const AVAILABLE: readonly AvailableAction[] = ['ask', 'save', 'who', 'promises', 'reply', 'visualize', 'search', 'recall', 'write'];
 /** Actions that read tier 2 when clicked: the ones that send or store the text around the selection. */
 const TIER2: readonly ActionId[] = ['ask', 'save', 'who', 'promises', 'reply'];
 export const needsTier2 = (a: ActionId) => TIER2.includes(a);
@@ -49,7 +48,7 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
   };
 }
 
-/** The bar with nothing selected: Ask, then Search and the paste actions under the slot rule. Save is hidden. */
+/** The bar with nothing selected: Ask, then Search, Write here, and Reply under the slot rule. Save is hidden. */
 export function emptySlotsView(slots: Slots): SlotsView {
   return {
     slot1: slot('ask'),

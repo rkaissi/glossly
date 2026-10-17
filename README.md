@@ -77,7 +77,7 @@ Select a table (from a spreadsheet, a web page, Markdown, or a CSV) and get a cl
 <p align="center"><img src="docs/media/banner-connected.png" width="820" alt="Recall, Search, Paste, People, Calendar, and Local only, connected"></p>
 
 - **Search** everything you saved, your people, and open tasks: press the hotkey with nothing selected.
-- **Paste snippets** you saved recently, or have Glossly **write them up** for the field you're typing in.
+- **Write here**: Glossly writes for the field you're typing in from your notes, tasks, and calendar, in your voice, or pastes the snippets you saved.
 - **Settings** has full Tasks and Calendar views, your people and saved items, model choices, privacy controls, and local usage metrics, in light and dark.
 
 <details>

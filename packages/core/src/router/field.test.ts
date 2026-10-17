@@ -120,12 +120,12 @@ describe('fieldReplyScore', () => {
 
 describe('the empty bar', () => {
   it('leads with Reply in a reply box, ahead of Search, and keeps a maybe under More', () => {
-    const sure = assignEmptySlots({ editable: true, recent: 3, summaryModel: true, reply: 0.7 }, router);
+    const sure = assignEmptySlots({ editable: true, recent: 3, model: true, reply: 0.7 }, router);
     expect([sure.slot3?.action, sure.slot4?.action]).toEqual(['reply', 'search']);
-    expect(sure.more.map((m) => m.action)).toEqual(['paste_list', 'paste_summary']);
-    const maybe = assignEmptySlots({ editable: true, recent: 0, summaryModel: true, reply: 0.35 }, router);
+    expect(sure.more.map((m) => m.action)).toEqual(['write']);
+    const maybe = assignEmptySlots({ editable: true, recent: 0, model: false, reply: 0.35 }, router);
     expect([maybe.slot3?.action, maybe.slot4, maybe.more.map((m) => m.action)]).toEqual(['search', null, ['reply']]);
-    const none = assignEmptySlots({ editable: true, recent: 0, summaryModel: true }, router);
+    const none = assignEmptySlots({ editable: true, recent: 0, model: false }, router);
     expect(none.more).toEqual([]);
   });
 });

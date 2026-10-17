@@ -1,25 +1,18 @@
-// Paste for the bar with nothing selected. It picks the saved snippets that fit what the user is
-// writing (by meaning, against the text around the caret), else the most recent ones, and
-// formats them for where the cursor is: an email, a chat, a document, code. Two forms: a list,
-// made in code, and a text written for that spot by the Chat model (one structured call). Either
-// way the text is shown first and pasted only when the user says so.
-import { z } from 'zod';
-import pastePrompt from '../../prompts/paste-compose.md?raw';
+// Write here's Snippets view (decision 81), with no model: the saved snippets that fit what the
+// user is writing (by meaning, against the text around the caret), else the most recent ones,
+// formatted for where the cursor is: an email, a chat, a document, code. The written view is
+// write.ts. Either way the text is shown first and pasted only when the user says so.
 import { cleanText } from '../capture/clean';
 import type { Embedder } from '../embed/types';
-import type { LlmProvider } from '../llm/types';
-import { describeSource, replyChannel } from '../people/reply-style';
+import { replyChannel } from '../people/reply-style';
 import type { Settings } from '../settings';
 import type { Store } from '../store/store';
 import { isoNow, type Item, type Surroundings } from '../types';
-import { markCursor } from './ask';
-import { PASTE_FORMATS, type PasteFormat, type PasteTarget } from './paste-types';
+import type { PasteTarget } from './paste-types';
 
-export { PASTE_FORMATS, type PasteFormat, type PasteTarget } from './paste-types';
+export type { PasteTarget } from './paste-types';
 
 const MAX_LIST_ITEM = 300;
-const MAX_PROMPT_ITEM = 1200;
-const MAX_SURROUNDINGS = 3000;
 const DAY_MS = 86_400_000;
 /** Too little text around the caret to say what fits; use the recent snippets. */
 const MIN_CONTEXT_CHARS = 20;
@@ -140,72 +133,3 @@ export function pasteAsSaved(items: Pick<Item, 'text'>[]): string {
 }
 
 
-export const PasteDraftSchema = z.object({
-  use: z.array(z.number().int()).describe('The n of every snippet the text uses. Empty when none fits.'),
-  format: z.enum(PASTE_FORMATS),
-  text: z.string().describe('The text to insert at the cursor, ready to paste. Empty when no snippet fits.'),
-});
-
-const TARGET_WORDS: Record<PasteTarget, string> = {
-  email: 'an email',
-  chat: 'a chat message',
-  document: 'a document',
-  code: 'a code editor',
-  other: 'an app (kind unknown)',
-};
-
-export interface PasteComposeInput {
-  items: Pick<Item, 'text' | 'why' | 'created_at'>[];
-  target: PasteTarget;
-  app: string;
-  title: string;
-  surroundings: Surroundings | null;
-}
-
-export function buildPastePrompt(input: PasteComposeInput): string {
-  const parts = [
-    '## Where the text goes',
-    `${TARGET_WORDS[input.target]}: ${describeSource(input.app, input.title)}`,
-    '',
-  ];
-  const s = input.surroundings;
-  if (s?.text.trim()) {
-    const marked = markCursor(s);
-    const at = s.caret >= 0 ? s.caret : 0;
-    // Keep the cursor inside the window when the text is long.
-    const start = Math.max(0, Math.min(at - Math.floor(MAX_SURROUNDINGS * 0.7), marked.length - MAX_SURROUNDINGS));
-    parts.push(
-      s.source === 'caret' ? '## What the user is writing ([CURSOR] marks where the text goes)' : '## What is on the screen (no cursor found)',
-      '<context>',
-      marked.slice(start, start + MAX_SURROUNDINGS),
-      '</context>',
-      '',
-    );
-  } else {
-    parts.push('## What the user is writing', 'Unknown.', '');
-  }
-  parts.push('## Saved snippets');
-  input.items.forEach((it, i) => {
-    parts.push(`<snippet n="${i + 1}" saved="${it.created_at.slice(0, 10)}">`, clip(cleanText(it.text), MAX_PROMPT_ITEM));
-    if (it.why) parts.push(`Why it was saved: ${clip(oneLine(it.why), 200)}`);
-    parts.push('</snippet>');
-  });
-  return parts.join('\n');
-}
-
-export interface PasteDraft {
-  text: string;
-  format: PasteFormat;
-  /** Indexes into the input items that the text uses. */
-  used: number[];
-}
-
-/** The text for this spot, on the Chat role. Empty text means no snippet fits. Throws LlmError. */
-export async function composePaste(llm: LlmProvider, input: PasteComposeInput, signal?: AbortSignal): Promise<PasteDraft> {
-  const out = await llm.structured(
-    { role: 'chat', action: 'paste_summary', instructions: pastePrompt, prompt: buildPastePrompt(input), signal, maxOutputTokens: 900, temperature: 0.2 },
-    PasteDraftSchema,
-  );
-  const used = [...new Set(out.use.filter((n) => Number.isInteger(n) && n >= 1 && n <= input.items.length).map((n) => n - 1))];
-  return { text: out.text.trim(), format: out.format, used };
-}

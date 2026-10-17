@@ -3,7 +3,7 @@ import type { ContextTask } from '../context/retrieve';
 import type { ChatRequest, LlmProvider } from '../llm/types';
 import type { PersonCard } from '../people/types';
 import { DEFAULT_SETTINGS } from '../settings';
-import { buildWritePrompt, mergeWriteNotes, write, writeSuggestions, writtenText, type WriteInput } from './write';
+import { buildWritePrompt, mergeWriteNotes, NOTHING_TO_WRITE, write, writeSuggestions, type WriteInput } from './write';
 
 const settings = { ...DEFAULT_SETTINGS, identity: { name: 'Alex Morgan', emails: [], handles: [] } };
 // Wednesday, Oct 14, 2026, 10:00 local.
@@ -144,18 +144,8 @@ describe('Write here', () => {
     write(llm, settings, base);
     write(llm, settings, { ...base, target: 'chat' });
     expect(calls[0]).toMatchObject({ role: 'chat', action: 'write', maxOutputTokens: 800, reasoning: 'low' });
-    expect(calls[0]!.instructions).toContain('[nothing to write]');
+    expect(calls[0]!.instructions).toContain(NOTHING_TO_WRITE);
     expect(calls[1]!.maxOutputTokens).toBe(350);
-  });
-
-  it('cleans the streamed text, and hides the nothing-to-write answer even half arrived', () => {
-    expect(writtenText('  the slides are done.\n')).toBe('the slides are done.');
-    expect(writtenText('[nothing')).toBe('');
-    expect(writtenText('[nothing to write]')).toBe('');
-    expect(writtenText('```\n- one\n- two\n```')).toBe('- one\n- two');
-    expect(writtenText('"Sounds good, see you then."')).toBe('Sounds good, see you then.');
-    // Quotes inside the text stay.
-    expect(writtenText('"Done" means shipped, not "almost"')).toBe('"Done" means shipped, not "almost"');
   });
 
   describe('suggestions for an empty field', () => {

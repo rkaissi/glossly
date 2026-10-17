@@ -1,11 +1,10 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import type { Embedder } from '../embed/types';
-import type { ChatRequest, LlmProvider } from '../llm/types';
 import { DEFAULT_SETTINGS } from '../settings';
 import { assignEmptySlots, scoreEmptyActions } from '../router/slots';
 import { Store } from '../store/store';
-import { buildPastePrompt, composePaste, pasteAsSaved, pasteList, pasteSnippets, pasteTarget, recentSnippets, richEditor } from './paste';
+import { pasteAsSaved, pasteList, pasteSnippets, pasteTarget, recentSnippets, richEditor } from './paste';
 
 const require = createRequire(import.meta.url);
 const vecExtensionPath = (require('sqlite-vec') as { getLoadablePath(): string }).getLoadablePath();
@@ -100,54 +99,20 @@ describe('paste', () => {
     }
   });
 
-  it('asks the Chat role for text shaped for the spot, and keeps only real snippet numbers', async () => {
-    const calls: ChatRequest[] = [];
-    const llm: LlmProvider = {
-      stream: () => {
-        throw new Error('unused');
-      },
-      structured: async <T,>(req: ChatRequest) => {
-        calls.push(req);
-        return { use: [2, 2, 7], format: 'sentences', text: '  The budget is 40k.  ' } as T;
-      },
-      hasModel: () => true,
-    };
-    const items = [
-      { text: 'Launch checklist', why: null, created_at: '2026-10-08T10:00:00-04:00' },
-      { text: 'Q4 budget is 40k', why: 'for Sam', created_at: '2026-10-09T10:00:00-04:00' },
-    ];
-    const input = {
-      items,
-      target: 'email' as const,
-      app: 'chrome.exe',
-      title: 'Re: offsite - Gmail',
-      surroundings: { text: 'Hi Sam,\n\n', caret: 9, source: 'caret' as const },
-    };
-    const p = buildPastePrompt(input);
-    expect(p).toContain('an email: chrome.exe, "Re: offsite - Gmail"');
-    expect(p).toContain('Hi Sam,\n\n[CURSOR]');
-    expect(p).toContain('<snippet n="2" saved="2026-10-09">\nQ4 budget is 40k\nWhy it was saved: for Sam');
-    const draft = await composePaste(llm, input);
-    expect(draft).toEqual({ text: 'The budget is 40k.', format: 'sentences', used: [1] });
-    expect(calls[0]).toMatchObject({ role: 'chat', action: 'paste_summary' });
-  });
-
-  it('ranks Search first, then pasting, under the shared slot rule', () => {
+  it('ranks Search first, then Write here, under the shared slot rule', () => {
     const router = DEFAULT_SETTINGS.router;
-    const full = assignEmptySlots({ editable: true, recent: 3, summaryModel: true }, router);
-    expect([full.slot3?.action, full.slot4?.action]).toEqual(['search', 'paste_list']);
-    expect(full.more.map((m) => m.action)).toEqual(['paste_summary']);
-    // Nothing saved lately: only Search.
-    const none = assignEmptySlots({ editable: true, recent: 0, summaryModel: true }, router);
+    const full = assignEmptySlots({ editable: true, recent: 3, model: true }, router);
+    expect([full.slot3?.action, full.slot4?.action, full.more]).toEqual(['search', 'write', []]);
+    // Nothing saved lately and no model: only Search.
+    const none = assignEmptySlots({ editable: true, recent: 0, model: false }, router);
     expect([none.slot3?.action, none.slot4, none.more]).toEqual(['search', null, []]);
-    // The focus doesn't take text: pasting goes to the clipboard, so it waits under More.
-    const readOnly = assignEmptySlots({ editable: false, recent: 3, summaryModel: true }, router);
+    // A model and a field to type into: it can write what is asked, from tasks and events.
+    expect(assignEmptySlots({ editable: true, recent: 0, model: true }, router).slot4?.action).toBe('write');
+    // The focus doesn't take text: the text goes to the clipboard, so it waits under More.
+    const readOnly = assignEmptySlots({ editable: false, recent: 3, model: true }, router);
     expect(readOnly.slot4).toBeNull();
-    expect(readOnly.more.map((m) => m.action)).toEqual(['paste_list', 'paste_summary']);
-    // Writing in a field: "Write it for here" goes ahead of the plain list, even with nothing recent.
-    const writing = assignEmptySlots({ editable: true, recent: 0, summaryModel: true, writing: true }, router);
-    expect([writing.slot3?.action, writing.slot4?.action]).toEqual(['search', 'paste_summary']);
-    // No model: the summary stays under More, where it says why.
-    expect(scoreEmptyActions({ editable: null, recent: 2, summaryModel: false }).paste_summary).toBeGreaterThan(router.moreThreshold);
+    expect(readOnly.more.map((m) => m.action)).toEqual(['write']);
+    // Writing in a field, with nothing recent: still offered.
+    expect(scoreEmptyActions({ editable: null, recent: 0, model: false, writing: true }).write).toBe(0.8);
   });
 });

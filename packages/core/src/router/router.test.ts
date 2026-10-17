@@ -162,11 +162,11 @@ describe('slots', () => {
   });
 
   it('never shows a third slot, however many actions score high, and drops the ones under the More bar', () => {
-    const scores = { reply: 0.95, who: 0.9, promises: 0.85, visualize: 0.7, search: 0.6, paste_list: 0.15, paste_summary: 0.55 };
-    const order = ['reply', 'who', 'promises', 'visualize', 'search', 'paste_list', 'paste_summary'] as const;
+    const scores = { reply: 0.95, who: 0.9, promises: 0.85, visualize: 0.7, search: 0.6, write: 0.15 };
+    const order = ['reply', 'who', 'promises', 'visualize', 'search', 'write'] as const;
     const s = rankSlots(scores, order, DEFAULT_SETTINGS.router);
     expect([s.slot3?.action, s.slot4?.action]).toEqual(['reply', 'who']);
-    expect(s.more.map((m) => m.action)).toEqual(['promises', 'visualize', 'search', 'paste_summary']);
+    expect(s.more.map((m) => m.action)).toEqual(['promises', 'visualize', 'search']);
   });
 
   it('breaks ties in a stable order', () => {

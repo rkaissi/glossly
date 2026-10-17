@@ -71,6 +71,7 @@ export interface FeatureMetrics {
   recall: { shown: number; opened: number; dismissed: number };
   /** Reply: draft sets written, then what happened to them. `own` replies are in `inserted` too. */
   reply: { drafts: number; inserted: number; edited: number; own: number; copied: number; discarded: number; redo: number };
+  /** Write here (decision 81): texts written (and the old paste compositions), and pastes. */
   paste: { composed: number; inserted: number };
   promises: { extracted: number; saved: number };
   search: { inserted: number };
@@ -97,7 +98,7 @@ export interface MetricsSummary {
   features: FeatureMetrics;
 }
 
-const ERROR_KINDS = new Set(['ask_error', 'reply_error', 'paste_error', 'promises_error', 'visualize_error']);
+const ERROR_KINDS = new Set(['ask_error', 'reply_error', 'paste_error', 'write_error', 'promises_error', 'visualize_error']);
 
 function emptyFeatures(): FeatureMetrics {
   return {
@@ -152,9 +153,11 @@ function countFeature(f: FeatureMetrics, kind: string, p: Record<string, unknown
       f.reply.redo++;
       break;
     case 'paste_composed':
+    case 'write_written':
       f.paste.composed++;
       break;
     case 'paste_inserted':
+    case 'write_inserted':
       f.paste.inserted++;
       break;
     case 'promises_extracted':

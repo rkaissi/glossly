@@ -48,7 +48,16 @@ import {
   type FieldRoute,
   pasteAsSaved,
   pasteList,
-  composePaste as composeForHere,
+  mergeWriteNotes,
+  writeSuggestions,
+  write as streamWrite,
+  LOCAL_ONLY_MESSAGE,
+  type PasteTarget,
+  type WriteInput,
+  type WriteOpen,
+  type WriteStart,
+  type WriteStartArgs,
+  type PersonCard,
   pasteSnippets,
   pasteTarget,
   recentSnippets,
@@ -90,7 +99,6 @@ import {
   type PromiseSaveRow,
   type EventSaveRow,
   type PromisesResult,
-  type PasteCompose,
   type ReplyInsertResult,
   type ReplyPick,
   type ReplyRedo,
@@ -221,8 +229,8 @@ interface Session {
   field: { input: FieldInput; selection: SelectionPayload } | null;
   /** Whether that field answers someone, once routed. */
   fieldRoute: FieldRoute | null;
-  /** The running paste summary. */
-  pasteCtl: AbortController | null;
+  /** The running Write here stream (decision 81). */
+  write: { requestId: string; ctl: AbortController } | null;
   /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
   saved: SavedNotice | null;
   /** Autosave moves its item to the route's collection once; set after that. */
@@ -239,11 +247,13 @@ const BASELINE_WAIT_MS = 100;
 const FORCE_DOT = !app.isPackaged && process.env.GLOSSLY_FORCE_DOT === '1';
 
 /** Actions that work with nothing selected. */
-const WITHOUT_SELECTION: readonly ActionId[] = ['ask', 'search', 'paste_list', 'paste_summary'];
+const WITHOUT_SELECTION: readonly ActionId[] = ['ask', 'search', 'write'];
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const ms = (t: number) => Math.round(performance.now() - t);
 const round2 = (n: number) => Math.round(n * 100) / 100;
+/** YYYY-MM-DD for the local day, as the calendar stores all-day events and compares starts. */
+const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /** What Reply answers: the selection, or with nothing selected, the messages around the reply box (decision 75). */
 const replySelection = (s: Session): SelectionPayload | null => s.selection ?? s.field?.selection ?? null;
 
@@ -578,7 +588,7 @@ export class Capture {
         surroundings: null,
         field: null,
         fieldRoute: null,
-        pasteCtl: null,
+        write: null,
         saved: null,
         savedSettled: false,
         visualCtl: null,
@@ -827,7 +837,7 @@ export class Capture {
       surroundings,
       field,
       fieldRoute: null,
-      pasteCtl: null,
+      write: null,
       saved: null,
       savedSettled: false,
       visualCtl: null,
@@ -977,7 +987,7 @@ export class Capture {
       {
         editable: s.focusEditable,
         recent: recentSnippets(this.services.store, settings).length,
-        summaryModel: this.services.llm.hasModel('chat'),
+        model: this.services.llm.hasModel('chat'),
         writing: s.surroundings?.source === 'caret' && s.surroundings.text.trim().length > 0 && this.services.store.collectionCounts().total > 0,
         reply: s.fieldRoute?.score ?? 0,
       },
@@ -1513,7 +1523,7 @@ export class Capture {
   private async insertText(
     s: Session,
     text: string,
-    what: 'reply' | 'paste' | 'search',
+    what: 'reply' | 'write' | 'search',
     record: (how: 'inserted' | 'copied') => void,
     opts: { findField?: boolean } = {},
   ): Promise<ReplyInsertResult> {
@@ -1614,46 +1624,163 @@ ${s.selection.text}`;
     return { itemId: r.item.id, collection, undoUntil: r.undoUntil };
   }
 
-  // ---- Paste (nothing selected) ----
+  // ---- Write here (nothing selected, decision 81) ----
 
-  /**
-   * The snippets that fit where the cursor is (by meaning against the surroundings, else the
-   * newest), as a list shaped for the spot, or written for it by the Chat model. Shown before
-   * anything is pasted.
-   */
-  async composePaste(sessionId: number, kind: 'list' | 'summary'): Promise<PasteCompose> {
-    const s = this.current(sessionId);
-    if (!s) return { ok: false, code: 'no_selection', message: 'This bar is gone. Press the hotkey again.' };
-    const target = pasteTarget(s.fg?.process_name ?? '', s.fg?.title ?? '');
-    const t = performance.now();
+  /** The window's app and title, and what kind of place the text goes to. */
+  private writePlace(s: Session) {
+    const app = s.fg?.process_name ?? '';
+    const title = s.fg?.title ?? '';
+    return { app, title, target: pasteTarget(app, title), rich: richEditor(app, title) };
+  }
+
+  /** The snippets that fit the spot (by meaning, else the newest), without the ones marked "Not related" in this session. */
+  private async writeSnippets(s: Session, target: PasteTarget) {
     const sv = this.services;
     const picked = await pasteSnippets({ store: sv.store, embedder: () => sv.embed.embedder(), settings: () => sv.settings }, { surroundings: s.surroundings, target });
-    const items = picked.items;
-    if (items.length === 0) return { ok: false, code: 'no_selection', message: `Nothing saved in the last ${this.settings.paste.recentDays} days.` };
-    const base = { count: items.length, total: items.length, target, reason: picked.reason };
-    if (kind === 'list') {
-      this.services.metrics.record('paste_composed', { kind, count: items.length, target, reason: picked.reason, ms: ms(t) });
-      return { ok: true, ...base, text: pasteList(items, target, richEditor(s.fg?.process_name ?? '', s.fg?.title ?? '')), asSaved: pasteAsSaved(items) };
+    return { ...picked, items: picked.items.filter((it) => !s.contextDismissed.has(`note:${it.id}`)) };
+  }
+
+  /**
+   * Who the text goes to: whoever wrote the message the field sits under (the thread the router
+   * read, decision 75), unless the user wrote it. Their record comes along when it resolves.
+   */
+  private writeRecipient(s: Session): { name: string; person: PersonCard | null } | null {
+    const sel = s.field?.selection;
+    if (!sel) return null;
+    const det = detectPeople(detectInputFor(sel, null), this.settings.identity, this.services.store.listKnownPeople());
+    const { author, authorIsMe } = authorFrom(null, det);
+    if (authorIsMe || !author) return null;
+    const match = resolvePerson(this.services.people, author, sel.source_app);
+    const person = match?.kind === 'exact' ? this.services.people.card(match.personId) : null;
+    const name = person?.name ?? author.name ?? author.email ?? (author.handle ? `@${author.handle}` : null);
+    return name ? { name, person } : null;
+  }
+
+  /**
+   * What the Write here panel needs first, with no model call: the place, the snippets for the
+   * Snippets view, whether there is text to continue, who it goes to, and for an empty field,
+   * suggestions from the week's events, open tasks, and recent snippets.
+   */
+  async openWrite(sessionId: number): Promise<WriteOpen> {
+    const s = this.current(sessionId);
+    if (!s) throw new Error('This bar is gone. Press the hotkey again.');
+    const t = performance.now();
+    const { target, rich } = this.writePlace(s);
+    const picked = await this.writeSnippets(s, target);
+    const model = this.services.llm.hasModel('chat');
+    const sur = s.surroundings;
+    const writing = sur?.source === 'caret' && sur.text.slice(0, Math.max(0, sur.caret)).trim().length > 0;
+    const now = new Date();
+    const suggestions =
+      model && !writing
+        ? writeSuggestions(
+            {
+              target,
+              events: this.services.calendar.list({ from: localDay(now), to: localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7)), limit: 30 }),
+              tasks: this.services.people.commitments({ status: 'open' }),
+              recent: recentSnippets(this.services.store, this.settings).length,
+            },
+            now,
+          )
+        : [];
+    const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+    const snippets = picked.items.map((it) => {
+      const saved = new Date(it.created_at);
+      const collection = (it as typeof it & { collection?: string | null }).collection;
+      return {
+        id: it.id,
+        line: pasteList([it], target, rich),
+        full: pasteAsSaved([it]),
+        detail: [collection ?? 'Saved', Number.isNaN(saved.getTime()) ? null : day.format(saved)].filter(Boolean).join(' · '),
+      };
+    });
+    const noModel: WriteOpen['noModel'] = model
+      ? null
+      : this.settings.privacy === 'local'
+        ? { code: 'local_only', message: LOCAL_ONLY_MESSAGE }
+        : { code: 'no_model', message: 'Writing needs a model. Add a key in Settings.' };
+    const to = this.writeRecipient(s);
+    this.services.metrics.record('write_opened', { target, snippets: snippets.length, reason: picked.reason, writing, model, suggestions: suggestions.length, to: Boolean(to), ms: ms(t) });
+    return { target, model, noModel, writing, to: to?.name ?? null, suggestions, snippets, reason: picked.reason };
+  }
+
+  /**
+   * Streams the text for the spot (Chat role) to the panel's write:* channels: continuing the
+   * text at the caret, writing what was asked, or changing the text written before. It gets
+   * Reply's context: saved data close to the text and the request (decision 77), the person
+   * written to, and the voice, preferences, and style notes for this kind of place.
+   */
+  async startWrite(sessionId: number, target: WebContents, args: Omit<WriteStartArgs, 'sessionId'>): Promise<WriteStart> {
+    const requestId = randomUUID();
+    const send = <T>(channel: string, payload: T) => {
+      if (!target.isDestroyed()) target.send(channel, payload);
+    };
+    const fail = (code: AskErrorEvent['code'], message: string) => send<AskErrorEvent>('write:error', { requestId, code, message });
+    const s = this.current(sessionId);
+    if (!s) {
+      setTimeout(() => fail('no_selection', 'This bar is gone. Press the hotkey again.'), 0);
+      return { requestId, used: [], to: null };
     }
-    s.pasteCtl?.abort();
+    s.write?.ctl.abort();
     const ctl = new AbortController();
-    s.pasteCtl = ctl;
-    try {
-      const draft = await composeForHere(
-        this.services.llm,
-        { items, target, app: s.fg?.process_name ?? '', title: s.fg?.title ?? '', surroundings: s.surroundings },
-        ctl.signal,
-      );
-      this.services.metrics.record('paste_composed', { kind, count: draft.used.length, offered: items.length, target, reason: picked.reason, format: draft.format, ms: ms(t) });
-      if (!draft.text) return { ok: false, code: 'no_selection', message: 'None of your saved snippets fit what you are writing. Paste snippets lists them anyway.' };
-      return { ok: true, ...base, count: draft.used.length || items.length, text: draft.text, format: draft.format };
-    } catch (e) {
-      const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
-      if (code !== 'aborted') this.services.metrics.record('paste_error', { code, ...(e instanceof LlmError && e.statusCode && { status: e.statusCode }) });
-      return { ok: false, code, message: e instanceof LlmError ? e.message : 'The model call failed.' };
-    } finally {
-      if (s.pasteCtl === ctl) s.pasteCtl = null;
-    }
+    const state = { requestId, ctl };
+    s.write = state;
+    const place = this.writePlace(s);
+    const to = this.writeRecipient(s);
+    const sur = s.surroundings;
+    const near = sur ? (sur.caret >= 0 ? sur.text.slice(Math.max(0, sur.caret - 1500), sur.caret + 300) : sur.text.slice(0, 1800)) : '';
+    const personIds = [to?.person?.id, ...(s.route?.features.knownPeople ?? [])].filter((x): x is string => Boolean(x));
+    const [picked, context] = await Promise.all([this.writeSnippets(s, place.target), this.savedContext(s, 'write', [args.request ?? '', near], personIds)]);
+    if (s.write !== state || ctl.signal.aborted) return { requestId, used: [], to: to?.name ?? null };
+    const notes = mergeWriteNotes(picked.items, context?.notes ?? []);
+    const used = contextUsed(context ?? { people: [], tasks: [], events: [] }, notes, new Date());
+
+    // Samples, preferences, and notes for this person, their relationship, and this kind of platform (Profile > How you write).
+    const people = this.services.people;
+    const channel = replyChannel(place.app, place.title);
+    const audience = { channel, personId: to?.person?.id ?? null, relationship: to?.person?.relationship ?? null };
+    const learning = this.settings.replyLearning;
+    const input: WriteInput = {
+      ...place,
+      surroundings: sur,
+      request: args.request ?? null,
+      to,
+      notes,
+      context,
+      voice: people.voiceForPrompt(3, audience),
+      preferences: learning ? preferencesFor(people.styleSignals(), audience).map((p) => preferenceLine(p, p.scope === 'person' ? to?.person?.name : null)) : [],
+      styleNotes: learning ? people.styleNotes(channel).map((n) => n.text) : [],
+      change: args.change ? { previous: args.change.previous, asks: args.change.asks, note: args.change.note ?? null } : null,
+    };
+    const kind = args.change ? 'change' : args.request ? 'request' : 'continue';
+    log.info('write started', { kind, target: place.target, to: Boolean(to), person: Boolean(to?.person), notes: notes.length, snippets: picked.items.length });
+    void (async () => {
+      const t = performance.now();
+      let firstMs: number | null = null;
+      try {
+        const r = streamWrite(this.services.llm, this.settings, input, ctl.signal);
+        for await (const text of r.textStream) {
+          firstMs ??= ms(t);
+          send('write:chunk', { requestId, text });
+        }
+        const model = await r.model;
+        send('write:done', { requestId, model });
+        this.services.metrics.record('write_written', { kind, target: place.target, first_token_ms: firstMs ?? -1, total_ms: ms(t), notes: notes.length, person: Boolean(to?.person) });
+      } catch (e) {
+        const code: AskErrorEvent['code'] = e instanceof LlmError ? e.code : ctl.signal.aborted ? 'aborted' : 'provider';
+        const message = e instanceof LlmError ? e.message : 'The model call failed.';
+        if (code !== 'aborted') this.services.metrics.record('write_error', { code, ...(e instanceof LlmError && e.statusCode && { status: e.statusCode }) });
+        fail(code, message);
+      } finally {
+        if (s.write === state) s.write = null;
+      }
+    })();
+    return { requestId, used, to: to?.name ?? null };
+  }
+
+  cancelWrite(requestId: string): void {
+    const w = this.session?.write;
+    if (w?.requestId === requestId) w.ctl.abort();
   }
 
   /**
@@ -1668,12 +1795,12 @@ ${s.selection.text}`;
     return this.insertText(s, cleanText(item.text), 'search', (how) => this.services.metrics.record('search_inserted', { how, ms: ms(s.t0) }));
   }
 
-  async insertPaste(sessionId: number, text: string, kind: 'list' | 'summary', edited: boolean): Promise<ReplyInsertResult> {
+  async insertWrite(sessionId: number, text: string, mode: 'written' | 'snippets', edited: boolean): Promise<ReplyInsertResult> {
     const s = this.current(sessionId);
     if (!s) throw new Error('This bar is gone. Press the hotkey again.');
     const body = text.trim();
     if (!body) throw new Error('There is nothing to paste.');
-    return this.insertText(s, body, 'paste', (how) => this.services.metrics.record('paste_inserted', { kind, how, edited, ms: ms(s.t0) }));
+    return this.insertText(s, body, 'write', (how) => this.services.metrics.record('write_inserted', { mode, how, edited, ms: ms(s.t0) }));
   }
 
   /** Tasks: one structured call for the tasks in the selected message, or patterns without a model. */
@@ -1912,7 +2039,7 @@ ${s.selection.text}`;
       surroundings: null,
       field: null,
       fieldRoute: null,
-      pasteCtl: null,
+      write: null,
       saved,
       savedSettled: true,
       visualCtl: null,
@@ -2010,7 +2137,7 @@ ${s.selection.text}`;
    * marked "Not related" in this session. Null when it's off (Privacy), there's no text, or it
    * fails; the action then goes on without it.
    */
-  private async savedContext(s: Session, action: 'ask' | 'reply', query: string[], personIds: string[]): Promise<RetrievedContext | null> {
+  private async savedContext(s: Session, action: 'ask' | 'reply' | 'write', query: string[], personIds: string[]): Promise<RetrievedContext | null> {
     if (!this.settings.context.enabled) return null;
     const sv = this.services;
     const texts = query.filter((t) => t.trim());
@@ -2320,7 +2447,7 @@ ${s.selection.text}`;
     s.routeCtl?.abort();
     s.promisesCtl?.abort();
     s.whoCtl?.abort();
-    s.pasteCtl?.abort();
+    s.write?.ctl.abort();
     s.visualCtl?.abort();
     s.reply?.ctl.abort();
     if (s.reply?.done && !s.reply.used) this.services.metrics.record('reply_discarded');

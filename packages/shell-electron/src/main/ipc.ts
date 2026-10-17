@@ -5,6 +5,7 @@ import {
   namedPeople,
   REPLY_CHANNELS,
   REPLY_REDO_ASKS,
+  WRITE_ASKS,
   STYLE_DIMENSIONS,
   channelWords,
   WROTE_OWN,
@@ -18,6 +19,8 @@ import {
   type ReplyPick,
   type ReplyRedo,
   type ReplyRedoAsk,
+  type WriteAsk,
+  type WriteStartArgs,
   type StyleDimension,
   type StyleView,
   type ActionId,
@@ -48,7 +51,7 @@ import type { Updater } from './updater';
 
 const log = logger('ipc');
 
-const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall', 'paste_list', 'paste_summary'];
+const ACTIONS: readonly ActionId[] = ['ask', 'save', 'reply', 'who', 'promises', 'visualize', 'search', 'recall', 'write'];
 const TABS = ['tasks', 'calendar', 'people', 'saved', 'profile', 'models', 'privacy', 'general', 'metrics'] as const;
 const ALIAS_KINDS: readonly AliasKind[] = ['email', 'handle', 'name'];
 const STATUSES: readonly CommitmentStatus[] = ['open', 'done', 'dropped'];
@@ -119,6 +122,17 @@ const replyRedo = (v: unknown): ReplyRedo | undefined => {
     return a as ReplyRedoAsk;
   });
   return { passedOn, asks: [...new Set(asks)], note: optStr(r.note, 500) ?? null };
+};
+/** Write here's change: the text written before, the chips picked, and what the user typed. */
+const writeChange = (v: unknown): WriteStartArgs['change'] => {
+  if (v === undefined || v === null) return undefined;
+  const r = obj(v);
+  if (!Array.isArray(r.asks) || r.asks.length > WRITE_ASKS.length) throw new Error('Invalid argument');
+  const asks = r.asks.map((a) => {
+    if (!(WRITE_ASKS as readonly unknown[]).includes(a)) throw new Error('Invalid argument');
+    return a as WriteAsk;
+  });
+  return { previous: str(r.previous, 20_000), asks: [...new Set(asks)], note: optStr(r.note, 500) };
 };
 
 export function registerIpc(deps: IpcDeps): void {
@@ -246,15 +260,13 @@ export function registerIpc(deps: IpcDeps): void {
     capture.replyCopied(num(a.sessionId), a.text === undefined ? undefined : str(a.text, 10_000), replyPick(a.pick), optStr(a.personId, 100)),
   );
 
-  // ---- Paste (nothing selected) ----
-  const pasteKind = (v: unknown) => {
-    if (v !== 'list' && v !== 'summary') throw new Error('Invalid kind');
-    return v;
-  };
-  handle('paste:compose', (a) => capture.composePaste(num(a.sessionId), pasteKind(a.kind)));
-  handle('paste:insert', (a) => {
-    if (typeof a.edited !== 'boolean') throw new Error('Invalid argument');
-    return capture.insertPaste(num(a.sessionId), str(a.text, 20_000), pasteKind(a.kind), a.edited);
+  // ---- Write here (nothing selected, decision 81) ----
+  handle('write:open', (a) => capture.openWrite(num(a.sessionId)));
+  handle('write:start', (a, e) => capture.startWrite(num(a.sessionId), e.sender, { request: optStr(a.request, 500), change: writeChange(a.change) }));
+  handle('write:cancel', (a) => capture.cancelWrite(str(a.requestId, 100)));
+  handle('write:insert', (a) => {
+    if (typeof a.edited !== 'boolean' || (a.mode !== 'written' && a.mode !== 'snippets')) throw new Error('Invalid argument');
+    return capture.insertWrite(num(a.sessionId), str(a.text, 20_000), a.mode, a.edited);
   });
 
   // ---- Tasks (formerly What did I promise) ----
