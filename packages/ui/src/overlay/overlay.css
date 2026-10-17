@@ -675,22 +675,6 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   font-size: 11.5px;
   color: var(--muted);
 }
-.create-person {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.form-grid .wide {
-  grid-column: 1 / -1;
-}
-.row-tight button svg {
-  margin-right: 2px;
-}
 
 /* ---- What did I promise ---- */
 

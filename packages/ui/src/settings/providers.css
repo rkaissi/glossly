@@ -40,15 +40,6 @@
 
 /* ---- the list in the Models tab ---- */
 
-.section-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  margin: var(--s-5) 0 var(--s-3);
-}
-.section-head h3 {
-  margin: 0;
-}
 .plist {
   background: var(--card);
   border: 1px solid var(--border);

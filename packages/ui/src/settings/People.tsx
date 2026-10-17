@@ -1,26 +1,43 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Pencil, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Search, Trash2, UserRoundPlus } from 'lucide-react';
 import type { CommitmentView, PersonCard, PersonSummary } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { Select } from '../controls/Select';
 import { formatDay } from '../dates';
+import { draftFromQuery } from '../people/draft';
 import { CommitmentList, PersonCardView } from '../people/PersonCard';
+import { CreatePerson } from '../people/PersonForm';
 import { useAction } from './useAction';
 import { useLive } from './useLive';
 
 function PeopleList() {
   const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState(false);
   const people = useLive(useCallback(() => glossly.invoke('people:list', { query }), [query]));
   return (
     <section>
       <h2>People</h2>
       <p className="muted">
-        Everyone here was added by you, from "Who is this", a task you saved, or a reply you inserted. Nothing is looked up online. Open tasks and
-        events are in the <a href="#tasks">Tasks</a> and <a href="#calendar">Calendar</a> tabs.
+        Everyone here was added by you: with Add person, from "Who is this", a task you saved, or a reply you inserted. Nothing is looked up
+        online. Open tasks and events are in the <a href="#tasks">Tasks</a> and <a href="#calendar">Calendar</a> tabs.
       </p>
 
-      <h3>Everyone</h3>
+      <div className="section-head">
+        <h3>Everyone</h3>
+        <span className="spacer" />
+        {!adding && (
+          <button className="primary" onClick={() => setAdding(true)}>
+            <UserRoundPlus size={15} strokeWidth={1.75} aria-hidden />
+            Add person
+          </button>
+        )}
+      </div>
+      {adding && (
+        <div className="field">
+          <CreatePerson initial={draftFromQuery(query)} onCreated={(card) => (location.hash = `people/${card.id}`)} onCancel={() => setAdding(false)} />
+        </div>
+      )}
       <div className="search">
         <Search size={14} strokeWidth={1.75} aria-hidden />
         <input value={query} placeholder="Search names, emails, and handles" spellCheck={false} onChange={(e) => setQuery(e.target.value)} />
@@ -44,7 +61,7 @@ function PeopleList() {
         </ul>
       ) : (
         <p className="muted small">
-          {!people ? 'Loading…' : query ? 'No one matches.' : 'No people yet. Select a message and open "Who is this" to add someone.'}
+          {!people ? 'Loading…' : query ? 'No one matches.' : 'No people yet. Use Add person, or select a message and open "Who is this".'}
         </p>
       )}
     </section>

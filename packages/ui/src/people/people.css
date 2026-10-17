@@ -114,6 +114,24 @@ button.chip-x.danger:hover:not(:disabled) {
   padding: 0 10px;
   font-size: 12.5px;
 }
+.row-tight button svg {
+  margin-right: 2px;
+}
+
+/* Adding a person (PersonForm): in Who is this, Reply, and Settings > People. */
+.create-person {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.form-grid .wide {
+  grid-column: 1 / -1;
+}
 
 .person-section {
   display: flex;

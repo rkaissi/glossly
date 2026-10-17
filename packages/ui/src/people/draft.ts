@@ -26,6 +26,15 @@ export function draftFrom(found: Partial<Pick<DetectedPerson, 'name' | 'email' |
   };
 }
 
+/** Settings > People's Add person starts from the search box: an email, a @handle, or else a name. */
+export function draftFromQuery(query: string): PersonDraft {
+  const q = query.trim();
+  const d = draftFrom(null);
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q)) return { ...d, email: q };
+  if (/^@[^\s@]+$/.test(q)) return { ...d, handle: q.slice(1) };
+  return { ...d, name: q };
+}
+
 /** The fields as `people:create` (and a new person in Tasks) takes them: trimmed, blanks left out. */
 export function draftToCreate(d: PersonDraft) {
   return {

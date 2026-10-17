@@ -237,6 +237,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [x] Hotkey in an empty Notepad tab, Search, Enter types the item; the copy icon copies without inserting; over non-editable text Enter copies.
 
 **People**
+- [ ] (Oct 17) Settings > People > Add person: the form opens under Everyone, prefilled from the search box (a name, an email, a @handle); Enter creates and opens the record, Esc cancels; Who is this and Reply's add form look unchanged (their styles moved to `people.css`). Delete the test person after.
 - [x] (Step 21, on fictional look-alike pages; the real apps are still Rayan's to try) Who on a real Outlook web email and a real Discord DM (the two fixtures in `who-judge.test.ts`): right people, no button labels, no shared inboxes, an address ending a sentence is found.
 - [x] Switch away from Who and back: `who looked up {"cached":true}`.
 - [x] A saved "Jordan Hale" and a message from "Jordan": Who asks "Is this the same Jordan?".

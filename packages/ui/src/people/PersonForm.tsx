@@ -6,6 +6,7 @@ import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
 import { useAction } from '../settings/useAction';
 import { RELATIONSHIP_OPTIONS } from './relationship';
+import './people.css';
 
 /** Name, email, handle, about, and relationship. `showName` false when the name is the row's heading. */
 export function PersonFields({ value, onChange, showName = true }: { value: PersonDraft; onChange: (d: PersonDraft) => void; showName?: boolean }) {
@@ -26,8 +27,8 @@ export function PersonFields({ value, onChange, showName = true }: { value: Pers
   );
 }
 
-/** Add a person: the fields prefilled from what was found, then "Create person" (Enter) and, where it can be dismissed, Cancel (Esc). */
-export function CreatePerson({ initial, title, onCreated, onCancel }: { initial: PersonDraft; title: string; onCreated: (card: PersonCard) => void; onCancel?: () => void }) {
+/** Add a person: the fields prefilled from what was found, then "Create person" (Enter) and, where it can be dismissed, Cancel (Esc). No `title` when the page heads it. */
+export function CreatePerson({ initial, title, onCreated, onCancel }: { initial: PersonDraft; title?: string; onCreated: (card: PersonCard) => void; onCancel?: () => void }) {
   const [draft, setDraft] = useState(initial);
   const { busy, error, run } = useAction();
   const create = () =>
@@ -48,7 +49,7 @@ export function CreatePerson({ initial, title, onCreated, onCancel }: { initial:
   };
   return (
     <div className="create-person" onKeyDown={onKeyDown}>
-      <h2>{title}</h2>
+      {title && <h2>{title}</h2>}
       <PersonFields value={draft} onChange={setDraft} />
       <div className="row-tight">
         <button className="primary" disabled={busy || !draft.name.trim()} onClick={create}>

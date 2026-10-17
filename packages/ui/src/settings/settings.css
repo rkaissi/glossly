@@ -84,6 +84,16 @@ code {
 .spacer {
   flex: 1;
 }
+/* An h3 with a button on its right (Models > Providers, People > Everyone). */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-5) 0 var(--s-3);
+}
+.section-head h3 {
+  margin: 0;
+}
 .grow {
   flex: 1;
   min-width: 0;
