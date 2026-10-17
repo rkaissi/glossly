@@ -60,6 +60,7 @@ export * from './actions/promises';
 export * from './actions/reply';
 export * from './actions/style-notes';
 export * from './actions/paste';
+export * from './actions/write';
 
 export * from './recall/recall';
 export * from './context/docs';

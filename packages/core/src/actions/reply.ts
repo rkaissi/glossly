@@ -68,7 +68,7 @@ const day = (iso: string) => {
 };
 
 /** The person record for the prompt: note, open commitments both ways, and recent messages. */
-function personSection(p: PersonCard): string[] {
+export function personSection(p: PersonCard): string[] {
   const out = [`## What you know about ${p.name}`];
   if (p.relationship) out.push(`Relationship to the user: ${p.relationship}`);
   if (p.note) out.push(`How the user knows them: ${clip(p.note, 400)}`);
