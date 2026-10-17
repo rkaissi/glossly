@@ -50,11 +50,14 @@ import {
   pasteAsSaved,
   pasteList,
   mergeWriteNotes,
+  PASTE_COUNT,
+  NOTHING_TO_WRITE,
   writeSuggestions,
   write as streamWrite,
   LOCAL_ONLY_MESSAGE,
   type PasteTarget,
   type ReplyChannel,
+  type Item,
   type WriteInput,
   type WriteOpen,
   type WriteStart,
@@ -130,7 +133,7 @@ import type { HelperManager } from './helper-manager';
 import { errorInfo, logger } from './log';
 import { HIDDEN_STATE, MAX_W, SIZES, type Overlay } from './overlay';
 import type { Services } from './services';
-import { ExpiringLru, Lru, actionForSlot, clickedWhere, replyCacheKey, contains, routeComparison, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, mouseAwayLimit, shouldHideOverlay, slotsView, type HideSignal } from './view';
+import { ExpiringLru, Lru, actionForSlot, clickedWhere, replyCacheKey, writeCacheKey, contains, routeComparison, distanceToRect, emptySlotsView, growFrom, holdForRoute, isAvailable, mergeRoute, needsTier2, mouseAwayLimit, shouldHideOverlay, slotsView, type HideSignal } from './view';
 
 const log = logger('capture');
 
@@ -232,7 +235,9 @@ interface Session {
   /** Whether that field answers someone, once routed. */
   fieldRoute: FieldRoute | null;
   /** The running Write here stream (decision 81). */
-  write: { requestId: string; ctl: AbortController } | null;
+  write: { requestId: string; ctl: AbortController; key: string; raw: string; done: boolean; start: WriteStart | null } | null;
+  /** The last request Write here wrote for in this session, so a reopened panel asks for it again (decision 83). */
+  writeLast: WriteOpen['last'];
   /** Kinds of saved data Write here showed in this session, recorded with what was left out when it pastes (decision 81). */
   writeKinds: Set<ContextUsed['kind']>;
   /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
@@ -257,6 +262,8 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const ms = (t: number) => Math.round(performance.now() - t);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 /** YYYY-MM-DD for the local day, as the calendar stores all-day events and compares starts. */
+/** Less text than this around the caret says nothing about which snippets fit (as `pasteSnippets`). */
+const WRITE_CLUE_CHARS = 20;
 const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 /** What Reply answers: the selection, or with nothing selected, the messages around the reply box (decision 75). */
 const replySelection = (s: Session): SelectionPayload | null => s.selection ?? s.field?.selection ?? null;
@@ -336,6 +343,8 @@ export class Capture {
   private readonly whoPending = new Map<string, Promise<WhoRead>>();
   /** Finished Reply drafts per highlight (`replyCacheKey`), so switching panels doesn't write them again. */
   private readonly replyCache = new ExpiringLru<string, { raw: string; model: ModelRef; used: ContextUsed[] }>(MODEL_CACHE_SIZE, REPLY_CACHE_MS);
+  /** Finished Write here texts per spot and request (`writeCacheKey`, decision 83), so reopening the panel doesn't write them again. */
+  private readonly writeCache = new ExpiringLru<string, { raw: string; model: ModelRef; start: WriteStart }>(MODEL_CACHE_SIZE, REPLY_CACHE_MS);
   private readonly visualCache = new Lru<string, Extract<VisualizeResult, { ok: true }>>(MODEL_CACHE_SIZE);
 
   /**
@@ -594,6 +603,7 @@ export class Capture {
         fieldRoute: null,
         write: null,
         writeKinds: new Set(),
+        writeLast: null,
         saved: null,
         savedSettled: false,
         visualCtl: null,
@@ -844,6 +854,7 @@ export class Capture {
       fieldRoute: null,
       write: null,
       writeKinds: new Set(),
+      writeLast: null,
       saved: null,
       savedSettled: false,
       visualCtl: null,
@@ -1274,6 +1285,7 @@ export class Capture {
   clearCaches(): void {
     this.whoCache.clear();
     this.replyCache.clear();
+    this.writeCache.clear();
     this.visualCache.clear();
   }
 
@@ -1639,11 +1651,23 @@ ${s.selection.text}`;
     return { app, title, target: pasteTarget(app, title), rich: richEditor(app, title) };
   }
 
-  /** The snippets that fit the spot (by meaning, else the newest), without the ones marked "Not related" in this session. */
-  private async writeSnippets(s: Session, target: PasteTarget) {
+  /**
+   * The snippets that fit the spot (by meaning, else the newest), without the ones marked "Not
+   * related" in this session. With little text around the caret (an empty document), a request
+   * is what they're matched against; `recent` asks for the newest ones outright.
+   */
+  private async writeSnippets(s: Session, target: PasteTarget, opts: { recent?: boolean; request?: string } = {}) {
     const sv = this.services;
-    const picked = await pasteSnippets({ store: sv.store, embedder: () => sv.embed.embedder(), settings: () => sv.settings }, { surroundings: s.surroundings, target });
-    return { ...picked, items: picked.items.filter((it) => !s.contextDismissed.has(`note:${it.id}`)) };
+    const keep = (it: Item) => !s.contextDismissed.has(`note:${it.id}`);
+    if (opts.recent) {
+      const items = recentSnippets(sv.store, sv.settings).filter(keep).slice(0, PASTE_COUNT[target]).reverse();
+      return { items, reason: 'recent' as const };
+    }
+    const sur = s.surroundings;
+    const thin = !sur || sur.text.trim().length < WRITE_CLUE_CHARS;
+    const surroundings = thin && opts.request?.trim() ? { text: opts.request, caret: -1, source: 'visible' as const } : sur;
+    const picked = await pasteSnippets({ store: sv.store, embedder: () => sv.embed.embedder(), settings: () => sv.settings }, { surroundings, target });
+    return { ...picked, items: picked.items.filter(keep) };
   }
 
   /**
@@ -1714,7 +1738,7 @@ ${s.selection.text}`;
         : { code: 'no_model', message: 'Writing needs a model. Add a key in Settings.' };
     const to = this.writeRecipient(s);
     this.services.metrics.record('write_opened', { target, snippets: snippets.length, reason: picked.reason, writing, model, suggestions: suggestions.length, to: Boolean(to), ms: ms(t) });
-    return { target, model, noModel, writing, to: to?.name ?? null, suggestions, snippets, reason: picked.reason };
+    return { target, model, noModel, writing, to: to?.name ?? null, suggestions, snippets, reason: picked.reason, last: s.writeLast };
   }
 
   /**
@@ -1734,11 +1758,32 @@ ${s.selection.text}`;
       setTimeout(() => fail('no_selection', 'This bar is gone. Press the hotkey again.'), 0);
       return { requestId, used: [], to: null, leftOut: [] };
     }
+    const place = this.writePlace(s);
+    const sur = s.surroundings;
+    const near = sur ? (sur.caret >= 0 ? sur.text.slice(Math.max(0, sur.caret - 1500), sur.caret + 300) : sur.text.slice(0, 1800)) : '';
+    // The same spot and request get the text they already have (decision 83): switching panels or
+    // opening the bar again shows it without another call. A change replaces it.
+    const key = writeCacheKey({ place: s.siteKey ?? place.app, around: near, request: args.request ?? null, include: args.include ?? [] });
+    s.writeLast = args.request ? { request: args.request, label: args.label ?? null, suggested: Boolean(args.suggested), recentSnippets: Boolean(args.recentSnippets) } : null;
+    const running = s.write;
+    if (!args.change && running && !running.done && running.start && running.key === key && !running.ctl.signal.aborted) {
+      log.info('write resumed', { chars: running.raw.length });
+      return { ...running.start, resumed: running.raw };
+    }
+    const hit = args.change ? undefined : this.writeCache.get(key);
+    if (hit) {
+      s.write?.ctl.abort();
+      s.write = null;
+      for (const u of hit.start.used) s.writeKinds.add(u.kind);
+      setTimeout(() => send('write:done', { requestId, model: hit.model }), 0);
+      log.info('write cached', { chars: hit.raw.length });
+      return { ...hit.start, requestId, resumed: hit.raw };
+    }
+
     s.write?.ctl.abort();
     const ctl = new AbortController();
-    const state = { requestId, ctl };
+    const state: NonNullable<Session['write']> = { requestId, ctl, key, raw: '', done: false, start: null };
     s.write = state;
-    const place = this.writePlace(s);
     const to = this.writeRecipient(s);
     const people = this.services.people;
     const channel = replyChannel(place.app, place.title);
@@ -1746,10 +1791,8 @@ ${s.selection.text}`;
     const personId = to?.person?.id ?? null;
     this.learnFromWriteAsks(args, { channel, personId });
 
-    const sur = s.surroundings;
-    const near = sur ? (sur.caret >= 0 ? sur.text.slice(Math.max(0, sur.caret - 1500), sur.caret + 300) : sur.text.slice(0, 1800)) : '';
     const personIds = [personId, ...(s.route?.features.knownPeople ?? [])].filter((x): x is string => Boolean(x));
-    const [picked, found] = await Promise.all([this.writeSnippets(s, place.target), this.savedContext(s, 'write', [args.request ?? '', near], personIds)]);
+    const [picked, found] = await Promise.all([this.writeSnippets(s, place.target, { recent: args.recentSnippets, request: args.request }), this.savedContext(s, 'write', [args.request ?? '', near], personIds)]);
     if (s.write !== state || ctl.signal.aborted) return { requestId, used: [], to: to?.name ?? null, leftOut: [] };
     // Kinds the user keeps dropping in this place start left out, unless they asked to put them back (decision 81).
     const usuallyDropped = new Set(learning ? people.droppedKinds(channel).filter((k) => !args.include?.includes(k as ContextUsed['kind'])) : []);
@@ -1760,8 +1803,13 @@ ${s.selection.text}`;
       tasks: usuallyDropped.has('task') ? [] : found.tasks,
       events: usuallyDropped.has('event') ? [] : found.events,
     };
-    const snippets = usuallyDropped.has('note') ? [] : picked.items;
-    const had: Record<ContextUsed['kind'], number> = { note: picked.items.length + (found?.notes.length ?? 0), person: found?.people.length ?? 0, task: found?.tasks.length ?? 0, event: found?.events.length ?? 0 };
+    // Only snippets close in meaning (to the text, or to the request in an empty field) go into the
+    // text. The newest ones stand in only when there's nothing to judge by, or when asked for
+    // (decision 83: with text around the caret, an unrelated newest note was in the Used chip).
+    const nothingToJudge = near.trim().length < WRITE_CLUE_CHARS && !args.request?.trim();
+    const fitting = picked.reason === 'related' || args.recentSnippets || nothingToJudge ? picked.items : [];
+    const snippets = usuallyDropped.has('note') ? [] : fitting;
+    const had: Record<ContextUsed['kind'], number> = { note: fitting.length + (found?.notes.length ?? 0), person: found?.people.length ?? 0, task: found?.tasks.length ?? 0, event: found?.events.length ?? 0 };
     const leftOut = (['note', 'person', 'task', 'event'] as const).filter((k) => usuallyDropped.has(k) && had[k] > 0);
     const notes = mergeWriteNotes(snippets, context?.notes ?? []);
     const used = contextUsed(context ?? { people: [], tasks: [], events: [] }, notes, new Date());
@@ -1783,6 +1831,8 @@ ${s.selection.text}`;
     };
     const kind = args.change ? 'change' : args.request ? 'request' : 'continue';
     log.info('write started', { kind, target: place.target, to: Boolean(to), person: Boolean(to?.person), notes: notes.length, snippets: picked.items.length });
+    const start: WriteStart = { requestId, used, to: to?.name ?? null, leftOut };
+    state.start = start;
     void (async () => {
       const t = performance.now();
       let firstMs: number | null = null;
@@ -1790,9 +1840,13 @@ ${s.selection.text}`;
         const r = streamWrite(this.services.llm, this.settings, input, ctl.signal);
         for await (const text of r.textStream) {
           firstMs ??= ms(t);
+          state.raw += text;
           send('write:chunk', { requestId, text });
         }
         const model = await r.model;
+        state.done = true;
+        // "Nothing to write" isn't kept: the next try may have more to go on.
+        if (state.raw.trim() && !state.raw.trim().startsWith(NOTHING_TO_WRITE)) this.writeCache.set(key, { raw: state.raw, model, start });
         send('write:done', { requestId, model });
         this.services.metrics.record('write_written', { kind, target: place.target, first_token_ms: firstMs ?? -1, total_ms: ms(t), notes: notes.length, person: Boolean(to?.person) });
       } catch (e) {
@@ -1804,7 +1858,7 @@ ${s.selection.text}`;
         if (s.write === state) s.write = null;
       }
     })();
-    return { requestId, used, to: to?.name ?? null, leftOut };
+    return start;
   }
 
   /**
@@ -2118,6 +2172,7 @@ ${s.selection.text}`;
       fieldRoute: null,
       write: null,
       writeKinds: new Set(),
+      writeLast: null,
       saved,
       savedSettled: true,
       visualCtl: null,

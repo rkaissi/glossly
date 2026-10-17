@@ -262,6 +262,18 @@ export function replyCacheKey(input: { place: string; author: string | null; tex
     .digest('hex');
 }
 
+/**
+ * Write here's cache key (decision 83): the place, the text around the caret, what was asked,
+ * and the kinds put back. A change ("Shorter") isn't in it, so a changed text replaces the one
+ * it came from and reopening the panel shows the latest.
+ */
+export function writeCacheKey(input: { place: string; around: string; request: string | null; include: string[] }): string {
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
+  return createHash('sha256')
+    .update(['write', input.place.toLowerCase(), norm(input.around), input.request ? norm(input.request).toLowerCase() : '', [...input.include].sort().join(',')].join('\u0000'))
+    .digest('hex');
+}
+
 /** An Lru whose entries also expire, for model answers that go stale (Reply's drafts). */
 export class ExpiringLru<K, V> {
   private readonly lru: Lru<K, { value: V; at: number }>;

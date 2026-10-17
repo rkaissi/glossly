@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { anchoredTo, ExpiringLru, Lru, replyCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
+import { anchoredTo, ExpiringLru, Lru, replyCacheKey, writeCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
@@ -227,6 +227,24 @@ describe('Lru', () => {
     expect([c.get('a'), c.get('b'), c.get('c')]).toEqual([1, undefined, 3]);
     c.clear();
     expect(c.get('a')).toBeUndefined();
+  });
+});
+
+describe("Write here's cache key (decision 83)", () => {
+  const base = { place: 'olk.exe', around: 'Hi Jordan,\n\nQuick status on the deck: ', request: null, include: [] };
+
+  it('is a hash of the place, the text around the caret, the request, and the kinds put back', () => {
+    const k = writeCacheKey(base);
+    expect(k).toMatch(/^[0-9a-f]{64}$/);
+    expect(writeCacheKey({ ...base, around: 'Hi Jordan,  Quick status on the deck:' })).toBe(k);
+    expect(writeCacheKey({ ...base, place: 'OLK.EXE' })).toBe(k);
+    expect(writeCacheKey({ ...base, around: 'Hi Casey, quick status on the deck: ' })).not.toBe(k);
+    expect(writeCacheKey({ ...base, request: 'agenda for Thursday' })).not.toBe(k);
+    expect(writeCacheKey({ ...base, request: 'Agenda for  Thursday' })).toBe(writeCacheKey({ ...base, request: 'agenda for Thursday' }));
+    expect(writeCacheKey({ ...base, include: ['task', 'note'] })).toBe(writeCacheKey({ ...base, include: ['note', 'task'] }));
+    expect(writeCacheKey({ ...base, include: ['note'] })).not.toBe(k);
+    // Never the same as Reply's key for the same text.
+    expect(writeCacheKey(base)).not.toBe(replyCacheKey({ place: base.place, author: null, text: base.around }));
   });
 });
 

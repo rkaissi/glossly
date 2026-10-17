@@ -331,6 +331,11 @@ export interface WriteOpen {
   snippets: WriteSnippet[];
   /** `related`: picked by meaning against the text around the cursor; `recent`: the newest ones. */
   reason: 'related' | 'recent';
+  /**
+   * The last request written for this spot in this session (decision 83), so a reopened panel asks
+   * for it again and gets the cached text. Null when the last run continued the text, or none ran.
+   */
+  last: { request: string; label: string | null; suggested: boolean; recentSnippets: boolean } | null;
 }
 
 export interface WriteStartArgs {
@@ -343,6 +348,10 @@ export interface WriteStartArgs {
   suggested?: boolean;
   /** "Put back": kinds of saved data to use even though the user usually leaves them out here. */
   include?: ContextUsed['kind'][];
+  /** The "notes from your newest snippets" suggestion: use the newest snippets, not only the ones close in meaning. */
+  recentSnippets?: boolean;
+  /** The heading for a request (a suggestion's label), kept so a reopened panel shows it again. */
+  label?: string;
 }
 export interface WriteStart {
   /** Chunks, done, and errors arrive on write:chunk, write:done, and write:error with this id. */
@@ -352,6 +361,8 @@ export interface WriteStart {
   to: string | null;
   /** Kinds of saved data left out because the user usually drops them in this place (decision 81). */
   leftOut: ContextUsed['kind'][];
+  /** Set when this picks up a text already written for this spot (decision 83): the text so far, or all of it when it's finished. */
+  resumed?: string;
 }
 
 // ---- Tasks (formerly What did I promise) ----

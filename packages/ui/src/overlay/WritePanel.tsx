@@ -59,7 +59,7 @@ export function WritePanel({ s }: { s: OverlayState }) {
   const [start, setStart] = useState<WriteStart | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
   const [box, setBox] = useState('');
-  const [asked, setAsked] = useState<{ label: string; request: string; suggested: boolean } | null>(null);
+  const [asked, setAsked] = useState<{ label: string; request: string; suggested: boolean; recent: boolean } | null>(null);
   const [include, setInclude] = useState<ContextUsed['kind'][]>([]);
   const [off, setOff] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<'list' | 'as_saved'>('list');
@@ -82,10 +82,9 @@ export function WritePanel({ s }: { s: OverlayState }) {
       glossly.on('write:done', (p) => route(p.requestId, { kind: 'done' })),
       glossly.on('write:error', (p) => route(p.requestId, { kind: 'error', code: p.code, message: p.message })),
     ];
-    return () => {
-      offs.forEach((o) => o());
-      if (current.current) void glossly.invoke('write:cancel', { requestId: current.current });
-    };
+    // Closing the panel doesn't cancel the text: main finishes and keeps it for this spot, so
+    // switching to another action and back shows it without another call (decision 83).
+    return () => offs.forEach((o) => o());
   }, []);
 
   const run = async (args: Omit<WriteStartArgs, 'sessionId'> = {}) => {
@@ -103,7 +102,10 @@ export function WritePanel({ s }: { s: OverlayState }) {
     setStart(r);
     const queued = early.current.get(r.requestId) ?? [];
     early.current.clear();
-    if (queued.length) setStream((st) => queued.reduce(apply, st));
+    // A text already written (cached) or still being written for this spot: start from it. Its
+    // queued chunks are already in it; a queued done or error still applies.
+    if (r.resumed !== undefined) setStream(queued.filter((e) => e.kind !== 'chunk').reduce(apply, { status: 'streaming', raw: r.resumed }));
+    else if (queued.length) setStream((st) => queued.reduce(apply, st));
   };
 
   useEffect(() => {
@@ -112,7 +114,12 @@ export function WritePanel({ s }: { s: OverlayState }) {
       .then((o) => {
         setOpen(o);
         if (!o.model) setMode('snippets');
-        else if (o.writing) void run();
+        else if (o.last) {
+          // Asked for something earlier in this session: ask again, which gets the cached text.
+          const a = { label: o.last.label ?? o.last.request, request: o.last.request, suggested: o.last.suggested, recent: o.last.recentSnippets };
+          setAsked(a);
+          void run(base(a));
+        } else if (o.writing) void run();
       })
       .catch(() => setOpenError('This bar is gone. Press the hotkey again.'));
     // One open per panel; the session id never changes inside it.
@@ -141,7 +148,7 @@ export function WritePanel({ s }: { s: OverlayState }) {
 
   // What every run carries: the request (a suggestion says so, so nothing is learned from it) and kinds put back.
   const base = (a = asked, inc = include): Omit<WriteStartArgs, 'sessionId'> => ({
-    ...(a && { request: a.request, ...(a.suggested && { suggested: true }) }),
+    ...(a && { request: a.request, label: a.label, ...(a.suggested && { suggested: true }), ...(a.recent && { recentSnippets: true }) }),
     ...(inc.length > 0 && { include: inc }),
   });
   const submitBox = () => {
@@ -149,7 +156,7 @@ export function WritePanel({ s }: { s: OverlayState }) {
     if (!words) return;
     setBox('');
     if (asking) {
-      const a = { label: words, request: words, suggested: false };
+      const a = { label: words, request: words, suggested: false, recent: false };
       setAsked(a);
       void run(base(a));
     } else if (done && text.trim()) {
@@ -157,7 +164,7 @@ export function WritePanel({ s }: { s: OverlayState }) {
     }
   };
   const pickSuggestion = (sg: WriteSuggestion) => {
-    const a = { label: sg.label, request: sg.request, suggested: true };
+    const a = { label: sg.label, request: sg.request, suggested: true, recent: sg.kind === 'snippets' };
     setAsked(a);
     void run(base(a));
   };
