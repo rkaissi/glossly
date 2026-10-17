@@ -176,6 +176,8 @@ export function write(llm: LlmProvider, settings: Pick<Settings, 'identity'>, in
     signal,
     maxOutputTokens: WRITE_MAX_OUTPUT[input.target],
     reasoning: 'low',
+    // One text, not three drafts: steady from run to run (Rayan, Oct 17: "sometimes it shows nothing and sometimes it gives something").
+    temperature: 0.3,
   });
 }
 

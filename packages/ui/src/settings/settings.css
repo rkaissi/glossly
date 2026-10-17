@@ -284,6 +284,10 @@ table {
   flex-direction: column;
   gap: var(--s-3);
 }
+/* A switch keeps its own width in a field's column (a stretched one sets its cells left of center); a full one fills it. */
+.field > .seg:not(.full) {
+  align-self: flex-start;
+}
 .field p {
   margin: 0;
 }

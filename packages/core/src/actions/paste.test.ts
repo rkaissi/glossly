@@ -99,18 +99,20 @@ describe('paste', () => {
     }
   });
 
-  it('ranks Search first, then Write here, under the shared slot rule', () => {
+  it('gives Write here slot 3 under the shared slot rule; Search has slot 2 (decision 82)', () => {
     const router = DEFAULT_SETTINGS.router;
     const full = assignEmptySlots({ editable: true, recent: 3, model: true }, router);
-    expect([full.slot3?.action, full.slot4?.action, full.more]).toEqual(['search', 'write', []]);
-    // Nothing saved lately and no model: only Search.
+    expect([full.slot3?.action, full.slot4, full.more]).toEqual(['write', null, []]);
+    // Search never competes for 3 and 4.
+    expect([full.slot3, full.slot4, ...full.more].some((x) => x?.action === 'search')).toBe(false);
+    // Nothing saved lately and no model: nothing beyond Search.
     const none = assignEmptySlots({ editable: true, recent: 0, model: false }, router);
-    expect([none.slot3?.action, none.slot4, none.more]).toEqual(['search', null, []]);
+    expect([none.slot3, none.slot4, none.more]).toEqual([null, null, []]);
     // A model and a field to type into: it can write what is asked, from tasks and events.
-    expect(assignEmptySlots({ editable: true, recent: 0, model: true }, router).slot4?.action).toBe('write');
+    expect(assignEmptySlots({ editable: true, recent: 0, model: true }, router).slot3?.action).toBe('write');
     // The focus doesn't take text: the text goes to the clipboard, so it waits under More.
     const readOnly = assignEmptySlots({ editable: false, recent: 3, model: true }, router);
-    expect(readOnly.slot4).toBeNull();
+    expect(readOnly.slot3).toBeNull();
     expect(readOnly.more.map((m) => m.action)).toEqual(['write']);
     // Writing in a field, with nothing recent: still offered.
     expect(scoreEmptyActions({ editable: null, recent: 0, model: false, writing: true }).write).toBe(0.8);

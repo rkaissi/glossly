@@ -39,13 +39,16 @@ describe('barKey', () => {
     expect(barKey(key('4'), ctx())).toBeNull();
     expect(barKey(key('2'), ctx({ items: barItems(null, false, false) }))).toBeNull();
   });
-  it('numbers the buttons by position, so the empty bar has no gap where Save would be', () => {
-    const empty: SlotsView = { ...slots, slot3: slot('search', true), slot4: slot('write', true), more: [] };
+  it('numbers the buttons by position: the empty bar is 1 Ask, 2 Search, 3 and 4 (decision 82)', () => {
+    const empty: SlotsView = { ...slots, slot2: { ...slot('search', true), collection: '' }, slot3: slot('reply', true), slot4: slot('write', true), more: [] };
     const items = barItems(empty, false, false);
-    expect([slotKey(items, 1), slotKey(items, 3), slotKey(items, 4)]).toEqual([1, 2, 3]);
-    expect(barKey(key('2'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 3 } });
-    expect(barKey(key('3'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 4 } });
-    expect(barKey(key('4'), ctx({ items }))).toBeNull();
+    expect([slotKey(items, 1), slotKey(items, 2), slotKey(items, 3), slotKey(items, 4)]).toEqual([1, 2, 3, 4]);
+    expect(barKey(key('2'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 2 } });
+    expect(barKey(key('4'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 4 } });
+    // An empty bar with only Write here: no gap after Search.
+    const one = barItems({ ...empty, slot3: slot('write', true), slot4: null }, false, false);
+    expect(barKey(key('3'), ctx({ items: one }))).toEqual({ kind: 'run', target: { slot: 3 } });
+    expect(barKey(key('4'), ctx({ items: one }))).toBeNull();
     expect(slotKey(barItems(slots, true, false), 3)).toBe(3);
   });
   it('runs the highlighted item on Enter', () => {

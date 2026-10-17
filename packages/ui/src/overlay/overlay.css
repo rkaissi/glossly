@@ -630,6 +630,10 @@ html:not([data-material='acrylic']) :is(.pill, .frame) {
   font-family: var(--font);
   font-weight: 400;
 }
+/* The List / As saved switch keeps its own width: stretched by the panel's column, its cells sat left of center. */
+.panel.write > .seg {
+  align-self: flex-start;
+}
 .panel.write .thinking {
   color: var(--muted);
 }

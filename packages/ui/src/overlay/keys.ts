@@ -32,8 +32,8 @@ export type BarCommand =
 /** The bar's actionable items: slots 1 to 4 (no Save without a selection), then More's actions while the menu is open. */
 export function barItems(slots: SlotsView | null, hasSelection: boolean, menuOpen: boolean): BarItem[] {
   const items: BarItem[] = [{ slot: 1 }];
-  // Nothing selected: Save is hidden, and slots 3 and 4 hold Search and the paste actions.
-  if (hasSelection) items.push({ slot: 2 });
+  // Nothing selected: Search takes Save's place in slot 2 (decision 82); slots 3 and 4 hold Reply and Write here.
+  if (hasSelection || slots?.slot2.action === 'search') items.push({ slot: 2 });
   if (slots?.slot3) items.push({ slot: 3 });
   if (slots?.slot4) items.push({ slot: 4 });
   if (menuOpen && slots) for (const m of slots.more) items.push({ action: m.action });
@@ -42,7 +42,7 @@ export function barItems(slots: SlotsView | null, hasSelection: boolean, menuOpe
 
 /**
  * The number shown on a slot button and the key that runs it: its position on the bar, so
- * the empty bar (no Save) reads 1 Ask, 2 Search, 3 Paste snippets rather than skipping 2.
+ * a bar without a slot 2 never skips a number. The empty bar reads 1 Ask, 2 Search, 3 Reply or Write here.
  */
 export function slotKey(items: BarItem[], slot: 1 | 2 | 3 | 4): number {
   return items.filter((i) => 'slot' in i).findIndex((i) => 'slot' in i && i.slot === slot) + 1;

@@ -193,11 +193,13 @@ describe('shouldHideOverlay', () => {
 });
 
 describe('empty selection', () => {
-  it('puts Search and Write here in slots 3 and 4, and reads tier 2 only for actions that send or store the text', () => {
-    const v = emptySlotsView({ slot3: { action: 'search', score: 0.9 }, slot4: { action: 'write', score: 0.8 }, more: [{ action: 'reply', score: 0.35 }], scores: {} });
-    expect(actionForSlot(v, 3)).toBe('search');
-    expect(actionForSlot(v, 4)).toBe('write');
-    expect(v.slot4?.label).toBe('Write here');
+  it('puts Search in slot 2 and the ranked actions in 3 and 4, and reads tier 2 only for actions that send or store the text', () => {
+    const v = emptySlotsView({ slot3: { action: 'write', score: 0.8 }, slot4: null, more: [{ action: 'reply', score: 0.35 }], scores: {} });
+    expect(actionForSlot(v, 2)).toBe('search');
+    expect(actionForSlot(v, 3)).toBe('write');
+    expect(actionForSlot(v, 4)).toBeNull();
+    expect(v.slot3?.label).toBe('Write here');
+    expect(actionForSlot(null, 2)).toBe('save');
     expect(v.more.map((m) => m.label)).toEqual(['Reply']);
     expect(needsTier2('write')).toBe(false);
     expect(needsTier2('ask')).toBe(true);

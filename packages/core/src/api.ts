@@ -107,7 +107,7 @@ export interface SlotView {
 export interface SlotsView {
   /** Always Ask. */
   slot1: SlotView;
-  /** "Save to {collection}", or the collection alone when that is too long (`saveLabel`). */
+  /** "Save to {collection}", or the collection alone when that is too long (`saveLabel`). With nothing selected, Search (decision 82). */
   slot2: SlotView & { collection: string };
   slot3: SlotView | null;
   slot4: SlotView | null;

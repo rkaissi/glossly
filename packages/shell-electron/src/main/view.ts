@@ -48,11 +48,11 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
   };
 }
 
-/** The bar with nothing selected: Ask, then Search, Write here, and Reply under the slot rule. Save is hidden. */
+/** The bar with nothing selected (decision 82): Ask, Search in Save's place (slot 2), then Reply and Write here under the slot rule. */
 export function emptySlotsView(slots: Slots): SlotsView {
   return {
     slot1: slot('ask'),
-    slot2: { ...slot('save'), collection: '' },
+    slot2: { ...slot('search'), collection: '' },
     slot3: slots.slot3 ? slot(slots.slot3.action, slots.slot3.score) : null,
     slot4: slots.slot4 ? slot(slots.slot4.action, slots.slot4.score) : null,
     more: slots.more.map((a) => slot(a.action, a.score)),
@@ -108,7 +108,8 @@ function shownMore(prev: SlotView[], next: SlotView[]): SlotView[] {
 /** The action for a slot number, or null if the slot is empty. */
 export function actionForSlot(s: SlotsView | null, n: 1 | 2 | 3 | 4): ActionId | null {
   if (n === 1) return 'ask';
-  if (n === 2) return 'save';
+  // Search on the empty bar (decision 82), else Save.
+  if (n === 2) return s?.slot2.action ?? 'save';
   if (!s) return null;
   return (n === 3 ? s.slot3 : s.slot4)?.action ?? null;
 }

@@ -55,15 +55,16 @@ export interface EmptyContext {
   reply?: number;
 }
 
-/** Reply's place on the empty bar once the field is more likely a reply box than not: ahead of Search, whose box is already open. */
+/** Reply's place on the empty bar once the field is more likely a reply box than not: slot 3, ahead of Write here. */
 const REPLY_LEADS = 0.95;
 
 /**
- * Nothing selected: Search always. Write here (decision 81) when there is something to write
- * from: recent snippets, text around the caret, or a model and a field to type into (it can
- * write what the user asks from tasks and events). It ranks lower when the focused control
- * doesn't take text, since the text then lands on the clipboard. In a reply box, Reply leads;
- * when it only might be one, Reply keeps its score and so sits under More or nowhere.
+ * Nothing selected: Search always, in slot 2 (decision 82; its score is only for the debug view).
+ * Write here (decision 81) when there is something to write from: recent snippets, text around
+ * the caret, or a model and a field to type into (it can write what the user asks from tasks and
+ * events). It ranks lower when the focused control doesn't take text, since the text then lands
+ * on the clipboard. In a reply box, Reply takes slot 3 and Write here slot 4; when it only might
+ * be one, Reply keeps its score and so sits under More or nowhere.
  */
 export function scoreEmptyActions(c: EmptyContext): Record<EmptyAction, number> {
   const something = c.recent > 0 || c.writing || (c.model && c.editable === true);
@@ -91,7 +92,11 @@ export function assignSlots(d: Decisions, f: Features, thresholds: Settings['rou
   return rankSlots(scoreActions(d, f), CONTEXTUAL_ACTIONS, thresholds);
 }
 
-/** The same rule for the bar with nothing selected. */
+/** The empty-bar actions that compete for slots 3 and 4; Search always has slot 2, where Save would be (decision 82). */
+const RANKED_EMPTY = EMPTY_ACTIONS.filter((a): a is Exclude<EmptyAction, 'search'> => a !== 'search');
+
+/** The same rule for the bar with nothing selected, for Reply and Write here. */
 export function assignEmptySlots(c: EmptyContext, thresholds: Settings['router']): Slots {
-  return rankSlots(scoreEmptyActions(c), EMPTY_ACTIONS, thresholds);
+  const scores = scoreEmptyActions(c);
+  return { ...rankSlots({ reply: scores.reply, write: scores.write }, RANKED_EMPTY, thresholds), scores };
 }

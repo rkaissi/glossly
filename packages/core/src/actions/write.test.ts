@@ -143,7 +143,7 @@ describe('Write here', () => {
     };
     write(llm, settings, base);
     write(llm, settings, { ...base, target: 'chat' });
-    expect(calls[0]).toMatchObject({ role: 'chat', action: 'write', maxOutputTokens: 800, reasoning: 'low' });
+    expect(calls[0]).toMatchObject({ role: 'chat', action: 'write', maxOutputTokens: 800, reasoning: 'low', temperature: 0.3 });
     expect(calls[0]!.instructions).toContain(NOTHING_TO_WRITE);
     expect(calls[1]!.maxOutputTokens).toBe(350);
   });

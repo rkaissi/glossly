@@ -275,8 +275,9 @@ function Expanded({ s }: { s: OverlayState }) {
         <div className="row">
           <MenuButton open={menuOpen} onClick={() => toggleMenu(!menuOpen)} />
           {slotButton({ slot: 1 }, ask, { cls: 'ask' })}
-          {/* Nothing selected: nothing to save, so Search and the paste actions sit next to Ask. */}
+          {/* Nothing selected: nothing to save, so Search takes slot 2 (decision 82). */}
           {s.hasSelection && !s.saved && slotButton({ slot: 2 }, save, { cls: 'save' })}
+          {!s.hasSelection && slots?.slot2.action === 'search' && slotButton({ slot: 2 }, slots.slot2)}
           {s.hasSelection && s.saved && (
             // Already saved (autosave): slot 2 undoes it while the undo window lasts.
             <button
