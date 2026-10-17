@@ -66,7 +66,7 @@ One action when nothing is selected (`write`, decision 81; it replaced Paste sni
 - Enter pastes the box through `insertText` (copies when the focus takes no text); metrics `write_opened`, `write_written`, `write_inserted`, `write_error`.
 - **Learning** (Step 27d, decision 81; the same switch and store as Reply's, kept per place, with documents a place of their own): an edit before Paste counts like a Reply edit, and a big one is a voice sample; Shorter and Longer vote on length; what the user types (a request, a change, More casual or More formal) goes to `write_requests` for the style notes, where two of them back a note, including what they like to include. A kind of saved data left out in 3 of the last 5 writes in a place starts left out there ("Left out your notes here, as you usually do" with Put back). A habit two places agree on applies everywhere else (`judgeEverywhere`), for Reply too. Profile's learned list filters by place and names which action taught each row.
 
-Status: unit-tested and built (Step 27a to 27c), not seen live. The earlier Paste snippets list and As saved were live-checked on Oct 16.
+Status: live-checked Oct 17 on a throwaway profile (`docs/testing.md`, "Write here"): the reply box, the empty document, suggestions, Shorter and a typed change, Snippets with ticks, paste, and the learning rows pass; the missing "to Jordan Hale" was fixed and rechecked. Not seen live: Not related then Rewrite, Left out and Put back, Local only, and Profile's place filter.
 
 ## People, Profile, and Who is this
 

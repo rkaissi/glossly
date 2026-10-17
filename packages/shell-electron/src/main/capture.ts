@@ -1648,16 +1648,23 @@ ${s.selection.text}`;
 
   /**
    * Who the text goes to: whoever wrote the message the field sits under (the thread the router
-   * read, decision 75), unless the user wrote it. Their record comes along when it resolves.
+   * read, decision 75), unless the user wrote it. Their record comes along when it resolves. The
+   * rules often find no author there, since the user's own start of a reply ends the text (the
+   * live check, Oct 17: a sign-off above "Hi Jordan, …" wasn't read), so when exactly one saved
+   * person appears in the thread, it's them.
    */
   private writeRecipient(s: Session): { name: string; person: PersonCard | null } | null {
     const sel = s.field?.selection;
     if (!sel) return null;
     const det = detectPeople(detectInputFor(sel, null), this.settings.identity, this.services.store.listKnownPeople());
-    const { author, authorIsMe } = authorFrom(null, det);
-    if (authorIsMe || !author) return null;
-    const match = resolvePerson(this.services.people, author, sel.source_app);
-    const person = match?.kind === 'exact' ? this.services.people.card(match.personId) : null;
+    const found = authorFrom(null, det);
+    if (found.authorIsMe) return null;
+    const known = [...new Set(det.people.map((p) => p.knownId).filter((x): x is string => Boolean(x)))];
+    const author = found.author ?? (known.length === 1 ? (det.people.find((p) => p.knownId === known[0]) ?? null) : null);
+    if (!author) return null;
+    const match = author.knownId ? null : resolvePerson(this.services.people, author, sel.source_app);
+    const personId = author.knownId ?? (match?.kind === 'exact' ? match.personId : null);
+    const person = personId ? this.services.people.card(personId) : null;
     const name = person?.name ?? author.name ?? author.email ?? (author.handle ? `@${author.handle}` : null);
     return name ? { name, person } : null;
   }
