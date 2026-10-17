@@ -1,0 +1,376 @@
+/* Providers added from a list (decision 79; docs/design/mockups/26-providers.html). */
+
+/* ---- the letter tile that stands in for a logo ---- */
+
+.mark {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font: 600 13px var(--font-display);
+  color: var(--fg);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.mark svg {
+  color: var(--fg-2);
+}
+
+.dot {
+  flex: none;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.dot.bad {
+  background: var(--danger);
+}
+.dot.idle {
+  background: var(--faint);
+}
+
+/* A speed measured from this computer's own calls: dashed, so it reads as observed rather than listed. */
+.tag.measured {
+  border-style: dashed;
+}
+
+/* ---- the list in the Models tab ---- */
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-5) 0 var(--s-3);
+}
+.section-head h3 {
+  margin: 0;
+}
+.plist {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.plist-empty {
+  margin: 0;
+  padding: var(--s-5);
+  text-align: center;
+}
+.prow + .prow {
+  border-top: 1px solid var(--border);
+}
+button.prow-head {
+  width: 100%;
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) 14px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  font-weight: 400;
+}
+button.prow-head:hover:not(:disabled) {
+  background: var(--hover);
+}
+.prow-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prow-name {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-weight: 600;
+}
+.pstatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pstatus.error {
+  color: var(--danger);
+}
+.prow .chev {
+  flex: none;
+  color: var(--muted);
+  transition: transform var(--fade) var(--ease-out);
+}
+.prow.open .chev {
+  transform: rotate(90deg);
+}
+.prow-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: 0 14px 14px 58px;
+  animation: rise-in var(--spring-soft-ms) var(--spring-soft);
+}
+.prow-body p {
+  margin: 0;
+}
+.kv {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 4px var(--s-3);
+  margin: 0;
+  font-size: 13px;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---- the Add a provider dialog ---- */
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  /* Under popovers (1000), so a Select inside the dialog opens above it. */
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  padding: var(--s-5);
+  background: rgba(0, 0, 0, 0.18);
+  animation: modal-fade 160ms ease-out;
+}
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+.modal {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: var(--popover);
+  backdrop-filter: var(--popover-blur);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  animation: modal-in var(--spring-gentle-ms) var(--spring-gentle);
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.modal-head h3 {
+  flex: 1;
+  margin: 0;
+  font: 600 17px var(--font-display);
+}
+.modal > p {
+  margin: 0;
+}
+.preset-search,
+.model-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--muted);
+}
+.preset-search input,
+.model-search input {
+  flex: 1;
+  min-width: 0;
+}
+.preset-group h4 {
+  margin: var(--s-2) 2px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.preset-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+}
+button.preset-tile {
+  height: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border);
+  text-align: left;
+  font-weight: 400;
+  white-space: normal;
+}
+button.preset-tile:hover:not(:disabled) {
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border-hover);
+}
+button.preset-tile:disabled {
+  opacity: 0.55;
+}
+.preset-tile .mark {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.preset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.preset-text strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.preset-text > span {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+@media (max-width: 560px) {
+  .preset-tiles {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- the form a provider needs (the dialog, a row, setup) ---- */
+
+.provider-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.provider-form p {
+  margin: 0;
+}
+.callout {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--fg-2);
+}
+.found {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 13px;
+}
+
+/* ---- the model picker ---- */
+
+.model-trigger {
+  width: 100%;
+}
+.model-trigger .trigger-value {
+  flex: 1;
+}
+.model-trigger .clip1 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The provider never shrinks; the model name ends in "…" first. */
+.model-trigger .via {
+  flex: none;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.popover.model-pop {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  overflow: hidden;
+}
+.model-pop .model-search {
+  flex: none;
+  padding: 2px 4px 6px;
+}
+.model-pop .pop-menu {
+  min-height: 0;
+  max-height: 340px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.model-none {
+  margin: 0;
+  padding: var(--s-2);
+}
+
+/* ---- setup's Connect step ---- */
+
+.provider-choices .choice-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.provider-choices .choice-head .mark {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.setup-choices.provider-choices svg {
+  margin-bottom: 0;
+}
+.provider-choices button.wide {
+  grid-column: 1 / -1;
+}
+.provider-choices .ok-line {
+  font-size: 12.5px;
+  color: var(--ok);
+}
+button.more-providers {
+  width: 100%;
+  height: 44px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed var(--border-strong);
+}
+button.more-providers:hover:not(:disabled) {
+  background: var(--hover);
+}
+button.more-providers .muted {
+  font-weight: 400;
+}

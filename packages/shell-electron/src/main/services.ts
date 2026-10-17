@@ -6,20 +6,27 @@ import {
   CalendarRepo,
   DEFAULT_BLOCK_LIST,
   DEFAULT_HOTKEY_ONLY,
+  CUSTOM_PRESET,
+  LEGACY_PROVIDERS,
   LOCAL_PRESETS,
   LOCAL_PROVIDER,
   LocalProvider,
   Metrics,
-  PROVIDER_ORDER,
-  PROVIDERS,
+  PRESET_BY_ID,
+  PRESETS,
   PeopleRepo,
   ProviderKeyError,
   SaveService,
   SettingsSchema,
   Store,
+  createModel as createProviderModel,
+  detectApi,
   isLoopbackUrl,
   isoNow,
+  listModels as listProviderModels,
+  sdkOf,
   toLlmCallRow,
+  toRef,
   CALL_LOG_DAYS,
   normalizeBaseUrl,
   parseRef,
@@ -27,15 +34,21 @@ import {
   updateLocalModel,
   updateRoles,
   type CatalogModel,
-  type KeyStatus,
   type KeyTestResult,
+  type LocalFound,
   type LocalStatus,
   type ModelRef,
   type ModelsRefreshResult,
+  type PresetInfo,
+  type Price,
+  type ProviderAddArgs,
+  type ProviderConnection,
+  type ProviderStatus,
   type RoleSetArgs,
   type Settings,
   type SettingsKey,
   type SettingsView,
+  type Speed,
 } from '@glossly/core';
 import { EmbedHost } from './embed-host';
 import { KeyStore } from './keys';
@@ -44,6 +57,24 @@ import { userDataPath } from './paths';
 
 const log = logger('services');
 const CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Measured speeds are worked out from the metrics at most this often. */
+const SPEEDS_MAX_AGE_MS = 10 * 60 * 1000;
+
+/** The listed price a model row keeps (decision 79); rows saved before it hold other fields. */
+function storedPrice(stored: Record<string, unknown>): Price | null {
+  const p = stored.price as Partial<Price> | undefined;
+  return p && typeof p.input === 'number' && typeof p.output === 'number' ? { input: p.input, output: p.output } : null;
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+};
+
+const fail = (error: string): KeyTestResult => ({ ok: false, models: 0, error, at: isoNow() });
 
 /** sqlite-vec's DLL lives inside app.asar.unpacked when packaged. */
 function vecPath(): string {
@@ -66,6 +97,7 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
   readonly embed: EmbedHost;
   private settingsCache: Settings;
   private readonly lastTests = new Map<string, KeyTestResult>();
+  private speedCache: { at: number; speeds: Record<string, Speed> } | null = null;
 
   constructor() {
     super();
@@ -85,22 +117,35 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     this.metrics = new Metrics(store);
     this.keys = new KeyStore(userDataPath('keys'));
     this.settingsCache = store.getSettings();
-    for (const p of [...PROVIDER_ORDER, LOCAL_PROVIDER]) {
+    this.addLegacyProviders();
+    for (const p of [...this.settingsCache.providers.map((c) => c.id), LOCAL_PROVIDER]) {
       const test = JSON.parse(store.getMeta(`key_test:${p}`) ?? 'null') as KeyTestResult | null;
       if (test) this.lastTests.set(p, test);
     }
 
     this.llm = new AiSdkLlm({
       settings: () => this.settingsCache,
-      // The local server needs no key; it is usable once an address is saved.
-      apiKey: (p) => (p === LOCAL_PROVIDER ? (this.settingsCache.local.baseUrl === null ? null : '') : this.keys.get(p)),
+      // The local server needs no key; it is usable once an address is saved. So is a Custom provider added without one.
+      apiKey: (p) => {
+        if (p === LOCAL_PROVIDER) return this.settingsCache.local.baseUrl === null ? null : '';
+        const conn = this.connection(p);
+        if (!conn) return null;
+        return this.keys.get(p) ?? (conn.preset === CUSTOM_PRESET ? '' : null);
+      },
       createModel: (ref, key) => {
         const { provider, modelId } = parseRef(ref);
         const baseUrl = this.settingsCache.local.baseUrl;
         if (provider === LOCAL_PROVIDER && baseUrl) return LocalProvider.createModel(baseUrl, modelId);
-        const info = PROVIDERS[provider];
-        if (!info) throw new Error(`Unknown provider: ${provider}`);
-        return info.createModel(key, modelId);
+        const conn = this.connection(provider);
+        if (!conn) throw new Error(`Unknown provider: ${provider}`);
+        return createProviderModel(conn, key, modelId);
+      },
+      // Ramp Router and a Custom provider on the Responses API take OpenAI's options (decision 79).
+      optionsKey: (p) => {
+        const conn = this.connection(p);
+        if (!conn) return null;
+        const sdk = sdkOf(conn);
+        return sdk === 'groq' ? 'groq' : sdk === 'openai' || sdk === 'responses' ? 'openai' : null;
       },
       // Which call moved from which model, and why (decision 60): codes only.
       onFallback: (f) => this.metrics.record('llm_fallback', { ...f, status: f.status ?? 'none' }),
@@ -151,23 +196,63 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     return this.store.listCollections().map((c) => c.name);
   }
 
-  catalog(): CatalogModel[] {
-    return this.store.listModels().map((m) => toCatalogModel(m.provider, m.model_id, m.display_name));
+  /** Each model's measured speed (decision 79), worked out from the metrics at most every 10 minutes. */
+  private speeds(): Record<string, Speed> {
+    const now = Date.now();
+    if (!this.speedCache || now - this.speedCache.at > SPEEDS_MAX_AGE_MS) {
+      let speeds: Record<string, Speed> = {};
+      try {
+        speeds = this.metrics.modelSpeeds();
+      } catch (e) {
+        log.warn('measured speeds failed', { name: (e as Error)?.name ?? 'error' });
+      }
+      this.speedCache = { at: now, speeds };
+    }
+    return this.speedCache.speeds;
   }
 
-  keyStatuses(): KeyStatus[] {
-    return PROVIDER_ORDER.map((id) => {
-      const p = PROVIDERS[id]!;
+  catalog(): CatalogModel[] {
+    const speeds = this.speeds();
+    return this.store
+      .listModels()
+      .map((m) => toCatalogModel(m.provider, m.model_id, m.display_name, { price: storedPrice(m.capabilities), measured: speeds[toRef(m.provider, m.model_id)] ?? null }));
+  }
+
+  /** An added hosted provider by id. */
+  private connection(id: string): ProviderConnection | undefined {
+    return this.settingsCache.providers.find((c) => c.id === id);
+  }
+
+  /** Keys saved before providers were added from a list (decision 79) become added providers, once. */
+  private addLegacyProviders(): void {
+    const have = new Set(this.settingsCache.providers.map((c) => c.id));
+    const add = LEGACY_PROVIDERS.filter((p) => !have.has(p) && this.keys.has(p)).map((p): ProviderConnection => ({ id: p, preset: p }));
+    if (add.length === 0) return;
+    this.setSetting('providers', [...this.settingsCache.providers, ...add]);
+    log.info('keys moved to added providers', { count: add.length });
+  }
+
+  providerStatuses(): ProviderStatus[] {
+    return this.settingsCache.providers.map((c) => {
+      const p = PRESET_BY_ID[c.preset];
       return {
-        provider: id,
-        label: p.label,
-        keyUrl: p.keyUrl,
-        free: p.free,
-        keyPlaceholder: p.keyPlaceholder,
-        hasKey: this.keys.has(id),
-        lastTest: this.lastTests.get(id) ?? null,
+        id: c.id,
+        preset: c.preset,
+        label: c.label ?? p?.label ?? c.id,
+        baseUrl: c.preset === CUSTOM_PRESET ? (c.baseUrl ?? null) : null,
+        api: c.preset === CUSTOM_PRESET ? (c.api ?? null) : null,
+        via: p?.via ?? true,
+        free: p?.free ?? false,
+        keyUrl: p?.keyUrl ?? '',
+        keyPlaceholder: p?.keyPlaceholder ?? '',
+        hasKey: this.keys.has(c.id),
+        lastTest: this.lastTests.get(c.id) ?? null,
       };
     });
+  }
+
+  presets(): PresetInfo[] {
+    return PRESETS.map(({ knownModels: _known, ...p }) => p);
   }
 
   localStatus(): LocalStatus {
@@ -179,7 +264,8 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     return {
       settings: this.settingsCache,
       collections: this.collections(),
-      keys: this.keyStatuses(),
+      providers: this.providerStatuses(),
+      presets: this.presets(),
       local: this.localStatus(),
       models: this.catalog(),
       embed: this.embed.getStatus(),
@@ -205,7 +291,7 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
    * settings back to their defaults, so the app is back at first-run setup. Saved data stays.
    */
   resetSettings(): void {
-    for (const p of PROVIDER_ORDER) {
+    for (const p of new Set([...this.settingsCache.providers.map((c) => c.id), ...LEGACY_PROVIDERS, ...this.keys.providers()])) {
       this.keys.remove(p);
       this.store.setMeta(`key_test:${p}`, 'null');
     }
@@ -225,51 +311,107 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     return r;
   }
 
-  /** Lists the provider's models with the key: the live key test. Stores the catalog on success. */
-  private async testWith(provider: string, key: string): Promise<KeyTestResult> {
-    const info = PROVIDERS[provider];
-    if (!info) return { ok: false, models: 0, error: 'Unknown provider', at: isoNow() };
+  /** Lists the provider's models with the key: the live key test. Stores the catalog, with any listed prices, on success. */
+  private async testWith(conn: ProviderConnection, key: string): Promise<KeyTestResult> {
     try {
-      const models = await info.listModels(key);
+      const models = await listProviderModels(conn, key);
+      if (models.length === 0) return fail('The key works, but it has no chat models to use.');
       this.store.replaceModels(
-        provider,
-        models.map((m) => ({ model_id: m.modelId, display_name: m.displayName, capabilities: (m.capabilities ?? {}) as Record<string, unknown> })),
+        conn.id,
+        models.map((m) => ({ model_id: m.modelId, display_name: m.displayName, capabilities: m.price ? { price: m.price } : {} })),
       );
       return { ok: true, models: models.length, at: isoNow() };
     } catch (e) {
       if (e instanceof ProviderKeyError) return { ok: false, models: 0, error: e.message, status: e.status, at: isoNow() };
-      return { ok: false, models: 0, error: 'The key test failed unexpectedly.', at: isoNow() };
+      return fail('The key test failed unexpectedly.');
     }
   }
 
-  async addKey(provider: string, key: string): Promise<KeyTestResult> {
-    const trimmed = key.trim();
-    if (!trimmed) return { ok: false, models: 0, error: 'Paste a key first.', at: isoNow() };
-    const r = await this.testWith(provider, trimmed);
-    if (r.ok) {
-      this.keys.set(provider, trimmed);
-      this.applyRoleUpdate();
-      log.info('key added', { provider, models: r.models });
+  /** The next free "custom-N". */
+  private nextCustomId(): string {
+    const used = this.settingsCache.providers.map((c) => /^custom-(\d+)$/.exec(c.id)?.[1]).filter(Boolean).map(Number);
+    return `custom-${Math.max(0, ...used) + 1}`;
+  }
+
+  /**
+   * Adds a hosted provider, or replaces the key or address of one already added (decision 79).
+   * Saved only when listing its models with the key works. A Custom provider with no way of
+   * talking given finds out first; one with no key typed keeps the key it had.
+   */
+  async addProvider(a: ProviderAddArgs): Promise<KeyTestResult> {
+    const preset = PRESET_BY_ID[a.preset];
+    if (!preset || preset.group === 'local') return fail('Unknown provider.');
+    const custom = preset.id === CUSTOM_PRESET;
+    const existing = a.id ? this.connection(a.id) : custom ? undefined : this.connection(preset.id);
+    if (a.id && (!existing || existing.preset !== preset.id)) return fail('That provider is no longer added.');
+    const id = existing?.id ?? (custom ? this.nextCustomId() : preset.id);
+    const key = a.key?.trim() || (existing ? (this.keys.get(id) ?? '') : '');
+    if (!custom && !key) return fail('Paste a key first.');
+
+    let conn: ProviderConnection = { id, preset: preset.id };
+    if (custom) {
+      const baseUrl = normalizeBaseUrl(a.baseUrl ?? existing?.baseUrl ?? '');
+      if (!baseUrl) return fail('Type an address, such as https://llm.example.com/v1.');
+      const label = ((a.label ?? existing?.label ?? '').trim() || hostOf(baseUrl)).slice(0, 60);
+      let api = a.api;
+      if (!api) {
+        try {
+          api = await detectApi(baseUrl, key);
+        } catch (e) {
+          return fail(e instanceof ProviderKeyError ? e.message : "Couldn't tell how that address talks.");
+        }
+      }
+      conn = { id, preset: CUSTOM_PRESET, label, baseUrl, api };
     }
-    return this.recordTest(provider, r);
-  }
 
-  async testKey(provider: string): Promise<KeyTestResult> {
-    const key = this.keys.get(provider);
-    if (!key) return this.recordTest(provider, { ok: false, models: 0, error: 'No key saved.', at: isoNow() });
-    const r = await this.testWith(provider, key);
-    if (r.ok) this.applyRoleUpdate();
-    return this.recordTest(provider, r);
-  }
-
-  removeKey(provider: string): void {
-    if (!(provider in PROVIDERS)) return;
-    this.keys.remove(provider);
-    this.store.removeProviderModels(provider);
-    this.lastTests.delete(provider);
-    this.store.setMeta(`key_test:${provider}`, 'null');
+    const r = await this.testWith(conn, key);
+    // A failed first try leaves nothing behind; a failed replace keeps the provider as it was.
+    if (!r.ok) return existing ? this.recordTest(id, r) : r;
+    if (key) this.keys.set(id, key);
+    else this.keys.remove(id);
+    const list = this.settingsCache.providers;
+    this.setSetting('providers', existing ? list.map((c) => (c.id === id ? conn : c)) : [...list, conn]);
     this.applyRoleUpdate();
-    log.info('key removed', { provider });
+    log.info(existing ? 'provider changed' : 'provider added', { provider: id, preset: preset.id, models: r.models, ...(conn.api && { api: conn.api }) });
+    return this.recordTest(id, { ...r, id });
+  }
+
+  async testProvider(id: string): Promise<KeyTestResult> {
+    const conn = this.connection(id);
+    if (!conn) return fail('That provider is no longer added.');
+    const key = this.keys.get(id) ?? '';
+    if (!key && conn.preset !== CUSTOM_PRESET) return this.recordTest(id, fail('No key saved.'));
+    const r = await this.testWith(conn, key);
+    if (r.ok) this.applyRoleUpdate();
+    return this.recordTest(id, r);
+  }
+
+  removeProvider(id: string): void {
+    if (!this.connection(id)) return;
+    this.keys.remove(id);
+    this.store.removeProviderModels(id);
+    this.lastTests.delete(id);
+    this.store.setMeta(`key_test:${id}`, 'null');
+    this.setSetting(
+      'providers',
+      this.settingsCache.providers.filter((c) => c.id !== id),
+    );
+    this.applyRoleUpdate();
+    log.info('provider removed', { provider: id });
+  }
+
+  /** Which local presets answer at their default address right now (a quick look, under 2 seconds). */
+  async detectLocal(): Promise<LocalFound[]> {
+    return Promise.all(
+      LOCAL_PRESETS.map(async (p): Promise<LocalFound> => {
+        try {
+          const models = await LocalProvider.listModels(p.baseUrl, fetch, AbortSignal.timeout(1500));
+          return { preset: p.id, baseUrl: p.baseUrl, models: models.length, running: true };
+        } catch {
+          return { preset: p.id, baseUrl: p.baseUrl, models: 0, running: false };
+        }
+      }),
+    );
   }
 
   // ---- the local model server ----
@@ -331,8 +473,8 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
 
   async refreshModels(): Promise<ModelsRefreshResult> {
     const errors: ModelsRefreshResult['errors'] = [];
-    for (const provider of this.keys.providers()) {
-      const r = await this.testKey(provider);
+    for (const { id: provider } of this.settingsCache.providers) {
+      const r = await this.testProvider(provider);
       if (!r.ok) errors.push({ provider, message: r.error ?? 'Failed' });
     }
     if (this.settingsCache.local.baseUrl) {
@@ -353,7 +495,7 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
   /** On launch: re-fit automatic roles to the catalog we have (decision 60), then refresh it when it is older than 24 hours. */
   async refreshIfStale(): Promise<void> {
     this.applyRoleUpdate();
-    if (this.keys.providers().length === 0 && !this.settingsCache.local.baseUrl) return;
+    if (this.settingsCache.providers.length === 0 && !this.settingsCache.local.baseUrl) return;
     const fetched = this.store.listModels().map((m) => Date.parse(m.fetched_at));
     const oldest = fetched.length ? Math.min(...fetched) : 0;
     if (Date.now() - oldest < CATALOG_MAX_AGE_MS) return;

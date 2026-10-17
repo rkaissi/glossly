@@ -18,6 +18,24 @@ export const RoleAssignmentSchema = z.object({
 });
 export type RoleAssignment = z.infer<typeof RoleAssignmentSchema>;
 
+/** How a custom provider talks (decision 79): OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages. */
+export const ApiStyleSchema = z.enum(['chat', 'responses', 'anthropic']);
+export type ApiStyle = z.infer<typeof ApiStyleSchema>;
+
+/**
+ * A provider the user added (decision 79). `id` is the provider in model refs and names the key
+ * file: the preset's id, or "custom-N" for Custom, which also keeps a name, an address, and how
+ * it talks. The local server isn't one of these; it stays in `local`.
+ */
+export const ProviderConnectionSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+  preset: z.string().min(1),
+  label: z.string().max(60).optional(),
+  baseUrl: z.string().url().optional(),
+  api: ApiStyleSchema.optional(),
+});
+export type ProviderConnection = z.infer<typeof ProviderConnectionSchema>;
+
 export const PrivacySchema = z.enum(['all', 'local']);
 export type Privacy = z.infer<typeof PrivacySchema>;
 
@@ -57,6 +75,8 @@ export const SettingsSchema = z.object({
    * are refused (decision 12). A third choice (a subscription) may join later.
    */
   privacy: PrivacySchema.default('all'),
+  /** The hosted providers the user added, in the order added (decision 79). Keys live in the key store, by id. */
+  providers: z.array(ProviderConnectionSchema).default([]),
   /**
    * The local model server (Ollama, LM Studio, or any OpenAI-compatible endpoint). baseUrl null
    * means none is set up. `model` is what Local only uses for any call whose role model isn't

@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Glossly providers redesign</title>
+<!-- packages/ui/src/theme.css, inlined so the page renders anywhere -->
+<style>
+/*
+ * Shared tokens for the overlay and the settings window (Step 13 redesign, Step 20.1 scale).
+ * Monochrome: no accent color anywhere (Rayan kept it in Step 20.1, decision 39). Light and dark follow the system theme. The windows themselves are
+ * Windows 11 acrylic (overlay) and mica (settings); `--glass` is the tint laid over them so
+ * text stays readable on busy backgrounds.
+ */
+:root {
+  color-scheme: light;
+  --fg: #0d0d0d;
+  --fg-2: #4b4b4b;
+  --muted: #7a7a7a;
+  --faint: #a3a3a3;
+  --glass: rgba(255, 255, 255, 0.58);
+  /* Used where there is no acrylic or mica behind (Windows 10, the dot). */
+  --glass-solid: rgba(250, 250, 250, 0.97);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(0, 0, 0, 0.035);
+  --hover: rgba(0, 0, 0, 0.055);
+  --pressed: rgba(0, 0, 0, 0.09);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --primary: #0d0d0d;
+  --primary-fg: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ring: rgba(0, 0, 0, 0.42);
+  --select: rgba(0, 0, 0, 0.12);
+  --danger: #b42318;
+  --ok: #1f7a43;
+  --warn: #8a5a00;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --danger-solid: #c2463a;
+  --danger-solid-hover: #b03e33;
+  --border-hover: rgba(0, 0, 0, 0.34);
+  --toggle-on-hover: #404040;
+  --seg-thumb: #ffffff;
+  --popover: rgba(252, 252, 252, 0.94);
+  --popover-blur: saturate(1.6) blur(28px);
+  --shadow-lg: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12);
+  /* The scale (Step 20.1): a 4 px grid, three control heights, two icon sizes, one radius scale. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --h-sm: 28px;
+  /* Quiet buttons inside the overlay's dense panel rows (Copy, Edit, Redo, Undo). */
+  --h-xs: 26px;
+  --h-md: 32px;
+  --h-lg: 36px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --row-h: 40px;
+  --row-px: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --fade: 150ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /*
+   * Motion (Step 20.3, decision 41): damped springs sampled into linear() curves (the spring()
+   * generator is in docs/design/mockups/20-3-design-pass.html). Soft for things that appear,
+   * pop for small things (checks, presses), gentle for big things (panels). Exits ease in, fast,
+   * with no bounce.
+   */
+  --spring-soft: linear(0, 0.019, 0.067, 0.136, 0.218, 0.306, 0.395, 0.483, 0.566, 0.642, 0.711, 0.772, 0.825, 0.871, 0.909, 0.94, 0.965, 0.985, 1, 1.011, 1.019, 1.024, 1.027, 1.028, 1.028, 1.027, 1.025, 1.023, 1.02, 1.018, 1.015, 1.013, 1.011, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+  --spring-soft-ms: 470ms; /* 2.8% overshoot */
+  --spring-pop: linear(0, 0.03, 0.108, 0.216, 0.338, 0.464, 0.586, 0.697, 0.794, 0.876, 0.942, 0.992, 1.029, 1.054, 1.069, 1.075, 1.075, 1.071, 1.064, 1.055, 1.046, 1.036, 1.028, 1.02, 1.013, 1.007, 1.003, 0.999, 0.997, 0.995, 0.995, 0.994, 0.994, 0.995, 0.995, 0.996, 0.997, 0.998, 0.998, 0.999, 1);
+  --spring-pop-ms: 510ms; /* 7.5% overshoot */
+  --spring-gentle: linear(0, 0.021, 0.073, 0.146, 0.231, 0.321, 0.411, 0.498, 0.578, 0.651, 0.717, 0.774, 0.823, 0.865, 0.899, 0.928, 0.95, 0.969, 0.983, 0.993, 1.001, 1.006, 1.01, 1.012, 1.013, 1.013, 1.013, 1.012, 1.011, 1.01, 1.009, 1.008, 1.006, 1.005, 1.004, 1.004, 1.003, 1.002, 1.002, 1.001, 1);
+  --spring-gentle-ms: 580ms; /* 1.3% overshoot */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mono: 'Cascadia Mono', ui-monospace, Consolas, monospace;
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font: 14px/1.45 var(--font);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fg: #ececec;
+    --fg-2: #c2c2c2;
+    --muted: #949494;
+    --faint: #6b6b6b;
+    --glass: rgba(28, 28, 28, 0.5);
+    --glass-solid: rgba(36, 36, 36, 0.97);
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-2: rgba(255, 255, 255, 0.045);
+    --hover: rgba(255, 255, 255, 0.075);
+    --pressed: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --primary: #ececec;
+    --primary-fg: #0d0d0d;
+    --primary-hover: #ffffff;
+    --ring: rgba(255, 255, 255, 0.5);
+    --select: rgba(255, 255, 255, 0.16);
+    --danger: #ff8a80;
+    --ok: #7fd6a0;
+    --warn: #e8c070;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    --border-hover: rgba(255, 255, 255, 0.4);
+    --toggle-on-hover: #c4c4c4;
+    --seg-thumb: rgba(255, 255, 255, 0.12);
+    --popover: rgba(40, 40, 40, 0.92);
+    --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 16px rgba(0, 0, 0, 0.3), 0 24px 48px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Thin, quiet scrollbars instead of Windows' default ones with arrow buttons. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+::selection {
+  background: var(--select);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--h-md);
+  padding: 0 var(--s-3);
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 1px var(--border-strong) inset,
+    var(--shadow-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--fade) ease,
+    box-shadow var(--fade) ease,
+    opacity var(--fade) ease,
+    transform var(--spring-pop-ms) var(--spring-pop);
+}
+/* Press: a quick squish that springs back on release. */
+button:active:not(:disabled, [role='checkbox'], [role='switch'], [role='radio']) {
+  transform: scale(0.96);
+  transition: transform 80ms ease-out;
+}
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+button:active:not(:disabled) {
+  background: var(--pressed);
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button.sm {
+  height: var(--h-sm);
+  padding: 0 10px;
+  font-size: 13px;
+}
+button.lg {
+  height: var(--h-lg);
+  padding: 0 var(--s-4);
+}
+button.primary {
+  background: var(--primary);
+  color: var(--primary-fg);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    var(--shadow-sm);
+}
+button.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+button.ghost {
+  background: transparent;
+  box-shadow: none;
+}
+button.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+/* Destructive buttons are filled red (decision 38); the inline confirm stays. */
+button.danger {
+  background: var(--danger-solid);
+  border-color: transparent;
+  color: #fff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    var(--shadow-sm);
+}
+button.danger:hover:not(:disabled),
+button.danger:active:not(:disabled) {
+  background: var(--danger-solid-hover);
+}
+/* Icon buttons: 32 (or 28 with .sm) square, quiet until hovered; a delete one turns red on hover. */
+button.icon-btn {
+  width: var(--h-md);
+  height: var(--h-md);
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg-2);
+}
+button.icon-btn.sm {
+  width: var(--h-sm);
+  height: var(--h-sm);
+}
+button.icon-btn:hover:not(:disabled),
+button.icon-btn.open {
+  background: var(--hover);
+  color: var(--fg);
+}
+button.icon-btn.danger {
+  background: transparent;
+  color: var(--fg-2);
+  box-shadow: none;
+}
+button.icon-btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+/* Trash that grows into the filled red Delete in place (decision 46): quiet 28 px, then armed. */
+button.delete-btn {
+  height: var(--h-sm);
+  min-width: var(--h-sm);
+  padding: 0 7px;
+  gap: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg-2);
+  font-size: 13px;
+  transition:
+    background-color 180ms var(--ease-out),
+    color 180ms var(--ease-out),
+    padding var(--spring-soft-ms) var(--spring-soft),
+    gap var(--spring-soft-ms) var(--spring-soft),
+    transform var(--spring-pop-ms) var(--spring-pop);
+}
+button.delete-btn > span {
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-width var(--spring-soft-ms) var(--spring-soft),
+    opacity 150ms var(--ease-out);
+}
+button.delete-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+button.delete-btn.armed,
+button.delete-btn.armed:hover:not(:disabled) {
+  padding: 0 10px;
+  gap: 6px;
+  background: var(--danger-solid);
+  color: #fff;
+}
+button.delete-btn.armed:hover:not(:disabled) {
+  background: var(--danger-solid-hover);
+}
+button.delete-btn.armed > span {
+  max-width: 72px;
+  opacity: 1;
+}
+/* Sits in the row it confirms (which may tint red); the red button is the warning, no outline. */
+.confirm.inline {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+button svg {
+  flex: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+input[type='text'],
+input[type='password'],
+input:not([type]),
+textarea {
+  height: var(--h-md);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  transition: border-color var(--fade) ease;
+}
+textarea {
+  height: auto;
+  padding: 8px 10px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--ring);
+}
+kbd {
+  font: 11px/16px var(--mono);
+  min-width: 18px;
+  padding: 0 4px;
+  text-align: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+}
+
+a {
+  color: inherit;
+}
+
+.muted {
+  color: var(--muted);
+}
+.error {
+  color: var(--danger);
+}
+.ok {
+  color: var(--ok);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Shared motion (decision 41): rise in on the soft spring; pop in for small things; the squash
+   and pop of a check (anticipation, past full size, settle). */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes pop-in-small {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.92);
+  }
+}
+@keyframes squash-pop {
+  0% {
+    transform: scale(1);
+  }
+  22% {
+    transform: scale(0.82, 0.88);
+  }
+  55% {
+    transform: scale(1.18);
+  }
+  75% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+}
+</style>
+<style>
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --fg: #ececec; --fg-2: #c2c2c2; --muted: #949494; --faint: #6b6b6b;
+  --surface: rgba(255,255,255,.055); --surface-2: rgba(255,255,255,.045); --hover: rgba(255,255,255,.075); --pressed: rgba(255,255,255,.12);
+  --border: rgba(255,255,255,.09); --border-strong: rgba(255,255,255,.18); --primary: #ececec; --primary-fg: #0d0d0d; --primary-hover: #fff;
+  --ring: rgba(255,255,255,.5); --danger: #ff8a80; --ok: #6fd39a; --warn: #f0c060; --seg-thumb: rgba(255,255,255,.12); --border-hover: rgba(255,255,255,.4);
+  --popover: rgba(40,40,40,.96); --shadow-lg: 0 0 0 1px rgba(255,255,255,.08), 0 8px 16px rgba(0,0,0,.3), 0 24px 48px rgba(0,0,0,.4);
+  --card: rgba(255,255,255,.045); --page: rgba(33,33,33,.86);
+}
+html[data-theme='light'] { color-scheme: light; --card: rgba(255,255,255,.9); --page: rgba(255,255,255,.84); }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: radial-gradient(1200px 700px at 15% 10%, #b9d3ee, transparent 60%), radial-gradient(900px 700px at 90% 80%, #e8c8d8, transparent 60%), #d8dde6;
+  padding: 72px 24px 48px;
+}
+html[data-theme='dark'] body { background: radial-gradient(1200px 700px at 15% 10%, #1d2b44, transparent 60%), radial-gradient(900px 700px at 90% 80%, #3a2233, transparent 60%), #15171c; }
+.topbar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; gap: 6px; padding: 6px; border-radius: 12px; background: var(--popover); backdrop-filter: var(--popover-blur); box-shadow: var(--shadow-lg); }
+.topbar button[aria-pressed='true'] { background: var(--pressed); }
+.page { max-width: 900px; margin: 0 auto; }
+section.part { display: none; }
+section.part.on { display: block; animation: tab-in 220ms var(--ease-out); }
+@keyframes tab-in { from { opacity: 0; transform: translateY(6px); } }
+.doc-h { font: 600 28px/1.2 var(--font-display); letter-spacing: -.01em; margin: 0 0 6px; }
+.lede { color: var(--fg-2); margin: 0 0 var(--s-5); max-width: 720px; }
+.notes { margin: var(--s-5) 0 0; padding: var(--s-4) var(--s-5); border-radius: var(--radius-md); background: var(--card); border: 1px solid var(--border); max-width: 720px; }
+.notes h3 { margin: 0 0 6px; font: 600 14px var(--font-display); }
+.notes ul { margin: 0; padding-left: 18px; color: var(--fg-2); font-size: 13px; line-height: 1.6; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+/* ---- the settings window, cut down ---- */
+.win { position: relative; display: grid; grid-template-columns: 168px 1fr; min-height: 640px; border-radius: var(--radius-lg); overflow: hidden; background: var(--page); backdrop-filter: blur(40px) saturate(1.4); box-shadow: var(--shadow-lg); }
+.win nav { padding: var(--s-4) var(--s-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.win nav a { padding: 6px 10px; border-radius: 6px; color: var(--fg-2); text-decoration: none; font-size: 13px; }
+.win nav a.on { background: var(--pressed); color: var(--fg); }
+.win main { padding: var(--s-5) 28px 40px; overflow: auto; max-height: 760px; }
+.win h2 { font: 600 22px var(--font-display); margin: 0 0 4px; }
+.win h3 { font: 600 15px var(--font-display); margin: 32px 0 var(--s-3); display: flex; align-items: center; gap: 8px; }
+.win h3 .spacer { flex: 1; }
+.muted { color: var(--muted); } .small { font-size: 12.5px; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .error { color: var(--danger); }
+.tag { display: inline-flex; align-items: center; height: 20px; font-size: 11.5px; padding: 0 7px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--fg-2); white-space: nowrap; }
+.tag.accent { background: var(--pressed); border-color: transparent; color: var(--fg); }
+.mono { width: 32px; height: 32px; flex: none; border-radius: 9px; display: grid; place-items: center; font: 600 13px var(--font-display); color: var(--fg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+.mono svg { width: 16px; height: 16px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; display: inline-block; }
+.dot.bad { background: var(--danger); } .dot.idle { background: var(--faint); }
+
+/* provider list */
+.plist { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; }
+.prow { border-top: 1px solid var(--border); }
+.prow:first-child { border-top: 0; }
+.prow-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+.prow-head:hover { background: var(--hover); }
+.prow-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.prow-main .name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.prow-main .status { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.chev { color: var(--muted); transition: transform 200ms var(--ease-out); }
+.prow.open .chev { transform: rotate(90deg); }
+.prow-body { display: none; padding: 0 14px 14px 58px; flex-direction: column; gap: 10px; }
+.prow.open .prow-body { display: flex; animation: tab-in 200ms var(--ease-out); }
+.prow.new { animation: row-in var(--spring-soft-ms) var(--spring-soft); }
+@keyframes row-in { from { opacity: 0; transform: translateY(-6px); } }
+.kv { display: grid; grid-template-columns: 90px 1fr; gap: 4px 12px; font-size: 13px; }
+.kv span:nth-child(odd) { color: var(--muted); }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.empty { padding: 28px; text-align: center; color: var(--muted); }
+
+/* roles */
+.roles { display: flex; flex-direction: column; gap: 10px; }
+/* Name and description on top, then Model and Fallback side by side with labels (like role-pickers today). */
+.role { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.role p { margin: 2px 0 0; }
+.role-pickers { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+/* In a narrow window, Model and Fallback stack, so each one keeps a full-width box. */
+.role { container-type: inline-size; }
+@container (max-width: 440px) { .role-pickers { grid-template-columns: minmax(0, 1fr); } }
+.role-pickers label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fake-select { height: 32px; border-radius: 8px; padding: 0 8px 0 10px; display: flex; align-items: center; gap: 8px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-strong); font-size: 13px; cursor: pointer; white-space: nowrap; min-width: 0; }
+/* The model name shrinks with an ellipsis; the provider and chevron never do. */
+.fake-select .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fake-select .via { flex: none; color: var(--muted); font-size: 12px; }
+.fake-select .cv { flex: none; color: var(--muted); }
+.fake-select:hover { box-shadow: inset 0 0 0 1px var(--border-hover); }
+.fake-select[aria-expanded='true'] { box-shadow: inset 0 0 0 1.5px var(--ring); }
+.adv { margin-top: 12px; color: var(--fg-2); font-size: 13px; }
+
+/* model picker popover: fixed to the viewport, so no window edge clips it; opens upward when there's no room below */
+.picker { position: fixed; z-index: 90; width: 340px; background: var(--popover); backdrop-filter: var(--popover-blur); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 6px; display: none; flex-direction: column; }
+.picker.on { display: flex; animation: pop-in 180ms var(--ease-out); }
+.picker.up { animation-name: pop-up; }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes pop-up { from { opacity: 0; transform: translateY(4px) scale(.98); } }
+.picker input { width: 100%; box-sizing: border-box; margin-bottom: 6px; flex: none; }
+.picker .scroll { overflow: auto; min-height: 0; }
+.picker .opt.on { font-weight: 600; }
+.picker .grp { font-size: 11.5px; color: var(--muted); padding: 8px 8px 4px; text-transform: uppercase; letter-spacing: .04em; }
+.picker .opt { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.picker .opt:hover { background: var(--hover); }
+.picker .opt .badges { margin-left: auto; display: inline-flex; gap: 4px; flex: none; }
+/* A speed measured from your own calls: dashed, so it reads as observed rather than listed. */
+.tag.measured { border-style: dashed; }
+.picker .legend { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px; margin-top: 4px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.picker .more { padding: 6px 8px; font-size: 12.5px; color: var(--muted); }
+
+/* add-provider dialog */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.18); display: none; place-items: center; z-index: 50; }
+html[data-theme='dark'] .scrim { background: rgba(0,0,0,.45); }
+.scrim.on { display: grid; animation: fade 160ms ease-out; }
+@keyframes fade { from { opacity: 0; } }
+.dialog { width: min(560px, calc(100% - 48px)); max-height: calc(100% - 64px); overflow: auto; background: var(--popover); backdrop-filter: var(--popover-blur); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 20px; animation: dlg-in var(--spring-gentle-ms) var(--spring-gentle); }
+@keyframes dlg-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.dialog-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.dialog-head h4 { margin: 0; font: 600 17px var(--font-display); flex: 1; }
+.icon-btn { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; background: transparent; box-shadow: none; }
+.icon-btn svg { width: 16px; height: 16px; }
+.dialog .search { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+.cat { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 14px 2px 6px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile { all: unset; box-sizing: border-box; display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; background: var(--card); box-shadow: inset 0 0 0 1px var(--border); cursor: pointer; }
+.tile:hover { box-shadow: inset 0 0 0 1px var(--border-hover); }
+.tile:focus-visible { box-shadow: inset 0 0 0 1.5px var(--ring); }
+.tile[aria-checked='true'] { box-shadow: inset 0 0 0 1.5px var(--fg); }
+.tile.added { opacity: .55; cursor: default; }
+.tile .t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tile strong { font-weight: 600; font-size: 13.5px; display: flex; gap: 6px; align-items: center; }
+.tile span.d { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.tile .mono { width: 28px; height: 28px; font-size: 12px; border-radius: 8px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.field label { display: flex; justify-content: space-between; font-size: 13px; color: var(--fg-2); }
+.field input { width: 100%; box-sizing: border-box; }
+.keyline { display: flex; gap: 8px; }
+.keyline input { flex: 1; }
+.callout { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 12.5px; color: var(--fg-2); line-height: 1.5; }
+.dialog-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.found { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+
+/* setup */
+.setup { position: relative; max-width: 620px; margin: 0 auto; min-height: 600px; border-radius: var(--radius-lg); background: var(--page); backdrop-filter: blur(40px) saturate(1.4); box-shadow: var(--shadow-lg); padding: 28px 40px 24px; display: flex; flex-direction: column; }
+.setup-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 28px; }
+.setup-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); }
+.setup-dots span.on { width: 18px; border-radius: 3px; background: var(--fg); }
+.setup-dots span.done { background: var(--fg-2); }
+.setup h1 { font: 600 26px/1.2 var(--font-display); margin: 0 0 6px; }
+.setup .sub { color: var(--fg-2); margin: 0 0 20px; }
+.setup .tiles { grid-template-columns: 1fr 1fr; }
+.setup .tile { padding: 14px; }
+.setup .tile.wide { grid-column: 1 / -1; }
+/* "More providers": a full-width quiet button under the tiles, dashed so it reads as "add", not as a fifth choice. */
+.more-btn { margin-top: 8px; width: 100%; height: 44px; justify-content: flex-start; gap: 10px; padding: 0 14px; border-radius: 10px; background: transparent; box-shadow: none; border: 1px dashed var(--border-strong); font-weight: 600; }
+.more-btn:hover:not(:disabled) { background: var(--hover); }
+.more-btn .muted { font-weight: 400; }
+.setup select, .dialog select { height: 32px; border-radius: 8px; padding: 0 8px; background: var(--surface); color: var(--fg); border: 0; box-shadow: inset 0 0 0 1px var(--border-strong); font: inherit; }
+.connected { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ok); }
+.linkish { all: unset; cursor: pointer; color: var(--fg-2); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
+.linkish:hover { color: var(--fg); }
+.setup-foot { margin-top: auto; padding-top: 24px; display: flex; justify-content: space-between; align-items: center; }
+.setup-pane { animation: tab-in 220ms var(--ease-out); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="topbar" role="toolbar">
+  <button data-part="models" aria-pressed="true">Settings, Models</button>
+  <button data-part="setup" aria-pressed="false">Setup, Connect step</button>
+  <button data-part="how" aria-pressed="false">How it works</button>
+  <button id="theme" title="Light or dark">Light / dark</button>
+</div>
+
+<div class="page">
+
+<!-- ================= MODELS TAB ================= -->
+<section class="part on" id="part-models">
+  <h1 class="doc-h">Models tab: add providers from a list</h1>
+  <p class="lede">You only see the providers you've connected. <b>Add provider</b> opens a list to choose from, and each row opens to show its key, address, and actions. Model pickers search across every connected provider, so OpenRouter's hundreds of models stay usable. Click around: everything on this page responds.</p>
+  <div class="layout">
+    <div class="win" id="win">
+      <nav>
+        <a>General</a><a>Tasks</a><a>Calendar</a><a>People</a><a>Saved</a><a class="on">Models</a><a>Privacy</a><a>Data</a>
+      </nav>
+      <main>
+        <h2>Models</h2>
+        <p class="muted small" style="margin:0">Keys are encrypted on this computer and only go to their own provider.</p>
+
+        <h3>Providers <span class="spacer"></span><button class="primary" id="add-btn">+ Add provider</button></h3>
+        <div class="plist" id="plist"></div>
+
+        <h3>Which model does what</h3>
+        <p class="muted small" style="margin:-6px 0 12px">Glossly picks these from your providers. A model you choose stays.</p>
+        <div class="roles">
+          <div class="role">
+            <div><strong>Chat</strong><p class="muted small">Ask, Reply, and summaries. Use your best writer.</p></div>
+            <div class="role-pickers">
+              <label><span class="small muted">Model</span><div class="fake-select" data-pick><span class="nm">Claude Sonnet 5.5</span><span class="via">Anthropic</span><svg class="cv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></label>
+              <label><span class="small muted">Fallback</span><div class="fake-select" data-pick><span class="nm">Llama 4 Maverick 17B 128E Instruct</span><span class="via">Groq</span><svg class="cv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></label>
+            </div>
+          </div>
+          <div class="role">
+            <div><strong>Fast</strong><p class="muted small">Who is this, Tasks, Visualize, and saving.</p></div>
+            <div class="role-pickers">
+              <label><span class="small muted">Model</span><div class="fake-select" data-pick><span class="nm">Llama 3.3 70B Versatile</span><span class="via">Groq</span><svg class="cv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></label>
+              <label><span class="small muted">Fallback</span><div class="fake-select" data-pick><span class="nm">Gemini Flash</span><span class="via">Google</span><svg class="cv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></label>
+            </div>
+          </div>
+          <div class="role">
+            <div><strong>Decision</strong><p class="muted small">Suggests actions when the bar opens. Use a small, quick model.</p></div>
+            <div class="role-pickers">
+              <label><span class="small muted">Model</span><div class="fake-select" data-pick><span class="nm">Llama 3.1 8B Instant</span><span class="via">Groq</span><svg class="cv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></label>
+              <label><span class="small muted">Fallback</span><div class="fake-select" data-pick><span class="nm">None</span><svg class="cv" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div></label>
+            </div>
+          </div>
+        </div>
+        <p class="adv">▸ Use a different model for one action &nbsp;·&nbsp; ▸ On this computer (search model) &nbsp;·&nbsp; ▸ All available models</p>
+      </main>
+    </div>
+
+    <div class="notes" style="margin:0">
+      <h3>What to look at</h3>
+      <ul>
+        <li><b>Add provider</b>: the list is grouped by kind and searchable. Providers you've already added are greyed out, except Custom, which you can add more than once.</li>
+        <li>Pick one and the dialog asks only for what that provider needs: a key; a name, address, and key for Custom; or nothing for Ollama when it's already running.</li>
+        <li><b>Test and save</b> works as it does today: Glossly only saves a key that works, and roles get filled in once the first provider connects.</li>
+        <li>Click a provider row to see Test again, Replace key, and Remove.</li>
+        <li>Click a model box under "Which model does what" for the searchable picker. Long names end in "…", and the provider name and arrow always stay visible. The list opens upward when there's no room below and scrolls inside itself, so the window edge never cuts it off.</li>
+        <li>No logos: each provider gets a letter tile, since the app has no accent colors (decision 39).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SETUP ================= -->
+<section class="part" id="part-setup">
+  <h1 class="doc-h">Setup: the Connect step</h1>
+  <p class="lede">Four big choices instead of a tab strip: the two free providers first, then OpenAI and Anthropic. <b>More providers</b> opens the same list as Settings, right here in setup. Whatever you pick there joins the tiles, with its key field below. Once one provider works, Continue lights up. Under Local only this step stays as it is today, plus a note when Ollama is already running.</p>
+  <div class="setup" id="setup">
+    <div class="setup-dots"><span class="done"></span><span class="done"></span><span class="on"></span><span></span><span></span><span></span><span></span></div>
+    <h1>Connect a model</h1>
+    <p class="sub">Pick where Glossly's AI comes from. You can add more later in Settings, Models.</p>
+    <div class="tiles" id="setup-tiles" role="radiogroup"></div>
+    <button class="more-btn" id="setup-more">+ More providers <span class="muted small">xAI, DeepSeek, OpenRouter, Ollama, your own…</span></button>
+    <div id="setup-pane"></div>
+    <div class="setup-foot">
+      <button class="ghost lg">Back</button>
+      <button class="primary lg" id="setup-next" disabled>Continue</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HOW IT WORKS ================= -->
+<section class="part" id="part-how">
+  <h1 class="doc-h">How it works underneath</h1>
+  <p class="lede">The plan for building it, in the order I'd do it. Nothing here has been built yet. All of it runs on the AI SDK version we already use (<code>ai</code> 7). Each provider is one of four ways of talking to a model, plus its own address, key link, and model list.</p>
+  <div class="notes">
+    <h3>1. Four ways of talking to a model</h3>
+    <ul>
+      <li><b>Chat Completions</b> (<code>createOpenAICompatible</code>, already used for local servers): Groq, xAI, DeepSeek, Kimi, MiniMax, Mistral, Together, Fireworks, Baseten, OpenRouter, Vercel AI Gateway, Ollama, LM Studio.</li>
+      <li><b>OpenAI Responses</b> (<code>createOpenAI({ baseURL })</code>, already used for OpenAI): OpenAI and <b>Ramp Router</b>. Ramp's docs say it has no Chat Completions endpoint, so it needs this one.</li>
+      <li><b>Anthropic Messages</b> (<code>createAnthropic({ baseURL })</code>): Anthropic, and gateways that offer the Anthropic API (Ramp does too).</li>
+      <li><b>Google</b> (<code>@ai-sdk/google</code>, a new package): Gemini.</li>
+      <li>So a <b>preset</b> is just data: a name, an address, a key link, and one of the four. Adding another gateway or host takes one entry, with no new code.</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <h3>2. Presets, and the providers you've added</h3>
+    <ul>
+      <li><b>Presets</b> (the list in the dialog): Groq, Gemini, OpenAI, Anthropic, xAI, DeepSeek, Kimi, MiniMax, Mistral, OpenRouter, Vercel AI Gateway, Ramp Router, Together, Fireworks, Baseten, Ollama, LM Studio, Other local server, Custom.</li>
+      <li><b>Connections</b> (in settings): the ones you've added, like <code>{ id: 'openrouter', preset: 'openrouter' }</code> or <code>{ id: 'custom-1', preset: 'custom', label: 'Work gateway', baseUrl, api: 'chat' }</code>. Keys stay encrypted the way they are now, stored by connection id.</li>
+      <li><b>Model refs stay <code>connection:model</code>.</b> Today's Groq, OpenAI, and Anthropic keys become connections with the same ids, so a migration moves the keys over and every saved role and override keeps working.</li>
+      <li><b>Custom</b> asks for a name, an address, and an optional key. Test and save tries Chat Completions first, then Responses, and the result is shown, so you don't need to know which one a gateway speaks. You can still pick it yourself.</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <h3>3. What changes in the model layer</h3>
+    <ul>
+      <li><code>createModel</code> and <code>listModels</code> switch on the way of talking, not the provider name. Settings for reasoning effort and structured output (<code>llm.ts</code> lines 294 and 382 key them on <code>'groq'</code> and <code>'openai'</code>) switch the same way.</li>
+      <li>Structured output already copes with models it doesn't know: a model missing from <code>capabilities.json</code> gets JSON mode with a retry, the same as a local model. Gateway ids like <code>anthropic/claude-…</code> drop the <code>vendor/</code> prefix to find their known capabilities.</li>
+      <li>Ramp's model ids are specific to each account and come from its <code>/v1/models</code>, which we already call to test the key.</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <h3>4. Picking models when there are hundreds</h3>
+    <ul>
+      <li>The model picker gets a search box and opens in whichever direction has room. Models that are in use or have known capabilities come first, and the rest appear when you type.</li>
+      <li>Automatic role picking only chooses models listed in <code>capabilities.json</code>, so a gateway key never puts an untested model on a role by surprise.</li>
+      <li>A short privacy line for gateways, hosts, and Custom: "Text goes to this service, and from there to the model's maker."</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <h3>5. Model labels: what's known, what's listed, what's measured</h3>
+    <ul>
+      <li>Today every label (speed, cost, structured output, reasoning, and the hidden intelligence rank) comes from the hand-written <code>capabilities.json</code>. No benchmarks are fetched. That list stays the only source of the <b>rank</b> and of <b>structured output</b>, so it alone decides what Glossly picks for you.</li>
+      <li><b>Known through a gateway.</b> Gateway ids drop their <code>vendor/</code> prefix (and Ramp's <code>provider:</code> prefix) before the lookup, so <code>openai/gpt-5-mini</code> gets the same labels as <code>gpt-5-mini</code>.</li>
+      <li><b>Cost from the provider's own list.</b> When the model list has prices (OpenRouter's does), a model with no entry still gets Low, Medium, or High cost from those prices. Thresholds are set per million tokens. A listed entry's cost wins over this.</li>
+      <li><b>Speed from your own calls.</b> Each call already records how long it took (<code>ms</code> in the model layer). After about 10 calls, a model's label switches to its measured speed (output tokens per second plus time to first token, so short and long answers are judged fairly), shown with a dashed border. Measured speed replaces listed speed in the label and in auto-picking, since your connection is what counts. Nothing leaves the computer: it's worked out from the metrics table.</li>
+      <li>A model that is in no list stays <b>Untested</b> and is never picked for you, even when it has a price and a measured speed.</li>
+    </ul>
+  </div>
+  <div class="notes">
+    <h3>6. Choices for you</h3>
+    <ul>
+      <li>Which presets to include at launch. The mockup has 19, and trimming or adding them later is cheap.</li>
+      <li>Whether the setup's four big tiles should be Groq, Gemini, OpenAI, and Anthropic (as shown), or swap one for OpenRouter.</li>
+      <li>Can someone add the same preset twice (two OpenAI keys, say)? The mockup allows it only for Custom.</li>
+    </ul>
+  </div>
+</section>
+</div>
+
+<!-- model picker (one, fixed to the viewport) -->
+<div class="picker" id="picker">
+  <input placeholder="Search models" aria-label="Search models" />
+  <div class="scroll">
+    <div class="grp">Groq</div>
+    <div class="opt">Llama 3.3 70B Versatile<span class="badges"><span class="tag">Fast</span><span class="tag">Low cost</span></span></div>
+    <div class="opt">Llama 3.1 8B Instant<span class="badges"><span class="tag">Fast</span><span class="tag">Low cost</span></span></div>
+    <div class="opt">Llama 4 Maverick 17B 128E Instruct<span class="badges"><span class="tag">Fast</span><span class="tag">Low cost</span></span></div>
+    <div class="grp">Anthropic</div>
+    <div class="opt">Claude Sonnet 5.5<span class="badges"><span class="tag">Medium</span><span class="tag">High cost</span></span></div>
+    <div class="opt">Claude Haiku 5.5<span class="badges"><span class="tag">Fast</span><span class="tag">Medium cost</span></span></div>
+    <div class="grp">Google</div>
+    <div class="opt">Gemini Flash<span class="badges"><span class="tag">Fast</span><span class="tag">Low cost</span></span></div>
+    <div class="opt">Gemini Pro<span class="badges"><span class="tag">Medium</span><span class="tag">High cost</span></span></div>
+    <div class="grp">OpenRouter</div>
+    <div class="opt" title="Known as gpt-5-mini once the openai/ prefix is dropped">openai/gpt-5-mini<span class="badges"><span class="tag">Fast</span><span class="tag">Low cost</span></span></div>
+    <div class="opt" title="Speed measured from your last 12 calls">x-ai/grok-4-fast<span class="badges"><span class="tag measured">Fast</span><span class="tag">Low cost</span></span></div>
+    <div class="opt" title="Cost from OpenRouter's price list; not in Glossly's list, so never picked for you">moonshotai/kimi-k2<span class="badges"><span class="tag">Low cost</span><span class="tag warn">Untested</span></span></div>
+    <div class="more">+ 312 more from OpenRouter. Type to search.</div>
+    <div class="legend"><span class="tag measured">Fast</span> measured from your own calls</div>
+  </div>
+</div>
+
+<script>
+const KINDS = [
+  { id: 'groq', name: 'Groq', letter: 'G', cat: 'Free to start', desc: 'Fast open models. Free tier, then pay as you go.', tag: 'Free tier', need: 'key', ph: 'gsk_...', models: 14 },
+  { id: 'google', name: 'Google Gemini', letter: 'Ge', cat: 'Free to start', desc: 'Every Gemini model. Free tier, then pay as you go.', tag: 'Free tier', need: 'key', ph: 'AIza...', models: 9 },
+  { id: 'openai', name: 'OpenAI', letter: 'O', cat: 'Model makers', desc: 'GPT models.', need: 'key', ph: 'sk-...', models: 22 },
+  { id: 'anthropic', name: 'Anthropic', letter: 'A', cat: 'Model makers', desc: 'Claude models.', need: 'key', ph: 'sk-ant-...', models: 7 },
+  { id: 'xai', name: 'xAI', letter: 'X', cat: 'Model makers', desc: 'Grok models.', need: 'key', ph: 'xai-...', models: 6 },
+  { id: 'deepseek', name: 'DeepSeek', letter: 'D', cat: 'Model makers', desc: 'DeepSeek chat and reasoning models.', need: 'key', ph: 'sk-...', models: 2 },
+  { id: 'moonshot', name: 'Kimi (Moonshot)', letter: 'K', cat: 'Model makers', desc: 'Kimi models.', need: 'key', ph: 'sk-...', models: 5 },
+  { id: 'minimax', name: 'MiniMax', letter: 'Mx', cat: 'Model makers', desc: 'MiniMax models.', need: 'key', ph: 'Paste the key', models: 3 },
+  { id: 'mistral', name: 'Mistral', letter: 'M', cat: 'Model makers', desc: 'Mistral and Ministral models.', need: 'key', ph: 'Paste the key', models: 11 },
+  { id: 'openrouter', name: 'OpenRouter', letter: 'OR', cat: 'Gateways: one key, many makers', desc: 'Hundreds of models from every maker.', tag: 'Gateway', need: 'key', ph: 'sk-or-...', models: 318 },
+  { id: 'vercel', name: 'Vercel AI Gateway', letter: 'V', cat: 'Gateways: one key, many makers', desc: 'Models from many makers through Vercel.', tag: 'Gateway', need: 'key', ph: 'Paste the key', models: 140 },
+  { id: 'ramp', name: 'Ramp Router', letter: 'R', cat: 'Gateways: one key, many makers', desc: 'Your company\'s models through Ramp.', tag: 'Gateway', need: 'key', ph: 'Paste the Router key', models: 12 },
+  { id: 'together', name: 'Together AI', letter: 'T', cat: 'Open models, hosted', desc: 'Open models like Llama, Qwen, and DeepSeek.', tag: 'Host', need: 'key', ph: 'Paste the key', models: 60 },
+  { id: 'fireworks', name: 'Fireworks', letter: 'F', cat: 'Open models, hosted', desc: 'Open models like Llama, Qwen, and DeepSeek.', tag: 'Host', need: 'key', ph: 'fw_...', models: 45 },
+  { id: 'baseten', name: 'Baseten', letter: 'B', cat: 'Open models, hosted', desc: 'Open models like Llama, Qwen, and DeepSeek.', tag: 'Host', need: 'key', ph: 'Paste the key', models: 8 },
+  { id: 'ollama', name: 'Ollama', letter: 'Ol', cat: 'On this computer', desc: 'Free. Nothing leaves this computer.', tag: 'Running', need: 'none', models: 2, url: 'localhost:11434' },
+  { id: 'lmstudio', name: 'LM Studio', letter: 'LM', cat: 'On this computer', desc: 'Free. Nothing leaves this computer.', need: 'none', models: 3, url: 'localhost:1234', notRunning: true },
+  { id: 'local', name: 'Other local server', letter: '⌂', cat: 'On this computer', desc: 'Any address on this computer.', need: 'url', models: 1 },
+  { id: 'custom', name: 'Custom', letter: '{ }', cat: 'Anything else', desc: 'Any other gateway or server, by address.', need: 'custom', multi: true, models: 40 },
+];
+const byId = Object.fromEntries(KINDS.map(k => [k.id, k]));
+const viaService = k => k.tag === 'Gateway' || k.tag === 'Host' || k.need === 'custom';
+let added = [ { kind: 'groq', ago: '2 hours ago' }, { kind: 'anthropic', ago: 'yesterday' } ];
+let customN = 0;
+
+const chev = '<svg class="chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3l5 5-5 5"/></svg>';
+const back = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3L5 8l5 5"/></svg>';
+const x = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+
+function renderList(newId) {
+  const el = document.getElementById('plist');
+  if (!added.length) { el.innerHTML = '<div class="empty">No providers yet. Add one to start.</div>'; return; }
+  el.innerHTML = added.map((a, i) => {
+    const k = byId[a.kind];
+    const label = a.label || k.name;
+    const local = k.cat === 'On this computer';
+    const where = a.url ? `<span>Address</span><span><code>${a.url}</code></span>` : '';
+    const api = a.api ? `<span>Speaks</span><span>${a.api}</span>` : '';
+    return `<div class="prow${a.uid === newId ? ' new' : ''}" data-i="${i}">
+      <div class="prow-head"><div class="mono">${k.letter}</div>
+        <div class="prow-main"><div class="name">${label}${k.tag && k.tag !== 'Running' ? ` <span class="tag">${k.tag}</span>` : ''}${local ? ' <span class="tag">This computer</span>' : ''}</div>
+        <div class="status"><span class="dot"></span>Working · ${k.models} models · tested ${a.ago}</div></div>${chev}</div>
+      <div class="prow-body">
+        <div class="kv">${local ? '' : '<span>Key</span><span>Saved, encrypted</span>'}${where}${api}<span>Used for</span><span>${a.kind === 'groq' ? 'Fast, Decision, Chat fallback' : a.kind === 'anthropic' ? 'Chat' : 'Nothing yet'}</span></div>
+        ${viaService(k) ? '<p class="muted small" style="margin:0">Text goes to this service, and from there to the model\'s maker.</p>' : ''}
+        <div class="btns"><button>Test again</button>${local ? '<button>Change address</button>' : '<button>Replace key</button>'}<button class="danger" data-remove="${i}">Remove</button></div>
+      </div></div>`;
+  }).join('');
+}
+document.getElementById('plist').addEventListener('click', e => {
+  const rm = e.target.closest('[data-remove]');
+  if (rm) { added.splice(+rm.dataset.remove, 1); renderList(); return; }
+  const head = e.target.closest('.prow-head');
+  if (head) head.parentElement.classList.toggle('open');
+});
+
+/* ---- the Add a provider dialog: one component, mounted in Settings or in setup ---- */
+const scrim = document.createElement('div');
+scrim.className = 'scrim';
+scrim.innerHTML = `<div class="dialog" role="dialog" aria-label="Add a provider">
+  <div data-list>
+    <div class="dialog-head"><h4>Add a provider</h4><button class="icon-btn" data-close aria-label="Close">${x}</button></div>
+    <input class="search" data-search placeholder="Search providers" aria-label="Search providers" />
+    <div data-cats></div>
+  </div>
+  <div data-form class="hidden"></div></div>`;
+const $ = s => scrim.querySelector(s);
+let dlg = { onPick: null, isTaken: null };
+
+function tile(k, taken) {
+  const tag = k.tag === 'Running' ? '<span class="tag accent">Running</span>' : k.tag ? `<span class="tag">${k.tag}</span>` : '';
+  return `<button class="tile${taken ? ' added' : ''}" data-kind="${k.id}" ${taken ? 'disabled' : ''}><div class="mono">${k.letter}</div>
+    <div class="t"><strong>${k.name} ${taken ? '<span class="tag">Added</span>' : tag}</strong><span class="d">${k.desc}</span></div></button>`;
+}
+function renderCats(q = '') {
+  const cats = [...new Set(KINDS.map(k => k.cat))];
+  const ql = q.toLowerCase();
+  $('[data-cats]').innerHTML = cats.map(c => {
+    const ks = KINDS.filter(k => k.cat === c && (k.name + k.desc + (k.tag || '')).toLowerCase().includes(ql));
+    return ks.length ? `<div class="cat">${c}</div><div class="tiles">${ks.map(k => tile(k, !k.multi && dlg.isTaken(k.id))).join('')}</div>` : '';
+  }).join('') || '<p class="muted small">No provider by that name. Use Custom with its address.</p>';
+}
+function formFor(k, { inline = false } = {}) {
+  let body = '';
+  if (k.need === 'key') body = `
+    <div class="field"><label><span>${k.name} API key</span><a href="#" onclick="return false">${k.tag && k.tag.startsWith('Free') ? 'Get a free key' : 'Get a key'} ↗</a></label>
+    <div class="keyline"><input type="password" placeholder="${k.ph}" data-key /><button class="primary" data-save>Test and save</button></div></div>`;
+  if (k.need === 'custom') body = `
+    <div class="field"><label><span>Name</span></label><input placeholder="Work gateway" data-label /></div>
+    <div class="field"><label><span>Address</span></label><input placeholder="https://llm.example.com/v1" data-url /></div>
+    <div class="field"><label><span>Speaks</span></label><select data-api><option>Find out when testing</option><option>OpenAI Chat Completions (most)</option><option>OpenAI Responses</option><option>Anthropic Messages</option></select></div>
+    <div class="field"><label><span>API key <span class="muted">(if it needs one)</span></span></label>
+    <div class="keyline"><input type="password" placeholder="Paste the key" data-key /><button class="primary" data-save>Test and save</button></div></div>`;
+  if (k.need === 'none') body = k.notRunning
+    ? `<div class="callout">LM Studio isn't running at <code>${k.url}</code>. Open it, start its server, then try again.</div>
+       <div class="dialog-foot" style="justify-content:flex-start"><button data-save>Try again</button><a href="#" onclick="return false" class="small">Get LM Studio ↗</a></div>`
+    : `<div class="found" style="margin-top:12px"><span class="dot"></span>Ollama is running at <code>${k.url}</code> with ${k.models} models.</div>
+       <div class="dialog-foot" style="justify-content:flex-start"><button class="primary" data-save>Connect</button></div>`;
+  if (k.need === 'url') body = `
+    <div class="field"><label><span>Address on this computer</span></label>
+    <div class="keyline"><input placeholder="http://localhost:8080/v1" data-url /><button class="primary" data-save>Connect</button></div></div>`;
+  const note = viaService(k) ? '<div class="callout">Text goes to this service, and from there to the model\'s maker. Glossly fills your roles only with models it knows, and you can pick any of the others yourself.</div>'
+    : k.cat === 'On this computer' ? '<div class="callout">Local only uses this for everything. It\'s slower than a hosted model.</div>' : '';
+  return `${inline ? '' : `<div class="dialog-head"><button class="icon-btn" data-back aria-label="Back">${back}</button><h4>${k.name}</h4><button class="icon-btn" data-close aria-label="Close">${x}</button></div>
+    <p class="muted small" style="margin:0">${k.desc}</p>`}${body}${note}<p class="error small hidden" data-err style="margin:8px 0 0"></p>`;
+}
+function fakeSave(root, k, done) {
+  const btn = root.querySelector('[data-save]');
+  const key = root.querySelector('[data-key]'), url = root.querySelector('[data-url]'), err = root.querySelector('[data-err]');
+  const fail = m => { err.textContent = m; err.classList.remove('hidden'); };
+  if (k.need === 'key' && !key.value.trim()) return fail('Paste a key first.');
+  if ((k.need === 'custom' || k.need === 'url') && !url.value.trim()) return fail('Type the address first.');
+  if (k.notRunning) return fail('Still not running. Try a different address under Other local server.');
+  err.classList.add('hidden');
+  const label = btn.textContent;
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Testing…';
+  setTimeout(() => {
+    btn.disabled = false; btn.textContent = label;
+    const entry = { kind: k.id, ago: 'just now', uid: Math.random() };
+    if (k.need === 'custom') {
+      customN++;
+      entry.label = root.querySelector('[data-label]').value.trim() || `Custom ${customN}`;
+      entry.url = url.value.trim();
+      const a = root.querySelector('[data-api]').value;
+      entry.api = a.startsWith('Find') ? 'OpenAI Chat Completions (found when tested)' : a;
+    }
+    if (k.need === 'url') entry.url = url.value.trim();
+    if (k.need === 'none') entry.url = k.url;
+    done(entry);
+  }, 900);
+}
+/** Opens the dialog over `host`. `onPick(kind, form)` decides what picking a provider does there. */
+function openDialog(host, opts) {
+  dlg = opts;
+  host.appendChild(scrim);
+  showList(); $('[data-search]').value = ''; renderCats();
+  scrim.classList.add('on');
+  $('[data-search]').focus();
+}
+function closeDialog() { scrim.classList.remove('on'); }
+function showList() { $('[data-list]').classList.remove('hidden'); $('[data-form]').classList.add('hidden'); }
+function showForm(k) {
+  const f = $('[data-form]');
+  f.innerHTML = formFor(k); f.classList.remove('hidden');
+  $('[data-list]').classList.add('hidden');
+  f.querySelector('input')?.focus();
+  f.querySelector('[data-save]').onclick = () => fakeSave(f, k, entry => { added.push(entry); closeDialog(); renderList(entry.uid); });
+}
+$('[data-search]').oninput = e => renderCats(e.target.value);
+scrim.addEventListener('click', e => {
+  if (e.target === scrim || e.target.closest('[data-close]')) return closeDialog();
+  if (e.target.closest('[data-back]')) return showList();
+  const t = e.target.closest('.tile:not(.added)');
+  if (t) dlg.onPick(byId[t.dataset.kind]);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDialog(); closePicker(); } });
+
+// Settings: picking a provider shows its form inside the dialog.
+document.getElementById('add-btn').onclick = () =>
+  openDialog(document.getElementById('win'), { isTaken: id => added.some(a => a.kind === id), onPick: showForm });
+
+/* ---- model picker ---- */
+const picker = document.getElementById('picker');
+let pickerFor = null;
+function closePicker() { picker.classList.remove('on', 'up'); pickerFor?.setAttribute('aria-expanded', 'false'); pickerFor = null; }
+document.querySelectorAll('[data-pick]').forEach(el => el.onclick = e => {
+  e.stopPropagation();
+  if (pickerFor === el) return closePicker();
+  closePicker();
+  pickerFor = el; el.setAttribute('aria-expanded', 'true');
+  const r = el.getBoundingClientRect(), gap = 4, edge = 12, want = 380;
+  const below = innerHeight - r.bottom - gap - edge, above = r.top - gap - edge;
+  const up = below < Math.min(want, 240) && above > below;
+  const h = Math.min(want, up ? above : below);
+  picker.style.maxHeight = h + 'px';
+  picker.style.width = Math.max(r.width, 300) + 'px';
+  picker.style.left = Math.max(edge, Math.min(r.left, innerWidth - Math.max(r.width, 300) - edge)) + 'px';
+  picker.style.top = up ? '' : (r.bottom + gap) + 'px';
+  picker.style.bottom = up ? (innerHeight - r.top + gap) + 'px' : '';
+  picker.classList.toggle('up', up);
+  picker.classList.add('on');
+  picker.querySelectorAll('.opt').forEach(o => o.classList.toggle('on', o.firstChild.textContent.trim() === el.querySelector('.nm').textContent));
+});
+picker.addEventListener('click', e => {
+  const o = e.target.closest('.opt'); if (!o || !pickerFor) return;
+  pickerFor.querySelector('.nm').textContent = o.firstChild.textContent.trim();
+  let g = o.previousElementSibling; while (g && !g.classList.contains('grp')) g = g.previousElementSibling;
+  const via = pickerFor.querySelector('.via');
+  if (via && g) via.textContent = g.textContent;
+  closePicker();
+});
+document.addEventListener('click', e => { if (!picker.contains(e.target)) closePicker(); });
+// The page scrolling closes it; the list scrolling inside it doesn't.
+addEventListener('scroll', e => { if (!picker.contains(e.target)) closePicker(); }, true);
+addEventListener('resize', closePicker);
+
+/* ---- setup ---- */
+const BIG = ['groq', 'google', 'openai', 'anthropic'];
+let setupPick = 'groq', setupDone = [], setupExtra = null;
+function renderSetup() {
+  const ids = setupExtra ? [...BIG, setupExtra] : BIG;
+  document.getElementById('setup-tiles').innerHTML = ids.map(id => {
+    const k = byId[id], done = setupDone.includes(id);
+    return `<button class="tile${id === setupExtra ? ' wide' : ''}" role="radio" aria-checked="${setupPick === id}" data-kind="${id}"><div class="mono">${k.letter}</div>
+      <div class="t"><strong>${k.name} ${k.tag && k.tag.startsWith('Free') ? `<span class="tag accent">${k.tag}</span>` : k.tag && k.tag !== 'Running' ? `<span class="tag">${k.tag}</span>` : ''}</strong>
+      <span class="d">${done ? '<span class="connected"><span class="dot"></span>Connected</span>' : k.desc}</span></div></button>`;
+  }).join('');
+  const pane = document.getElementById('setup-pane'), k = byId[setupPick];
+  pane.className = 'setup-pane';
+  pane.innerHTML = setupDone.includes(setupPick)
+    ? `<div class="callout" style="margin-top:16px"><span class="ok">${k.name} works.</span> ${k.models} models found, and Glossly has picked one for each job. Add another provider if you like, or Continue.</div>`
+    : formFor(k, { inline: true });
+  const s = pane.querySelector('[data-save]');
+  if (s) s.onclick = () => fakeSave(pane, k, () => { setupDone.push(k.id); renderSetup(); });
+  document.getElementById('setup-next').disabled = setupDone.length === 0;
+}
+document.getElementById('setup-tiles').addEventListener('click', e => {
+  const t = e.target.closest('.tile'); if (!t) return;
+  setupPick = t.dataset.kind; renderSetup();
+});
+// Setup: the same list opens over the setup window. Picking closes it and puts that provider among the tiles, selected.
+document.getElementById('setup-more').onclick = () => openDialog(document.getElementById('setup'), {
+  isTaken: id => setupDone.includes(id),
+  onPick: k => {
+    closeDialog();
+    if (!BIG.includes(k.id)) setupExtra = k.id;
+    setupPick = k.id; renderSetup();
+  },
+});
+
+/* ---- chrome ---- */
+document.querySelectorAll('[data-part]').forEach(b => b.onclick = () => {
+  closeDialog(); closePicker();
+  document.querySelectorAll('[data-part]').forEach(o => o.setAttribute('aria-pressed', o === b));
+  document.querySelectorAll('section.part').forEach(s => s.classList.toggle('on', s.id === 'part-' + b.dataset.part));
+});
+document.getElementById('theme').onclick = () => { const h = document.documentElement; h.dataset.theme = h.dataset.theme === 'dark' ? 'light' : 'dark'; };
+renderList(); renderSetup();
+</script>
+</body>
+</html>

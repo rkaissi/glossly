@@ -2,7 +2,13 @@
 import type { CatalogModel, SettingsView } from '@glossly/core/api';
 
 // Component files export only components, so React Fast Refresh can hot-swap them.
-export const hasWorkingKey = (view: SettingsView) => view.keys.some((k) => k.hasKey && k.lastTest?.ok);
+export const hasWorkingKey = (view: SettingsView) => view.providers.some((p) => p.lastTest?.ok);
+
+/** The local server's name: the preset at its address (Ollama, LM Studio), else "Local server". */
+export const localLabel = (view: SettingsView) => view.local.presets.find((p) => p.baseUrl === view.local.baseUrl)?.label ?? 'Local server';
+
+/** Every provider's id and name, in the order they were added, the local server last. */
+export const providerOrder = (view: SettingsView) => [...view.providers.map((p) => ({ provider: p.id, label: p.label })), { provider: 'local', label: localLabel(view) }];
 
 /** A working key, or a local server that lists models. */
 export const hasWorkingModel = (view: SettingsView) => hasWorkingKey(view) || Boolean(view.local.baseUrl && view.local.lastTest?.ok);
@@ -33,16 +39,50 @@ export function groupByProvider(models: CatalogModel[], order: { provider: strin
   }));
 }
 
-/** Short badges for a model's capabilities, or ["Untested"]. */
-export function capabilityBadges(m: CatalogModel): string[] {
+/** One label on a model. `measured`: the speed comes from this computer's own calls (decision 79). */
+export interface Badge {
+  label: string;
+  tone?: 'warn' | 'measured';
+}
+
+const cap = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)}`;
+
+/**
+ * Short labels for a model (decision 79): what it can do and its speed and cost when it is known;
+ * for an untested one, "Untested" plus any cost from its listed price and speed measured here.
+ */
+export function capabilityBadges(m: CatalogModel): Badge[] {
   const c = m.capabilities;
-  if (!c) return ['Untested'];
-  const out: string[] = [];
-  if (c.structured !== 'none') out.push(c.structured === 'json_schema' ? 'Structured' : 'JSON mode');
-  if (c.streaming) out.push('Streaming');
-  out.push(`${c.speed[0]!.toUpperCase()}${c.speed.slice(1)}`, `${c.cost[0]!.toUpperCase()}${c.cost.slice(1)} cost`);
-  if (c.reasoning) out.push('Reasoning');
+  const speed = (s: string): Badge => (m.measured ? { label: cap(s), tone: 'measured' } : { label: cap(s) });
+  if (!c) {
+    const out: Badge[] = [{ label: 'Untested', tone: 'warn' }];
+    if (m.measured) out.push(speed(m.measured));
+    if (m.cost) out.push({ label: `${cap(m.cost)} cost` });
+    return out;
+  }
+  const out: Badge[] = [];
+  if (c.structured !== 'none') out.push({ label: c.structured === 'json_schema' ? 'Structured' : 'JSON mode' });
+  if (c.streaming) out.push({ label: 'Streaming' });
+  out.push(speed(c.speed), { label: `${cap(c.cost)} cost` });
+  if (c.reasoning) out.push({ label: 'Reasoning' });
   return out;
+}
+
+/** The quiet text beside a model in a picker: speed and cost, or "Untested". */
+export function modelHint(m: CatalogModel): string {
+  const speed = m.capabilities?.speed ?? m.measured;
+  const parts = [m.capabilities ? null : 'Untested', speed && cap(speed), m.cost && `${cap(m.cost)} cost`].filter(Boolean);
+  return parts.join(' · ');
+}
+
+/** Models matching a search: every word in the name, id, or provider name. */
+export function matchModels(models: CatalogModel[], query: string, labelOf: (provider: string) => string): CatalogModel[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return models;
+  return models.filter((m) => {
+    const hay = `${m.displayName} ${m.modelId} ${labelOf(m.provider)}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
 }
 
 /** Why a model is a poor fit for a role, or null. */

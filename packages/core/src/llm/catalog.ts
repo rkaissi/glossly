@@ -16,13 +16,28 @@ export interface Capabilities {
   reasoning?: 'none' | 'minimal' | 'low';
 }
 
+/** Dollars per million tokens, from the provider's own model list. */
+export interface Price {
+  input: number;
+  output: number;
+}
+
 export interface CatalogModel {
   provider: string;
   modelId: string;
   ref: ModelRef;
   displayName: string;
-  /** Null means "Untested": selectable by hand, never auto-assigned. */
+  /**
+   * Null means "Untested": selectable by hand, never auto-assigned. Its `speed` is the measured
+   * one once there is one (decision 79).
+   */
   capabilities: Capabilities | null;
+  /** The price the provider lists, when its model list has one. */
+  price: Price | null;
+  /** Cost from `capabilities`, else from `price`, else null. */
+  cost: Tier | null;
+  /** Speed worked out from this computer's own calls to the model, once there are enough (decision 79). */
+  measured: Speed | null;
 }
 
 interface CapabilityEntry extends Capabilities {
@@ -54,20 +69,69 @@ export function isChatModel(modelId: string): boolean {
   return !exclude.some((re) => re.test(modelId));
 }
 
-export function lookupCapabilities(provider: string, modelId: string): Capabilities | null {
+/** Providers with their own entries in the capabilities file. */
+const listedProviders = new Set(entries.map((e) => e.provider));
+
+/** A gateway's vendor prefix ("x-ai/grok-4", "deepseek-ai/DeepSeek-V3") → the maker's provider id in the file. */
+const VENDORS: Record<string, string> = {
+  openai: 'openai',
+  anthropic: 'anthropic',
+  google: 'google',
+  'x-ai': 'xai',
+  xai: 'xai',
+  deepseek: 'deepseek',
+  'deepseek-ai': 'deepseek',
+  moonshotai: 'moonshot',
+  moonshot: 'moonshot',
+  mistralai: 'mistral',
+  mistral: 'mistral',
+  minimax: 'minimax',
+  minimaxai: 'minimax',
+};
+
+function direct(provider: string, modelId: string): Capabilities | null {
   const e = entries.find((m) => m.provider === provider && m.re.test(modelId));
   if (!e) return null;
   const { provider: _p, pattern: _pat, re: _re, ...caps } = e;
   return caps;
 }
 
-export function toCatalogModel(provider: string, modelId: string, displayName?: string): CatalogModel {
+/**
+ * A model's known capabilities, or null ("Untested"). A gateway, host, or custom provider has no
+ * entries of its own, so its model ids drop their vendor prefix ("openai/gpt-5-mini", Ramp's
+ * "openai:gpt-5-mini") and are looked up under the maker (decision 79).
+ */
+export function lookupCapabilities(provider: string, modelId: string): Capabilities | null {
+  const own = direct(provider, modelId);
+  if (own || listedProviders.has(provider)) return own;
+  const m = /^([^/:]+)[/:](.+)$/.exec(modelId);
+  const maker = m && VENDORS[m[1]!.toLowerCase()];
+  return maker ? direct(maker, m[2]!) : null;
+}
+
+/** Below these blended prices (3 parts input to 1 part output, per million tokens) a model counts as low, then medium cost. */
+const COST_LIMITS = { low: 1.5, medium: 8 };
+
+/** Low, medium, or high cost from a listed price (decision 79). */
+export function costFromPrice(p: Price): Tier {
+  const blended = (3 * p.input + p.output) / 4;
+  return blended < COST_LIMITS.low ? 'low' : blended < COST_LIMITS.medium ? 'medium' : 'high';
+}
+
+export function toCatalogModel(provider: string, modelId: string, displayName?: string, extra: { price?: Price | null; measured?: Speed | null } = {}): CatalogModel {
+  const known = lookupCapabilities(provider, modelId);
+  const measured = extra.measured ?? null;
+  const price = extra.price ?? null;
+  const capabilities = known && measured ? { ...known, speed: measured } : known;
   return {
     provider,
     modelId,
     ref: toRef(provider, modelId),
     displayName: displayName || modelId,
-    capabilities: lookupCapabilities(provider, modelId),
+    capabilities,
+    price,
+    cost: capabilities?.cost ?? (price ? costFromPrice(price) : null),
+    measured,
   };
 }
 
@@ -82,7 +146,11 @@ const SPEED: Record<Speed, number> = { fast: 0, medium: 1, slow: 2 };
  */
 export function pickDefault(role: RoleName, models: CatalogModel[]): CatalogModel | null {
   const tested = models.filter((m): m is CatalogModel & { capabilities: Capabilities } => m.capabilities !== null);
-  const order = (m: CatalogModel) => entries.findIndex((e) => e.provider === m.provider && e.re.test(m.modelId));
+  // Among equals, the maker's own key before a gateway's copy of the same model.
+  const order = (m: CatalogModel) => {
+    const i = entries.findIndex((e) => e.provider === m.provider && e.re.test(m.modelId));
+    return i >= 0 ? i : entries.length;
+  };
   if (role === 'decision') {
     const reasons = (c: Capabilities) => (c.reasoning && c.reasoning !== 'none' ? 1 : 0);
     const ok = tested.filter((m) => m.capabilities.structured !== 'none');

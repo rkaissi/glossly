@@ -1,5 +1,5 @@
 {
-  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). tier: a rough intelligence rank across providers (a decimal places a model between two steps; Rayan, Oct 12: gpt-oss-120b, then Qwen 3.8 27B, then gpt-oss-20b). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Patterns are case-insensitive regexes over the provider's model ID.",
+  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). tier: a rough intelligence rank across providers (a decimal places a model between two steps; Rayan, Oct 12: gpt-oss-120b, then Qwen 3.8 27B, then gpt-oss-20b). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Gateways, hosts, and Custom have no entries: their ids drop the vendor prefix (openai/, x-ai/, deepseek-ai/, ...) and match the maker's entries (decision 79). The Google, xAI, DeepSeek, Kimi, MiniMax, Mistral, and gpt-oss entries (Oct 17) are conservative first guesses: JSON mode where schema support is unclear; a model's speed is replaced by the one measured on this computer after 10 calls. Patterns are case-insensitive regexes over the provider's model ID.",
   "version": 1,
   "exclude": [
     "embed",
@@ -55,6 +55,29 @@
     { "provider": "anthropic", "pattern": "^claude-sonnet-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "medium", "speed": "medium", "tier": 4 },
     { "provider": "anthropic", "pattern": "^claude-opus-[45]", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "high", "speed": "slow", "tier": 5 },
     { "provider": "anthropic", "pattern": "^claude-3-5-haiku", "structured": "json_schema", "streaming": true, "tools": true, "context": 200000, "cost": "low", "speed": "fast", "tier": 1 },
+
+    { "provider": "openai", "pattern": "^gpt-oss-20b", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 1.5, "reasoning": "low" },
+    { "provider": "openai", "pattern": "^gpt-oss-120b", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 3, "reasoning": "low" },
+
+    { "provider": "google", "pattern": "^gemini-.*flash-lite", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 1.5 },
+    { "provider": "google", "pattern": "^gemini-.*flash", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 2.5 },
+    { "provider": "google", "pattern": "^gemini-.*pro", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "medium", "speed": "medium", "tier": 4 },
+
+    { "provider": "xai", "pattern": "^grok-.*mini", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "xai", "pattern": "^grok-.*fast", "structured": "json_schema", "streaming": true, "tools": true, "context": 2000000, "cost": "low", "speed": "fast", "tier": 3 },
+    { "provider": "xai", "pattern": "^grok-\\d", "structured": "json_schema", "streaming": true, "tools": true, "context": 256000, "cost": "medium", "speed": "medium", "tier": 4 },
+
+    { "provider": "deepseek", "pattern": "^deepseek-reasoner", "structured": "none", "streaming": true, "tools": false, "context": 128000, "cost": "low", "speed": "slow", "tier": 4 },
+    { "provider": "deepseek", "pattern": "^deepseek-(chat|v\\d)", "structured": "json", "streaming": true, "tools": true, "context": 128000, "cost": "low", "speed": "medium", "tier": 3 },
+
+    { "provider": "moonshot", "pattern": "^kimi-k2", "structured": "json", "streaming": true, "tools": true, "context": 262144, "cost": "medium", "speed": "medium", "tier": 3 },
+
+    { "provider": "minimax", "pattern": "^minimax-m\\d", "structured": "json", "streaming": true, "tools": true, "context": 204800, "cost": "low", "speed": "medium", "tier": 3 },
+
+    { "provider": "mistral", "pattern": "^ministral", "structured": "json", "streaming": true, "tools": true, "context": 128000, "cost": "low", "speed": "fast", "tier": 1 },
+    { "provider": "mistral", "pattern": "^mistral-small", "structured": "json", "streaming": true, "tools": true, "context": 128000, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "mistral", "pattern": "^mistral-medium", "structured": "json", "streaming": true, "tools": true, "context": 128000, "cost": "medium", "speed": "medium", "tier": 3 },
+    { "provider": "mistral", "pattern": "^mistral-large", "structured": "json", "streaming": true, "tools": true, "context": 128000, "cost": "medium", "speed": "medium", "tier": 3.5 },
 
     { "provider": "local", "pattern": ".", "structured": "json_schema", "streaming": true, "tools": false, "context": 8192, "cost": "low", "speed": "slow", "tier": 1 }
   ],

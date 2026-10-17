@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { ChevronDown, Search } from 'lucide-react';
 import type { CatalogModel, ModelRef, ModelsRefreshResult, RoleName, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { MenuList, type MenuItem } from '../controls/Menu';
+import { Popover } from '../controls/Popover';
 import { Select } from '../controls/Select';
 import { Embeddings } from './Data';
-import { KeyCard, LocalCard } from './Keys';
-import { capabilityBadges, groupByProvider, roleWarning } from './format';
+import { ProviderList } from './Providers';
+import { capabilityBadges, groupByProvider, matchModels, modelHint, providerOrder, roleWarning } from './format';
 import { useAction } from './useAction';
 
 const ROLES: { role: RoleName; label: string; desc: string }[] = [
@@ -19,21 +22,26 @@ const ACTION_OVERRIDES: { action: string; label: string; role: RoleName }[] = [
   { action: 'router', label: 'Router decision', role: 'decision' },
 ];
 
-const providerOrder = (view: SettingsView) => [...view.keys.map((k) => ({ provider: k.provider, label: k.label })), { provider: 'local', label: 'Local' }];
+/** Models shown per provider before searching: a gateway lists hundreds (decision 79). */
+const PER_PROVIDER = 8;
 
 function Badges({ m }: { m: CatalogModel }) {
   return (
     <span className="badges">
       {capabilityBadges(m).map((b) => (
-        <span key={b} className={`tag${b === 'Untested' ? ' warn' : ''}`}>
-          {b}
+        <span key={b.label} className={`tag${b.tone ? ` ${b.tone}` : ''}`} title={b.tone === 'measured' ? 'Measured from your own calls' : undefined}>
+          {b.label}
         </span>
       ))}
     </span>
   );
 }
 
-/** A model dropdown grouped by provider. `nullLabel` adds a "none" choice. */
+/**
+ * A model picker grouped by provider, with a search box (decision 79). Without a search each
+ * provider shows its first few models (known ones first) and how many more there are.
+ * `nullLabel` adds a "none" choice.
+ */
 export function ModelSelect(props: {
   view: SettingsView;
   value: ModelRef | null;
@@ -43,21 +51,105 @@ export function ModelSelect(props: {
   onChange: (v: ModelRef | null) => void;
 }) {
   const { view, value } = props;
-  const groups = groupByProvider(view.models, providerOrder(view));
-  const missing = value && !view.models.some((m) => m.ref === value);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const order = providerOrder(view);
+  const labelOf = (p: string) => order.find((o) => o.provider === p)?.label ?? p;
+  const current = view.models.find((m) => m.ref === value);
+
+  const close = (restore: boolean) => {
+    setOpen(false);
+    setQuery('');
+    if (restore) ref.current?.focus();
+  };
+  const pick = (v: string) => {
+    close(true);
+    if (v.startsWith('more:')) return;
+    const next = v === '' ? null : v;
+    if (next !== value) props.onChange(next);
+  };
+
+  const items: MenuItem<string>[] = [];
+  if (open) {
+    if (props.nullLabel !== undefined && !query) items.push({ value: '', label: props.nullLabel });
+    if (value && !current && !query) items.push({ value, label: `${value} (not available)` });
+    for (const g of groupByProvider(matchModels(view.models, query, labelOf), order)) {
+      const shown = query ? g.models : g.models.slice(0, PER_PROVIDER);
+      if (!query && current && current.provider === g.provider && !shown.includes(current)) shown.push(current);
+      for (const m of shown) items.push({ value: m.ref, label: m.displayName, hint: modelHint(m), group: g.label });
+      const more = g.models.length - shown.length;
+      if (more > 0) items.push({ value: `more:${g.provider}`, label: `${more} more. Type to search.`, group: g.label, disabled: true });
+    }
+  }
+
   return (
-    <Select<string>
-      label={props.label}
-      value={value ?? (props.nullLabel !== undefined ? '' : null)}
-      placeholder={view.models.length ? 'Pick a model' : 'Add a key first'}
-      disabled={props.disabled}
-      onChange={(v) => props.onChange(v === '' ? null : v)}
-      options={[
-        ...(props.nullLabel !== undefined ? [{ value: '', label: props.nullLabel }] : []),
-        ...(missing ? [{ value, label: `${value} (not available)` }] : []),
-        ...groups.flatMap((g) => g.models.map((m) => ({ value: m.ref, label: m.displayName, hint: m.capabilities ? undefined : 'Untested', group: g.label }))),
-      ]}
-    />
+    <>
+      <button
+        ref={ref}
+        type="button"
+        className="trigger model-trigger"
+        aria-label={props.label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={props.disabled}
+        data-control
+        onClick={() => (open ? close(false) : setOpen(true))}
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        <span className="trigger-value">
+          {current ? (
+            <>
+              <span className="clip1">{current.displayName}</span>
+              <span className="via">{labelOf(current.provider)}</span>
+            </>
+          ) : value ? (
+            <span className="clip1">{`${value} (not available)`}</span>
+          ) : props.nullLabel !== undefined ? (
+            <span className="clip1">{props.nullLabel}</span>
+          ) : (
+            <span className="placeholder">{view.models.length ? 'Pick a model' : 'Add a provider first'}</span>
+          )}
+        </span>
+        <ChevronDown className="trigger-chevron" size={14} strokeWidth={1.75} aria-hidden />
+      </button>
+      {open && (
+        <Popover anchor={ref} onClose={close} label={props.label} className="select-pop model-pop" scrolls>
+          <label className="model-search">
+            <Search size={14} strokeWidth={1.75} aria-hidden />
+            <input
+              ref={searchRef}
+              data-autofocus
+              placeholder="Search models"
+              aria-label="Search models"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  e.currentTarget.closest('.popover')?.querySelector<HTMLElement>('.pop-menu')?.focus();
+                } else if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const first = items.find((i) => !i.disabled);
+                  if (first) pick(first.value);
+                }
+              }}
+            />
+          </label>
+          {items.length > 0 ? (
+            <MenuList key={query} items={items} selected={value ?? ''} checks autoFocus={false} noInitialActive label={props.label} onPick={pick} />
+          ) : (
+            <p className="model-none muted small">No model matches.</p>
+          )}
+        </Popover>
+      )}
+    </>
   );
 }
 
@@ -185,7 +277,10 @@ function ActionOverrides({ view }: { view: SettingsView }) {
 function Catalog({ view }: { view: SettingsView }) {
   const { busy, error, run } = useAction();
   const [result, setResult] = useState<ModelsRefreshResult | null>(null);
+  const [query, setQuery] = useState('');
   const r = view.settings.roles;
+  const order = providerOrder(view);
+  const labelOf = (p: string) => order.find((o) => o.provider === p)?.label ?? p;
   const usedBy = (ref: ModelRef) =>
     ROLES.flatMap(({ role, label }) => [r[role].model === ref && label, r[role].fallback === ref && `${label} fallback`]).filter(
       (x): x is string => Boolean(x),
@@ -194,19 +289,20 @@ function Catalog({ view }: { view: SettingsView }) {
     const res = await run(() => glossly.invoke('models:refresh'));
     if (res) setResult(res);
   };
-  const groups = groupByProvider(view.models, providerOrder(view));
+  const groups = groupByProvider(matchModels(view.models, query, labelOf), order);
   return (
     <>
       <div className="row">
-        <span className="grow" />
+        <input className="grow" placeholder="Search models" aria-label="Search models" value={query} onChange={(e) => setQuery(e.target.value)} />
         <button disabled={busy} onClick={() => void refresh()}>
           {busy ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
+      <p className="muted small">Speed with a dashed border is measured from your own calls. Untested models are never picked for you.</p>
       {error && <p className="error small">{error}</p>}
       {result?.errors.map((e) => (
         <p key={e.provider} className="error small">
-          {e.provider}: {e.message}
+          {labelOf(e.provider)}: {e.message}
         </p>
       ))}
       {result?.notices.map((n) => (
@@ -214,7 +310,7 @@ function Catalog({ view }: { view: SettingsView }) {
           {n}
         </p>
       ))}
-      {groups.length === 0 && <p className="muted">No models yet. Add a key under Providers above.</p>}
+      {view.models.length === 0 && <p className="muted">No models yet. Add a provider above.</p>}
       {groups.map((g) => (
         <div key={g.provider} className="catalog">
           <h4>
@@ -241,17 +337,13 @@ function Catalog({ view }: { view: SettingsView }) {
   );
 }
 
-/** Keys, local models, which model does each job, and the embedding model (Keys merged in, Step 20.1). */
+/** Providers, which model does what, and the embedding model (decision 79: providers are added from a list). */
 export function ModelsTab({ view }: { view: SettingsView }) {
   return (
     <section>
       <h2>Models</h2>
       <p className="muted">Your keys are encrypted on this computer and only go to their own provider.</p>
-      <h3>Providers</h3>
-      {view.keys.map((k) => (
-        <KeyCard key={k.provider} k={k} />
-      ))}
-      <LocalCard local={view.local} />
+      <ProviderList view={view} />
       <h3>Which model does what</h3>
       <p className="muted small">Glossly picks these for you. A model you choose stays.</p>
       <RolePickers view={view} />

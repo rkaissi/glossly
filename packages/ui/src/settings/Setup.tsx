@@ -1,13 +1,14 @@
 // First-run setup (Step 20.3, decision 41; designed in docs/design/mockups/20-3-design-pass.html):
 // one screen per step with progress dots and one primary button. A step slides in from the side it
 // comes from only when the step changes; choices inside it update in place.
-import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { Bookmark, Check, Cloud, ExternalLink, Laptop, ListChecks, MessageCircle, Reply } from 'lucide-react';
-import type { KeyStatus, Privacy, SettingsView } from '@glossly/core/api';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { Bookmark, Check, Cloud, Laptop, ListChecks, MessageCircle, Plus, Reply } from 'lucide-react';
+import type { Privacy, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
-import { Checkbox, Segmented } from '../controls/Toggles';
+import { Checkbox } from '../controls/Toggles';
 import { GlassIcon } from '../icons';
 import { formatAccelerator, hasWorkingModel, pct } from './format';
+import { AddProviderDialog, ProviderForm, ProviderMark, presetWorks, useLocalFound } from './Providers';
 import { SETUP_STEPS, TRY_STEPS, canContinue, joinContacts, splitContacts, tickTry, type SetupStep } from './setup-logic';
 import { useAction } from './useAction';
 import './setup.css';
@@ -16,12 +17,6 @@ const SAMPLE = {
   from: 'Jordan Hale',
   time: '9:41 AM',
   text: "Can you send me the slides from Tuesday's review before Friday? I'll share them with the team so they can prep for the client call.",
-};
-
-const PROVIDER_NOTES: Record<string, string> = {
-  groq: 'Free tier, no card needed. The easiest place to start.',
-  openai: 'Pay as you go on your OpenAI account.',
-  anthropic: 'Pay as you go on your Anthropic account.',
 };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -140,70 +135,6 @@ function OkLine({ children }: { children: ReactNode }) {
   );
 }
 
-/** One provider's key: paste and test (only a working key is saved), or the working key with Replace. */
-function KeyField({ k }: { k: KeyStatus }) {
-  const [value, setValue] = useState('');
-  const [replacing, setReplacing] = useState(false);
-  const { busy, error, setError, run } = useAction();
-  const working = k.hasKey && k.lastTest?.ok;
-  const add = async (e: FormEvent) => {
-    e.preventDefault();
-    const r = await run(() => glossly.invoke('keys:add', { provider: k.provider, key: value.trim() }));
-    if (!r) return;
-    if (r.ok) {
-      setValue('');
-      setReplacing(false);
-    } else setError(r.error ?? 'The key did not work.');
-  };
-  if (working && !replacing)
-    return (
-      <div className="setup-ok">
-        <OkLine>Working. {plural(k.lastTest!.models, 'model')}, saved and encrypted on this computer.</OkLine>
-        <button type="button" onClick={() => setReplacing(true)}>
-          Replace
-        </button>
-      </div>
-    );
-  return (
-    <form className="field-big" onSubmit={(e) => void add(e)}>
-      <label htmlFor={`key-${k.provider}`}>
-        <span>{k.label} API key</span>
-        <a href={k.keyUrl} target="_blank" rel="noreferrer">
-          {k.free ? 'Get a free key' : 'Get a key'}
-          <ExternalLink size={12} strokeWidth={2} aria-hidden />
-        </a>
-      </label>
-      <div className="keyline">
-        <input
-          id={`key-${k.provider}`}
-          type="password"
-          placeholder={k.keyPlaceholder}
-          autoComplete="off"
-          spellCheck={false}
-          autoFocus
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <button type="submit" className="primary" disabled={busy || !value.trim()}>
-          {busy ? 'Testing…' : 'Test and save'}
-        </button>
-        {replacing && (
-          <button type="button" onClick={() => setReplacing(false)}>
-            Cancel
-          </button>
-        )}
-      </div>
-      {error ? (
-        <span className="error small">{error}</span>
-      ) : k.hasKey && k.lastTest && !k.lastTest.ok ? (
-        <span className="error small">The saved key failed its last test: {k.lastTest.error ?? 'unknown error'}</span>
-      ) : (
-        <span className="muted small">{PROVIDER_NOTES[k.provider] ?? ''}</span>
-      )}
-    </form>
-  );
-}
-
 /** The local server: Ollama and LM Studio presets or another address, or the working connection. */
 function LocalConnect({ view }: { view: SettingsView }) {
   const [value, setValue] = useState('');
@@ -266,16 +197,20 @@ function LocalConnect({ view }: { view: SettingsView }) {
   );
 }
 
-/** The tab to open on: a provider that already works, else the free one. */
-function firstProvider(view: SettingsView): string {
-  const working = view.keys.find((k) => k.hasKey && k.lastTest?.ok);
-  if (working) return working.provider;
-  if (view.local.baseUrl && view.local.lastTest?.ok) return 'local';
-  return (view.keys.find((k) => k.free) ?? view.keys[0])?.provider ?? 'local';
+/** The four big choices (decision 79): the two free providers, then OpenAI and Anthropic. More providers adds a fifth. */
+const BIG = ['groq', 'google', 'openai', 'anthropic'];
+
+/** The choice to open on: one that already works, else Groq. */
+function firstPick(view: SettingsView): string {
+  return view.presets.find((p) => presetWorks(view, p) && p.id !== 'custom')?.id ?? 'groq';
 }
 
 function ConnectStep({ view }: { view: SettingsView }) {
-  const [provider, setProvider] = useState(() => firstProvider(view));
+  const [pick, setPick] = useState(() => firstPick(view));
+  const [adding, setAdding] = useState(false);
+  // A Custom provider saved here: shown as working once it is.
+  const [custom, setCustom] = useState<string | null>(null);
+  const found = useLocalFound(view.settings.privacy !== 'local');
   if (view.settings.privacy === 'local')
     return (
       <>
@@ -289,46 +224,68 @@ function ConnectStep({ view }: { view: SettingsView }) {
         </div>
       </>
     );
-  const k = view.keys.find((x) => x.provider === provider);
+  const ids = BIG.includes(pick) ? BIG : [...BIG, pick];
+  const preset = view.presets.find((p) => p.id === pick)!;
+  const works = (id: string) => (id === 'custom' ? Boolean(custom && view.providers.find((p) => p.id === custom)?.lastTest?.ok) : presetWorks(view, view.presets.find((p) => p.id === id)!));
+  const working = view.providers.find((p) => (pick === 'custom' ? p.id === custom : p.preset === pick));
+  const models = preset.group === 'local' ? view.local.lastTest?.models : working?.lastTest?.models;
   return (
     <>
-      <h1>Add a key</h1>
-      <p className="sub">Pick a provider and paste a key. Glossly tests it and keeps it encrypted on this computer.</p>
-      <Segmented
-        label="Provider"
-        full
-        value={provider}
-        onChange={setProvider}
-        options={[
-          ...view.keys.map(
-            (x) =>
-              [
-                x.provider,
-                <>
-                  {x.label}
-                  {x.free && <span className="free">Free</span>}
-                </>,
-              ] as const,
-          ),
-          [
-            'local',
-            <>
-              <Laptop size={14} strokeWidth={1.75} aria-hidden />
-              Local
-            </>,
-          ] as const,
-        ]}
-      />
-      <div className="setup-pane" key={provider}>
-        {k ? (
-          <KeyField k={k} />
+      <h1>Connect a model</h1>
+      <p className="sub">Pick where Glossly's AI comes from. Glossly tests the key and keeps it encrypted on this computer. You can add more later in Settings, Models.</p>
+      <div className="setup-choices provider-choices" role="radiogroup" aria-label="Provider">
+        {ids.map((id) => {
+          const p = view.presets.find((x) => x.id === id)!;
+          return (
+            <button key={id} type="button" role="radio" aria-checked={pick === id} className={BIG.includes(id) ? undefined : 'wide'} onClick={() => setPick(id)}>
+              <span className="choice-head">
+                <ProviderMark preset={id} />
+                <strong>{p.label}</strong>
+                {p.group === 'free' && <span className="tag accent">Free tier</span>}
+              </span>
+              {works(id) ? (
+                <span className="ok-line">
+                  <Check size={14} strokeWidth={2.25} aria-hidden />
+                  Connected
+                </span>
+              ) : (
+                <span>{p.blurb}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <button type="button" className="more-providers" onClick={() => setAdding(true)}>
+        <Plus size={16} strokeWidth={1.75} aria-hidden />
+        More providers
+        <span className="muted small">xAI, DeepSeek, OpenRouter, Ollama, your own…</span>
+      </button>
+      <div className="setup-pane" key={pick}>
+        {works(pick) ? (
+          <div className="setup-ok">
+            <OkLine>
+              {preset.label} works{models ? `: ${plural(models, 'model')}` : ''}, and Glossly has picked one for each job. Add another if you like, or Continue.
+            </OkLine>
+          </div>
         ) : (
-          <>
-            <LocalConnect view={view} />
-            <span className="muted small">Ollama and LM Studio are free apps that run models on this computer. You can add one beside a key; Local only uses it for everything.</span>
-          </>
+          <ProviderForm
+            view={view}
+            preset={preset}
+            found={found}
+            onSaved={(id) => {
+              if (pick === 'custom') setCustom(id);
+            }}
+          />
         )}
       </div>
+      {adding && (
+        <AddProviderDialog
+          view={view}
+          onClose={() => setAdding(false)}
+          onPick={setPick}
+          isTaken={(p) => p.id !== 'custom' && works(p.id)}
+        />
+      )}
     </>
   );
 }
@@ -362,10 +319,10 @@ const ROLE_ROWS = [
 ] as const;
 
 function ModelsStep({ view }: { view: SettingsView }) {
-  const { settings, models, keys } = view;
+  const { settings, models, providers } = view;
   const localOnly = settings.privacy === 'local';
   const find = (ref: string | null) => (ref ? models.find((m) => m.ref === ref) : undefined);
-  const providerLabel = (p: string) => (p === 'local' ? 'This computer' : (keys.find((k) => k.provider === p)?.label ?? p));
+  const providerLabel = (p: string) => (p === 'local' ? 'This computer' : (providers.find((x) => x.id === p)?.label ?? p));
   const localModel = find(settings.local.model);
   if (localOnly && !localModel)
     return (

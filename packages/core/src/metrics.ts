@@ -1,3 +1,5 @@
+import type { Speed } from './llm/catalog';
+import { measuredSpeed, type SpeedSample } from './llm/speed';
 import type { Store } from './store/store';
 import { isoNow } from './types';
 
@@ -211,6 +213,29 @@ export class Metrics {
     } catch {
       /* best effort */
     }
+  }
+
+  /**
+   * Each model's speed measured from its calls over the last `days` days (decision 79), from the
+   * `llm_tokens` events that carry the model and the call's time. Models with too few calls are left out.
+   */
+  modelSpeeds(days = 30): Record<string, Speed> {
+    const since = isoNow(new Date(this.now().getTime() - days * 86_400_000));
+    const samples = new Map<string, SpeedSample[]>();
+    for (const e of this.store.listEvents(since)) {
+      if (e.kind !== 'llm_tokens') continue;
+      const p = e.payload ?? {};
+      if (typeof p.model !== 'string' || typeof p.ms !== 'number' || typeof p.output !== 'number') continue;
+      let list = samples.get(p.model);
+      if (!list) samples.set(p.model, (list = []));
+      list.push({ ms: p.ms, output: p.output });
+    }
+    const out: Record<string, Speed> = {};
+    for (const [model, list] of samples) {
+      const speed = measuredSpeed(list);
+      if (speed) out[model] = speed;
+    }
+    return out;
   }
 
   /** Per-day counts for the last `days` local days, including today. */

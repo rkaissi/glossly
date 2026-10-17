@@ -96,4 +96,21 @@ describe('Metrics', () => {
     expect(f.errors).toBe(1);
     expect(f.fallbacks).toBe(1);
   });
+
+  it("measures each model's speed from its token events, once there are enough (decision 79)", () => {
+    store = new Store(':memory:');
+    let now = new Date(2026, 7, 1, 12);
+    const m = new Metrics(store, () => now);
+    // An old run of slow calls falls outside the 30 days.
+    for (let i = 0; i < 12; i++) m.record('llm_tokens', { action: 'ask', model: 'groq:llama-3.3-70b-versatile', ms: 20_000, output: 100 + 20 * i });
+    now = new Date(2026, 9, 17, 12);
+    for (let i = 0; i < 12; i++) {
+      m.record('llm_tokens', { action: 'ask', model: 'groq:llama-3.3-70b-versatile', ms: 300 + 2 * (40 * i), output: 40 * i });
+      m.record('llm_tokens', { action: 'ask', model: 'openrouter:someone/slow-model', ms: 2_000 + 60 * (40 * i), output: 40 * i });
+    }
+    for (let i = 0; i < 5; i++) m.record('llm_tokens', { action: 'who', model: 'openai:gpt-5-mini', ms: 900, output: 50 });
+    // Events from before decision 79 have no model or time.
+    m.record('llm_tokens', { action: 'who', input: 10, output: 5 });
+    expect(m.modelSpeeds()).toEqual({ 'groq:llama-3.3-70b-versatile': 'fast', 'openrouter:someone/slow-model': 'slow' });
+  });
 });

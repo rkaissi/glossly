@@ -1,14 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
-import { PROVIDERS } from '@glossly/core';
 import { logger } from './log';
 
 const log = logger('keys');
 
+/** A provider id ("groq", "openrouter", "custom-2"): also the key file's name, so nothing else gets in. */
+const ID = /^[a-z0-9-]{1,40}$/;
+
 /**
- * API keys, one safeStorage-encrypted file per provider (DPAPI on Windows). Decrypted keys
- * live only in memory and are never logged.
+ * API keys, one safeStorage-encrypted file per added provider (DPAPI on Windows), named by its
+ * id (decision 79). Decrypted keys live only in memory and are never logged.
  */
 export class KeyStore {
   private readonly cache = new Map<string, string>();
@@ -18,12 +20,12 @@ export class KeyStore {
   }
 
   private file(provider: string): string {
-    if (!(provider in PROVIDERS)) throw new Error(`Unknown provider: ${provider}`);
+    if (!ID.test(provider)) throw new Error(`Unknown provider: ${provider}`);
     return join(this.dir, `${provider}.bin`);
   }
 
   get(provider: string): string | null {
-    if (!(provider in PROVIDERS)) return null;
+    if (!ID.test(provider)) return null;
     const hit = this.cache.get(provider);
     if (hit) return hit;
     const f = this.file(provider);
@@ -39,7 +41,7 @@ export class KeyStore {
   }
 
   has(provider: string): boolean {
-    return provider in PROVIDERS && existsSync(this.file(provider));
+    return ID.test(provider) && existsSync(this.file(provider));
   }
 
   set(provider: string, key: string): void {
@@ -49,11 +51,16 @@ export class KeyStore {
   }
 
   remove(provider: string): void {
+    if (!ID.test(provider)) return;
     rmSync(this.file(provider), { force: true });
     this.cache.delete(provider);
   }
 
+  /** Every provider with a key file. */
   providers(): string[] {
-    return Object.keys(PROVIDERS).filter((p) => this.has(p));
+    return readdirSync(this.dir)
+      .filter((f) => f.endsWith('.bin'))
+      .map((f) => f.slice(0, -4))
+      .filter((p) => ID.test(p));
   }
 }

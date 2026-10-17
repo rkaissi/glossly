@@ -33,6 +33,8 @@ import {
   type PromiseSaveRow,
   type SetSettingResult,
   type SettingsKey,
+  ApiStyleSchema,
+  type ApiStyle,
 } from '@glossly/core';
 import type { Capture } from './capture';
 import type { HotkeyManager, SaveHotkey } from './hotkey';
@@ -502,6 +504,7 @@ export function registerIpc(deps: IpcDeps): void {
     const key = str(a.key, 50) as SettingsKey;
     if (key === 'roles') throw new Error('Use roles:set');
     if (key === 'local') throw new Error('Use local:connect, local:remove, or local:model');
+    if (key === 'providers') throw new Error('Use providers:add or providers:remove');
     if (key === 'hotkey') {
       const value = str(a.value, 100);
       if (services.settings.saveMode === 'hotkey' && value === services.settings.saveHotkey) {
@@ -525,20 +528,30 @@ export function registerIpc(deps: IpcDeps): void {
     broadcastSettings();
     return { settings: services.settings, ...(error && { error }) };
   });
-  handle('keys:add', async (a) => {
-    const r = await services.addKey(str(a.provider, 30), str(a.key, 500));
+  handle('providers:add', async (a) => {
+    const api = optStr(a.api, 20);
+    if (api !== undefined && !ApiStyleSchema.safeParse(api).success) throw new Error('Unknown way of talking');
+    const r = await services.addProvider({
+      preset: str(a.preset, 40),
+      id: optStr(a.id, 40),
+      key: optStr(a.key, 1000),
+      label: optStr(a.label, 60),
+      baseUrl: optStr(a.baseUrl, 300),
+      api: api as ApiStyle | undefined,
+    });
     broadcastSettings();
     return r;
   });
-  handle('keys:test', async (a) => {
-    const r = await services.testKey(str(a.provider, 30));
+  handle('providers:test', async (a) => {
+    const r = await services.testProvider(str(a.id, 40));
     broadcastSettings();
     return r;
   });
-  handle('keys:remove', (a) => {
-    services.removeKey(str(a.provider, 30));
+  handle('providers:remove', (a) => {
+    services.removeProvider(str(a.id, 40));
     broadcastSettings();
   });
+  handle('local:detect', () => services.detectLocal());
   handle('local:connect', async (a) => {
     const r = await services.connectLocal(str(a.baseUrl, 300));
     broadcastSettings();

@@ -4,9 +4,10 @@ import { convertArrayToReadableStream, MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type ModelRef, type Settings } from '../settings';
-import { isChatModel, lookupCapabilities, parseRef, pickDefault, toCatalogModel, toRef } from './catalog';
+import { costFromPrice, isChatModel, lookupCapabilities, parseRef, pickDefault, toCatalogModel, toRef } from './catalog';
 import { AiSdkLlm, isFallbackError, LOCAL_UNREACHABLE_MESSAGE, privacyChain, REASONING_ROOM, retryAfterMs, type LlmCall } from './llm';
-import { isLoopbackUrl, LocalProvider, normalizeBaseUrl, PROVIDERS, ProviderKeyError } from './providers';
+import { detectApi, isLoopbackUrl, listedPrice, listModels, LocalProvider, normalizeBaseUrl, ProviderKeyError } from './providers';
+import { measuredSpeed, type SpeedSample } from './speed';
 import { modelChain, updateLocalModel, updateRoles } from './roles';
 import { LlmError } from './types';
 import { answerAfterUnaskedSave, rememberTool } from '../actions/ask';
@@ -546,7 +547,8 @@ describe('providers.listModels', () => {
 
   it('lists chat models only, sorted, with capabilities', async () => {
     const seen: { url?: string; headers?: Record<string, string> } = {};
-    const models = await PROVIDERS.groq!.listModels(
+    const models = await listModels(
+      { id: 'groq', preset: 'groq' },
       'gsk_test',
       fetchJson(200, { data: [{ id: 'whisper-large-v3' }, { id: 'openai/gpt-oss-20b' }, { id: 'llama-3.1-8b-instant' }, { id: 'old', active: false }] }, seen),
     );
@@ -556,20 +558,174 @@ describe('providers.listModels', () => {
   });
 
   it('keeps only chat families from OpenAI and uses Anthropic display names', async () => {
-    const o = await PROVIDERS.openai!.listModels('k', fetchJson(200, { data: [{ id: 'gpt-5-mini' }, { id: 'text-embedding-3-small' }, { id: 'babbage-002' }, { id: 'omni-moderation' }] }));
+    const o = await listModels({ id: 'openai', preset: 'openai' }, 'k', fetchJson(200, { data: [{ id: 'gpt-5-mini' }, { id: 'text-embedding-3-small' }, { id: 'babbage-002' }, { id: 'omni-moderation' }] }));
     expect(o.map((m) => m.modelId)).toEqual(['gpt-5-mini']);
-    const a = await PROVIDERS.anthropic!.listModels('k', fetchJson(200, { data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' }] }));
+    const a = await listModels({ id: 'anthropic', preset: 'anthropic' }, 'k', fetchJson(200, { data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' }] }));
     expect(a[0]!.displayName).toBe('Claude Sonnet 5.5');
   });
 
   it('surfaces the provider’s error message on a bad key, without the key', async () => {
-    const err = await PROVIDERS.groq!.listModels('gsk_secret', fetchJson(401, { error: { message: 'Invalid API Key' } })).catch((e) => e);
+    const err = await listModels({ id: 'groq', preset: 'groq' }, 'gsk_secret', fetchJson(401, { error: { message: 'Invalid API Key' } })).catch((e) => e);
     expect(err).toBeInstanceOf(ProviderKeyError);
     expect(err).toMatchObject({ provider: 'groq', status: 401, message: 'Invalid API Key' });
     expect(String(err.message)).not.toContain('gsk_secret');
 
-    const net = await PROVIDERS.openai!.listModels('k', (async () => Promise.reject(new Error('offline'))) as unknown as typeof fetch).catch((e) => e);
-    expect(net).toMatchObject({ status: 0, message: 'Could not reach openai: offline' });
+    const net = await listModels({ id: 'openai', preset: 'openai' }, 'k', (async () => Promise.reject(new Error('offline'))) as unknown as typeof fetch).catch((e) => e);
+    expect(net).toMatchObject({ status: 0, message: 'Could not reach OpenAI: offline' });
+  });
+});
+
+describe('added providers (decision 79)', () => {
+  type Call = { url: string; method: string; headers: Record<string, string> };
+  /** Answers by URL suffix; anything unlisted is a 404. Records each request. */
+  const routes = (map: Record<string, [number, unknown]>, calls: Call[] = []) =>
+    (async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method ?? 'GET', headers: (init?.headers ?? {}) as Record<string, string> });
+      const hit = Object.entries(map).find(([suffix]) => url.endsWith(suffix));
+      const [status, body] = hit ? hit[1] : [404, { error: { message: 'Not found' } }];
+      return new Response(JSON.stringify(body), { status });
+    }) as unknown as typeof fetch;
+
+  it('lists a gateway at its own address with the key, and reads its prices', async () => {
+    const calls: Call[] = [];
+    const models = await listModels(
+      { id: 'openrouter', preset: 'openrouter' },
+      'sk-or-test',
+      routes(
+        {
+          '/models': [
+            200,
+            {
+              data: [
+                { id: 'openai/gpt-5-mini', name: 'OpenAI: GPT-5 mini', pricing: { prompt: '0.00000025', completion: '0.000002' } },
+                { id: 'moonshotai/kimi-k2', pricing: { prompt: '0.0000006', completion: '0.0000025' } },
+                { id: 'openai/text-embedding-3-small' },
+              ],
+            },
+          ],
+        },
+        calls,
+      ),
+    );
+    expect(calls[0]).toMatchObject({ url: 'https://openrouter.ai/api/v1/models', headers: { Authorization: 'Bearer sk-or-test' } });
+    expect(models.map((m) => m.ref)).toEqual(['openrouter:moonshotai/kimi-k2', 'openrouter:openai/gpt-5-mini']);
+    const mini = models[1]!;
+    expect(mini.displayName).toBe('OpenAI: GPT-5 mini');
+    expect(mini.price).toEqual({ input: 0.25, output: 2 });
+    // Known through its vendor prefix: the maker's capabilities, so it can be picked for a role.
+    expect(mini.capabilities).toMatchObject({ structured: 'json_schema', speed: 'fast', cost: 'low' });
+  });
+
+  it('reads a bare-array model list (Together) and keeps only chat types', async () => {
+    const models = await listModels(
+      { id: 'together', preset: 'together' },
+      'k',
+      routes({
+        '/models': [
+          200,
+          [
+            { id: 'deepseek-ai/DeepSeek-V3', display_name: 'DeepSeek V3', type: 'chat', pricing: { input: 1.25, output: 1.25 } },
+            { id: 'black-forest-labs/FLUX.1', type: 'image' },
+          ],
+        ],
+      }),
+    );
+    expect(models.map((m) => m.modelId)).toEqual(['deepseek-ai/DeepSeek-V3']);
+    expect(models[0]!.price).toEqual({ input: 1.25, output: 1.25 });
+    expect(models[0]!.capabilities?.structured).toBe('json');
+  });
+
+  it('offers known models when a service has no model list, after checking the key', async () => {
+    const calls: Call[] = [];
+    const models = await listModels({ id: 'minimax', preset: 'minimax' }, 'k', routes({ '/chat/completions': [400, { error: 'bad request' }] }, calls));
+    expect(models.map((m) => m.modelId)).toEqual(['MiniMax-M2', 'MiniMax-M2.7']);
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual(['GET https://api.minimax.io/v1/models', 'POST https://api.minimax.io/v1/chat/completions']);
+    const bad = await listModels({ id: 'minimax', preset: 'minimax' }, 'k', routes({ '/chat/completions': [401, {}] })).catch((e) => e);
+    expect(bad).toMatchObject({ status: 401, message: 'The key was not accepted.' });
+  });
+
+  it('finds how a custom address talks, without spending tokens', async () => {
+    expect(await detectApi('https://llm.example.com/v1', 'k', routes({ '/chat/completions': [400, {}] }))).toBe('chat');
+    // A Responses-only gateway: no Chat Completions endpoint.
+    expect(await detectApi('https://llm.example.com/v1', 'k', routes({ '/responses': [400, {}] }))).toBe('responses');
+    expect(await detectApi('https://llm.example.com/v1', 'k', routes({ '/messages': [400, {}] }))).toBe('anthropic');
+    await expect(detectApi('https://llm.example.com/v1', 'k', routes({}))).rejects.toBeInstanceOf(ProviderKeyError);
+  });
+
+  it('lists Gemini models that generate text', async () => {
+    const calls: Call[] = [];
+    const models = await listModels(
+      { id: 'google', preset: 'google' },
+      'AIza-test',
+      routes(
+        {
+          '/models?pageSize=1000': [
+            200,
+            {
+              models: [
+                { name: 'models/gemini-3-flash', displayName: 'Gemini 3 Flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-embedding-001', supportedGenerationMethods: ['embedContent'] },
+              ],
+            },
+          ],
+        },
+        calls,
+      ),
+    );
+    expect(calls[0]!.headers).toEqual({ 'x-goog-api-key': 'AIza-test' });
+    expect(models.map((m) => m.ref)).toEqual(['google:gemini-3-flash']);
+    expect(models[0]!.capabilities).toMatchObject({ structured: 'json_schema', cost: 'low' });
+  });
+
+  it('looks models up under their maker only for providers without entries of their own', () => {
+    expect(lookupCapabilities('ramp', 'anthropic:claude-sonnet-5-5')?.tier).toBe(4);
+    expect(lookupCapabilities('custom-1', 'x-ai/grok-4-fast')?.speed).toBe('fast');
+    // Groq has its own entries, so its "openai/..." ids are Groq's, not OpenAI's.
+    expect(lookupCapabilities('groq', 'openai/gpt-oss-20b')?.reasoning).toBe('low');
+    expect(lookupCapabilities('groq', 'openai/gpt-5-mini')).toBeNull();
+    expect(lookupCapabilities('openrouter', 'meta-llama/llama-3.3-70b-instruct')).toBeNull();
+  });
+
+  it("prefers the maker's own key over a gateway's copy of the same model", () => {
+    const viaGateway = toCatalogModel('openrouter', 'openai/gpt-5-mini');
+    const direct = toCatalogModel('openai', 'gpt-5-mini');
+    expect(pickDefault('fast', [viaGateway, direct])?.ref).toBe('openai:gpt-5-mini');
+  });
+});
+
+describe('model labels (decision 79)', () => {
+  it('turns listed prices into cost, per token or per million', () => {
+    expect(listedPrice({ prompt: '0.0000003', completion: '0.0000012' })).toEqual({ input: 0.3, output: 1.2 });
+    expect(listedPrice({ input: 3, output: 15 })).toEqual({ input: 3, output: 15 });
+    expect(listedPrice({ input: 'n/a' })).toBeNull();
+    expect(costFromPrice({ input: 0.25, output: 2 })).toBe('low');
+    expect(costFromPrice({ input: 1.25, output: 10 })).toBe('medium');
+    expect(costFromPrice({ input: 15, output: 75 })).toBe('high');
+  });
+
+  it('gives an untested model a cost from its price, and a known one keeps its own', () => {
+    const untested = toCatalogModel('openrouter', 'someone/new-model', undefined, { price: { input: 0.1, output: 0.4 } });
+    expect(untested).toMatchObject({ capabilities: null, cost: 'low' });
+    const known = toCatalogModel('anthropic', 'claude-opus-5-1', undefined, { price: { input: 0.1, output: 0.1 } });
+    expect(known.cost).toBe('high');
+  });
+
+  it('measures speed from wait plus time per token, judged at a typical answer', () => {
+    const fit = (wait: number, perToken: number, lengths: number[]): SpeedSample[] => lengths.map((output) => ({ ms: wait + perToken * output, output }));
+    const mixed = [20, 40, 60, 300, 500, 80, 100, 250, 400, 30];
+    expect(measuredSpeed(fit(300, 2, mixed))).toBe('fast');
+    expect(measuredSpeed(fit(1500, 15, mixed))).toBe('medium');
+    expect(measuredSpeed(fit(2000, 50, mixed))).toBe('slow');
+    // Too few calls: no measured speed yet.
+    expect(measuredSpeed(fit(300, 2, mixed.slice(0, 9)))).toBeNull();
+    // All the same length (the router's short answers): the median time stands in.
+    expect(measuredSpeed(Array.from({ length: 12 }, () => ({ ms: 450, output: 47 })))).toBe('fast');
+  });
+
+  it('puts a measured speed in place of the listed one', () => {
+    const m = toCatalogModel('anthropic', 'claude-haiku-4-5', undefined, { measured: 'slow' });
+    expect(m.capabilities?.speed).toBe('slow');
+    expect(m.measured).toBe('slow');
   });
 });
 
@@ -645,11 +801,11 @@ describe('token counts (decision 48)', () => {
     });
     await llm.structured({ role: 'fast', action: 'who', instructions: 'i', prompt: 'p' }, z.object({ answer: z.string(), n: z.number() }));
     await collect(llm.stream({ role: 'chat', action: 'reply', instructions: 'i', prompt: 'p' }).textStream);
-    const row = { input: 10, output: 5, cached: 0, reasoning: 0 };
+    const row = { input: 10, output: 5, cached: 0, reasoning: 0, ms: expect.any(Number) };
     expect(seen).toEqual([
-      { action: 'who', role: 'fast', provider: 'openai', ...row },
-      { action: 'who', role: 'fast', provider: 'openai', ...row },
-      { action: 'reply', role: 'chat', provider: 'anthropic', ...row },
+      { action: 'who', role: 'fast', provider: 'openai', model: 'openai:gpt-5-mini', ...row },
+      { action: 'who', role: 'fast', provider: 'openai', model: 'openai:gpt-5-mini', ...row },
+      { action: 'reply', role: 'chat', provider: 'anthropic', model: CHAT.model, ...row },
     ]);
   });
 });

@@ -26,7 +26,14 @@ export interface AiSdkLlmDeps {
   onCall?: (call: LlmCall) => void;
   /** Monotonic clock for the rate-limit memory (default `performance.now`); tests pass their own. */
   now?: () => number;
+  /**
+   * Which SDK's options (reasoning effort, Groq's structured mode) a provider takes, by the way
+   * it talks (decision 79): Ramp Router talks like OpenAI. Default: the provider id itself.
+   */
+  optionsKey?: (provider: string) => 'groq' | 'openai' | null;
 }
+
+const defaultOptionsKey = (provider: string): 'groq' | 'openai' | null => (provider === 'groq' || provider === 'openai' ? provider : null);
 
 /** A call moved to the next model in its chain. Codes only. */
 export interface LlmFallback {
@@ -60,6 +67,9 @@ export interface LlmUsage {
   action: string;
   role: RoleName;
   provider: string;
+  /** The model, and how long the call took: a model's measured speed comes from these (decision 79). */
+  model: ModelRef;
+  ms: number;
   input: number;
   output: number;
   /** Prompt tokens served from the provider's cache (they don't count toward Groq's limits). */
@@ -67,12 +77,14 @@ export interface LlmUsage {
   reasoning: number;
 }
 
-function usageOf(req: ChatRequest, ref: ModelRef, u: LanguageModelUsage | undefined): LlmUsage | null {
+function usageOf(req: ChatRequest, ref: ModelRef, u: LanguageModelUsage | undefined, t0: number): LlmUsage | null {
   if (!u) return null;
   return {
     action: req.action ?? req.role,
     role: req.role,
     provider: parseRef(ref).provider,
+    model: ref,
+    ms: Math.round(performance.now() - t0),
     input: u.inputTokens ?? 0,
     output: u.outputTokens ?? 0,
     cached: u.inputTokenDetails?.cacheReadTokens ?? 0,
@@ -291,7 +303,8 @@ export class AiSdkLlm implements LlmProvider {
         // A reasoning model streams at the effort asked for (Reply asks for low), never above its own.
         const caps = lookupCapabilities(provider, modelId);
         const effort = req.reasoning && caps?.reasoning && caps.reasoning !== 'none' ? req.reasoning : undefined;
-        const providerOptions: Record<string, Record<string, string>> | undefined = effort ? (provider === 'groq' ? { groq: { reasoningEffort: effort } } : provider === 'openai' ? { openai: { reasoningEffort: effort } } : undefined) : undefined;
+        const sdk = (deps.optionsKey ?? defaultOptionsKey)(provider);
+        const providerOptions: Record<string, Record<string, string>> | undefined = effort && sdk ? { [sdk]: { reasoningEffort: effort } } : undefined;
         try {
           const result = streamText({
             model: m,
@@ -330,7 +343,7 @@ export class AiSdkLlm implements LlmProvider {
             }
           }
           if (!started) resolveModel(ref);
-          const used = usageOf(req, ref, await Promise.resolve(result.usage).catch(() => undefined));
+          const used = usageOf(req, ref, await Promise.resolve(result.usage).catch(() => undefined), t0);
           if (used) deps.onUsage?.(used);
           self.limited.delete(ref);
           self.logCall(req, ref, from, t0, { response: text, usage: used });
@@ -377,10 +390,11 @@ export class AiSdkLlm implements LlmProvider {
       ? `${req.instructions}\n\nRespond with only a JSON object matching this JSON Schema:\n${JSON.stringify(z.toJSONSchema(schema))}`
       : req.instructions;
     const reasoningEffort = caps?.reasoning;
+    const sdk = (this.deps.optionsKey ?? defaultOptionsKey)(provider);
     const providerOptions: Record<string, Record<string, string | boolean>> | undefined =
-      provider === 'groq'
+      sdk === 'groq'
         ? { groq: { structuredOutputs: !jsonMode, ...(reasoningEffort && { reasoningEffort }) } }
-        : provider === 'openai' && reasoningEffort
+        : sdk === 'openai' && reasoningEffort
           ? { openai: { reasoningEffort } }
           : undefined;
 
@@ -401,12 +415,12 @@ export class AiSdkLlm implements LlmProvider {
           maxRetries: 0,
           providerOptions,
         });
-        const used = usageOf(req, ref, usage);
+        const used = usageOf(req, ref, usage, t0);
         if (used) this.deps.onUsage?.(used);
         this.logCall(req, ref, from, t0, { prompt, response: JSON.stringify(output), usage: used });
         return output as T;
       } catch (e) {
-        const used = NoObjectGeneratedError.isInstance(e) ? usageOf(req, ref, e.usage) : null;
+        const used = NoObjectGeneratedError.isInstance(e) ? usageOf(req, ref, e.usage, t0) : null;
         if (used) this.deps.onUsage?.(used);
         this.logCall(req, ref, from, t0, {
           prompt,

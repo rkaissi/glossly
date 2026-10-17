@@ -12,7 +12,7 @@ import type { EmbedProgress } from './embed/types';
 import type { CatalogModel } from './llm/catalog';
 import type { MetricsSummary } from './metrics';
 import type { BarAction, ContentType, DecisionProviderId } from './router/types';
-import type { AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
+import type { ApiStyle, AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
 import type { CaptureMethod, Trigger } from './types';
 import type { WhoView } from './actions/who';
 import type { PasteFormat, PasteTarget } from './actions/paste-types';
@@ -24,7 +24,8 @@ import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSum
 import type { PickDraft, ReplyChannel, ReplyRedo, StyleDimension, StylePreference } from './people/reply-style';
 import type { Relationship } from './people/relationship';
 
-export type { CatalogModel, Capabilities } from './llm/catalog';
+export type { CatalogModel, Capabilities, Price, Speed, Tier } from './llm/catalog';
+export type { ApiStyle, ProviderConnection } from './settings';
 export type { MetricsSummary } from './metrics';
 export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
@@ -350,19 +351,65 @@ export interface SaveDone {
 
 // ---- settings ----
 
-export interface KeyStatus {
-  provider: string;
+/** One entry in the Add a provider list (decision 79); `ProviderPreset` in core without its code. */
+export interface PresetInfo {
+  id: string;
   label: string;
+  group: 'free' | 'makers' | 'gateways' | 'hosts' | 'local' | 'custom';
+  blurb: string;
   keyUrl: string;
+  keyPlaceholder: string;
   free: boolean;
+  /** Text goes through this service on its way to the model's maker. */
+  via: boolean;
+  baseUrl?: string;
+}
+
+/** A provider the user added (decision 79), as the Models tab shows it. */
+export interface ProviderStatus {
+  /** The provider in model refs: the preset's id, or "custom-N". */
+  id: string;
+  preset: string;
+  /** The preset's name, or a Custom provider's own. */
+  label: string;
+  /** A Custom provider's address. */
+  baseUrl: string | null;
+  /** How a Custom provider talks. */
+  api: ApiStyle | null;
+  via: boolean;
+  free: boolean;
+  keyUrl: string;
   keyPlaceholder: string;
   hasKey: boolean;
   /** Result of the last live test, if any. */
   lastTest: KeyTestResult | null;
 }
 
+/** What "Add provider" sends. `id` replaces the key or address of a provider already added. */
+export interface ProviderAddArgs {
+  preset: string;
+  id?: string;
+  key?: string;
+  /** Custom only. */
+  label?: string;
+  baseUrl?: string;
+  /** Custom only; left out to find out when testing. */
+  api?: ApiStyle;
+}
+
+/** A local server found running at a preset's address (Ollama, LM Studio). */
+export interface LocalFound {
+  preset: string;
+  baseUrl: string;
+  /** Chat models it serves; 0 when it isn't running. */
+  models: number;
+  running: boolean;
+}
+
 export interface KeyTestResult {
   ok: boolean;
+  /** The provider the test saved, on success ("custom-2" for a new Custom one). */
+  id?: string;
   /** Number of chat models the key can use. */
   models: number;
   /** The provider's own error message on failure. Never contains the key. */
@@ -379,7 +426,7 @@ export interface LocalStatus {
   loopback: boolean;
   /** Result of the last connection test, if any. `models` counts its chat models. */
   lastTest: KeyTestResult | null;
-  presets: readonly { label: string; baseUrl: string }[];
+  presets: readonly { id: string; label: string; baseUrl: string }[];
 }
 
 export interface EmbedStatus {
@@ -395,7 +442,10 @@ export interface EmbedStatus {
 export interface SettingsView {
   settings: Settings;
   collections: string[];
-  keys: KeyStatus[];
+  /** The hosted providers added, in order (decision 79). */
+  providers: ProviderStatus[];
+  /** Everything Add provider offers. */
+  presets: PresetInfo[];
   local: LocalStatus;
   models: CatalogModel[];
   embed: EmbedStatus;
@@ -558,10 +608,13 @@ export interface InvokeChannels {
 
   'settings:get': { args: void; result: SettingsView };
   'settings:set': { args: { key: SettingsKey; value: unknown }; result: SetSettingResult };
-  /** Saves the key (encrypted) only if the live test passes. */
-  'keys:add': { args: { provider: string; key: string }; result: KeyTestResult };
-  'keys:test': { args: { provider: string }; result: KeyTestResult };
-  'keys:remove': { args: { provider: string }; result: void };
+  /** Adds a hosted provider, or replaces its key or address: saved (the key encrypted) only if the live test passes (decision 79). */
+  'providers:add': { args: ProviderAddArgs; result: KeyTestResult };
+  'providers:test': { args: { id: string }; result: KeyTestResult };
+  /** Forgets the provider, its key, and its models. */
+  'providers:remove': { args: { id: string }; result: void };
+  /** Which local presets are running right now (a quick look at each default address). */
+  'local:detect': { args: void; result: LocalFound[] };
   /** Lists the server's models; saves the address only if that works. */
   'local:connect': { args: { baseUrl: string }; result: KeyTestResult };
   'local:test': { args: void; result: KeyTestResult };

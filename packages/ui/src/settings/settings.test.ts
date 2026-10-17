@@ -6,6 +6,8 @@ import {
   errorText,
   formatAccelerator,
   groupByProvider,
+  matchModels,
+  modelHint,
   normalizeAppKey,
   roleWarning,
   timeAgo,
@@ -19,6 +21,9 @@ const model = (provider: string, modelId: string, tested = true): CatalogModel =
   ref: `${provider}:${modelId}`,
   displayName: modelId,
   capabilities: tested ? { structured: 'json_schema', streaming: true, tools: true, context: 131072, cost: 'low', speed: 'fast', tier: 2 } : null,
+  price: null,
+  cost: tested ? 'low' : null,
+  measured: null,
 });
 
 const order = [
@@ -36,11 +41,26 @@ describe('groupByProvider', () => {
 
 describe('capabilityBadges and roleWarning', () => {
   it('labels untested models', () => {
-    expect(capabilityBadges(model('groq', 'x', false))).toEqual(['Untested']);
+    expect(capabilityBadges(model('groq', 'x', false))).toEqual([{ label: 'Untested', tone: 'warn' }]);
     expect(roleWarning('fast', model('groq', 'x', false))).toMatch(/Untested/);
   });
   it('lists capabilities', () => {
-    expect(capabilityBadges(model('groq', 'x'))).toEqual(['Structured', 'Streaming', 'Fast', 'Low cost']);
+    expect(capabilityBadges(model('groq', 'x')).map((b) => b.label)).toEqual(['Structured', 'Streaming', 'Fast', 'Low cost']);
+  });
+  it('shows a listed cost and a measured speed on an untested model, and marks measured speeds (decision 79)', () => {
+    const m = { ...model('openrouter', 'someone/new', false), cost: 'medium' as const, measured: 'slow' as const };
+    expect(capabilityBadges(m)).toEqual([{ label: 'Untested', tone: 'warn' }, { label: 'Slow', tone: 'measured' }, { label: 'Medium cost' }]);
+    expect(modelHint(m)).toBe('Untested · Slow · Medium cost');
+    const known = { ...model('groq', 'x'), measured: 'fast' as const };
+    expect(capabilityBadges(known)[2]).toEqual({ label: 'Fast', tone: 'measured' });
+    expect(modelHint(known)).toBe('Fast · Low cost');
+  });
+  it('finds models by every word of a search, including the provider name', () => {
+    const ms = [model('openrouter', 'openai/gpt-5-mini'), model('groq', 'llama-3.1-8b-instant'), model('anthropic', 'claude-haiku-4-5')];
+    const label = (p: string) => ({ openrouter: 'OpenRouter', groq: 'Groq', anthropic: 'Anthropic' })[p] ?? p;
+    expect(matchModels(ms, 'router mini', label).map((m) => m.modelId)).toEqual(['openai/gpt-5-mini']);
+    expect(matchModels(ms, '  ', label)).toHaveLength(3);
+    expect(matchModels(ms, 'groq 8b', label).map((m) => m.provider)).toEqual(['groq']);
   });
   it('warns when a fast model has no structured output', () => {
     const m = model('groq', 'x');
@@ -104,7 +124,7 @@ describe('canBackfill', () => {
   const view = (privacy: 'all' | 'local', o: { key?: boolean; local?: { loopback: boolean; model: string | null } } = {}) =>
     ({
       settings: { privacy, local: { model: o.local?.model ?? null } },
-      keys: [{ hasKey: Boolean(o.key), lastTest: o.key ? { ok: true, models: 3, at: '' } : null }],
+      providers: [{ hasKey: Boolean(o.key), lastTest: o.key ? { ok: true, models: 3, at: '' } : null }],
       local: o.local ? { baseUrl: 'http://localhost:11434/v1', loopback: o.local.loopback, lastTest: { ok: true, models: 2, at: '' } } : { baseUrl: null, loopback: false, lastTest: null },
     }) as unknown as SettingsView;
   it('needs any working model under All models', () => {

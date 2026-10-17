@@ -45,6 +45,7 @@ export * from './calendar/events';
 export * from './llm/types';
 export * from './llm/catalog';
 export * from './llm/providers';
+export * from './llm/speed';
 export * from './llm/roles';
 export * from './llm/llm';
 

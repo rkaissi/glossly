@@ -15,6 +15,7 @@ pnpm typecheck   # tsc in all three packages
 - Helper protocol: `helpers/fixtures/*.json` (one file per command, plus `errors.json` and `events.json`) are validated by `packages/core/src/helper/protocol.test.ts`. Update the fixture when a command changes.
 - **Helper against the live binary:** `pnpm helper:record --check` replays the deterministic fixture cases. `pnpm helper:record` (`--copy` adds `copy_fallback`) records read-only commands against the foreground app after 3 s into git-ignored `helpers/fixtures/recorded/local-*.json`. `context_caret` reads screen state, so it has no `--check` case.
 - Test data uses fictional people only (AGENTS.md).
+- **Settings UI in the browser pane, without Electron** (used for decision 79): a scratch Vite config with `root` at `packages/ui`, a `transformIndexHtml` plugin (order `pre`) that adds a stub bridge script before `/src/settings/main.tsx` (match the tag's start: after a hot update it carries `?t=`), an `@core` alias to `packages/core/src` so the stub can build views with `PRESETS` and `toCatalogModel`, and `--configLoader native` with a `file:///` import of `@vitejs/plugin-react` (the bundled loader fails on `vite/internal`). The stub answers `settings:get` and the channels under test with fictional data. A hash-only navigation doesn't reload the page; reload it. Keep the config and stub in the session scratchpad, not the repo.
 
 ## Evals
 
@@ -256,6 +257,15 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [x] Visualize a table: the chart pick renders; switch to Ask and back: `visualized {"cached":true}`.
 - [x] Settings > Saved: filter, search, move, copy, delete.
 - [x] Metrics shows the Features table with real counts.
+
+**Providers added from a list (decision 79, Oct 17)**
+- [ ] First launch of the build on Rayan's profile: the saved Groq, OpenAI, and Anthropic keys show as added providers (`keys moved to added providers` in main.log), with the same roles and overrides, and Ask still answers. Read the `providers` setting after.
+- [ ] Add a provider with a real key (Gemini's free tier is the cheapest to try): Test and save lists its models, roles fill only if it's the first provider, the row says Working. A bad key shows the provider's own message and adds nothing.
+- [ ] Ollama running: the dialog's Ollama tile says Running and Connect adds it as the local server; LM Studio not running says so. Undo it after (Remove).
+- [ ] The model picker in the real window: opens up near the bottom, search narrows, "N more" rows, Esc closes only the picker.
+- [ ] Setup's Connect step on a throwaway profile: the four choices, More providers in setup, Continue after a working key.
+- [ ] After about 10 Ask calls on one model, its speed tag in All available models is dashed (measured).
+- [ ] Not testable without accounts: OpenRouter, Vercel, Ramp, the hosts, and Custom against a real gateway (`detectApi` is unit tested with stub servers only).
 
 **Local models and privacy (Step 18)**
 - [x] First launch after the update: a stored Local only shows as Local only in General (settings migration), and `localOnly` is gone from the `settings` table.
