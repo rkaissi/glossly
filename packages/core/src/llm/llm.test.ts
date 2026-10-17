@@ -693,6 +693,33 @@ describe('added providers (decision 79)', () => {
   });
 });
 
+describe('Gemini and gateway picks (decision 80)', () => {
+  const gemini = ['gemini-2.5-pro', 'gemini-2.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'].map((id) =>
+    toCatalogModel('google', id),
+  );
+
+  it('never picks Pro, previews, or the retired 2.x family on its own, but still labels them', () => {
+    expect(lookupCapabilities('google', 'gemini-2.5-pro')).toMatchObject({ auto: false, cost: 'high' });
+    expect(lookupCapabilities('google', 'gemini-3-flash-preview')?.auto).toBe(false);
+    expect(pickDefault('chat', gemini)?.modelId).toBe('gemini-3.5-flash');
+    expect(pickDefault('decision', gemini)?.modelId).toBe('gemini-3.5-flash-lite');
+    // A full tie goes to the newer version of the same family.
+    expect(pickDefault('fast', [toCatalogModel('google', 'gemini-3.1-flash-lite'), toCatalogModel('google', 'gemini-3.5-flash-lite')])?.modelId).toBe('gemini-3.5-flash-lite');
+  });
+
+  it('breaks a Chat tie on speed, measured speed included', () => {
+    expect(lookupCapabilities('google', 'gemini-3.8-flash')?.speed).toBe('slow');
+    const slowed = [toCatalogModel('google', 'gemini-3.5-flash', undefined, { measured: 'slow' }), toCatalogModel('google', 'gemini-3.8-flash', undefined, { measured: 'fast' })];
+    expect(pickDefault('chat', slowed)?.modelId).toBe('gemini-3.8-flash');
+  });
+
+  it("looks a gateway's unprefixed ids up under each maker (Ramp)", () => {
+    expect(lookupCapabilities('ramp', 'gpt-5.6-luna')).toMatchObject({ cost: 'low', speed: 'fast' });
+    expect(lookupCapabilities('ramp', 'claude-haiku-4-5')?.tier).toBe(2);
+    expect(lookupCapabilities('ramp', 'some-house-model')).toBeNull();
+  });
+});
+
 describe('model labels (decision 79)', () => {
   it('turns listed prices into cost, per token or per million', () => {
     expect(listedPrice({ prompt: '0.0000003', completion: '0.0000012' })).toEqual({ input: 0.3, output: 1.2 });

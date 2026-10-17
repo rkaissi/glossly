@@ -3,7 +3,7 @@
 // provider needs, which setup's Connect step uses too.
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ArrowLeft, Braces, ChevronRight, ExternalLink, Laptop, Search, X } from 'lucide-react';
-import type { ApiStyle, LocalFound, PresetInfo, ProviderStatus, SettingsView } from '@glossly/core/api';
+import type { ApiStyle, LocalFound, PresetInfo, ProviderStatus, RoleMove, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { Select } from '../controls/Select';
@@ -100,6 +100,51 @@ export function presetWorks(view: SettingsView, p: PresetInfo): boolean {
 
 // ---- the form each provider needs ----
 
+const ROLE_NAMES = { chat: 'Chat', fast: 'Fast', decision: 'Decision' } as const;
+
+/**
+ * After a provider is added: the automatic roles it took over, from which model to which, with
+ * "Keep my previous models" (decision 80). Hand-picked roles never move, so they never show here.
+ */
+function RoleMoves({ view, moves, onDone }: { view: SettingsView; moves: RoleMove[]; onDone: () => void }) {
+  const { busy, error, run } = useAction();
+  const name = (ref: string | null) => (ref ? (view.models.find((m) => m.ref === ref)?.displayName ?? ref.slice(ref.indexOf(':') + 1)) : 'none');
+  return (
+    <div className="provider-form role-moves">
+      <p className="found">
+        <span className="dot" />
+        Added. Glossly moved {moves.length === 1 ? 'one job' : `${moves.length} jobs`} to models it now thinks fit better:
+      </p>
+      <ul>
+        {moves.map((m) => (
+          <li key={m.role}>
+            <strong>{ROLE_NAMES[m.role]}</strong> {name(m.from)} → {name(m.to)}
+          </li>
+        ))}
+      </ul>
+      <div className="row">
+        <button type="button" className="primary" disabled={busy} data-autofocus autoFocus onClick={onDone}>
+          Use the new picks
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              await glossly.invoke('roles:restore', { moves });
+              onDone();
+            })
+          }
+        >
+          Keep my previous models
+        </button>
+      </div>
+      <p className="muted small">Change any of them later under Which model does what. A model you pick there stays.</p>
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
 /**
  * What a provider needs, and Test and save: a key; a name, address, way of talking, and maybe a
  * key (Custom); or nothing for a local server that's running. `existing` replaces the key or
@@ -124,6 +169,7 @@ export function ProviderForm({
   const [name, setName] = useState(existing?.label ?? '');
   const [address, setAddress] = useState(existing?.baseUrl ?? '');
   const [api, setApi] = useState<ApiStyle | 'auto'>(existing?.api ?? 'auto');
+  const [moved, setMoved] = useState<{ id: string; moves: RoleMove[] } | null>(null);
   const { busy, error, setError, run } = useAction();
 
   const save = async (e?: FormEvent) => {
@@ -137,7 +183,8 @@ export function ProviderForm({
       }),
     );
     if (!r) return;
-    if (r.ok && r.id) onSaved(r.id);
+    if (r.ok && r.id && r.moved?.length) setMoved({ id: r.id, moves: r.moved });
+    else if (r.ok && r.id) onSaved(r.id);
     else setError(r.error ?? 'That did not work.');
   };
   const connectLocal = async (baseUrl: string) => {
@@ -146,6 +193,8 @@ export function ProviderForm({
     if (r.ok) onSaved('local');
     else setError(r.error ?? 'Could not connect.');
   };
+
+  if (moved) return <RoleMoves view={view} moves={moved.moves} onDone={() => onSaved(moved.id)} />;
 
   const cancel = onCancel && (
     <button type="button" onClick={onCancel}>
@@ -293,6 +342,7 @@ export function ProviderForm({
         <p className="error small">The saved key failed its last test: {existing.lastTest.error ?? 'unknown error'}</p>
       ) : null}
       {preset.via && <p className="callout">{VIA_NOTE} Glossly fills your roles only with models it knows, and you can pick any of the others yourself.</p>}
+      {preset.note && <p className="callout">{preset.note}</p>}
     </form>
   );
 }
@@ -478,6 +528,7 @@ function ProviderRow({ view, p }: { view: SettingsView; p: ProviderStatus }) {
             <dd>{usedFor(view, p.id)}</dd>
           </dl>
           {p.via && <p className="muted small">{VIA_NOTE}</p>}
+          {p.note && <p className="muted small">{p.note}</p>}
           {editing && preset ? (
             <ProviderForm view={view} preset={preset} existing={p} onSaved={() => setEditing(false)} onCancel={() => setEditing(false)} />
           ) : (

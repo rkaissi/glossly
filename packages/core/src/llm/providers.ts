@@ -33,6 +33,8 @@ export interface ProviderPreset {
   baseUrl?: string;
   /** Model ids to offer when the service has no model list (`GET /models` answers 404). */
   knownModels?: string[];
+  /** Something to know before adding it, shown with its key field (decision 80). */
+  note?: string;
 }
 
 /** How each hosted preset is reached. Custom takes its connection's own `api`. */
@@ -61,7 +63,7 @@ export const CUSTOM_PRESET = 'custom';
 
 export const PRESETS: readonly ProviderPreset[] = [
   { id: 'groq', label: 'Groq', group: 'free', blurb: 'Fast open models. Free tier, then pay as you go.', keyUrl: 'https://console.groq.com/keys', keyPlaceholder: 'gsk_...', free: true, via: false },
-  { id: 'google', label: 'Google Gemini', group: 'free', blurb: 'Every Gemini model. Free tier, then pay as you go.', keyUrl: 'https://aistudio.google.com/apikey', keyPlaceholder: 'AIza...', free: true, via: false },
+  { id: 'google', label: 'Google Gemini', group: 'free', blurb: 'Every Gemini model. Free tier, then pay as you go.', keyUrl: 'https://aistudio.google.com/apikey', keyPlaceholder: 'AIza...', free: true, via: false, note: "On Google's free tier, Google may use what you send to improve its products; with billing on, it doesn't. Pro models need billing." },
   { id: 'openai', label: 'OpenAI', group: 'makers', blurb: 'GPT models.', keyUrl: 'https://platform.openai.com/api-keys', keyPlaceholder: 'sk-...', free: false, via: false },
   { id: 'anthropic', label: 'Anthropic', group: 'makers', blurb: 'Claude models.', keyUrl: 'https://console.anthropic.com/settings/keys', keyPlaceholder: 'sk-ant-...', free: false, via: false },
   { id: 'xai', label: 'xAI', group: 'makers', blurb: 'Grok models.', keyUrl: 'https://console.x.ai', keyPlaceholder: 'xai-...', free: false, via: false, baseUrl: 'https://api.x.ai/v1' },

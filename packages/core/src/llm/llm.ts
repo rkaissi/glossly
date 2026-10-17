@@ -30,10 +30,19 @@ export interface AiSdkLlmDeps {
    * Which SDK's options (reasoning effort, Groq's structured mode) a provider takes, by the way
    * it talks (decision 79): Ramp Router talks like OpenAI. Default: the provider id itself.
    */
-  optionsKey?: (provider: string) => 'groq' | 'openai' | null;
+  optionsKey?: (provider: string) => OptionsKey | null;
 }
 
-const defaultOptionsKey = (provider: string): 'groq' | 'openai' | null => (provider === 'groq' || provider === 'openai' ? provider : null);
+type OptionsKey = 'groq' | 'openai' | 'google';
+type Options = Record<string, Record<string, string | boolean | Record<string, string>>>;
+
+const defaultOptionsKey = (provider: string): OptionsKey | null => (provider === 'groq' || provider === 'openai' || provider === 'google' ? provider : null);
+
+/** A reasoning effort in each SDK's words. Gemini calls it a thinking level and has no "minimal" on its newer Flash models (decision 80). */
+function effortOptions(sdk: OptionsKey | null, effort: string): Options | undefined {
+  if (sdk === 'google') return { google: { thinkingConfig: { thinkingLevel: effort === 'minimal' ? 'low' : effort } } };
+  return sdk ? { [sdk]: { reasoningEffort: effort } } : undefined;
+}
 
 /** A call moved to the next model in its chain. Codes only. */
 export interface LlmFallback {
@@ -304,7 +313,7 @@ export class AiSdkLlm implements LlmProvider {
         const caps = lookupCapabilities(provider, modelId);
         const effort = req.reasoning && caps?.reasoning && caps.reasoning !== 'none' ? req.reasoning : undefined;
         const sdk = (deps.optionsKey ?? defaultOptionsKey)(provider);
-        const providerOptions: Record<string, Record<string, string>> | undefined = effort && sdk ? { [sdk]: { reasoningEffort: effort } } : undefined;
+        const providerOptions = effort ? effortOptions(sdk, effort) : undefined;
         try {
           const result = streamText({
             model: m,
@@ -391,11 +400,11 @@ export class AiSdkLlm implements LlmProvider {
       : req.instructions;
     const reasoningEffort = caps?.reasoning;
     const sdk = (this.deps.optionsKey ?? defaultOptionsKey)(provider);
-    const providerOptions: Record<string, Record<string, string | boolean>> | undefined =
+    const providerOptions: Options | undefined =
       sdk === 'groq'
         ? { groq: { structuredOutputs: !jsonMode, ...(reasoningEffort && { reasoningEffort }) } }
-        : sdk === 'openai' && reasoningEffort
-          ? { openai: { reasoningEffort } }
+        : reasoningEffort
+          ? effortOptions(sdk, reasoningEffort)
           : undefined;
 
     // Reasoning tokens count against the output cap, so a reasoning model gets room for them on top.

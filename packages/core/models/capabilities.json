@@ -1,5 +1,5 @@
 {
-  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). tier: a rough intelligence rank across providers (a decimal places a model between two steps; Rayan, Oct 12: gpt-oss-120b, then Qwen 3.8 27B, then gpt-oss-20b). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Gateways, hosts, and Custom have no entries: their ids drop the vendor prefix (openai/, x-ai/, deepseek-ai/, ...) and match the maker's entries (decision 79). The Google, xAI, DeepSeek, Kimi, MiniMax, Mistral, and gpt-oss entries (Oct 17) are conservative first guesses: JSON mode where schema support is unclear; a model's speed is replaced by the one measured on this computer after 10 calls. Patterns are case-insensitive regexes over the provider's model ID.",
+  "$comment": "Known chat models by ID pattern. First match wins, so list specific patterns before general ones. structured: json_schema (native schema-constrained output), json (JSON mode; schema goes in the prompt), or none. cost and speed: low/medium/high and slow/medium/fast (speed includes reasoning latency). tier: a rough intelligence rank across providers (a decimal places a model between two steps; Rayan, Oct 12: gpt-oss-120b, then Qwen 3.8 27B, then gpt-oss-20b). reasoning (optional): effort used for structured calls on reasoning models. Every local model (Ollama, LM Studio) gets one generic entry: structured through the server's json_schema support, no tools, slow. Models matching nothing show as Untested and are never auto-assigned. Gateways, hosts, and Custom have no entries: their ids drop the vendor prefix (openai/, x-ai/, deepseek-ai/, ...) and match the maker's entries (decision 79). auto: false means known but never picked for a role (Gemini Pro and previews need billing or vanish; the 2.x family answers 404 for new keys; all found live Oct 17). The Gemini entries follow that day's live probe of a free key: 3.7, 3.8, and flash-latest took 50 to 85 s or returned 503, 3.6 ran out of free quota after one call. The xAI, DeepSeek, Kimi, MiniMax, Mistral, and gpt-oss entries (Oct 17) are conservative first guesses: JSON mode where schema support is unclear; a model's speed is replaced by the one measured on this computer after 10 calls. Patterns are case-insensitive regexes over the provider's model ID.",
   "version": 1,
   "exclude": [
     "embed",
@@ -26,7 +26,9 @@
     "deprecated",
     "-instruct$",
     "^ft:",
-    "compound"
+    "compound",
+    "nano-banana",
+    "robotics"
   ],
   "models": [
     { "provider": "groq", "pattern": "^qwen/qwen3\\.\\d+-", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2, "reasoning": "none" },
@@ -39,7 +41,7 @@
     { "provider": "groq", "pattern": "^llama-3\\.3-70b-versatile$", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
     { "provider": "groq", "pattern": "^qwen/qwen3-32b", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
 
-    { "provider": "openai", "pattern": "^gpt-6.*luna", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "openai", "pattern": "^gpt-[56].*luna", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 2 },
     { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-nano", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 1 },
     { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-mini", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "low", "speed": "fast", "tier": 2 },
     { "provider": "openai", "pattern": "^gpt-[56](\\.\\d+)?-pro", "structured": "json_schema", "streaming": true, "tools": true, "context": 400000, "cost": "high", "speed": "slow", "tier": 4 },
@@ -59,9 +61,13 @@
     { "provider": "openai", "pattern": "^gpt-oss-20b", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 1.5, "reasoning": "low" },
     { "provider": "openai", "pattern": "^gpt-oss-120b", "structured": "json", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "medium", "tier": 3, "reasoning": "low" },
 
-    { "provider": "google", "pattern": "^gemini-.*flash-lite", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 1.5 },
-    { "provider": "google", "pattern": "^gemini-.*flash", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 2.5 },
-    { "provider": "google", "pattern": "^gemini-.*pro", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "medium", "speed": "medium", "tier": 4 },
+    { "provider": "google", "pattern": "^gemini-.*pro", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "high", "speed": "medium", "tier": 4.5, "reasoning": "low", "auto": false },
+    { "provider": "google", "pattern": "^gemini-2\\.", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 2, "auto": false },
+    { "provider": "google", "pattern": "^gemini-.*preview", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 3, "reasoning": "low", "auto": false },
+    { "provider": "google", "pattern": "^gemini-.*flash-lite", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 2 },
+    { "provider": "google", "pattern": "^gemini-(3\\.[7-9]-flash|flash-latest)", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "slow", "tier": 3.5, "reasoning": "low" },
+    { "provider": "google", "pattern": "^gemini-3\\.6-flash", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "medium", "tier": 3.5, "reasoning": "low" },
+    { "provider": "google", "pattern": "^gemini-.*flash", "structured": "json_schema", "streaming": true, "tools": true, "context": 1048576, "cost": "low", "speed": "fast", "tier": 3.5, "reasoning": "low" },
 
     { "provider": "xai", "pattern": "^grok-.*mini", "structured": "json_schema", "streaming": true, "tools": true, "context": 131072, "cost": "low", "speed": "fast", "tier": 2 },
     { "provider": "xai", "pattern": "^grok-.*fast", "structured": "json_schema", "streaming": true, "tools": true, "context": 2000000, "cost": "low", "speed": "fast", "tier": 3 },

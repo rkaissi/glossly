@@ -44,6 +44,7 @@ import {
   type ProviderAddArgs,
   type ProviderConnection,
   type ProviderStatus,
+  type RoleMove,
   type RoleSetArgs,
   type Settings,
   type SettingsKey,
@@ -145,7 +146,7 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
         const conn = this.connection(p);
         if (!conn) return null;
         const sdk = sdkOf(conn);
-        return sdk === 'groq' ? 'groq' : sdk === 'openai' || sdk === 'responses' ? 'openai' : null;
+        return sdk === 'groq' ? 'groq' : sdk === 'openai' || sdk === 'responses' ? 'openai' : sdk === 'google' ? 'google' : null;
       },
       // Which call moved from which model, and why (decision 60): codes only.
       onFallback: (f) => this.metrics.record('llm_fallback', { ...f, status: f.status ?? 'none' }),
@@ -243,6 +244,7 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
         api: c.preset === CUSTOM_PRESET ? (c.api ?? null) : null,
         via: p?.via ?? true,
         free: p?.free ?? false,
+        note: p?.note ?? null,
         keyUrl: p?.keyUrl ?? '',
         keyPlaceholder: p?.keyPlaceholder ?? '',
         hasKey: this.keys.has(c.id),
@@ -370,10 +372,17 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     if (key) this.keys.set(id, key);
     else this.keys.remove(id);
     const list = this.settingsCache.providers;
+    const before = this.settingsCache.roles;
     this.setSetting('providers', existing ? list.map((c) => (c.id === id ? conn : c)) : [...list, conn]);
     this.applyRoleUpdate();
-    log.info(existing ? 'provider changed' : 'provider added', { provider: id, preset: preset.id, models: r.models, ...(conn.api && { api: conn.api }) });
-    return this.recordTest(id, { ...r, id });
+    // Automatic roles follow the best models, so a new provider can take them over: say which (decision 80).
+    const after = this.settingsCache.roles;
+    const moved: RoleMove[] = (['chat', 'fast', 'decision'] as const)
+      .filter((role) => !before[role].manual && before[role].model !== null && before[role].model !== after[role].model)
+      .map((role) => ({ role, from: before[role].model!, fromFallback: before[role].fallback, to: after[role].model }));
+    log.info(existing ? 'provider changed' : 'provider added', { provider: id, preset: preset.id, models: r.models, moved: moved.length, ...(conn.api && { api: conn.api }) });
+    this.recordTest(id, { ...r, id });
+    return { ...r, id, ...(moved.length > 0 && { moved }) };
   }
 
   async testProvider(id: string): Promise<KeyTestResult> {
@@ -514,6 +523,18 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     const notices = [...u.notices, ...l.notices];
     if (notices.length > 0) this.setSetting('pendingNotice', notices.join(' '));
     return notices;
+  }
+
+  /** Puts moved roles back on their previous models, as picked by hand so the next refit leaves them (decision 80). */
+  restoreRoles(moves: RoleMove[]): Settings['roles'] {
+    const available = new Set(this.catalog().map((m) => m.ref));
+    const roles = structuredClone(this.settingsCache.roles);
+    for (const m of moves) {
+      if (!available.has(m.from)) continue;
+      roles[m.role] = { model: m.from, fallback: m.fromFallback && available.has(m.fromFallback) && m.fromFallback !== m.from ? m.fromFallback : null, manual: true };
+    }
+    log.info('roles restored', { count: moves.length });
+    return this.setSetting('roles', roles).roles;
   }
 
   setRole({ role, model, fallback }: RoleSetArgs): Settings['roles'] {

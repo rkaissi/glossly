@@ -363,6 +363,8 @@ export interface PresetInfo {
   /** Text goes through this service on its way to the model's maker. */
   via: boolean;
   baseUrl?: string;
+  /** Something to know before adding it (Gemini's free tier and training, decision 80). */
+  note?: string;
 }
 
 /** A provider the user added (decision 79), as the Models tab shows it. */
@@ -378,6 +380,7 @@ export interface ProviderStatus {
   api: ApiStyle | null;
   via: boolean;
   free: boolean;
+  note: string | null;
   keyUrl: string;
   keyPlaceholder: string;
   hasKey: boolean;
@@ -410,6 +413,8 @@ export interface KeyTestResult {
   ok: boolean;
   /** The provider the test saved, on success ("custom-2" for a new Custom one). */
   id?: string;
+  /** Roles that moved to another model because this provider was added (decision 80); hand-picked roles never move. */
+  moved?: RoleMove[];
   /** Number of chat models the key can use. */
   models: number;
   /** The provider's own error message on failure. Never contains the key. */
@@ -469,6 +474,14 @@ export interface ModelsRefreshResult {
   notices: string[];
   /** Providers whose listing failed, with the provider's message. */
   errors: { provider: string; message: string }[];
+}
+
+/** A role's automatic pick moved from one model to another. */
+export interface RoleMove {
+  role: RoleName;
+  from: ModelRef;
+  fromFallback: ModelRef | null;
+  to: ModelRef | null;
 }
 
 export interface RoleSetArgs {
@@ -624,6 +637,8 @@ export interface InvokeChannels {
   'local:model': { args: { model: ModelRef }; result: void };
   'models:refresh': { args: void; result: ModelsRefreshResult };
   'roles:set': { args: RoleSetArgs; result: Settings['roles'] };
+  /** "Keep my previous models": puts moved roles back, as picked by hand so they stay (decision 80). */
+  'roles:restore': { args: { moves: RoleMove[] }; result: Settings['roles'] };
   /** Shows a save dialog. Null when cancelled. */
   'data:export': { args: void; result: { path: string } | null };
   /** Deletes items, entities, people, vectors, events, and collections (re-seeded). Keys, settings, the model list, and the embedding model stay. */

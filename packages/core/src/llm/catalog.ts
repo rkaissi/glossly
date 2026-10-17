@@ -14,6 +14,8 @@ export interface Capabilities {
   tier: number;
   /** Reasoning effort for structured calls on reasoning models; reasoning tokens count against the output cap. */
   reasoning?: 'none' | 'minimal' | 'low';
+  /** False: known, but never picked for a role on its own (Gemini Pro and previews, retired families; decision 80). */
+  auto?: boolean;
 }
 
 /** Dollars per million tokens, from the provider's own model list. */
@@ -89,6 +91,9 @@ const VENDORS: Record<string, string> = {
   minimaxai: 'minimax',
 };
 
+/** The makers whose entries a gateway's unprefixed model id is tried against, in order. */
+const MAKERS = ['openai', 'anthropic', 'google', 'xai', 'deepseek', 'moonshot', 'mistral', 'minimax'];
+
 function direct(provider: string, modelId: string): Capabilities | null {
   const e = entries.find((m) => m.provider === provider && m.re.test(modelId));
   if (!e) return null;
@@ -106,7 +111,13 @@ export function lookupCapabilities(provider: string, modelId: string): Capabilit
   if (own || listedProviders.has(provider)) return own;
   const m = /^([^/:]+)[/:](.+)$/.exec(modelId);
   const maker = m && VENDORS[m[1]!.toLowerCase()];
-  return maker ? direct(maker, m[2]!) : null;
+  if (maker) return direct(maker, m[2]!);
+  // No vendor prefix (Ramp's "gpt-5.6-luna"): the makers' patterns name their families, so try each.
+  if (!m) for (const p of MAKERS) {
+    const caps = direct(p, modelId);
+    if (caps) return caps;
+  }
+  return null;
 }
 
 /** Below these blended prices (3 parts input to 1 part output, per million tokens) a model counts as low, then medium cost. */
@@ -135,17 +146,22 @@ export function toCatalogModel(provider: string, modelId: string, displayName?: 
   };
 }
 
+/** Last tie-break: within one family, the newer version ("gemini-3.5-flash-lite" before "gemini-3.1-flash-lite"; decision 80). */
+const family = (id: string) => id.replace(/\d+(\.\d+)*/g, '#');
+const newer = (a: CatalogModel, b: CatalogModel) =>
+  a.provider === b.provider && family(a.modelId) === family(b.modelId) ? b.modelId.localeCompare(a.modelId, undefined, { numeric: true }) : 0;
+
 const COST: Record<Tier, number> = { low: 0, medium: 1, high: 2 };
 const SPEED: Record<Speed, number> = { fast: 0, medium: 1, slow: 2 };
 
 /**
- * Default pick for a role from the available models, or null. Untested models are skipped.
+ * Default pick for a role from the available models, or null. Untested models, and known ones marked `auto: false`, are skipped.
  * Decision (the router, after every bar open) takes the fastest structured model, preferring one
  * that doesn't reason, then the smallest among equals, which answers soonest (decision 60). Fast takes the cheapest,
- * fastest structured model; Chat the highest tier.
+ * fastest structured model; Chat the highest tier, then the cheaper, then the quicker.
  */
 export function pickDefault(role: RoleName, models: CatalogModel[]): CatalogModel | null {
-  const tested = models.filter((m): m is CatalogModel & { capabilities: Capabilities } => m.capabilities !== null);
+  const tested = models.filter((m): m is CatalogModel & { capabilities: Capabilities } => m.capabilities !== null && m.capabilities.auto !== false);
   // Among equals, the maker's own key before a gateway's copy of the same model.
   const order = (m: CatalogModel) => {
     const i = entries.findIndex((e) => e.provider === m.provider && e.re.test(m.modelId));
@@ -161,7 +177,8 @@ export function pickDefault(role: RoleName, models: CatalogModel[]): CatalogMode
         COST[a.capabilities.cost] - COST[b.capabilities.cost] ||
         Number(b.capabilities.structured === 'json_schema') - Number(a.capabilities.structured === 'json_schema') ||
         a.capabilities.tier - b.capabilities.tier ||
-        order(a) - order(b),
+        order(a) - order(b) ||
+        newer(a, b),
     );
     return ok[0] ?? null;
   }
@@ -172,11 +189,20 @@ export function pickDefault(role: RoleName, models: CatalogModel[]): CatalogMode
         COST[a.capabilities.cost] - COST[b.capabilities.cost] ||
         SPEED[a.capabilities.speed] - SPEED[b.capabilities.speed] ||
         a.capabilities.tier - b.capabilities.tier ||
-        order(a) - order(b),
+        order(a) - order(b) ||
+        newer(a, b),
     );
     return ok[0] ?? null;
   }
   const ok = tested.filter((m) => m.capabilities.streaming);
-  ok.sort((a, b) => b.capabilities.tier - a.capabilities.tier || COST[a.capabilities.cost] - COST[b.capabilities.cost] || order(a) - order(b));
+  ok.sort(
+    (a, b) =>
+      b.capabilities.tier - a.capabilities.tier ||
+      COST[a.capabilities.cost] - COST[b.capabilities.cost] ||
+      // Among equals, the quicker one (measured once known): one Gemini Flash took a minute where another took a second (decision 80).
+      SPEED[a.capabilities.speed] - SPEED[b.capabilities.speed] ||
+      order(a) - order(b) ||
+      newer(a, b),
+  );
   return ok[0] ?? null;
 }

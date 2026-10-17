@@ -375,3 +375,12 @@ button.more-providers:hover:not(:disabled) {
 button.more-providers .muted {
   font-weight: 400;
 }
+
+/* ---- after adding: the roles that moved (decision 80) ---- */
+
+.role-moves ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+}

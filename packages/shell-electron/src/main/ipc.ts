@@ -34,6 +34,8 @@ import {
   type SetSettingResult,
   type SettingsKey,
   ApiStyleSchema,
+  ModelRefSchema,
+  RoleNameSchema,
   type ApiStyle,
 } from '@glossly/core';
 import type { Capture } from './capture';
@@ -574,6 +576,16 @@ export function registerIpc(deps: IpcDeps): void {
     const r = await services.refreshModels();
     broadcastSettings();
     return r;
+  });
+  handle('roles:restore', (a) => {
+    const moves = (Array.isArray(a.moves) ? a.moves.slice(0, 3) : []).map((m: unknown) => {
+      const o = obj(m);
+      const role = RoleNameSchema.parse(o.role);
+      return { role, from: ModelRefSchema.parse(o.from), fromFallback: o.fromFallback == null ? null : ModelRefSchema.parse(o.fromFallback), to: null };
+    });
+    const roles = services.restoreRoles(moves);
+    broadcastSettings();
+    return roles;
   });
   handle('roles:set', (a) => {
     const role = str(a.role, 20);
