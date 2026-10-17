@@ -148,9 +148,10 @@ button.prow-head:hover:not(:disabled) {
   inset: 0;
   /* Under popovers (1000), so a Select inside the dialog opens above it. */
   z-index: 900;
+  /* Pinned near the top, so the dialog grows and shrinks downward as the search filters and tiles stay put. */
   display: grid;
-  place-items: center;
-  padding: var(--s-5);
+  place-items: start center;
+  padding: 48px var(--s-5) var(--s-5);
   background: rgba(0, 0, 0, 0.18);
   animation: modal-fade 160ms ease-out;
 }

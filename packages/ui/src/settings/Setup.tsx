@@ -1,7 +1,7 @@
 // First-run setup (Step 20.3, decision 41; designed in docs/design/mockups/20-3-design-pass.html):
 // one screen per step with progress dots and one primary button. A step slides in from the side it
 // comes from only when the step changes; choices inside it update in place.
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Bookmark, Check, Cloud, Laptop, ListChecks, MessageCircle, Plus, Reply } from 'lucide-react';
 import type { Privacy, SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
@@ -207,6 +207,13 @@ function firstPick(view: SettingsView): string {
 
 function ConnectStep({ view }: { view: SettingsView }) {
   const [pick, setPick] = useState(() => firstPick(view));
+  const pane = useRef<HTMLDivElement>(null);
+  const first = useRef(true);
+  // A fifth choice from More providers pushes its form down: bring it into view (the Connect button was below the fold).
+  useEffect(() => {
+    if (first.current) first.current = false;
+    else pane.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [pick]);
   const [adding, setAdding] = useState(false);
   // A Custom provider saved here: shown as working once it is.
   const [custom, setCustom] = useState<string | null>(null);
@@ -260,7 +267,7 @@ function ConnectStep({ view }: { view: SettingsView }) {
         More providers
         <span className="muted small">xAI, DeepSeek, OpenRouter, Ollama, your own…</span>
       </button>
-      <div className="setup-pane" key={pick}>
+      <div className="setup-pane" key={pick} ref={pane}>
         {works(pick) ? (
           <div className="setup-ok">
             <OkLine>

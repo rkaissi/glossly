@@ -314,7 +314,7 @@ function Catalog({ view }: { view: SettingsView }) {
       {groups.map((g) => (
         <div key={g.provider} className="catalog">
           <h4>
-            {g.label} <span className="muted small">{g.models.length} models</span>
+            {g.label} <span className="muted small">{g.models.length === 1 ? '1 model' : `${g.models.length} models`}</span>
           </h4>
           <ul>
             {g.models.map((m) => (

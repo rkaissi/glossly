@@ -445,7 +445,8 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
       this.applyRoleUpdate();
       log.info('local server added', { models: r.models, loopback: isLoopbackUrl(baseUrl) });
     }
-    return this.recordTest(LOCAL_PROVIDER, r);
+    // A failed try at another address leaves the saved server's status as it was.
+    return r.ok || baseUrl === this.settingsCache.local.baseUrl ? this.recordTest(LOCAL_PROVIDER, r) : r;
   }
 
   async testLocal(): Promise<KeyTestResult> {
