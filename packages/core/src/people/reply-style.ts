@@ -13,9 +13,13 @@
 
 import { RELATIONSHIP_PLURALS, type Relationship } from './relationship';
 
-/** The kind of platform, not the app: Gmail and Outlook are both email, Discord and WhatsApp messaging, Slack and Teams work chat. */
-export type ReplyChannel = 'email' | 'messaging' | 'work_chat' | 'other';
-export const REPLY_CHANNELS = ['email', 'messaging', 'work_chat', 'other'] as const satisfies readonly ReplyChannel[];
+/**
+ * The kind of place, not the app: Gmail and Outlook are both email, Discord and WhatsApp
+ * messaging, Slack and Teams work chat, Word and Google Docs a document (Write here, decision 81).
+ * Each learns its own style.
+ */
+export type ReplyChannel = 'email' | 'messaging' | 'work_chat' | 'document' | 'other';
+export const REPLY_CHANNELS = ['email', 'messaging', 'work_chat', 'document', 'other'] as const satisfies readonly ReplyChannel[];
 
 export const STYLE_DIMENSIONS = [
   'length',
@@ -78,25 +82,36 @@ export interface StyleSignal {
   weight: number;
 }
 
+/** Which action taught a signal: Reply's picks and edits, or Write here's edits and asks (decision 81). */
+export type StyleSource = 'reply' | 'write';
+
 /** A stored signal: where and when it was seen, and the person's relationship as it is now. */
 export interface StyleSignalRow extends StyleSignal {
   channel: ReplyChannel;
   person_id: string | null;
   relationship: Relationship | null;
   at: string;
+  source: StyleSource;
 }
 
 export interface StylePreference {
   dimension: StyleDimension;
   pole: StylePole;
-  /** The person's own wins, then their relationship on this kind of platform, then the platform. */
-  scope: 'person' | 'group' | 'channel';
+  /**
+   * The person's own wins, then their relationship on this kind of platform, then the platform,
+   * then `everywhere`: a side that holds in two or more places with none disagreeing (decision 81).
+   */
+  scope: 'person' | 'group' | 'channel' | 'everywhere';
   channel: ReplyChannel | null;
   relationship: Relationship | null;
   personId: string | null;
   /** Recent signals that agree, out of `of`. */
   agree: number;
   of: number;
+  /** Which actions the agreeing signals came from. */
+  sources: StyleSource[];
+  /** Everywhere only: the places that agree. */
+  places?: ReplyChannel[];
 }
 
 const EMAIL_PROCESSES = ['outlook.exe', 'olk.exe', 'hxoutlook.exe', 'thunderbird.exe', 'mailspring.exe', 'mailclient.exe'];
@@ -106,9 +121,16 @@ const MESSAGING_PROCESSES = ['discord.exe', 'whatsapp.exe', 'whatsapp.root.exe',
 const EMAIL_TITLES = /(?:- Gmail|- Outlook|Outlook$|Yahoo Mail|Proton Mail|Fastmail|iCloud Mail|AOL Mail|Zoho Mail)\b/i;
 const WORK_TITLES = /(?:- Slack|Slack \||Microsoft Teams|Google Chat|Mattermost)\b/i;
 const MESSAGING_TITLES = /(?:Discord|WhatsApp|Messenger|Telegram|Instagram|Snapchat)\b/i;
+const DOC_PROCESSES = ['winword.exe', 'notepad.exe', 'wordpad.exe', 'onenote.exe', 'onenoteim.exe', 'notion.exe', 'obsidian.exe', 'soffice.bin', 'evernote.exe', 'typora.exe'];
+const DOC_TITLES = /(?:- Google Docs|- Word\b|Notion\b|- OneNote|Confluence|Dropbox Paper|Coda\b|- Obsidian|Quip\b)/i;
+const CODE_PROCESSES = ['code.exe', 'cursor.exe', 'devenv.exe', 'idea64.exe', 'pycharm64.exe', 'webstorm64.exe', 'rider64.exe', 'sublime_text.exe', 'notepad++.exe', 'zed.exe'];
+const CODE_TITLES = /(?:- Visual Studio Code|- Cursor$|· GitHub|- GitHub)/i;
+
+/** A code editor or a code host: not a document, and Write here keeps to plain text there. */
+export const isCodeEditor = (app: string, title: string) => CODE_PROCESSES.includes(app.toLowerCase()) || CODE_TITLES.test(title);
 
 /** The kind of platform: register differs a lot between them, so each learns on its own. */
-const PLATFORM_WORDS: Partial<Record<ReplyChannel, string>> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat' };
+const PLATFORM_WORDS: Partial<Record<ReplyChannel, string>> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', document: 'document' };
 
 /**
  * Where text came from, for a model prompt: the app, the window title, and the kind of platform
@@ -126,6 +148,8 @@ export function replyChannel(app: string, title: string): ReplyChannel {
   if (EMAIL_PROCESSES.includes(p) || EMAIL_TITLES.test(title)) return 'email';
   if (WORK_PROCESSES.includes(p) || WORK_TITLES.test(title)) return 'work_chat';
   if (MESSAGING_PROCESSES.includes(p) || MESSAGING_TITLES.test(title)) return 'messaging';
+  if (isCodeEditor(app, title)) return 'other';
+  if (DOC_PROCESSES.includes(p) || DOC_TITLES.test(title)) return 'document';
   return 'other';
 }
 
@@ -382,6 +406,11 @@ export function pickSignals(input: { drafts: PickDraft[]; chosen: number; final:
   return out;
 }
 
+/** What an edit of a Write here text changed (decision 81), each worth 2 as in Reply. */
+export function editedSignals(original: string, final: string): StyleSignal[] {
+  return editSignals(draftTraits(original), draftTraits(final));
+}
+
 /** What an edit changed, measured in code, for the style notes ("words 42 → 18", "Writes in lowercase"). */
 export function measuredChanges(original: string, final: string): string[] {
   const a = draftTraits(original);
@@ -397,9 +426,30 @@ const WINDOW = 20;
 const DECAY = 0.9;
 /** Share of the (decayed) weight one side needs. */
 const AGREE = 0.7;
-const MIN_SIGNALS = { person: 3, group: 5, channel: 5 } as const;
+/** `place` is what a place needs to count toward `everywhere` (it then needs two places). */
+const MIN_SIGNALS = { person: 3, group: 5, channel: 5, place: 3 } as const;
+/**
+ * Traits that can carry from one place to another (decision 81). What a reply picks (`kind`) and
+ * the shape of a message (greeting, sign-off, line breaks) belong to the place, so they never do.
+ */
+const EVERYWHERE_DIMENSIONS: ReadonlySet<StyleDimension> = new Set([
+  'length',
+  'exclamation',
+  'emoji',
+  'capitals',
+  'end_period',
+  'apostrophes',
+  'dashes',
+  'ellipsis',
+  'sentence_length',
+  'word_length',
+  'punctuation',
+  'tone',
+]);
 
-function judge(rows: StyleSignalRow[], min: number): { pole: StylePole; agree: number; of: number } | null {
+type Judged = { pole: StylePole; agree: number; of: number; sources: StyleSource[] };
+
+function judge(rows: StyleSignalRow[], min: number): Judged | null {
   const recent = [...rows].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)).slice(0, WINDOW);
   if (recent.length < min) return null;
   const totals = new Map<StylePole, number>();
@@ -411,10 +461,32 @@ function judge(rows: StyleSignalRow[], min: number): { pole: StylePole; agree: n
   });
   const [pole, weight] = [...totals.entries()].sort((a, b) => b[1] - a[1])[0]!;
   if (all === 0 || weight / all < AGREE) return null;
-  return { pole, agree: recent.filter((r) => r.pole === pole).length, of: recent.length };
+  const agreeing = recent.filter((r) => r.pole === pole);
+  const sources = (['reply', 'write'] as const).filter((s) => agreeing.some((r) => (r.source ?? 'reply') === s));
+  return { pole, agree: agreeing.length, of: recent.length, sources };
 }
 
-/** The preferences for one reply: the person's own where they have enough, else their relationship on this platform, else the platform's. */
+/**
+ * One trait everywhere: each place judged on its own (at least `MIN_SIGNALS.place`); the side
+ * that two or more places agree on, when no place leans the other way. Null otherwise.
+ */
+function judgeEverywhere(rows: StyleSignalRow[]): (Judged & { places: ReplyChannel[] }) | null {
+  const byPlace = REPLY_CHANNELS.map((c) => [c, judge(rows.filter((r) => r.channel === c), MIN_SIGNALS.place)] as const).filter((x): x is readonly [ReplyChannel, Judged] => x[1] !== null);
+  const poles = new Set(byPlace.map(([, j]) => j.pole));
+  if (byPlace.length < 2 || poles.size !== 1) return null;
+  return {
+    pole: byPlace[0]![1].pole,
+    agree: byPlace.reduce((n, [, j]) => n + j.agree, 0),
+    of: byPlace.reduce((n, [, j]) => n + j.of, 0),
+    sources: (['reply', 'write'] as const).filter((s) => byPlace.some(([, j]) => j.sources.includes(s))),
+    places: byPlace.map(([c]) => c),
+  };
+}
+
+/**
+ * The preferences for one text: the person's own where they have enough, else their relationship
+ * on this platform, else the platform's, else what holds everywhere (decision 81).
+ */
 export function preferencesFor(
   rows: StyleSignalRow[],
   to: { channel: ReplyChannel; personId: string | null; relationship: Relationship | null },
@@ -435,7 +507,12 @@ export function preferencesFor(
       continue;
     }
     const channel = judge(onPlatform, MIN_SIGNALS.channel);
-    if (channel) out.push({ ...base, ...channel, scope: 'channel', channel: to.channel });
+    if (channel) {
+      out.push({ ...base, ...channel, scope: 'channel', channel: to.channel });
+      continue;
+    }
+    const everywhere = EVERYWHERE_DIMENSIONS.has(dimension) ? judgeEverywhere(mine) : null;
+    if (everywhere) out.push({ ...base, ...everywhere, scope: 'everywhere' });
   }
   return out;
 }
@@ -465,6 +542,8 @@ export function allPreferences(rows: StyleSignalRow[]): StylePreference[] {
       );
       if (j) out.push({ ...base, ...j, scope: 'person', personId });
     }
+    const everywhere = EVERYWHERE_DIMENSIONS.has(dimension) ? judgeEverywhere(mine) : null;
+    if (everywhere) out.push({ ...base, ...everywhere, scope: 'everywhere' });
   }
   return out;
 }
@@ -504,7 +583,7 @@ const PHRASES: Record<StyleDimension, Partial<Record<StylePole, string>>> = {
   },
 };
 
-const CHANNEL_WORDS: Record<ReplyChannel, string> = { email: 'in email', messaging: 'in messaging apps', work_chat: 'in work chat', other: 'in other apps' };
+const CHANNEL_WORDS: Record<ReplyChannel, string> = { email: 'in email', messaging: 'in messaging apps', work_chat: 'in work chat', document: 'in documents', other: 'in other apps' };
 
 /** "in messaging apps", for a style note's platform. */
 export const channelWords = (c: ReplyChannel): string => CHANNEL_WORDS[c];
@@ -516,12 +595,14 @@ export function preferenceLabel(p: Pick<StylePreference, 'dimension' | 'pole'>):
 /** Where it applies, for a person by name: "in email", "with friends in messaging apps", "with Jordan Hale". */
 export function preferenceScope(p: Pick<StylePreference, 'scope' | 'channel' | 'relationship'>, personName?: string | null): string {
   if (p.scope === 'person') return `with ${personName ?? 'this person'}`;
+  if (p.scope === 'everywhere') return 'everywhere';
   const where = CHANNEL_WORDS[p.channel ?? 'other'];
   return p.scope === 'group' && p.relationship ? `with ${RELATIONSHIP_PLURALS[p.relationship]} ${where}` : where;
 }
 
 /** One line for the Reply prompt, with its evidence. */
 export function preferenceLine(p: StylePreference, personName?: string | null): string {
+  if (p.scope === 'everywhere') return `${preferenceLabel(p)} (${p.agree} of the last ${p.of} choices, in ${p.places?.length ?? 2} kinds of place)`;
   return `${preferenceLabel(p)} (${p.agree} of the last ${p.of} picks ${preferenceScope(p, personName)})`;
 }
 

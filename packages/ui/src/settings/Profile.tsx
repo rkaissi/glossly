@@ -1,9 +1,9 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { Pencil, Trash2, X } from 'lucide-react';
-import type { Identity, ReplyChannel, SettingsView, StylePreferenceView, StyleView, VoiceSample } from '@glossly/core/api';
+import type { ContextUsed, DroppedKindView, Identity, ReplyChannel, SettingsView, StylePreferenceView, StyleSource, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
-import { Switch } from '../controls/Toggles';
+import { Segmented, Switch } from '../controls/Toggles';
 import { parseEmail, parseHandle } from './format';
 import { useAction } from './useAction';
 
@@ -121,6 +121,7 @@ const VOICE_PLATFORMS: { value: VoicePlatform; label: string }[] = [
   { value: 'email', label: 'Email' },
   { value: 'messaging', label: 'Messaging app' },
   { value: 'work_chat', label: 'Work chat' },
+  { value: 'document', label: 'Document' },
   { value: 'any', label: 'Any' },
 ];
 
@@ -217,19 +218,45 @@ function VoiceSamples() {
   );
 }
 
+/** Which actions taught a preference, for its row. */
+const SOURCE_WORDS: Record<StyleSource, string> = { reply: 'Reply', write: 'Write here' };
+const sourceWords = (sources: StyleSource[]) => sources.map((s) => SOURCE_WORDS[s]).join(' and ');
+/** The places Profile can filter by; the list shows only the ones that have something. */
+const PLACE_LABELS: Record<ReplyChannel, string> = { email: 'Email', messaging: 'Messaging', work_chat: 'Work chat', document: 'Documents', other: 'Other' };
+const PLACE_WORDS: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging', work_chat: 'work chat', document: 'documents', other: 'other apps' };
+const KIND_WORDS: Record<ContextUsed['kind'], string> = { note: 'notes', person: 'people', task: 'tasks', event: 'events' };
+type PlaceFilter = ReplyChannel | 'all';
+const REPLY_PLACES: ReplyChannel[] = ['email', 'messaging', 'work_chat', 'document', 'other'];
+
 /**
- * What Reply learned from the drafts you pick and edit: preferences counted in code (per kind of
- * app and per person) and the model's style notes. Each can be removed; one switch turns it off.
+ * What Reply and Write here learned (decision 81): preferences counted in code (per place, per
+ * person, and everywhere), the model's style notes, and the kinds of saved data Write here leaves
+ * out in a place. A place filter narrows the list; each row can be forgotten; one switch turns
+ * learning off.
  */
 function LearnedStyle({ learning }: { learning: boolean }) {
   const [view, setView] = useState<StyleView | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [place, setPlace] = useState<PlaceFilter>('all');
   const { busy, error, run } = useAction();
   useEffect(() => reloadOnFocus(() => void glossly.invoke('style:get').then(setView)), [learning]);
-  const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.personId ?? `${p.relationship ?? ''}:${p.channel}`}`;
+  const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.scope}:${p.personId ?? `${p.relationship ?? ''}:${p.channel}`}`;
   const forget = (p: StylePreferenceView) =>
     void run(async () => {
-      setView(await glossly.invoke('style:forget', { dimension: p.dimension, channel: p.channel, personId: p.personId, relationship: p.relationship }));
+      setView(
+        await glossly.invoke('style:forget', {
+          dimension: p.dimension,
+          channel: p.channel,
+          personId: p.personId,
+          relationship: p.relationship,
+          ...(p.scope === 'everywhere' && { pole: p.pole }),
+        }),
+      );
+      setPending(null);
+    });
+  const forgetDropped = (d: DroppedKindView) =>
+    void run(async () => {
+      setView(await glossly.invoke('style:forget-dropped', { channel: d.channel, kind: d.kind }));
       setPending(null);
     });
   const removeNote = (id: string) =>
@@ -262,29 +289,54 @@ function LearnedStyle({ learning }: { learning: boolean }) {
       </button>
     </li>
   );
-  const prefs = view?.preferences ?? [];
-  const notes = view?.notes ?? [];
+  const allPrefs = view?.preferences ?? [];
+  const allNotes = view?.notes ?? [];
+  const allDropped = view?.dropped ?? [];
+  // A place shows its own rows and the ones that hold everywhere (or, for an everywhere preference, in that place).
+  const inPlace = (channel: ReplyChannel | null, places?: ReplyChannel[]) => place === 'all' || channel === place || (channel === null && (!places || places.includes(place)));
+  const prefs = allPrefs.filter((p) => (p.scope === 'person' ? place === 'all' : inPlace(p.channel, p.places)));
+  const notes = allNotes.filter((n) => inPlace(n.channel));
+  const dropped = allDropped.filter((d) => inPlace(d.channel));
+  const places = REPLY_PLACES.filter((c) => allPrefs.some((p) => p.channel === c || p.places?.includes(c)) || allNotes.some((n) => n.channel === c) || allDropped.some((d) => d.channel === c));
+  const nothing = allPrefs.length === 0 && allNotes.length === 0 && allDropped.length === 0;
+  const prefMeta = (p: StylePreferenceView) =>
+    [`${p.agree} of ${p.of}`, p.scope === 'everywhere' && p.places ? p.places.map((c) => PLACE_WORDS[c]).join(' and ') : null, p.sources.length ? sourceWords(p.sources) : null].filter(Boolean).join(' · ');
   return (
     <div className="field">
       <div className="toggle">
         <span>
-          <strong>Learn from the drafts I pick and edit</strong>
+          <strong>Learn from what I pick, edit, and ask for</strong>
           <span className="muted small block">
-            Reply learns your habits from the drafts you choose and the edits you make. What it learned shows here.
+            Reply and Write here learn your habits from the drafts you choose, the edits you make, and what you ask them to write or change, per place. A
+            habit you show in two places applies everywhere else too. What they learned shows here.
           </span>
         </span>
-        <Switch label="Learn from the drafts I pick and edit" checked={learning} disabled={busy} onChange={toggle} />
+        <Switch label="Learn from what I pick, edit, and ask for" checked={learning} disabled={busy} onChange={toggle} />
       </div>
-      {learning && view && prefs.length === 0 && notes.length === 0 && (
-        <p className="muted small">Nothing learned yet. After a few replies, what you tend to pick shows here.</p>
+      {learning && view && nothing && <p className="muted small">Nothing learned yet. After a few replies or texts, what you tend to pick shows here.</p>}
+      {places.length > 1 && (
+        <Segmented
+          size="sm"
+          label="Place"
+          value={places.includes(place as ReplyChannel) ? place : 'all'}
+          options={[['all', 'All'] as const, ...places.map((c) => [c, PLACE_LABELS[c]] as const)]}
+          onChange={(v) => {
+            setPlace(v);
+            setPending(null);
+          }}
+        />
       )}
-      {prefs.length > 0 && (
-        <ul className="list">{prefs.map((p) => row(prefKey(p), `${p.label} ${p.where}`, `${p.agree} of ${p.of}`, () => forget(p)))}</ul>
-      )}
+      {prefs.length > 0 && <ul className="list">{prefs.map((p) => row(prefKey(p), `${p.label} ${p.where}`, prefMeta(p), () => forget(p)))}</ul>}
       {notes.length > 0 && (
         <>
-          <p className="muted small">Notes from your edits</p>
+          <p className="muted small">Notes from your edits and requests</p>
           <ul className="list">{notes.map((n) => row(`note:${n.id}`, n.text, n.where, () => removeNote(n.id)))}</ul>
+        </>
+      )}
+      {dropped.length > 0 && (
+        <>
+          <p className="muted small">Write here leaves these out, since you usually do</p>
+          <ul className="list">{dropped.map((d) => row(`dropped:${d.channel}:${d.kind}`, `Your ${KIND_WORDS[d.kind]}`, d.where, () => forgetDropped(d)))}</ul>
         </>
       )}
       {error && <p className="error small">{error}</p>}

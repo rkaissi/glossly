@@ -44,7 +44,7 @@ const TARGET_WORDS: Record<PasteTarget, string> = {
   code: 'a code editor',
   other: 'an app (kind unknown)',
 };
-const PLATFORM: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', other: 'other app' };
+const PLATFORM: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', document: 'document', other: 'other app' };
 const ASK_LINES: Record<WriteAsk, string> = {
   shorter: 'Shorter.',
   longer: 'Longer and fuller.',

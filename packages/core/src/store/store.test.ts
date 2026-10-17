@@ -26,7 +26,7 @@ function unit(dims: number, hot: number): Float32Array {
 describe('Store', () => {
   it('migrates and seeds default collections', () => {
     store = new Store(':memory:');
-    expect(store.schemaVersion).toBe(10);
+    expect(store.schemaVersion).toBe(11);
     expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
     expect(store.collectionByName('reading')?.name).toBe('Reading');
   });
@@ -45,7 +45,7 @@ describe('Store', () => {
       old.exec("INSERT INTO style_notes (id, text, created_at) VALUES ('n', 'Writes in lowercase', '2026-10-10T20:00:00-04:00')");
       old.close();
       store = new Store(path);
-      expect(store.schemaVersion).toBe(10);
+      expect(store.schemaVersion).toBe(11);
       const people = new PeopleRepo(store);
       expect(people.styleSignals().map((s) => s.dimension)).toEqual(['length']);
       expect(people.styleNotes()).toMatchObject([{ text: 'Writes in lowercase', channel: null }]);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   allPreferences,
   draftTraits,
+  editedSignals,
   editRatio,
   isMeaningfulEdit,
   measuredChanges,
@@ -32,7 +33,10 @@ describe('replyChannel', () => {
     expect(replyChannel('ms-teams.exe', 'Chat | Microsoft Teams')).toBe('work_chat');
     expect(replyChannel('chrome.exe', 'Discord | #general')).toBe('messaging');
     expect(replyChannel('whatsapp.root.exe', 'WhatsApp')).toBe('messaging');
-    expect(replyChannel('notepad.exe', 'notes.txt')).toBe('other');
+    expect(replyChannel('notepad.exe', 'notes.txt')).toBe('document');
+    expect(replyChannel('chrome.exe', 'Plan - Google Docs - Google Chrome')).toBe('document');
+    expect(replyChannel('code.exe', 'notes.md - Notion clone - Visual Studio Code')).toBe('other');
+    expect(replyChannel('explorer.exe', 'Downloads')).toBe('other');
   });
 });
 
@@ -158,7 +162,7 @@ describe('pickSignals', () => {
 });
 
 const rows = (signals: StyleSignal[], over: Partial<StyleSignalRow> = {}, startDay = 1): StyleSignalRow[] =>
-  signals.map((s, i) => ({ ...s, channel: 'email', person_id: null, relationship: null, at: `2026-10-${String(startDay + i).padStart(2, '0')}T12:00:00-04:00`, ...over }));
+  signals.map((s, i) => ({ ...s, channel: 'email', person_id: null, relationship: null, source: 'reply', at: `2026-10-${String(startDay + i).padStart(2, '0')}T12:00:00-04:00`, ...over }));
 const shorter = (n: number): StyleSignal[] => Array.from({ length: n }, () => ({ dimension: 'length', pole: 'shorter', weight: 1 }));
 const longer = (n: number): StyleSignal[] => Array.from({ length: n }, () => ({ dimension: 'length', pole: 'longer', weight: 1 }));
 
@@ -167,7 +171,7 @@ describe('preferencesFor', () => {
     expect(preferencesFor(rows(shorter(1)), { channel: 'email', personId: null, relationship: null })).toEqual([]);
     expect(preferencesFor(rows(shorter(4)), { channel: 'email', personId: null, relationship: null })).toEqual([]);
     const p = preferencesFor(rows(shorter(5)), { channel: 'email', personId: null, relationship: null });
-    expect(p).toEqual([{ dimension: 'length', pole: 'shorter', scope: 'channel', channel: 'email', relationship: null, personId: null, agree: 5, of: 5 }]);
+    expect(p).toEqual([{ dimension: 'length', pole: 'shorter', scope: 'channel', channel: 'email', relationship: null, personId: null, agree: 5, of: 5, sources: ['reply'] }]);
     expect(preferenceLine(p[0]!)).toBe('Keeps replies short (5 of the last 5 picks in email)');
   });
 
@@ -211,11 +215,42 @@ describe('preferencesFor', () => {
   });
 });
 
+describe('everywhere (decision 81)', () => {
+  const dashes = (pole: 'with' | 'without', n: number): StyleSignal[] => Array.from({ length: n }, () => ({ dimension: 'dashes', pole, weight: 2 }));
+  const to = (channel: StyleSignalRow['channel']) => ({ channel, personId: null, relationship: null });
+
+  it('carries a side two places agree on to a place with no habit of its own, naming both actions', () => {
+    const data = [...rows(dashes('without', 3), { channel: 'email' }), ...rows(dashes('without', 3), { channel: 'document', source: 'write' }, 10)];
+    const p = preferencesFor(data, to('messaging'));
+    expect(p).toEqual([{ dimension: 'dashes', pole: 'without', scope: 'everywhere', channel: null, relationship: null, personId: null, agree: 6, of: 6, sources: ['reply', 'write'], places: ['email', 'document'] }]);
+    expect(preferenceLine(p[0]!)).toBe('Avoids dashes (6 of the last 6 choices, in 2 kinds of place)');
+    expect(allPreferences(data).filter((x) => x.scope === 'everywhere')).toHaveLength(1);
+  });
+
+  it('never when a place disagrees, with one place only, or for a trait that belongs to the place', () => {
+    const agree = [...rows(dashes('without', 3), { channel: 'email' }), ...rows(dashes('without', 3), { channel: 'document' }, 10)];
+    expect(preferencesFor([...agree, ...rows(dashes('with', 3), { channel: 'work_chat' }, 20)], to('messaging'))).toEqual([]);
+    expect(preferencesFor(rows(dashes('without', 4), { channel: 'email' }), to('messaging'))).toEqual([]);
+    const greeting = (channel: StyleSignalRow['channel'], day: number) => rows(Array.from({ length: 3 }, () => ({ dimension: 'greeting' as const, pole: 'without' as const, weight: 2 })), { channel }, day);
+    expect(preferencesFor([...greeting('email', 1), ...greeting('document', 10)], to('messaging'))).toEqual([]);
+  });
+
+  it("lets a place's own habit win over everywhere", () => {
+    const data = [...rows(dashes('without', 3), { channel: 'email' }), ...rows(dashes('without', 3), { channel: 'document' }, 10), ...rows(dashes('with', 5), { channel: 'messaging' }, 20)];
+    expect(preferencesFor(data, to('messaging'))[0]).toMatchObject({ scope: 'channel', pole: 'with' });
+  });
+
+  it('reads an edit of a written text like an edit of a draft', () => {
+    expect(editedSignals('The slides are done — and the quotes are next.', 'The slides are done and the quotes are next.')).toContainEqual({ dimension: 'dashes', pole: 'without', weight: 2 });
+  });
+});
+
 describe('describeSource (decision 54)', () => {
   it('names the app, the window, and the kind of platform when it is known', () => {
     expect(describeSource('chrome.exe', 'Mail - Alex Morgan - Outlook - Google Chrome')).toBe('chrome.exe, "Mail - Alex Morgan - Outlook - Google Chrome" (email)');
     expect(describeSource('discord.exe', 'Discord')).toBe('discord.exe, "Discord" (messaging app)');
-    expect(describeSource('notepad.exe', 'notes.txt - Notepad')).toBe('notepad.exe, "notes.txt - Notepad"');
+    expect(describeSource('notepad.exe', 'notes.txt - Notepad')).toBe('notepad.exe, "notes.txt - Notepad" (document)');
+    expect(describeSource('explorer.exe', 'Downloads')).toBe('explorer.exe, "Downloads"');
     expect(describeSource('', '')).toBe('unknown app');
   });
 });

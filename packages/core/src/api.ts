@@ -21,7 +21,7 @@ import type { CalendarEvent, EventPatch, EventCandidate, EventSaveRow } from './
 import type { LibraryQuery, LibraryResult, RecallHit, SearchResults } from './recall/types';
 import type { VisualizeResult } from './visualize/types';
 import type { AliasKind, CommitmentStatus, CommitmentView, PersonCard, PersonSummary, PromiseSaveRow, PromiseRow, StyleNote, VoiceSample } from './people/types';
-import type { PickDraft, ReplyChannel, ReplyRedo, StyleDimension, StylePreference } from './people/reply-style';
+import type { PickDraft, ReplyChannel, ReplyRedo, StyleDimension, StylePole, StylePreference } from './people/reply-style';
 import type { Relationship } from './people/relationship';
 
 export type { CatalogModel, Capabilities, Price, Speed, Tier } from './llm/catalog';
@@ -30,7 +30,7 @@ export type { MetricsSummary } from './metrics';
 export type { WhoEntry, WhoView } from './actions/who';
 export type { DetectedPerson } from './people/detect';
 export type * from './people/types';
-export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePreference } from './people/reply-style';
+export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, StylePole, StylePreference, StyleSource } from './people/reply-style';
 export type { Relationship } from './people/relationship';
 export type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
 export type { PromisesByRules } from './actions/promises';
@@ -285,10 +285,18 @@ export interface StyleNoteView extends StyleNote {
   /** "in messaging apps", or null for everywhere. */
   where: string | null;
 }
+/** A kind of saved data Write here leaves out in one place, because the user keeps dropping it there (decision 81). */
+export interface DroppedKindView {
+  channel: ReplyChannel;
+  kind: ContextUsed['kind'];
+  /** "in email". */
+  where: string;
+}
 export interface StyleView {
   learning: boolean;
   preferences: StylePreferenceView[];
   notes: StyleNoteView[];
+  dropped: DroppedKindView[];
 }
 /** inserted: pasted into the source app. copied: on the clipboard instead (focus failed, or the focused field doesn't take text). */
 export type ReplyInsertResult = { result: 'inserted' } | { result: 'copied'; reason: 'focus' | 'not_editable' | 'paste' };
@@ -331,6 +339,10 @@ export interface WriteStartArgs {
   request?: string;
   /** Rewrite the text written before: chips and/or typed words. */
   change?: { previous: string; asks: WriteAsk[]; note?: string };
+  /** The request is a suggestion built in code, not the user's words, so nothing is learned from it. */
+  suggested?: boolean;
+  /** "Put back": kinds of saved data to use even though the user usually leaves them out here. */
+  include?: ContextUsed['kind'][];
 }
 export interface WriteStart {
   /** Chunks, done, and errors arrive on write:chunk, write:done, and write:error with this id. */
@@ -338,6 +350,8 @@ export interface WriteStart {
   /** What the text drew on from saved data (decision 77), for the "Used N" chip. */
   used: ContextUsed[];
   to: string | null;
+  /** Kinds of saved data left out because the user usually drops them in this place (decision 81). */
+  leftOut: ContextUsed['kind'][];
 }
 
 // ---- Tasks (formerly What did I promise) ----
@@ -573,7 +587,7 @@ export interface InvokeChannels {
   'write:start': { args: WriteStartArgs; result: WriteStart };
   'write:cancel': { args: { requestId: string }; result: void };
   /** Pastes the (possibly edited) text through the insert path, like Reply. */
-  'write:insert': { args: { sessionId: number; mode: 'written' | 'snippets'; text: string; edited: boolean }; result: ReplyInsertResult };
+  'write:insert': { args: { sessionId: number; mode: 'written' | 'snippets'; text: string; edited: boolean; original?: string }; result: ReplyInsertResult };
 
   /** One structured call (Fast role) for the commitments in the selection; due dates resolved in code. */
   'promises:extract': { args: { sessionId: number }; result: PromisesResult };
@@ -639,12 +653,14 @@ export interface InvokeChannels {
   'voice:add': { args: { text: string }; result: VoiceSample[] };
   'voice:remove': { args: { id: string }; result: VoiceSample[] };
   'voice:label': { args: { id: string; channel: ReplyChannel | null }; result: VoiceSample[] };
-  /** What Reply learned from picks and edits, and the style notes. */
+  /** What Reply and Write here learned from picks, edits, and asks, the style notes, and the kinds Write here leaves out. */
   'style:get': { args: void; result: StyleView };
-  /** Forgets one learned preference (it can be learned again). */
-  'style:forget': { args: { dimension: StyleDimension; channel: ReplyChannel | null; personId: string | null; relationship?: Relationship | null }; result: StyleView };
+  /** Forgets one learned preference (it can be learned again). An everywhere one passes its pole, with no place or person. */
+  'style:forget': { args: { dimension: StyleDimension; channel: ReplyChannel | null; personId: string | null; relationship?: Relationship | null; pole?: StylePole }; result: StyleView };
   /** Removes a style note; it is not written again. */
   'style:note-remove': { args: { id: string }; result: StyleView };
+  /** Write here shows this kind in this place again. */
+  'style:forget-dropped': { args: { channel: ReplyChannel; kind: ContextUsed['kind'] }; result: StyleView };
   'commitments:set-status': { args: { id: string; status: CommitmentStatus }; result: void };
 
   'settings:get': { args: void; result: SettingsView };

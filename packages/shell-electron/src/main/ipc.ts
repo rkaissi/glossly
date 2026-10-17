@@ -19,8 +19,10 @@ import {
   type ReplyPick,
   type ReplyRedo,
   type ReplyRedoAsk,
+  type StylePole,
   type WriteAsk,
   type WriteStartArgs,
+  type ContextUsed,
   type StyleDimension,
   type StyleView,
   type ActionId,
@@ -123,6 +125,8 @@ const replyRedo = (v: unknown): ReplyRedo | undefined => {
   });
   return { passedOn, asks: [...new Set(asks)], note: optStr(r.note, 500) ?? null };
 };
+/** The kinds of saved data a prompt can draw on (decision 77). */
+const CONTEXT_KINDS = ['note', 'person', 'task', 'event'] as const satisfies readonly ContextUsed['kind'][];
 /** Write here's change: the text written before, the chips picked, and what the user typed. */
 const writeChange = (v: unknown): WriteStartArgs['change'] => {
   if (v === undefined || v === null) return undefined;
@@ -214,7 +218,7 @@ export function registerIpc(deps: IpcDeps): void {
   handle('ask:action-accept', (a) => capture.acceptAskAction(num(a.sessionId), str(a.id, 100)));
   handle('ask:action-undo', (a) => capture.undoAskAction(num(a.sessionId), str(a.id, 100)));
   handle('context:dismiss', (a) => {
-    const kind = (['note', 'person', 'task', 'event'] as const).find((k) => k === a.kind);
+    const kind = CONTEXT_KINDS.find((k) => k === a.kind);
     if (kind) capture.dismissContext(num(a.sessionId), kind, str(a.id, 100));
   });
   handle('search:query', (a) => capture.search(str(a.query ?? '', 500)));
@@ -262,11 +266,18 @@ export function registerIpc(deps: IpcDeps): void {
 
   // ---- Write here (nothing selected, decision 81) ----
   handle('write:open', (a) => capture.openWrite(num(a.sessionId)));
-  handle('write:start', (a, e) => capture.startWrite(num(a.sessionId), e.sender, { request: optStr(a.request, 500), change: writeChange(a.change) }));
+  const contextKinds = (v: unknown): ContextUsed['kind'][] | undefined => {
+    if (v === undefined || v === null) return undefined;
+    if (!Array.isArray(v) || v.length > CONTEXT_KINDS.length || !v.every((k) => (CONTEXT_KINDS as readonly unknown[]).includes(k))) throw new Error('Invalid argument');
+    return [...new Set(v as ContextUsed['kind'][])];
+  };
+  handle('write:start', (a, e) =>
+    capture.startWrite(num(a.sessionId), e.sender, { request: optStr(a.request, 500), change: writeChange(a.change), suggested: a.suggested === true, include: contextKinds(a.include) }),
+  );
   handle('write:cancel', (a) => capture.cancelWrite(str(a.requestId, 100)));
   handle('write:insert', (a) => {
     if (typeof a.edited !== 'boolean' || (a.mode !== 'written' && a.mode !== 'snippets')) throw new Error('Invalid argument');
-    return capture.insertWrite(num(a.sessionId), str(a.text, 20_000), a.mode, a.edited);
+    return capture.insertWrite(num(a.sessionId), str(a.text, 20_000), a.mode, a.edited, optStr(a.original, 20_000));
   });
 
   // ---- Tasks (formerly What did I promise) ----
@@ -492,13 +503,28 @@ export function registerIpc(deps: IpcDeps): void {
       return { ...p, label: preferenceLabel(p), where: preferenceScope(p, name) };
     }),
     notes: people.styleNotes().map((n) => ({ ...n, where: n.channel ? channelWords(n.channel) : null })),
+    dropped: people
+      .allDroppedKinds()
+      .flatMap((d) => (CONTEXT_KINDS as readonly string[]).includes(d.kind) ? [{ channel: d.channel, kind: d.kind as ContextUsed['kind'], where: channelWords(d.channel) }] : []),
   });
+  const channelArg = (v: unknown): ReplyChannel => {
+    const c = str(v, 20);
+    if (!(REPLY_CHANNELS as readonly string[]).includes(c)) throw new Error('Unknown platform.');
+    return c as ReplyChannel;
+  };
   handle('style:get', () => styleView());
   handle('style:forget', (a) => {
     const dimension = str(a.dimension, 20) as StyleDimension;
     if (!(STYLE_DIMENSIONS as readonly string[]).includes(dimension)) throw new Error('Invalid argument');
-    const channel = a.channel === null ? null : (str(a.channel, 10) as ReplyChannel);
-    people.forgetStyle(dimension, { channel, personId: a.personId === null ? null : str(a.personId, 100), relationship: asRelationship(a.relationship) });
+    const channel = a.channel === null ? null : channelArg(a.channel);
+    const pole = a.pole === undefined || a.pole === null ? undefined : (str(a.pole, 20) as StylePole);
+    people.forgetStyle(dimension, { channel, personId: a.personId === null ? null : str(a.personId, 100), relationship: asRelationship(a.relationship), pole });
+    return styleView();
+  });
+  handle('style:forget-dropped', (a) => {
+    const kind = CONTEXT_KINDS.find((k) => k === a.kind);
+    if (!kind) throw new Error('Invalid argument');
+    people.forgetDropped(channelArg(a.channel), kind);
     return styleView();
   });
   handle('style:note-remove', (a) => {

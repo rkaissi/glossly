@@ -180,6 +180,31 @@ describe('PeopleRepo', () => {
     expect(r.removedStyleNotes()).toEqual(['Drops the greeting']);
   });
 
+  it('keeps what Write here taught (decision 81): the source of a signal, requests, and kinds the user keeps dropping', () => {
+    const r = repo();
+    r.addStyleSignals([{ dimension: 'dashes', pole: 'without', weight: 2 }], { channel: 'document', personId: null, source: 'write' });
+    r.addStyleSignals([{ dimension: 'dashes', pole: 'without', weight: 2 }], { channel: 'email', personId: null });
+    r.addStyleSignals([{ dimension: 'dashes', pole: 'with', weight: 2 }], { channel: 'email', personId: null });
+    expect(r.styleSignals().map((x) => x.source)).toEqual(['write', 'reply', 'reply']);
+    // Forgetting an everywhere habit drops that side in every place, not the other side.
+    r.forgetStyle('dashes', { channel: null, personId: null, pole: 'without' });
+    expect(r.styleSignals().map((x) => x.pole)).toEqual(['with']);
+
+    r.addWriteRequest('request', '  agenda for   Thursday ', { channel: 'document', personId: null });
+    r.addWriteRequest('change', 'no em dashes', { channel: 'email', personId: null });
+    r.addWriteRequest('change', '   ', { channel: 'email', personId: null });
+    expect(r.writeRequests().map((x) => x.text).sort()).toEqual(['agenda for Thursday', 'no em dashes']);
+
+    // Notes dropped in 3 of the last 5 writes in email; tasks kept; documents separate.
+    for (const dropped of [true, false, true, true]) r.addWriteSources('email', [{ kind: 'note', dropped }, { kind: 'task', dropped: false }]);
+    r.addWriteSources('document', [{ kind: 'note', dropped: true }]);
+    expect(r.droppedKinds('email')).toEqual(['note']);
+    expect(r.droppedKinds('document')).toEqual([]);
+    expect(r.allDroppedKinds()).toEqual([{ channel: 'email', kind: 'note' }]);
+    r.forgetDropped('email', 'note');
+    expect(r.droppedKinds('email')).toEqual([]);
+  });
+
   it('deletes a person with their records', () => {
     const r = repo();
     const p = r.create({ name: 'Sam Lee', aliases: [{ kind: 'email', value: 'sam@acme.com' }] });

@@ -208,6 +208,29 @@ export const MIGRATIONS: string[] = [
     )
     .join('\n  ')}
   `,
+  /* 11: Write here learns into the same style as Reply (decision 81). Each signal says which action
+     taught it. What the user typed for Write here (a request, or how to change a text) is kept with
+     its place and person, for the style notes; so is whether each kind of saved data the user was
+     shown got left out, so a kind they keep dropping in a place starts left out there. */ `
+  ALTER TABLE style_signals ADD COLUMN source TEXT NOT NULL DEFAULT 'reply';
+  CREATE TABLE write_requests (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    person_id TEXT,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX write_requests_at ON write_requests(at);
+  CREATE TABLE write_sources (
+    id TEXT PRIMARY KEY,
+    channel TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    dropped INTEGER NOT NULL,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX write_sources_at ON write_sources(at);
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */
@@ -225,6 +248,8 @@ export const DATA_TABLES = [
   'voice_samples',
   'style_signals',
   'style_notes',
+  'write_requests',
+  'write_sources',
   'events',
   'models',
   'settings',

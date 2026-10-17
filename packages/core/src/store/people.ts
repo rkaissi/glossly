@@ -1,7 +1,7 @@
 import { uuidv7 } from 'uuidv7';
 import { canonicalize, normalizeEmail, normalizeHandle } from '../people/names';
 import type { Relationship } from '../people/relationship';
-import { suggestVoicePlatform, type ReplyChannel, type StyleDimension, type StyleSignal, type StyleSignalRow } from '../people/reply-style';
+import { suggestVoicePlatform, type ReplyChannel, type StyleDimension, type StylePole, type StyleSignal, type StyleSignalRow, type StyleSource } from '../people/reply-style';
 import type {
   AliasKind,
   Commitment,
@@ -34,6 +34,9 @@ const MAX_INSERTED_VOICE = 20;
 /** Pick signals kept for learning; the learner only looks at the newest 20 per trait and scope. */
 const MAX_STYLE_SIGNALS = 1000;
 const MAX_STYLE_NOTE = 160;
+const MAX_WRITE_REQUEST = 300;
+const MAX_WRITE_REQUESTS = 200;
+const MAX_WRITE_SOURCES = 500;
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -577,12 +580,12 @@ export class PeopleRepo {
 
   // ---- what Reply learned (picks and edits) ----
 
-  addStyleSignals(signals: StyleSignal[], where: { channel: ReplyChannel; personId: string | null }): void {
+  addStyleSignals(signals: StyleSignal[], where: { channel: ReplyChannel; personId: string | null; source?: StyleSource }): void {
     if (signals.length === 0) return;
     const at = this.now();
     this.store.tx(() => {
-      const insert = this.db.prepare('INSERT INTO style_signals (id, dimension, pole, weight, channel, person_id, at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      for (const sig of signals) insert.run(uuidv7(), sig.dimension, sig.pole, sig.weight, where.channel, where.personId, at);
+      const insert = this.db.prepare('INSERT INTO style_signals (id, dimension, pole, weight, channel, person_id, at, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      for (const sig of signals) insert.run(uuidv7(), sig.dimension, sig.pole, sig.weight, where.channel, where.personId, at, where.source ?? 'reply');
       this.db.prepare('DELETE FROM style_signals WHERE id NOT IN (SELECT id FROM style_signals ORDER BY at DESC, id DESC LIMIT ?)').run(MAX_STYLE_SIGNALS);
     });
   }
@@ -591,20 +594,74 @@ export class PeopleRepo {
     // The relationship is the person's current one, so changing it moves what was learned with them.
     return this.db
       .prepare(
-        `SELECT s.dimension, s.pole, s.weight, s.channel, s.person_id, p.relationship, s.at
+        `SELECT s.dimension, s.pole, s.weight, s.channel, s.person_id, p.relationship, s.at, s.source
          FROM style_signals s LEFT JOIN people p ON p.id = s.person_id ORDER BY s.at, s.id`,
       )
       .all() as unknown as StyleSignalRow[];
   }
 
-  /** "Forget this": drops what was learned for one trait in one place, so it starts over. */
-  forgetStyle(dimension: StyleDimension, where: { channel: ReplyChannel | null; personId: string | null; relationship?: Relationship | null }): void {
-    if (where.personId) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND person_id = ?').run(dimension, where.personId);
+  /**
+   * "Forget this": drops what was learned for one trait in one place, so it starts over. An
+   * everywhere preference (`pole` with no place or person) drops that side in every place.
+   */
+  forgetStyle(dimension: StyleDimension, where: { channel: ReplyChannel | null; personId: string | null; relationship?: Relationship | null; pole?: StylePole }): void {
+    if (where.pole && !where.channel && !where.personId) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND pole = ?').run(dimension, where.pole);
+    else if (where.personId) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND person_id = ?').run(dimension, where.personId);
     else if (where.channel && where.relationship) {
       this.db
         .prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ? AND person_id IN (SELECT id FROM people WHERE relationship = ?)')
         .run(dimension, where.channel, where.relationship);
     } else if (where.channel) this.db.prepare('DELETE FROM style_signals WHERE dimension = ? AND channel = ?').run(dimension, where.channel);
+  }
+
+  // ---- what Write here learned (decision 81) ----
+
+  /** What the user typed for Write here: a request ("agenda for Thursday") or how to change a text, with where. */
+  addWriteRequest(kind: 'request' | 'change', text: string, where: { channel: ReplyChannel; personId: string | null }): void {
+    const t = clip(oneLine(text), MAX_WRITE_REQUEST);
+    if (!t) return;
+    this.store.tx(() => {
+      this.db.prepare('INSERT INTO write_requests (id, kind, text, channel, person_id, at) VALUES (?, ?, ?, ?, ?, ?)').run(uuidv7(), kind, t, where.channel, where.personId, this.now());
+      this.db.prepare('DELETE FROM write_requests WHERE id NOT IN (SELECT id FROM write_requests ORDER BY at DESC, id DESC LIMIT ?)').run(MAX_WRITE_REQUESTS);
+    });
+  }
+
+  /** The newest requests, newest first, for the style notes. */
+  writeRequests(n = 12): { kind: 'request' | 'change'; text: string; channel: ReplyChannel }[] {
+    return this.db.prepare('SELECT kind, text, channel FROM write_requests ORDER BY at DESC, id DESC LIMIT ?').all(n) as unknown as { kind: 'request' | 'change'; text: string; channel: ReplyChannel }[];
+  }
+
+  /** After a Write here text is pasted: each kind of saved data it was shown, and whether the user left it out. */
+  addWriteSources(channel: ReplyChannel, rows: { kind: string; dropped: boolean }[]): void {
+    if (rows.length === 0) return;
+    const at = this.now();
+    this.store.tx(() => {
+      const insert = this.db.prepare('INSERT INTO write_sources (id, channel, kind, dropped, at) VALUES (?, ?, ?, ?, ?)');
+      for (const r of rows) insert.run(uuidv7(), channel, r.kind, r.dropped ? 1 : 0, at);
+      this.db.prepare('DELETE FROM write_sources WHERE id NOT IN (SELECT id FROM write_sources ORDER BY at DESC, id DESC LIMIT ?)').run(MAX_WRITE_SOURCES);
+    });
+  }
+
+  /** The kinds the user left out in at least `min` of their last `of` writes in this place that showed them. */
+  droppedKinds(channel: ReplyChannel, min = 3, of = 5): string[] {
+    const rows = this.db.prepare('SELECT kind, dropped FROM write_sources WHERE channel = ? ORDER BY at DESC, id DESC').all(channel) as { kind: string; dropped: number }[];
+    const byKind = new Map<string, number[]>();
+    for (const r of rows) {
+      const seen = byKind.get(r.kind) ?? [];
+      if (seen.length < of) byKind.set(r.kind, [...seen, r.dropped]);
+    }
+    return [...byKind.entries()].filter(([, d]) => d.filter(Boolean).length >= min).map(([k]) => k);
+  }
+
+  /** "Forget": the kind is shown again in this place, as if never left out. */
+  forgetDropped(channel: ReplyChannel, kind: string): void {
+    this.db.prepare('DELETE FROM write_sources WHERE channel = ? AND kind = ?').run(channel, kind);
+  }
+
+  /** Every place and kind that now starts left out, for Profile. */
+  allDroppedKinds(): { channel: ReplyChannel; kind: string }[] {
+    const channels = (this.db.prepare('SELECT DISTINCT channel FROM write_sources').all() as { channel: ReplyChannel }[]).map((r) => r.channel);
+    return channels.flatMap((channel) => this.droppedKinds(channel).map((kind) => ({ channel, kind })));
   }
 
   /** Every note, or only those for one kind of platform (with the ones for everywhere). */

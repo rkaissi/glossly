@@ -6,7 +6,9 @@
 // changes mean (formality, slang, "im" for "I'm") and may answer that nothing changed. Code
 // checks the answer: a new note has to name at least two real pairs, from its platform when it
 // has one (decision 49). The user sees the notes in Profile and can remove any; a removed note
-// is not written again.
+// is not written again. Write here's edits are pairs too, and what the user typed for it (a
+// request, or how to change a text) counts like a pair, so a request made twice can become a
+// note about how they write or what they include (decision 81).
 import { z } from 'zod';
 import stylePrompt from '../../prompts/style-notes.md?raw';
 import type { LlmProvider } from '../llm/types';
@@ -15,6 +17,7 @@ import { measuredChanges, REPLY_CHANNELS, type ReplyChannel } from '../people/re
 /** Edited replies between two runs. */
 export const STYLE_NOTES_EVERY = 5;
 const MAX_PAIRS = 12;
+const MAX_REQUESTS = 12;
 const MAX_PAIR_CHARS = 600;
 const MAX_NOTES = 5;
 /** At most this many notes about one aspect, so five punctuation notes can't crowd out the rest. */
@@ -35,6 +38,7 @@ export const STYLE_ASPECTS = [
   'word_choice',
   'emoji',
   'structure',
+  'includes',
 ] as const;
 
 /** Where a note holds: everywhere, or one kind of platform. */
@@ -49,15 +53,25 @@ export const StyleNotesSchema = z.object({
         note: z.string().describe('One short phrase about a habit, at most 12 words.'),
         where: z.enum(NOTE_PLACES).describe('The kind of platform it holds for, or everywhere.'),
         pairs: z.array(z.number().int()).describe('The n of every pair that shows this habit.'),
+        requests: z.array(z.number().int()).describe('The n of every request that shows it. Empty when none does.'),
       }),
     )
     .describe('When keep is false: the full new list, at most 5. Empty when keep is true.'),
 });
+/** The answer, where older callers (and tests) may leave a note's requests out. */
+type StyleNotesAnswer = { keep: boolean; notes: (Omit<z.infer<typeof StyleNotesSchema>['notes'][number], 'requests'> & { requests?: number[] })[] };
 
 export interface EditedPair {
   original: string;
   text: string;
   channel: ReplyChannel | null;
+}
+
+/** What the user typed for Write here (decision 81): a request, or how to change a text. */
+export interface WriteRequestLine {
+  kind: 'request' | 'change';
+  text: string;
+  channel: ReplyChannel;
 }
 
 export interface StyleNoteDraft {
@@ -68,7 +82,7 @@ export interface StyleNoteDraft {
 /** What the user's picks show, per kind of platform: `preferenceLine`s counted in code. */
 export type PickLines = Partial<Record<ReplyChannel, string[]>>;
 
-const CHANNEL_TITLES: Record<ReplyChannel, string> = { messaging: 'Messaging apps', work_chat: 'Work chat', email: 'Email', other: 'Other apps' };
+const CHANNEL_TITLES: Record<ReplyChannel, string> = { messaging: 'Messaging apps', work_chat: 'Work chat', email: 'Email', document: 'Documents', other: 'Other apps' };
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const placeOf = (c: ReplyChannel | null) => c ?? 'everywhere';
 const norm = (s: string) => s.trim().toLowerCase().replace(/[.!]+$/, '');
@@ -81,7 +95,10 @@ function grouped(pairs: EditedPair[]): { n: number; pair: EditedPair }[] {
   return order.flatMap((c) => used.filter((p) => p.channel === c).map((pair) => ({ n: ++n, pair })));
 }
 
-export function buildStyleNotesPrompt(pairs: EditedPair[], current: StyleNoteDraft[], picks: PickLines, removed: string[]): string {
+/** The requests the prompt shows, numbered from 1; the numbers are what notes cite. */
+const numberedRequests = (requests: WriteRequestLine[]) => requests.slice(0, MAX_REQUESTS).map((request, i) => ({ n: i + 1, request }));
+
+export function buildStyleNotesPrompt(pairs: EditedPair[], current: StyleNoteDraft[], picks: PickLines, removed: string[], requests: WriteRequestLine[] = []): string {
   const parts = ['## Current notes', ...(current.length ? current.map((c) => `- [${placeOf(c.channel)}] ${c.text}`) : ['None yet.']), ''];
   let place: ReplyChannel | null | undefined;
   for (const { n, pair } of grouped(pairs)) {
@@ -103,6 +120,11 @@ export function buildStyleNotesPrompt(pairs: EditedPair[], current: StyleNoteDra
   }
   const pickParts = REPLY_CHANNELS.flatMap((c) => (picks[c]?.length ? [`${CHANNEL_TITLES[c]}:`, ...picks[c]!.map((l) => `- ${l}`)] : []));
   parts.push('', '## What the user picks (counted in code)', ...(pickParts.length ? pickParts : ['Nothing clear yet.']));
+  const asked = numberedRequests(requests);
+  if (asked.length) {
+    parts.push('', '## What the user asked Write here for (newest first)');
+    for (const { n, request } of asked) parts.push(`<request n="${n}" kind="${request.kind}" where="${request.channel}">${clip(request.text, MAX_PAIR_CHARS)}</request>`);
+  }
   parts.push('', '## Notes the user removed', removed.length ? removed.map((r) => `- ${r}`).join('\n') : 'None.');
   return parts.join('\n');
 }
@@ -115,13 +137,15 @@ export function buildStyleNotesPrompt(pairs: EditedPair[], current: StyleNoteDra
  * Pure, so it is tested.
  */
 export function acceptStyleNotes(
-  out: z.infer<typeof StyleNotesSchema>,
+  out: StyleNotesAnswer,
   pairs: EditedPair[],
   current: StyleNoteDraft[],
   removed: string[],
+  requests: WriteRequestLine[] = [],
 ): { keep: true } | { keep: false; notes: StyleNoteDraft[] } {
   if (out.keep) return { keep: true };
   const numbered = new Map(grouped(pairs).map(({ n, pair }) => [n, pair]));
+  const asked = new Map(numberedRequests(requests).map(({ n, request }) => [n, request]));
   const gone = new Set(removed.map(norm));
   const had = new Set(current.map((c) => `${placeOf(c.channel)}:${norm(c.text)}`));
   const seen = new Set<string>();
@@ -133,7 +157,10 @@ export function acceptStyleNotes(
     if (!text || text.length > MAX_NOTE_CHARS || gone.has(norm(text)) || seen.has(norm(text))) continue;
     const carried = had.has(`${n.where}:${norm(text)}`);
     const shown = new Set(n.pairs.filter((p) => numbered.has(p) && (channel === null || numbered.get(p)!.channel === channel)));
-    if (!carried && shown.size < MIN_COUNT) continue;
+    const requested = new Set((n.requests ?? []).filter((r) => asked.has(r) && (channel === null || asked.get(r)!.channel === channel)));
+    if (!carried && shown.size + requested.size < MIN_COUNT) continue;
+    // What the user includes can only come from what they asked for, never from their messages.
+    if (!carried && n.aspect === 'includes' && requested.size < MIN_COUNT) continue;
     if ((perAspect.get(n.aspect) ?? 0) >= MAX_PER_ASPECT) continue;
     seen.add(norm(text));
     perAspect.set(n.aspect, (perAspect.get(n.aspect) ?? 0) + 1);
@@ -150,22 +177,23 @@ export function acceptStyleNotes(
  */
 export async function writeStyleNotes(
   llm: LlmProvider,
-  input: { pairs: EditedPair[]; current: StyleNoteDraft[]; picks: PickLines; removed: string[] },
+  input: { pairs: EditedPair[]; current: StyleNoteDraft[]; picks: PickLines; removed: string[]; requests?: WriteRequestLine[] },
   signal?: AbortSignal,
 ): Promise<{ keep: true } | { keep: false; notes: StyleNoteDraft[] }> {
-  if (input.pairs.length < MIN_COUNT) return { keep: true };
+  const requests = (input.requests ?? []).slice(0, MAX_REQUESTS);
+  if (input.pairs.length + requests.length < MIN_COUNT) return { keep: true };
   const used = input.pairs.slice(0, MAX_PAIRS);
   const out = await llm.structured(
     {
       role: 'fast',
       action: 'style_notes',
       instructions: stylePrompt,
-      prompt: buildStyleNotesPrompt(used, input.current, input.picks, input.removed),
+      prompt: buildStyleNotesPrompt(used, input.current, input.picks, input.removed, requests),
       signal,
       temperature: 0,
       maxOutputTokens: 600,
     },
     StyleNotesSchema,
   );
-  return acceptStyleNotes(out, used, input.current, input.removed);
+  return acceptStyleNotes(out, used, input.current, input.removed, requests);
 }

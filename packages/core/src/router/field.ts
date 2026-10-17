@@ -125,7 +125,9 @@ export function readField(input: FieldInput, people: KnownPerson[] = [], me?: Id
     people,
     me,
   );
-  const app = features.messengerApp || replyChannel(input.source_app, input.window_title) !== 'other';
+  // An email or chat app; a document is a place to write, not a conversation (decision 81).
+  const channel = replyChannel(input.source_app, input.window_title);
+  const app = features.messengerApp || channel === 'email' || channel === 'messaging' || channel === 'work_chat';
   const shape = features.chatLines >= 1 || QUOTE_HEADER.test(thread.text) || EMAIL_HEAD.test(thread.text);
   const title = TITLE_REPLY.test(input.window_title);
   const toUser = features.endsWithQuestion || SECOND_PERSON.test(thread.text);

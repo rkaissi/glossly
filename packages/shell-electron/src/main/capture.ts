@@ -36,6 +36,7 @@ import {
   preferenceLine,
   pickSignals,
   isMeaningfulEdit,
+  editedSignals,
   WROTE_OWN,
   writeStyleNotes,
   STYLE_NOTES_EVERY,
@@ -53,6 +54,7 @@ import {
   write as streamWrite,
   LOCAL_ONLY_MESSAGE,
   type PasteTarget,
+  type ReplyChannel,
   type WriteInput,
   type WriteOpen,
   type WriteStart,
@@ -231,6 +233,8 @@ interface Session {
   fieldRoute: FieldRoute | null;
   /** The running Write here stream (decision 81). */
   write: { requestId: string; ctl: AbortController } | null;
+  /** Kinds of saved data Write here showed in this session, recorded with what was left out when it pastes (decision 81). */
+  writeKinds: Set<ContextUsed['kind']>;
   /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
   saved: SavedNotice | null;
   /** Autosave moves its item to the route's collection once; set after that. */
@@ -589,6 +593,7 @@ export class Capture {
         field: null,
         fieldRoute: null,
         write: null,
+        writeKinds: new Set(),
         saved: null,
         savedSettled: false,
         visualCtl: null,
@@ -838,6 +843,7 @@ export class Capture {
       field,
       fieldRoute: null,
       write: null,
+      writeKinds: new Set(),
       saved: null,
       savedSettled: false,
       visualCtl: null,
@@ -1473,7 +1479,7 @@ export class Capture {
       ]),
     );
     const current = people.styleNotes().map((n) => ({ text: n.text, channel: n.channel }));
-    void writeStyleNotes(this.services.llm, { pairs: people.editedPairs(), current, picks, removed: people.removedStyleNotes() })
+    void writeStyleNotes(this.services.llm, { pairs: people.editedPairs(), current, picks, removed: people.removedStyleNotes(), requests: people.writeRequests() })
       .then((r) => {
         // The model may see nothing new: the notes there are stay.
         if (!r.keep) people.replaceStyleNotes(r.notes);
@@ -1719,7 +1725,7 @@ ${s.selection.text}`;
     const s = this.current(sessionId);
     if (!s) {
       setTimeout(() => fail('no_selection', 'This bar is gone. Press the hotkey again.'), 0);
-      return { requestId, used: [], to: null };
+      return { requestId, used: [], to: null, leftOut: [] };
     }
     s.write?.ctl.abort();
     const ctl = new AbortController();
@@ -1727,19 +1733,35 @@ ${s.selection.text}`;
     s.write = state;
     const place = this.writePlace(s);
     const to = this.writeRecipient(s);
-    const sur = s.surroundings;
-    const near = sur ? (sur.caret >= 0 ? sur.text.slice(Math.max(0, sur.caret - 1500), sur.caret + 300) : sur.text.slice(0, 1800)) : '';
-    const personIds = [to?.person?.id, ...(s.route?.features.knownPeople ?? [])].filter((x): x is string => Boolean(x));
-    const [picked, context] = await Promise.all([this.writeSnippets(s, place.target), this.savedContext(s, 'write', [args.request ?? '', near], personIds)]);
-    if (s.write !== state || ctl.signal.aborted) return { requestId, used: [], to: to?.name ?? null };
-    const notes = mergeWriteNotes(picked.items, context?.notes ?? []);
-    const used = contextUsed(context ?? { people: [], tasks: [], events: [] }, notes, new Date());
-
-    // Samples, preferences, and notes for this person, their relationship, and this kind of platform (Profile > How you write).
     const people = this.services.people;
     const channel = replyChannel(place.app, place.title);
-    const audience = { channel, personId: to?.person?.id ?? null, relationship: to?.person?.relationship ?? null };
     const learning = this.settings.replyLearning;
+    const personId = to?.person?.id ?? null;
+    this.learnFromWriteAsks(args, { channel, personId });
+
+    const sur = s.surroundings;
+    const near = sur ? (sur.caret >= 0 ? sur.text.slice(Math.max(0, sur.caret - 1500), sur.caret + 300) : sur.text.slice(0, 1800)) : '';
+    const personIds = [personId, ...(s.route?.features.knownPeople ?? [])].filter((x): x is string => Boolean(x));
+    const [picked, found] = await Promise.all([this.writeSnippets(s, place.target), this.savedContext(s, 'write', [args.request ?? '', near], personIds)]);
+    if (s.write !== state || ctl.signal.aborted) return { requestId, used: [], to: to?.name ?? null, leftOut: [] };
+    // Kinds the user keeps dropping in this place start left out, unless they asked to put them back (decision 81).
+    const usuallyDropped = new Set(learning ? people.droppedKinds(channel).filter((k) => !args.include?.includes(k as ContextUsed['kind'])) : []);
+    const context = found && {
+      ...found,
+      notes: usuallyDropped.has('note') ? [] : found.notes,
+      people: usuallyDropped.has('person') ? [] : found.people,
+      tasks: usuallyDropped.has('task') ? [] : found.tasks,
+      events: usuallyDropped.has('event') ? [] : found.events,
+    };
+    const snippets = usuallyDropped.has('note') ? [] : picked.items;
+    const had: Record<ContextUsed['kind'], number> = { note: picked.items.length + (found?.notes.length ?? 0), person: found?.people.length ?? 0, task: found?.tasks.length ?? 0, event: found?.events.length ?? 0 };
+    const leftOut = (['note', 'person', 'task', 'event'] as const).filter((k) => usuallyDropped.has(k) && had[k] > 0);
+    const notes = mergeWriteNotes(snippets, context?.notes ?? []);
+    const used = contextUsed(context ?? { people: [], tasks: [], events: [] }, notes, new Date());
+    for (const u of used) s.writeKinds.add(u.kind);
+
+    // Samples, preferences, and notes for this person, their relationship, and this kind of platform (Profile > How you write).
+    const audience = { channel, personId, relationship: to?.person?.relationship ?? null };
     const input: WriteInput = {
       ...place,
       surroundings: sur,
@@ -1775,7 +1797,29 @@ ${s.selection.text}`;
         if (s.write === state) s.write = null;
       }
     })();
-    return { requestId, used, to: to?.name ?? null };
+    return { requestId, used, to: to?.name ?? null, leftOut };
+  }
+
+  /**
+   * What asking Write here teaches (decision 81): Shorter and Longer are a vote on length, like
+   * Reply's redo; what the user typed (a request, or how to change the text) and the tone asks are
+   * kept for the style notes, and count toward their next run. A suggestion built in code isn't
+   * the user's words, so it teaches nothing.
+   */
+  private learnFromWriteAsks(args: Omit<WriteStartArgs, 'sessionId'>, where: { channel: ReplyChannel; personId: string | null }): void {
+    if (!this.settings.replyLearning) return;
+    const people = this.services.people;
+    const asks = args.change?.asks ?? [];
+    const length = asks.includes('shorter') ? 'shorter' : asks.includes('longer') ? 'longer' : null;
+    if (length) people.addStyleSignals([{ dimension: 'length', pole: length, weight: 1 }], { ...where, source: 'write' });
+    const typed: { kind: 'request' | 'change'; text: string }[] = [
+      ...(args.request && !args.suggested && !args.change ? [{ kind: 'request' as const, text: args.request }] : []),
+      ...asks.filter((a) => a === 'casual' || a === 'formal').map((a) => ({ kind: 'change' as const, text: a === 'casual' ? 'More casual' : 'More formal' })),
+      ...(args.change?.note?.trim() ? [{ kind: 'change' as const, text: args.change.note }] : []),
+    ];
+    for (const t of typed) people.addWriteRequest(t.kind, t.text, where);
+    if (typed.length) this.countStyleEdit();
+    if (length || typed.length) log.info('write learned asks', { length: Boolean(length), typed: typed.length, channel: where.channel });
   }
 
   cancelWrite(requestId: string): void {
@@ -1795,12 +1839,38 @@ ${s.selection.text}`;
     return this.insertText(s, cleanText(item.text), 'search', (how) => this.services.metrics.record('search_inserted', { how, ms: ms(s.t0) }));
   }
 
-  async insertWrite(sessionId: number, text: string, mode: 'written' | 'snippets', edited: boolean): Promise<ReplyInsertResult> {
+  async insertWrite(sessionId: number, text: string, mode: 'written' | 'snippets', edited: boolean, original?: string): Promise<ReplyInsertResult> {
     const s = this.current(sessionId);
     if (!s) throw new Error('This bar is gone. Press the hotkey again.');
     const body = text.trim();
     if (!body) throw new Error('There is nothing to paste.');
+    if (mode === 'written') this.learnFromWrite(s, body, original?.trim() ?? null);
     return this.insertText(s, body, 'write', (how) => this.services.metrics.record('write_inserted', { mode, how, edited, ms: ms(s.t0) }));
+  }
+
+  /**
+   * What a pasted Write here text teaches (decision 81), into the same store as Reply: an edit is
+   * measured like an edit of a draft, and one that changed enough is a voice sample for this kind
+   * of place; pasted as written, it's the model's text and teaches nothing about voice. Each kind
+   * of saved data the panel showed is recorded with whether the user left it out.
+   */
+  private learnFromWrite(s: Session, final: string, original: string | null): void {
+    if (!this.settings.replyLearning) return;
+    const people = this.services.people;
+    const place = this.writePlace(s);
+    const channel = replyChannel(place.app, place.title);
+    const personId = this.writeRecipient(s)?.person?.id ?? null;
+    const signals = original && original !== final ? editedSignals(original, final) : [];
+    people.addStyleSignals(signals, { channel, personId, source: 'write' });
+    const voice = Boolean(original) && isMeaningfulEdit(original!, final);
+    if (voice) {
+      people.addVoice(final, 'inserted_edited', { channel, personId, original: original! });
+      this.countStyleEdit();
+    }
+    const sources = [...s.writeKinds].map((kind) => ({ kind, dropped: [...s.contextDismissed].some((k) => k.startsWith(`${kind}:`)) }));
+    people.addWriteSources(channel, sources);
+    s.writeKinds.clear();
+    log.info('write learned', { signals: signals.length, voice, channel, kinds: sources.length, dropped: sources.filter((x) => x.dropped).length });
   }
 
   /** Tasks: one structured call for the tasks in the selected message, or patterns without a model. */
@@ -2040,6 +2110,7 @@ ${s.selection.text}`;
       field: null,
       fieldRoute: null,
       write: null,
+      writeKinds: new Set(),
       saved,
       savedSettled: true,
       visualCtl: null,

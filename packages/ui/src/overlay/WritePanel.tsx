@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowUp, CalendarDays, CircleCheck, ClipboardCheck, ClipboardList, Copy, CornerDownLeft, FileText, RotateCcw } from 'lucide-react';
-import type { AskErrorEvent, OverlayState, PasteTarget, WriteAsk, WriteOpen, WriteStart, WriteStartArgs, WriteSuggestion } from '@glossly/core/api';
+import type { AskErrorEvent, ContextUsed, OverlayState, PasteTarget, WriteAsk, WriteOpen, WriteStart, WriteStartArgs, WriteSuggestion } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { Checkbox, Segmented } from '../controls/Toggles';
 import { ActionIcon } from '../icons';
@@ -37,6 +37,12 @@ const FORMS = [
   ['as_saved', 'As saved'],
 ] as const;
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+const KIND_WORDS: Record<ContextUsed['kind'], string> = { note: 'notes', person: 'people', task: 'tasks', event: 'events' };
+/** "notes and tasks", "notes, tasks, and events". */
+const listKinds = (kinds: ContextUsed['kind'][]) => {
+  const w = kinds.map((k) => KIND_WORDS[k]);
+  return w.length < 3 ? w.join(' and ') : `${w.slice(0, -1).join(', ')}, and ${w[w.length - 1]}`;
+};
 
 /**
  * Write here (decision 81), for the bar with nothing selected. Written: the Chat model writes for
@@ -53,7 +59,8 @@ export function WritePanel({ s }: { s: OverlayState }) {
   const [start, setStart] = useState<WriteStart | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
   const [box, setBox] = useState('');
-  const [asked, setAsked] = useState<string | null>(null);
+  const [asked, setAsked] = useState<{ label: string; request: string; suggested: boolean } | null>(null);
+  const [include, setInclude] = useState<ContextUsed['kind'][]>([]);
   const [off, setOff] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<'list' | 'as_saved'>('list');
   const [snipEdit, setSnipEdit] = useState<string | null>(null);
@@ -132,33 +139,45 @@ export function WritePanel({ s }: { s: OverlayState }) {
     else if (ready) editor.current?.focus();
   }, [s.keyboard, asking, ready, mode]);
 
+  // What every run carries: the request (a suggestion says so, so nothing is learned from it) and kinds put back.
+  const base = (a = asked, inc = include): Omit<WriteStartArgs, 'sessionId'> => ({
+    ...(a && { request: a.request, ...(a.suggested && { suggested: true }) }),
+    ...(inc.length > 0 && { include: inc }),
+  });
   const submitBox = () => {
     const words = box.trim();
     if (!words) return;
     setBox('');
     if (asking) {
-      setAsked(words);
-      void run({ request: words });
+      const a = { label: words, request: words, suggested: false };
+      setAsked(a);
+      void run(base(a));
     } else if (done && text.trim()) {
-      void run({ ...(asked && { request: asked }), change: { previous: text, asks: [], note: words } });
+      void run({ ...base(), change: { previous: text, asks: [], note: words } });
     }
   };
   const pickSuggestion = (sg: WriteSuggestion) => {
-    setAsked(sg.label);
-    void run({ request: sg.request });
+    const a = { label: sg.label, request: sg.request, suggested: true };
+    setAsked(a);
+    void run(base(a));
   };
   const changeBy = (a: WriteAsk) => {
     if (!done || !text.trim()) return;
-    void run({ ...(asked && { request: asked }), change: { previous: text, asks: [a] } });
+    void run({ ...base(), change: { previous: text, asks: [a] } });
   };
-  const rewrite = () => void run(asked ? { request: asked } : {});
+  const rewrite = () => void run(base());
+  const putBack = () => {
+    const inc = [...new Set([...include, ...(start?.leftOut ?? [])])];
+    setInclude(inc);
+    void run(base(asked, inc));
+  };
 
   const insert = async () => {
     if (!ready || busy) return;
     setBusy(true);
     try {
       const original = mode === 'written' ? written : composed;
-      const r = await glossly.invoke('write:insert', { sessionId: s.sessionId, mode, text: shown, edited: shown !== original });
+      const r = await glossly.invoke('write:insert', { sessionId: s.sessionId, mode, text: shown, edited: shown !== original, ...(mode === 'written' && { original: written }) });
       // On success the bar has closed; a copy keeps the panel open with how to paste.
       if (r.result === 'copied') setNote(r.reason === 'not_editable' ? 'Copied. Click where it should go and press Ctrl+V.' : 'Copied. Paste with Ctrl+V.');
     } catch {
@@ -232,7 +251,7 @@ export function WritePanel({ s }: { s: OverlayState }) {
           <h2 className="saved-line">
             <ActionIcon action="write" size={16} />
             <span className="grow">
-              {asked ? clip(asked, 48) : stream.status === 'idle' ? `Write in ${place}` : `Writing for ${place}`}
+              {asked ? clip(asked.label, 48) : stream.status === 'idle' ? `Write in ${place}` : `Writing for ${place}`}
               {to && <span className="muted"> · to {to}</span>}
             </span>
             {switcher}
@@ -271,6 +290,15 @@ export function WritePanel({ s }: { s: OverlayState }) {
             />
           )}
           {done && !nothing && start && start.used.length > 0 && <UsedChip key={start.requestId} sessionId={s.sessionId} used={start.used} onRewrite={rewrite} />}
+          {done && start && start.leftOut.length > 0 && (
+            <div className="inline-note">
+              <span className="muted">Left out your {listKinds(start.leftOut)} here, as you usually do.</span>
+              <span className="spacer" />
+              <button className="ghost" onClick={putBack}>
+                Put back
+              </button>
+            </div>
+          )}
           {done && !nothing && (
             <>
               <div className="chips" role="group" aria-label="Change it">

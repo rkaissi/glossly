@@ -53,9 +53,9 @@ const THREAD_AFTER = 300;
 const MAX_VOICE = 3;
 const MAX_VOICE_CHARS = 300;
 /** Three chat replies fit well inside this; three emails need more. Reasoning stays low (`reasoning`). */
-export const REPLY_MAX_OUTPUT: Record<ReplyChannel, number> = { messaging: 450, work_chat: 450, email: 900, other: 900 };
+export const REPLY_MAX_OUTPUT: Record<ReplyChannel, number> = { messaging: 450, work_chat: 450, email: 900, document: 900, other: 900 };
 const SELECTION_MARK = '[SELECTION]';
-const PLATFORM: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', other: 'other app' };
+const PLATFORM: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging app', work_chat: 'work chat', document: 'document', other: 'other app' };
 const TARGET_MARK = '[REPLY TO THIS]';
 /** Nothing was selected, so the message is the text around the reply box, which may end with the user's own start of a reply. */
 const FIELD_NOTE =

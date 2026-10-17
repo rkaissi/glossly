@@ -4,7 +4,7 @@
 // write.ts. Either way the text is shown first and pasted only when the user says so.
 import { cleanText } from '../capture/clean';
 import type { Embedder } from '../embed/types';
-import { replyChannel } from '../people/reply-style';
+import { isCodeEditor, replyChannel } from '../people/reply-style';
 import type { Settings } from '../settings';
 import type { Store } from '../store/store';
 import { isoNow, type Item, type Surroundings } from '../types';
@@ -21,19 +21,12 @@ const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 
-const DOC_PROCESSES = ['winword.exe', 'notepad.exe', 'wordpad.exe', 'onenote.exe', 'onenoteim.exe', 'notion.exe', 'obsidian.exe', 'soffice.bin', 'evernote.exe', 'typora.exe'];
-const CODE_PROCESSES = ['code.exe', 'cursor.exe', 'devenv.exe', 'idea64.exe', 'pycharm64.exe', 'webstorm64.exe', 'rider64.exe', 'sublime_text.exe', 'notepad++.exe', 'zed.exe'];
-const DOC_TITLES = /(?:- Google Docs|- Word\b|Notion\b|- OneNote|Confluence|Dropbox Paper|Coda\b|- Obsidian|Quip\b)/i;
-const CODE_TITLES = /(?:- Visual Studio Code|- Cursor$|· GitHub|- GitHub)/i;
-
 export function pasteTarget(app: string, title: string): PasteTarget {
   const channel = replyChannel(app, title);
   if (channel === 'email') return 'email';
   if (channel === 'messaging' || channel === 'work_chat') return 'chat';
-  const p = app.toLowerCase();
-  if (CODE_PROCESSES.includes(p) || CODE_TITLES.test(title)) return 'code';
-  if (DOC_PROCESSES.includes(p) || DOC_TITLES.test(title)) return 'document';
-  return 'other';
+  if (isCodeEditor(app, title)) return 'code';
+  return channel === 'document' ? 'document' : 'other';
 }
 
 /** How many snippets fit each kind of place: a chat message stays short, a document can take more. */

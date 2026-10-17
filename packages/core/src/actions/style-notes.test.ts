@@ -86,6 +86,44 @@ describe('style notes (decision 49)', () => {
     });
   });
 
+  it('counts what the user asked Write here for (decision 81): a request made twice backs a note, and only requests back what they include', () => {
+    const requests = [
+      { kind: 'change' as const, text: 'no em dashes', channel: 'document' as const },
+      { kind: 'request' as const, text: 'status for Acme, mention the launch date', channel: 'email' as const },
+      { kind: 'change' as const, text: 'drop the dashes', channel: 'document' as const },
+      { kind: 'request' as const, text: 'update for Jordan with the launch date', channel: 'email' as const },
+    ];
+    const p = buildStyleNotesPrompt(pairs, [], {}, [], requests);
+    expect(p).toContain('## What the user asked Write here for (newest first)\n<request n="1" kind="change" where="document">no em dashes</request>');
+    const out = acceptStyleNotes(
+      {
+        keep: false,
+        notes: [
+          { aspect: 'punctuation', note: 'Avoids dashes', where: 'document', pairs: [], requests: [1, 3] },
+          { aspect: 'includes', note: 'Status emails mention the launch date', where: 'email', pairs: [], requests: [2, 4] },
+          // One pair and one request from email: enough together for a style note.
+          { aspect: 'length', note: 'Short emails', where: 'email', pairs: [1], requests: [2] },
+          // An includes note with pairs alone is never from requests: dropped.
+          { aspect: 'includes', note: 'Mentions Friday', where: 'email', pairs: [1, 2], requests: [] },
+          // A document request doesn't back an email note.
+          { aspect: 'emoji', note: 'No emoji', where: 'email', pairs: [1], requests: [3] },
+        ],
+      },
+      pairs,
+      [],
+      [],
+      requests,
+    );
+    expect(out).toEqual({
+      keep: false,
+      notes: [
+        { text: 'Avoids dashes', channel: 'document' },
+        { text: 'Status emails mention the launch date', channel: 'email' },
+        { text: 'Short emails', channel: 'email' },
+      ],
+    });
+  });
+
   it('asks the Fast role at temperature 0, and skips the call with fewer than two pairs', async () => {
     const calls: ChatRequest[] = [];
     const llm: LlmProvider = {

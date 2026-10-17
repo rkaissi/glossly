@@ -227,6 +227,7 @@ Built and unit tested, not yet seen in the real app. Run as one pass when Rayan 
 - [ ] Hotkey in an empty Notepad: Ask, Search, Write here; Write here asks "What should it write?" with suggestions from the fictional event and tasks; a suggestion writes an agenda.
 - [ ] Snippets view: ticks change the box; List and As saved; Local only with no local model opens on Snippets with the note.
 - [ ] `main.log`: `write started` with counts only, no text; `write_written` and `write_inserted` in metrics.
+- [ ] Learning (27d, throwaway profile): edit a written text heavily and paste: `write learned` with signals and voice true, a Document sample under Profile > How you write. Type "no em dashes" in the change box twice across two writes, then reach five edits or requests: a style note from the requests. Mark notes Not related in 3 pastes in Notepad: the next write says "Left out your notes here" and Put back brings them in; Profile lists it and Forget clears it. Profile's place filter shows Documents.
 
 **Ask and paste**
 - [x] Hotkey in an empty Gmail reply under a thread, Ask "what should I say?": the answer uses the thread. Over a page with nothing selected, Ask "summarize this". A password field gives no surroundings. Watch `context_caret` timing on a large Chromium page.
