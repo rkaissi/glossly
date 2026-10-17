@@ -101,7 +101,7 @@ Glossly reads selections through Windows UI Automation, so your clipboard stays 
 
 1. Download **`Glossly-Setup-<version>.exe`** from the [latest release](../../releases/latest).
 2. Run it. Glossly installs for your user account (no admin rights) and adds itself to the Start Menu.
-3. Setup walks you through the rest: where models run, adding a key, your name (so Glossly knows which messages are yours), and a quick try.
+3. Setup walks you through the rest: where models run, connecting a model provider, your name (so Glossly knows which messages are yours), and a quick try.
 
 > [!NOTE]
 > The installer isn't code-signed yet, so Windows SmartScreen may say "Windows protected your PC". Choose **More info**, then **Run anyway**. Some antivirus apps also scan new unsigned apps on first run.
@@ -117,12 +117,14 @@ Glossly reads selections through Windows UI Automation, so your clipboard stays 
 ### Requirements
 
 - Windows 11, x64.
-- A model provider, any one of:
-  - a [Groq](https://console.groq.com/keys) key (the free tier is enough for everyday use),
-  - an OpenAI or Anthropic key,
+- A model provider, any one or more of:
+  - a free key from [Groq](https://console.groq.com/keys) or [Google Gemini](https://aistudio.google.com/apikey) (either free tier is enough for everyday use; on Gemini's free tier Google may use what you send to improve its products),
+  - a key from OpenAI, Anthropic, xAI, DeepSeek, Kimi, MiniMax, or Mistral,
+  - a gateway that reaches many models with one key: OpenRouter, Vercel AI Gateway, or Ramp Router; or a host of open models: Together AI, Fireworks, or Baseten,
+  - any other OpenAI- or Anthropic-compatible address (Custom),
   - a local model through [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai), for fully offline use.
 
-Glossly gives each kind of job its own model: a quick one for picking actions, a small one for reading conversations, tasks, and charts, and a stronger one for Ask and Reply. Setup picks them for you, and you can change any of them in Settings > Models.
+Add providers in Settings > Models > **Add provider**, which lists all of them. Glossly gives each kind of job its own model: a quick one for picking actions, a small one for reading conversations, tasks, and charts, and a stronger one for Ask and Reply. It picks them from every provider you've added, using what it knows about each model, listed prices, and how fast each one answers on your computer, and tells you when a new provider takes over a job. You can change any of them in Settings > Models; a model you pick stays.
 
 ## Privacy
 
@@ -132,7 +134,7 @@ Glossly is built so you decide what leaves your computer.
 - **Local only mode** keeps everything on your computer: a local model does the work, and features that would need a cloud model say so instead.
 - **Your data stays local.** Saved items, people, tasks, the calendar, and search embeddings live in a SQLite database in `%APPDATA%\Glossly`. Search runs on a small embedding model on your computer.
 - **Only the saved data that fits goes out.** Ask and Reply send just the few saved notes, people, tasks, and events closest to the question, show what they used, and Settings > Privacy turns this off.
-- **Keys are encrypted** with Windows' data protection (Electron `safeStorage`) and only ever sent to their own provider.
+- **Keys are encrypted** with Windows' data protection (Electron `safeStorage`) and only ever sent to their own provider. With a gateway or a host, your text goes to that service and from there to the model's maker.
 - **No password fields, no keylogging.** Password fields are never read, and the keyboard is never hooked.
 - **No telemetry.** Usage metrics are counts and timings, stored locally and shown in Settings > Metrics. Logs hold codes and timings, never your text.
 - **Block any app.** Password managers are blocked by default; add any app or site in Settings > Privacy, or switch Glossly to hotkey-only there.
@@ -194,6 +196,7 @@ docs/              Architecture, decisions, features, testing, and design notes
 - [x] Local models and Local only mode
 - [x] Installer and automatic updates
 - [x] Memory: answers that use what you saved, and Ask that remembers and acts
+- [x] Providers from a list: Gemini, xAI, DeepSeek, gateways, hosts, and any compatible address
 - [ ] Code-signed installer
 - [ ] Google Calendar sync
 - [ ] macOS
