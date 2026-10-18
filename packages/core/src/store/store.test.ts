@@ -53,7 +53,8 @@ describe('Store', () => {
       store?.close();
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+    // A file on disk, migrated from 7 to the latest: over 5 s on GitHub's Windows runner (v0.1.7 build).
+  }, 30_000);
 
   it('round-trips settings with defaults for missing and corrupt keys', () => {
     store = new Store(':memory:');
