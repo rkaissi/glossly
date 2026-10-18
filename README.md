@@ -6,7 +6,7 @@
 
 **Highlight text anywhere on Windows. Glossly offers the right next step.**
 
-Ask about it, save it, reply to it, find out who's in it, turn it into tasks and events, or chart it, without leaving the app you're in.
+Ask about it, save it, reply to it, find out who's in it, turn it into tasks and events, or chart it, without leaving the app you're in. With nothing selected, it writes for the field you're typing in.
 
 [![Download](https://img.shields.io/badge/download-v0.1.6-0d0d0d?style=flat-square)](../../releases/latest)
 ![Windows 11](https://img.shields.io/badge/Windows%2011-x64-0078D4?style=flat-square&logo=windows11&logoColor=white)
@@ -39,6 +39,12 @@ Select a message and get three drafts that answer it, each taking a different li
 <p align="center"><img src="docs/media/hero.gif" width="820" alt="Reply: three drafts for a selected chat message, one inserted into the message box"></p>
 
 <p align="center"><img src="docs/media/banner-reply-learns.png" width="820" alt="Reply learns how you write: an edited draft, the pick out of three, and the style it learned for chat and email"></p>
+
+### Write here
+
+Press the hotkey with nothing selected in any text field, and Write here writes for that spot. Halfway through an email, it finishes your sentence from what you saved: the deck you owe, the review on your calendar, the note about who's doing what, written to the person you're answering. In an empty document it asks what to write and suggests things from your week, like an agenda for your next meeting or an update on what you owe someone. It writes in your voice. A chip under the text shows exactly what it used; mark anything not related and rewrite without it. **Shorter**, **Longer**, **More casual**, **More formal**, or just say what to change. **Snippets** switches to the plain list of what you saved, to tick and paste as is (and it's all you need without a model). Your edits and requests teach it your style, alongside Reply's, per kind of app.
+
+<p align="center"><img src="docs/media/banner-write-here.png" width="820" alt="Write here: finishing an email reply from a saved task, event, and memory, and an agenda written in an empty document from a suggestion"></p>
 
 ### Who is this
 
@@ -74,10 +80,9 @@ Select a table (from a spreadsheet, a web page, Markdown, or a CSV) and get a cl
 
 ### And more
 
-<p align="center"><img src="docs/media/banner-connected.png" width="820" alt="Recall, Search, Paste, People, Calendar, and Local only, connected"></p>
+<p align="center"><img src="docs/media/banner-connected.png" width="820" alt="Recall, Search, Write here, People, Calendar, and Local only, connected"></p>
 
 - **Search** everything you saved, your people, and open tasks: press the hotkey with nothing selected.
-- **Write here**: Glossly writes for the field you're typing in from your notes, tasks, and calendar, in your voice, or pastes the snippets you saved.
 - **Settings** has full Tasks and Calendar views, your people and saved items, model choices, privacy controls, and local usage metrics, in light and dark.
 
 <details>
@@ -92,6 +97,8 @@ Select a table (from a spreadsheet, a web page, Markdown, or a CSV) and get a cl
 1. **Select** text with the mouse, as you normally would. A small pill appears below the selection (or press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd>).
 2. **Open the bar.** Ask and Save are always there. The other two buttons are picked for this text: Reply and Who is this on a message from someone else, Tasks on a request with a date, Visualize on a table. Everything else is under More.
 3. **Act.** Each action opens a panel in place. Press <kbd>Esc</kbd> to step back, or just click away.
+
+With nothing selected, the hotkey opens the bar on Search, with Write here next to it, and Reply too when you're in a reply box.
 
 <p align="center"><img src="docs/media/banner-outcomes.png" width="860" alt="One highlighted message turned into a reply draft, a calendar event, and a task"></p>
 
@@ -144,7 +151,7 @@ Glossly is built so you decide what leaves your computer.
 
 | Keys | What it does |
 | --- | --- |
-| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> | Open the bar on the selection, or search when nothing is selected (configurable) |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> | Open the bar on the selection; with nothing selected, Search and Write here (configurable) |
 | <kbd>1</kbd> to <kbd>4</kbd> | Run the bar's buttons by position |
 | <kbd>Enter</kbd> | Run the highlighted button |
 | <kbd>Tab</kbd> | Open the menu (More actions, Settings) |
@@ -197,6 +204,7 @@ docs/              Architecture, decisions, features, testing, and design notes
 - [x] Installer and automatic updates
 - [x] Memory: answers that use what you saved, and Ask that remembers and acts
 - [x] Providers from a list: Gemini, xAI, DeepSeek, gateways, hosts, and any compatible address
+- [x] Write here: writes where you're typing from what you saved, and learns from your edits
 - [ ] Code-signed installer
 - [ ] Google Calendar sync
 - [ ] macOS
