@@ -149,9 +149,11 @@ describe('Write here', () => {
   });
 
   describe('suggestions for an empty field', () => {
+    // Local times, like the `now` the tests pass, so they hold in any time zone (CI runs in UTC).
+    const at = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).toISOString();
     const events = [
-      { title: 'Past standup', starts_at: '2026-10-14T08:00:00-04:00', ends_at: '2026-10-14T08:30:00-04:00', all_day: false },
-      { title: 'Acme review', starts_at: '2026-10-15T10:00:00-04:00', ends_at: '2026-10-15T11:00:00-04:00', all_day: false },
+      { title: 'Past standup', starts_at: at(14, 8), ends_at: at(14, 8, 30), all_day: false },
+      { title: 'Acme review', starts_at: at(15, 10), ends_at: at(15, 11), all_day: false },
       { title: 'Offsite', starts_at: '2026-10-30', ends_at: null, all_day: true },
     ];
     const tasks = [
