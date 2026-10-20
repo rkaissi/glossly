@@ -12,6 +12,18 @@ export interface PersonAlias {
   value: string;
 }
 
+/** Who added a fact: the user, Ask, or the old free-text note it was split from (decision 84). */
+export type FactSource = 'you' | 'ask' | 'note';
+
+/** One thing known about a person, shown and edited on its own (decision 84). */
+export interface PersonFact {
+  id: string;
+  person_id: string;
+  text: string;
+  source: FactSource;
+  created_at: string;
+}
+
 export interface Person {
   id: string;
   entity_id: string | null;

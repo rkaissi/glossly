@@ -1,6 +1,7 @@
 // Types shared with the UI (through api.ts). No runtime code.
 import type { CalendarEvent } from '../calendar/types';
 import type { CommitmentView, PersonSummary } from '../people/types';
+import type { Item } from '../types';
 
 /** Why a saved item came back: an entity it shares with the selection, a similar meaning, or the typed words. */
 export type RecallReason = 'same_person' | 'same_company' | 'same_product' | 'same_place' | 'similar_topic' | 'text_match';
@@ -44,7 +45,7 @@ export interface LibraryQuery {
 }
 
 export interface LibraryItem extends RecallHit {
-  kind: 'selection' | 'note' | 'chart';
+  kind: Item['kind'];
   /** True when `text` was clipped for display; Copy still copies all of it. */
   clipped: boolean;
 }

@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS } from '../settings';
 import { canonicalize } from '../people/names';
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS } from './migrations';
+import { CalendarRepo } from './calendar';
 import { PeopleRepo } from './people';
 import { toLlmCallRow } from './llm-call-row';
 import { Store } from './store';
@@ -26,7 +27,7 @@ function unit(dims: number, hot: number): Float32Array {
 describe('Store', () => {
   it('migrates and seeds default collections', () => {
     store = new Store(':memory:');
-    expect(store.schemaVersion).toBe(11);
+    expect(store.schemaVersion).toBe(MIGRATIONS.length);
     expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
     expect(store.collectionByName('reading')?.name).toBe('Reading');
   });
@@ -45,7 +46,7 @@ describe('Store', () => {
       old.exec("INSERT INTO style_notes (id, text, created_at) VALUES ('n', 'Writes in lowercase', '2026-10-10T20:00:00-04:00')");
       old.close();
       store = new Store(path);
-      expect(store.schemaVersion).toBe(11);
+      expect(store.schemaVersion).toBe(MIGRATIONS.length);
       const people = new PeopleRepo(store);
       expect(people.styleSignals().map((s) => s.dimension)).toEqual(['length']);
       expect(people.styleNotes()).toMatchObject([{ text: 'Writes in lowercase', channel: null }]);
@@ -55,6 +56,124 @@ describe('Store', () => {
     }
     // A file on disk, migrated from 7 to the latest: over 5 s on GitHub's Windows runner (v0.1.7 build).
   }, 30_000);
+
+  it('splits person notes into facts, one per line, and keeps the note (migration 12, decision 84)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'glossly-m12-'));
+    const path = join(dir, 'db.sqlite');
+    try {
+      const old = new DatabaseSync(path);
+      MIGRATIONS.slice(0, 11).forEach((m) => old.exec(m));
+      old.exec('PRAGMA user_version = 11');
+      const add = old.prepare("INSERT INTO people (id, entity_id, name, note, created_at, updated_at) VALUES (?, NULL, ?, ?, '2026-10-01T09:00:00-04:00', ?)");
+      add.run('p1', 'Jordan Hale', 'Leads the pricing project at Acme\r\n- Vegetarian\n\n  • Moving to the Berlin office in January  ', '2026-10-15T09:00:00-04:00');
+      add.run('p2', 'Casey Lin', null, '2026-10-02T09:00:00-04:00');
+      add.run('p3', 'Maya Chen', '   ', '2026-10-03T09:00:00-04:00');
+      add.run('p4', 'Alex Morgan', 'Prefers a call over email', '2026-10-04T09:00:00-04:00');
+      old.close();
+      store = new Store(path);
+      const people = new PeopleRepo(store);
+      expect(people.facts('p1').map((f) => f.text)).toEqual(['Leads the pricing project at Acme', 'Vegetarian', 'Moving to the Berlin office in January']);
+      expect(people.facts('p1').every((f) => f.source === 'note' && f.created_at === '2026-10-15T09:00:00-04:00')).toBe(true);
+      expect(people.facts('p2')).toEqual([]);
+      expect(people.facts('p3')).toEqual([]);
+      expect(people.facts('p4').map((f) => f.text)).toEqual(['Prefers a call over email']);
+      expect(people.get('p1')?.note).toContain('Vegetarian');
+    } finally {
+      store?.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('keeps an item page, addresses, and preview (decision 84)', () => {
+    store = new Store(':memory:');
+    const plain = store.insertItem({ collection_id: null, kind: 'selection', text: 'plain', why: null, source_app: null, window_title: null, data_json: null });
+    expect(store.getItem(plain.id)).toMatchObject({ page_url: null, page_title: null, urls_json: null, preview_json: null });
+    const link = store.insertItem({
+      collection_id: null,
+      kind: 'link',
+      text: 'https://acme.example.com/blog/design-reviews',
+      why: null,
+      source_app: 'chrome.exe',
+      window_title: 'How we run design reviews - Google Chrome',
+      data_json: null,
+      page_url: 'https://acme.example.com/blog/design-reviews',
+      page_title: 'How we run design reviews',
+      urls_json: JSON.stringify(['https://acme.example.com/blog/design-reviews']),
+    });
+    expect(store.getItem(link.id)).toMatchObject({ kind: 'link', page_title: 'How we run design reviews', preview_json: null });
+    const preview = { source: 'page' as const, title: 'How we run design reviews', description: null, site: 'Acme blog', image: 'a.png', icon: null };
+    store.setItemPreview(link.id, preview);
+    expect(JSON.parse(store.getItem(link.id)!.preview_json!)).toEqual(preview);
+    store.setItemPage(plain.id, { url: 'https://docs.example.com/d/1', title: 'Acme pricing 2026' });
+    expect(store.getItem(plain.id)).toMatchObject({ page_url: 'https://docs.example.com/d/1', page_title: 'Acme pricing 2026' });
+    store.setItemPreview(link.id, null);
+    expect(store.getItem(link.id)!.preview_json).toBeNull();
+  });
+
+  it('links items to people, tasks, and events, and drops a link when its target goes (decision 84)', () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const calendar = new CalendarRepo(store);
+    const jordan = people.create({ name: 'Jordan Hale' });
+    const task = people.addCommitment({ person_id: jordan.id, owner: 'me', text: 'Send pricing to Jordan', due_at: null });
+    const event = calendar.add({ title: 'Lunch with Jordan', starts_at: '2026-10-23T13:00:00-04:00', ends_at: '2026-10-23T14:00:00-04:00', all_day: false, location: null, attendees: [], personIds: [] }, null);
+    const item = (text: string) => store.insertItem({ collection_id: null, kind: 'selection', text, why: null, source_app: null, window_title: null, data_json: null });
+    const a = item('Q3 pricing tiers');
+    const b = item('Lunch spot');
+
+    store.linkItem(a.id, 'event', event.id);
+    store.linkItem(a.id, 'task', task.id);
+    store.linkItem(a.id, 'person', jordan.id);
+    store.linkItem(a.id, 'person', jordan.id);
+    store.linkItem(b.id, 'person', jordan.id);
+    expect(store.itemLinks(a.id)).toEqual([
+      { kind: 'person', target_id: jordan.id },
+      { kind: 'task', target_id: task.id },
+      { kind: 'event', target_id: event.id },
+    ]);
+    expect(store.itemsLinkedTo('person', jordan.id).sort()).toEqual([a.id, b.id].sort());
+
+    store.unlinkItem(b.id, 'person', jordan.id);
+    expect(store.itemLinks(b.id)).toEqual([]);
+    people.deleteCommitment(task.id);
+    calendar.delete(event.id);
+    expect(store.itemLinks(a.id)).toEqual([{ kind: 'person', target_id: jordan.id }]);
+    people.delete(jordan.id);
+    expect(store.itemLinks(a.id)).toEqual([]);
+
+    store.linkItem(b.id, 'person', people.create({ name: 'Casey Lin' }).id);
+    store.deleteItem(b.id);
+    expect(store.db.prepare('SELECT COUNT(*) AS n FROM item_links').get()).toEqual({ n: 0 });
+  });
+
+  it('keeps facts per person, moves them and person links on merge, and drops them with the person (decision 84)', () => {
+    store = new Store(':memory:');
+    let t = 0;
+    const people = new PeopleRepo(store, () => `2026-10-19T09:00:${String(t++).padStart(2, '0')}-04:00`);
+    const jordan = people.create({ name: 'Jordan Hale' });
+    const dup = people.create({ name: 'J. Hale' });
+    const first = people.addFact(jordan.id, '  Leads the pricing\n project  ', 'ask')!;
+    expect(first.text).toBe('Leads the pricing project');
+    expect(people.addFact(jordan.id, '   ', 'you')).toBeNull();
+    expect(people.addFact('gone', 'x', 'you')).toBeNull();
+    people.addFact(dup.id, 'Vegetarian', 'you');
+    expect(people.updateFact(first.id, 'Leads the pricing project at Acme')).toBe(true);
+    expect(people.facts(jordan.id).map((f) => f.text)).toEqual(['Leads the pricing project at Acme']);
+
+    const item = store.insertItem({ collection_id: null, kind: 'selection', text: 'x', why: null, source_app: null, window_title: null, data_json: null });
+    store.linkItem(item.id, 'person', jordan.id);
+    store.linkItem(item.id, 'person', dup.id);
+    people.merge(jordan.id, dup.id);
+    expect(people.facts(jordan.id).map((f) => f.text)).toEqual(['Leads the pricing project at Acme', 'Vegetarian']);
+    expect(store.itemLinks(item.id)).toEqual([{ kind: 'person', target_id: jordan.id }]);
+
+    const vegetarian = people.facts(jordan.id)[1]!;
+    expect(people.updateFact(vegetarian.id, '')).toBe(true);
+    expect(people.facts(jordan.id)).toHaveLength(1);
+    expect(people.removeFact('gone')).toBe(false);
+    people.delete(jordan.id);
+    expect(store.db.prepare('SELECT COUNT(*) AS n FROM person_facts').get()).toEqual({ n: 0 });
+  });
 
   it('round-trips settings with defaults for missing and corrupt keys', () => {
     store = new Store(':memory:');

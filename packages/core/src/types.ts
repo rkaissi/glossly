@@ -57,14 +57,45 @@ export interface Surroundings {
 
 export interface Item {
   id: string;
+  /** Unused since decision 84; kept for user-made groups later. */
   collection_id: string | null;
-  kind: 'selection' | 'note' | 'chart';
+  /** selection is a Snippet, note a Memory, link a saved web address, chart Visualize's (decision 84). */
+  kind: 'selection' | 'note' | 'chart' | 'link';
   text: string;
   why: string | null;
   source_app: string | null;
   window_title: string | null;
   data_json: string | null;
+  /** The page it was saved from, when saved in a browser (migration 12). */
+  page_url: string | null;
+  page_title: string | null;
+  /** JSON array of the web addresses in the text. */
+  urls_json: string | null;
+  /** JSON of the page's preview (`LinkPreview`), once fetched. */
+  preview_json: string | null;
   created_at: string;
+}
+
+/** The page fields an item may be saved with; each defaults to null. */
+export type ItemPageFields = 'page_url' | 'page_title' | 'urls_json' | 'preview_json';
+
+/** What a saved item can link to (decision 84). */
+export type ItemLinkKind = 'person' | 'task' | 'event';
+
+export interface ItemLink {
+  kind: ItemLinkKind;
+  target_id: string;
+}
+
+/** A page's own preview (Open Graph), or a picture of the window when the page gave none. */
+export interface LinkPreview {
+  source: 'page' | 'window';
+  title: string | null;
+  description: string | null;
+  site: string | null;
+  /** File name under the previews folder, or null with no image. */
+  image: string | null;
+  icon: string | null;
 }
 
 /** ISO 8601 timestamp with the local offset, e.g. 2026-10-09T20:41:00-04:00. */

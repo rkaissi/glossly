@@ -8,6 +8,7 @@ import type {
   CommitmentOwner,
   CommitmentStatus,
   CommitmentView,
+  FactSource,
   Interaction,
   InteractionDirection,
   InteractionView,
@@ -15,6 +16,7 @@ import type {
   PersonAlias,
   PersonCard,
   PersonItemView,
+  PersonFact,
   PersonSummary,
   StyleNote,
   VoiceOrigin,
@@ -27,6 +29,7 @@ import type { Store } from './store';
 
 const MAX_NAME = 100;
 const MAX_NOTE = 1000;
+const MAX_FACT = 300;
 const MAX_ALIAS = 200;
 const MAX_TEXT = 2000;
 /** Edited replies kept as voice samples; older ones are dropped. */
@@ -236,6 +239,9 @@ export class PeopleRepo {
       this.db.prepare('UPDATE OR IGNORE calendar_event_people SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       this.db.prepare('UPDATE voice_samples SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
       this.db.prepare('UPDATE style_signals SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
+      this.db.prepare('UPDATE person_facts SET person_id = ? WHERE person_id = ?').run(keepId, dropId);
+      // A link the kept person already has stays as it is; the dropped one's copy goes with them.
+      this.db.prepare("UPDATE OR IGNORE item_links SET target_id = ? WHERE kind = 'person' AND target_id = ?").run(keepId, dropId);
       const moved = drop.aliases;
       this.db.prepare('DELETE FROM person_aliases WHERE person_id = ?').run(dropId);
       this.db.prepare('DELETE FROM people WHERE id = ?').run(dropId);
@@ -258,6 +264,37 @@ export class PeopleRepo {
       this.db.prepare('UPDATE style_signals SET person_id = NULL WHERE person_id = ?').run(id);
       return Number(this.db.prepare('DELETE FROM people WHERE id = ?').run(id).changes) > 0;
     });
+  }
+
+  // ---- facts (decision 84) ----
+
+  /** What is known about a person, oldest first (the order they were added). */
+  facts(personId: string): PersonFact[] {
+    return this.db
+      .prepare('SELECT id, person_id, text, source, created_at FROM person_facts WHERE person_id = ? ORDER BY created_at, rowid')
+      .all(personId) as unknown as PersonFact[];
+  }
+
+  /** Adds a fact, one line, clipped; null when the text is empty or the person is gone. */
+  addFact(personId: string, text: string, source: FactSource): PersonFact | null {
+    const t = clip(oneLine(text), MAX_FACT);
+    if (!t || !this.get(personId)) return null;
+    const fact: PersonFact = { id: uuidv7(), person_id: personId, text: t, source, created_at: this.now() };
+    this.db
+      .prepare('INSERT INTO person_facts (id, person_id, text, source, created_at) VALUES (?, ?, ?, ?, ?)')
+      .run(fact.id, fact.person_id, fact.text, fact.source, fact.created_at);
+    return fact;
+  }
+
+  /** Rewords a fact; empty text removes it. False when it no longer exists. */
+  updateFact(id: string, text: string): boolean {
+    const t = clip(oneLine(text), MAX_FACT);
+    if (!t) return this.removeFact(id);
+    return Number(this.db.prepare('UPDATE person_facts SET text = ? WHERE id = ?').run(t, id).changes) > 0;
+  }
+
+  removeFact(id: string): boolean {
+    return Number(this.db.prepare('DELETE FROM person_facts WHERE id = ?').run(id).changes) > 0;
   }
 
   // ---- lookups for person resolution ----

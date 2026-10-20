@@ -2,7 +2,7 @@ import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { uuidv7 } from 'uuidv7';
 import type { KnownPerson } from '../router/types';
 import { DEFAULT_COLLECTIONS, SETTINGS_MIGRATIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
-import { isoNow, type Collection, type Item } from '../types';
+import { isoNow, type Collection, type Item, type ItemLink, type ItemLinkKind, type ItemPageFields, type LinkPreview } from '../types';
 import { canonicalize } from '../people/names';
 import { DATA_TABLES, MIGRATIONS, USER_DATA_TABLES } from './migrations';
 import type { LlmCallRow } from './llm-call-row';
@@ -172,15 +172,80 @@ export class Store {
 
   // ---- items ----
 
-  insertItem(item: Omit<Item, 'id' | 'created_at'> & { id?: string; created_at?: string }): Item {
-    const row: Item = { ...item, id: item.id ?? uuidv7(), created_at: item.created_at ?? isoNow() };
+  insertItem(item: Omit<Item, 'id' | 'created_at' | ItemPageFields> & Partial<Pick<Item, ItemPageFields>> & { id?: string; created_at?: string }): Item {
+    const row: Item = {
+      ...item,
+      page_url: item.page_url ?? null,
+      page_title: item.page_title ?? null,
+      urls_json: item.urls_json ?? null,
+      preview_json: item.preview_json ?? null,
+      id: item.id ?? uuidv7(),
+      created_at: item.created_at ?? isoNow(),
+    };
     this.db
       .prepare(
-        `INSERT INTO items (id, collection_id, kind, text, why, source_app, window_title, data_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO items (id, collection_id, kind, text, why, source_app, window_title, data_json, page_url, page_title, urls_json, preview_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(row.id, row.collection_id, row.kind, row.text, row.why, row.source_app, row.window_title, row.data_json, row.created_at);
+      .run(
+        row.id,
+        row.collection_id,
+        row.kind,
+        row.text,
+        row.why,
+        row.source_app,
+        row.window_title,
+        row.data_json,
+        row.page_url,
+        row.page_title,
+        row.urls_json,
+        row.preview_json,
+        row.created_at,
+      );
     return row;
+  }
+
+  /** The page an item was saved from (decision 84). */
+  setItemPage(id: string, page: { url: string | null; title: string | null }): void {
+    this.db.prepare('UPDATE items SET page_url = ?, page_title = ? WHERE id = ?').run(page.url, page.title, id);
+  }
+
+  /** The page's preview once fetched, or null to clear it. */
+  setItemPreview(id: string, preview: LinkPreview | null): void {
+    this.db.prepare('UPDATE items SET preview_json = ? WHERE id = ?').run(preview ? JSON.stringify(preview) : null, id);
+  }
+
+  // ---- item links (decision 84) ----
+
+  /** Links an item to a person, task, or event; linking twice is a no-op. */
+  linkItem(itemId: string, kind: ItemLinkKind, targetId: string): void {
+    this.db.prepare('INSERT OR IGNORE INTO item_links (item_id, kind, target_id) VALUES (?, ?, ?)').run(itemId, kind, targetId);
+  }
+
+  unlinkItem(itemId: string, kind: ItemLinkKind, targetId: string): void {
+    this.db.prepare('DELETE FROM item_links WHERE item_id = ? AND kind = ? AND target_id = ?').run(itemId, kind, targetId);
+  }
+
+  /** What an item links to, people first, then tasks, then events. */
+  itemLinks(itemId: string): ItemLink[] {
+    return this.db
+      .prepare(
+        `SELECT kind, target_id FROM item_links WHERE item_id = ?
+         ORDER BY CASE kind WHEN 'person' THEN 0 WHEN 'task' THEN 1 ELSE 2 END, rowid`,
+      )
+      .all(itemId) as unknown as ItemLink[];
+  }
+
+  /** The ids of the items linked to a person, task, or event, newest first. */
+  itemsLinkedTo(kind: ItemLinkKind, targetId: string): string[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT l.item_id FROM item_links l JOIN items i ON i.id = l.item_id
+           WHERE l.kind = ? AND l.target_id = ? ORDER BY i.created_at DESC, i.rowid DESC`,
+        )
+        .all(kind, targetId) as { item_id: string }[]
+    ).map((r) => r.item_id);
   }
 
   getItem(id: string): Item | null {

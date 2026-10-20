@@ -231,16 +231,58 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX write_sources_at ON write_sources(at);
   `,
+  /* 12: Everything goes where its subject is (decision 84, Step 28). A saved item keeps the page it
+     was saved from, the web addresses in its text, and the page's preview, and links to people,
+     tasks, and events. A link goes when what it points to is deleted. A person's note becomes a
+     list of facts, one per line (bullets dropped); the note column stays as it was. Collections
+     stay too, unused, for user-made groups later. */ `
+  ALTER TABLE items ADD COLUMN page_url TEXT;
+  ALTER TABLE items ADD COLUMN page_title TEXT;
+  ALTER TABLE items ADD COLUMN urls_json TEXT;
+  ALTER TABLE items ADD COLUMN preview_json TEXT;
+  CREATE TABLE item_links (
+    item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    PRIMARY KEY (item_id, kind, target_id)
+  );
+  CREATE INDEX item_links_target ON item_links(kind, target_id);
+  CREATE TRIGGER item_links_person_gone AFTER DELETE ON people BEGIN DELETE FROM item_links WHERE kind = 'person' AND target_id = OLD.id; END;
+  CREATE TRIGGER item_links_task_gone AFTER DELETE ON commitments BEGIN DELETE FROM item_links WHERE kind = 'task' AND target_id = OLD.id; END;
+  CREATE TRIGGER item_links_event_gone AFTER DELETE ON calendar_events BEGIN DELETE FROM item_links WHERE kind = 'event' AND target_id = OLD.id; END;
+  CREATE TABLE person_facts (
+    id TEXT PRIMARY KEY,
+    person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    source TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX person_facts_person ON person_facts(person_id, created_at);
+  ${['INSERT', 'UPDATE', 'DELETE']
+    .map((op) => `CREATE TRIGGER context_clock_person_facts_${op.toLowerCase()} AFTER ${op} ON person_facts BEGIN UPDATE context_clock SET n = n + 1; END;`)
+    .join('\n  ')}
+  WITH RECURSIVE split(person_id, line, rest, at, n) AS (
+    SELECT id, '', replace(note, char(13), '') || char(10), updated_at, 0 FROM people WHERE note IS NOT NULL AND trim(note) <> ''
+    UNION ALL
+    SELECT person_id, substr(rest, 1, instr(rest, char(10)) - 1), substr(rest, instr(rest, char(10)) + 1), at, n + 1 FROM split WHERE rest <> ''
+  )
+  INSERT INTO person_facts (id, person_id, text, source, created_at)
+    SELECT lower(hex(randomblob(16))), person_id, trim(ltrim(trim(line), '-*•· ')), 'note', at FROM split
+    WHERE n > 0 AND trim(ltrim(trim(line), '-*•· ')) <> ''
+    ORDER BY person_id, n;
+  `,
 ];
 
 /** Tables included in export, in foreign-key-safe delete order. */
 export const DATA_TABLES = [
   'calendar_event_people',
+  'item_links',
   'calendar_events',
   'item_entities',
   'commitments',
   'interactions',
   'person_aliases',
+  'person_facts',
   'people',
   'entities',
   'items',

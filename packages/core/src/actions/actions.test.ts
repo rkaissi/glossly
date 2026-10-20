@@ -40,6 +40,10 @@ function item(over: Partial<Item> = {}): Item {
     source_app: null,
     window_title: null,
     data_json: null,
+    page_url: null,
+    page_title: null,
+    urls_json: null,
+    preview_json: null,
     created_at: '2026-09-18T12:00:00-04:00',
     ...over,
   };

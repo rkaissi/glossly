@@ -8,7 +8,7 @@ import { useAction } from './useAction';
 
 const PAGE = 30;
 // Ask's notes are memories, asked for or saved on its own (decision 78).
-const KIND_LABEL: Record<LibraryItem['kind'], string | null> = { selection: null, note: 'Memory', chart: 'Chart' };
+const KIND_LABEL: Record<LibraryItem['kind'], string | null> = { selection: null, note: 'Memory', chart: 'Chart', link: 'Link' };
 
 /** One saved item: the text, where and when it was saved, and Copy, Move, and Delete (trash morphs in place). */
 function SavedRow({ item, collections, onChanged }: { item: LibraryItem; collections: string[]; onChanged: () => void }) {
