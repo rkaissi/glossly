@@ -108,6 +108,28 @@ export function extractUrls(text: string): string[] {
   return out;
 }
 
+const PAGE_SCHEMES = new Set(['http:', 'https:', 'file:']);
+
+/**
+ * What a browser's address bar shows (the `page_address` helper command), as a URL, or null for
+ * anything that isn't a page address: a search being typed, an internal page (chrome://, about:),
+ * or an empty bar. Chromium shows "acme.example.com/x" without the scheme, so https:// goes back on.
+ */
+export function normalizePageAddress(value: string | null | undefined): string | null {
+  const v = value?.trim();
+  if (!v || v.length > 2048 || /\s/.test(v)) return null;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(v) && !/^[^/:]+:\d+(\/|$)/.test(v);
+  let url: URL;
+  try {
+    url = new URL(hasScheme ? v : `https://${v}`);
+  } catch {
+    return null;
+  }
+  if (!PAGE_SCHEMES.has(url.protocol)) return null;
+  if (url.protocol !== 'file:' && !url.hostname.includes('.') && url.hostname !== 'localhost') return null;
+  return url.href;
+}
+
 /** A selection that is one web address and nothing else is saved as a Link (decision 84). */
 export function isLinkText(text: string): boolean {
   const t = text.trim();

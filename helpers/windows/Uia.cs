@@ -20,6 +20,7 @@ internal sealed record Rect(int X, int Y, int W, int H)
 internal sealed record SelectionResult(string Text, string Method, Rect? Bounds, bool IsEditable, bool IsPassword, string ControlType, bool Truncated, Rect? LastLine = null);
 internal sealed record ContextResult(string Before, string After);
 internal sealed record FieldResult(bool Found, Rect? Bounds, string ControlType);
+internal sealed record PageAddressResult(bool Found, string? Value);
 internal sealed record ContainerResult(string Text, int SelectionStart, int SelectionLength, string Source, string ContainerType);
 internal sealed record CaretResult(string Text, int Caret, string Source, string ContainerType, bool IsEditable);
 /// <summary>An obstacle near the selection. Id, class, and process are identifiers only, never window or element text.</summary>
@@ -571,6 +572,73 @@ internal sealed class Uia : IDisposable
         {
             return false;
         }
+    }
+
+    private const int UIA_AutomationIdPropertyId = 30011;
+    private const int UIA_ValueValuePropertyId = 30045;
+    /// <summary>Firefox's address bar (its id has been stable for years).</summary>
+    private const string FirefoxUrlBar = "urlbar-input";
+
+    /// <summary>
+    /// What the browser window <paramref name="handle"/> shows in its address bar (decision 84),
+    /// as typed there: Chromium leaves out "https://" and sometimes "www.", and the app fills them
+    /// back in. Firefox's bar is found by its id. Otherwise the bar is the widest edit field with a
+    /// value that sits wholly above the page (the largest document): the browser's toolbar. Fields
+    /// in the page are never read. Never logs the value.
+    /// </summary>
+    public PageAddressResult PageAddress(long handle)
+    {
+        var hwnd = new IntPtr(handle);
+        if (!IsWindow(hwnd)) throw new HelperException("window_gone", "The window no longer exists");
+        NudgeChromium(hwnd);
+        var native = _automation.NativeAutomation;
+        var window = Safe(() => native.ElementFromHandle(hwnd));
+        if (window == null) return new PageAddressResult(false, null);
+
+        var firefox = Safe(() => window.FindFirst(UIA.TreeScope.TreeScope_Descendants, native.CreatePropertyCondition(UIA_AutomationIdPropertyId, FirefoxUrlBar)));
+        if (firefox != null) return ReadAddress(firefox);
+
+        var cache = native.CreateCacheRequest();
+        foreach (var id in new[] { UIA_BoundingRectanglePropertyId, UIA_ControlTypePropertyId, UIA_IsPasswordPropertyId })
+            cache.AddProperty(id);
+        var docs = Safe(() => window.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, native.CreatePropertyCondition(UIA_ControlTypePropertyId, UIA_DocumentControlTypeId), cache));
+        int? pageTop = null;
+        long pageArea = 0;
+        for (int i = 0; docs != null && i < Math.Min(docs.Length, 50); i++)
+        {
+            var d = Safe(() => docs.GetElement(i));
+            if (d == null) continue;
+            var b = d.CachedBoundingRectangle;
+            long area = (long)(b.right - b.left) * (b.bottom - b.top);
+            if (area > pageArea) (pageArea, pageTop) = (area, b.top);
+        }
+        if (pageTop is not { } top) return new PageAddressResult(false, null);
+
+        var cond = native.CreateAndConditionFromArray(new[]
+        {
+            native.CreatePropertyCondition(UIA_ControlTypePropertyId, UIA_EditControlTypeId),
+            native.CreatePropertyCondition(UIA_IsValuePatternAvailablePropertyId, true),
+        });
+        var edits = Safe(() => window.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, cond, cache));
+        UIA.IUIAutomationElement? bar = null;
+        int barWidth = 0;
+        for (int i = 0; edits != null && i < Math.Min(edits.Length, MaxFields); i++)
+        {
+            var el = Safe(() => edits.GetElement(i));
+            if (el == null) continue;
+            var b = el.CachedBoundingRectangle;
+            int w = b.right - b.left;
+            // Only the toolbar: a field reaching into the page is the page's own, and is never read.
+            if (b.bottom > top || w < 120 || b.bottom - b.top < 12 || Safe(() => el.CachedIsPassword) != 0) continue;
+            if (w > barWidth) (bar, barWidth) = (el, w);
+        }
+        return bar == null ? new PageAddressResult(false, null) : ReadAddress(bar);
+    }
+
+    private static PageAddressResult ReadAddress(UIA.IUIAutomationElement el)
+    {
+        var value = Safe(() => el.GetCurrentPropertyValue(UIA_ValueValuePropertyId) as string)?.Trim();
+        return string.IsNullOrEmpty(value) || value.Length > 4096 ? new PageAddressResult(false, null) : new PageAddressResult(true, value);
     }
 
     /// <summary>Distance from the selection to the field; null when the field is wholly above it.</summary>

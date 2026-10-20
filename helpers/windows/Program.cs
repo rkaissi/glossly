@@ -74,6 +74,7 @@ internal static class Program
         "copy_fallback" => CopyFallback(uia, Int(req, "timeout_ms", 120, 10, 2_000)),
         "restore_focus" => Focus.Restore(Long(req, "handle")),
         "focus_field" => uia.FocusField(RectArg(req, "near")),
+        "page_address" => uia.PageAddress(Long(req, "handle")),
         "window_corners" => Focus.Corners(Long(req, "handle"), Str(req, "corners")),
         "paste" => Paste(Str(req, "text"), Int(req, "settle_ms", 250, 0, 2_000)),
         "mouse_hook" => SetMouse(Bool(req, "enabled")),

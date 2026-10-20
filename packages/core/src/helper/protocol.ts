@@ -117,6 +117,11 @@ export const Commands = {
     args: z.object({ near: RectSchema }),
     result: z.object({ found: z.boolean(), bounds: RectSchema.nullable(), control_type: z.enum(['edit', 'document', 'none']) }),
   },
+  page_address: {
+    args: z.object({ handle: z.number().int() }),
+    /** What the browser's address bar shows, as shown (no scheme in Chromium); `normalizePageAddress` makes it a URL. */
+    result: z.object({ found: z.boolean(), value: z.string().nullable() }),
+  },
   window_corners: {
     args: z.object({ handle: z.number().int(), corners: z.enum(['default', 'none', 'round', 'small']) }),
     result: z.object({ applied: z.boolean() }),

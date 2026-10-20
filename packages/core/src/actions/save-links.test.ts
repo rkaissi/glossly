@@ -8,7 +8,7 @@ import { CalendarRepo } from '../store/calendar';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { isoNow } from '../types';
-import { extractUrls, isLinkText } from './save';
+import { extractUrls, isLinkText, normalizePageAddress } from './save';
 import { saveOpen } from './save-links';
 
 const require = createRequire(import.meta.url);
@@ -29,6 +29,20 @@ describe('extractUrls and isLinkText (decision 84)', () => {
     expect(extractUrls('(https://docs.example.com/d/1)')).toEqual(['https://docs.example.com/d/1']);
     expect(extractUrls('no links, just example.com and http://intranet/wiki')).toEqual([]);
     expect(extractUrls('local http://localhost:3000/app')).toEqual(['http://localhost:3000/app']);
+  });
+
+  it('turns what an address bar shows into a URL, and leaves out searches and internal pages', () => {
+    expect(normalizePageAddress('acme.example.com/blog/design-reviews')).toBe('https://acme.example.com/blog/design-reviews');
+    expect(normalizePageAddress('  https://docs.example.com/d/1?tab=pricing ')).toBe('https://docs.example.com/d/1?tab=pricing');
+    expect(normalizePageAddress('http://intranet.example.com')).toBe('http://intranet.example.com/');
+    expect(normalizePageAddress('localhost:3000/app')).toBe('https://localhost:3000/app');
+    expect(normalizePageAddress('file:///C:/pages/discord.html')).toBe('file:///C:/pages/discord.html');
+    expect(normalizePageAddress('chrome://settings')).toBeNull();
+    expect(normalizePageAddress('about:blank')).toBeNull();
+    expect(normalizePageAddress('weather tomorrow')).toBeNull();
+    expect(normalizePageAddress('intranet')).toBeNull();
+    expect(normalizePageAddress('')).toBeNull();
+    expect(normalizePageAddress(null)).toBeNull();
   });
 
   it('calls a selection a link only when it is one address and nothing else', () => {

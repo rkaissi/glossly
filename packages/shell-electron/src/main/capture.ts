@@ -96,6 +96,9 @@ import {
   retrieveContext,
   saveOpen,
   ITEM_KIND_LABEL,
+  isBrowser,
+  normalizePageAddress,
+  stripBrowserSuffix,
   type ClassifiedObstacle,
   type DetectedPerson,
   type ItemLink,
@@ -407,6 +410,26 @@ export class Capture {
 
   private current(id: number): Session | null {
     return this.session && this.session.id === id ? this.session : null;
+  }
+
+  /**
+   * Keeps the page a save came from (decision 84): the title from the window title, the address
+   * from the browser's bar (`page_address`). Only for browsers; read once, after the save, so
+   * saving never waits for it. The address is never logged.
+   */
+  private recordPage(itemId: string, fg: Foreground | null): void {
+    if (!fg || !isBrowser(fg)) return;
+    const title = stripBrowserSuffix(fg.title).trim() || null;
+    const t = performance.now();
+    void this.helper
+      .request('page_address', { handle: fg.handle })
+      .catch(() => null)
+      .then((r) => {
+        const url = normalizePageAddress(r?.value);
+        if (!this.services.store.getItem(itemId)) return;
+        this.services.store.setItemPage(itemId, { url, title });
+        log.info('page recorded', { found: Boolean(r?.found), url: Boolean(url), title: Boolean(title), ms: ms(t) });
+      });
   }
 
   /** The helper's selection, with what other apps leave in copied text (OBJ, invisible characters) cleaned out. */
@@ -1642,6 +1665,7 @@ ${s.selection.text}`;
     const r = this.services.save.saveChart({ csv: v.csv, data: { columns: v.table.columns, rows: v.table.rows, types: v.types, spec: v.spec }, selection: s.selection });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     s.savedItemId = r.item.id;
+    this.recordPage(r.item.id, s.fg);
     return { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil };
   }
 
@@ -2048,6 +2072,7 @@ ${s.selection.text}`;
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     s.saved = { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil, via: 'autosave' };
     s.savedItemId = r.item.id;
+    this.recordPage(r.item.id, s.fg);
     this.lastAutosave = { handle: s.fg.handle, text: s.selection.text, notice: s.saved };
     log.info('autosaved');
   }
@@ -2122,6 +2147,7 @@ ${s.selection.text}`;
       const r = this.services.save.save({ selection, container: null, via: 'hotkey' });
       void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
       log.info('saved by hotkey', { ms: ms(t0) });
+      this.recordPage(r.item.id, fg);
       this.showToast({ itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil, via: 'hotkey' }, sel?.bounds ?? null, cursor, null, fg);
     } catch (e) {
       if (!(e instanceof HelperError)) log.error('save hotkey failed', errorInfo(e));
@@ -2513,6 +2539,7 @@ ${s.selection.text}`;
     const r = this.services.save.save({ selection: s.selection, container, why: args.why, links: args.links, unlinkedPeople: args.unlinkedPeople });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     s.savedItemId = r.item.id;
+    this.recordPage(r.item.id, s.fg);
     return { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil };
   }
 

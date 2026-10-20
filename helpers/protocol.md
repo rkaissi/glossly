@@ -186,6 +186,16 @@ Focuses the text field in the foreground window that a reply to the text at `nea
 
 Result: `{"found": bool, "bounds": Rect | null, "control_type": "edit" | "document" | "none"}`. Errors: `no_foreground`, `bad_request`.
 
+### `page_address`
+
+| Arg | Notes |
+| --- | --- |
+| `handle` | Required: the browser window, from `foreground` |
+
+What the browser's address bar shows (decision 84), read once when something is saved from a browser. Firefox's bar is found by its automation id (`urlbar-input`). For Chromium browsers (Chrome, Edge, Brave, Opera, Vivaldi, Arc) and the test viewer, the bar is the widest edit field with a value pattern that sits wholly above the page, the largest document in the window; a field that reaches into the page belongs to the page and is never read, and neither is a password field. The value is returned as shown: Chromium leaves out `https://` and sometimes `www.`, and the app turns it into a URL (`normalizePageAddress`). The helper never logs it.
+
+Result: `{"found": bool, "value": string | null}`. `found` is false (and `value` null) for a window with no address bar or an empty one. Errors: `window_gone`, `bad_request`.
+
 ### `window_corners`
 
 | Arg | Notes |

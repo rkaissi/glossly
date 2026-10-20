@@ -1,0 +1,30 @@
+{
+  "cmd": "page_address",
+  "cases": [
+    {
+      "name": "chromium bar, no scheme",
+      "request": { "id": 50, "cmd": "page_address", "handle": 722856 },
+      "response": { "id": 50, "ok": true, "result": { "found": true, "value": "acme.example.com/blog/design-reviews" } }
+    },
+    {
+      "name": "firefox bar",
+      "request": { "id": 51, "cmd": "page_address", "handle": 722857 },
+      "response": { "id": 51, "ok": true, "result": { "found": true, "value": "https://docs.example.com/d/1?tab=pricing" } }
+    },
+    {
+      "name": "not a browser",
+      "request": { "id": 52, "cmd": "page_address", "handle": 722858 },
+      "response": { "id": 52, "ok": true, "result": { "found": false, "value": null } }
+    },
+    {
+      "name": "window closed",
+      "request": { "id": 53, "cmd": "page_address", "handle": 1 },
+      "response": { "id": 53, "ok": false, "error": { "code": "window_gone", "message": "The window no longer exists" } }
+    },
+    {
+      "name": "missing handle",
+      "request": { "id": 54, "cmd": "page_address" },
+      "response": { "id": 54, "ok": false, "error": { "code": "bad_request", "message": "Missing handle" } }
+    }
+  ]
+}

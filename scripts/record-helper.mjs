@@ -125,6 +125,8 @@ const DETERMINISTIC = new Set([
   'restore_focus/window closed',
   'focus_field/missing near',
   'window_corners/window closed',
+  'page_address/window closed',
+  'page_address/missing handle',
   'paste/missing text',
   'popups_near/missing bounds',
   'mouse_hook/on',
