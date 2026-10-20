@@ -55,6 +55,7 @@ import { EmbedHost } from './embed-host';
 import { KeyStore } from './keys';
 import { logger } from './log';
 import { userDataPath } from './paths';
+import { Previews } from './previews';
 
 const log = logger('services');
 const CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -96,6 +97,8 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
   readonly people: PeopleRepo;
   readonly calendar: CalendarRepo;
   readonly embed: EmbedHost;
+  /** Link previews and their images (decision 84). */
+  readonly previews: Previews;
   private settingsCache: Settings;
   private readonly lastTests = new Map<string, KeyTestResult>();
   private speedCache: { at: number; speeds: Record<string, Speed> } | null = null;
@@ -174,6 +177,8 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
       settings: () => this.settingsCache,
       metrics: this.metrics,
     });
+    this.previews = new Previews(store, () => this.settingsCache, userDataPath('previews'));
+    this.previews.sweep();
   }
 
   get settings(): Settings {
@@ -279,13 +284,14 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
   }
 
   /**
-   * "Delete all data": saved items, entities, people, vectors, usage events, and collections
-   * (the defaults come back). Keys, settings, the model list, and the embedding model stay.
+   * "Delete all data": saved items and their preview images, entities, people, vectors, usage
+   * events, and collections. Keys, settings, the model list, and the embedding model stay.
    */
   async deleteAll(): Promise<void> {
     // A save still being enriched would write its vector and entities after the wipe.
     await Promise.race([this.save.idle(), new Promise((r) => setTimeout(r, 2000))]);
     this.store.deleteAll();
+    this.previews.sweep();
   }
 
   /**

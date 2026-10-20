@@ -216,7 +216,11 @@ export function registerIpc(deps: IpcDeps): void {
     }),
   );
   handle('save:setWhy', (a) => services.save.setWhy(str(a.itemId, 100), str(a.why, 2000)));
-  handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
+  handle('save:undo', (a) => {
+    const undone = services.save.undo(str(a.itemId, 100));
+    if (undone) services.previews.sweep();
+    return { undone };
+  });
   handle('saved:undo', (a) => capture.undoSaved(num(a.sessionId)));
   handle('clipboard:write', (a) => clipboard.writeText(str(a.text, MAX_CLIPBOARD)));
   handle('clipboard:image', async (a) => {
@@ -255,9 +259,13 @@ export function registerIpc(deps: IpcDeps): void {
   });
   handle('items:delete', (a) => {
     const deleted = services.save.remove(str(a.itemId, 100));
-    if (deleted) log.info('item deleted');
+    if (deleted) {
+      log.info('item deleted');
+      services.previews.sweep();
+    }
     return { deleted };
   });
+  handle('items:preview', (a) => capture.loadPreview(str(a.itemId, 100)));
   handle('items:edit', (a) => {
     const itemId = str(a.itemId, 100);
     const text = str(a.text, 2000);

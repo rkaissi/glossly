@@ -56,6 +56,7 @@ export * from './actions/ask';
 export * from './actions/ask-tools';
 export * from './actions/save';
 export * from './actions/save-links';
+export * from './actions/link-preview';
 export * from './actions/who';
 export * from './actions/promises';
 export * from './actions/reply';

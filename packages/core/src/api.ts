@@ -13,7 +13,7 @@ import type { CatalogModel } from './llm/catalog';
 import type { MetricsSummary } from './metrics';
 import type { BarAction, ContentType, DecisionProviderId } from './router/types';
 import type { ApiStyle, AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
-import type { CaptureMethod, Item, ItemLink, Trigger } from './types';
+import type { CaptureMethod, Item, ItemLink, LinkPreview, Trigger } from './types';
 import type { WhoView } from './actions/who';
 import type { SaveOpen } from './actions/save-links';
 import type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
@@ -36,7 +36,7 @@ export type { Relationship } from './people/relationship';
 export type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
 export type { PromisesByRules } from './actions/promises';
 export type { SaveLinkView, SaveOpen } from './actions/save-links';
-export type { ItemLink, ItemLinkKind } from './types';
+export type { ItemLink, ItemLinkKind, LinkPreview } from './types';
 export type * from './calendar/types';
 export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
@@ -630,6 +630,8 @@ export interface InvokeChannels {
   'library:query': { args: LibraryQuery; result: LibraryResult };
   /** Deletes a saved item for good (the Saved tab asks first), with its vector and orphaned entities. */
   'items:delete': { args: { itemId: string }; result: { deleted: boolean } };
+  /** Load preview (decision 84): fetches a Link's address (or the item's page) because the user asked. Null when off, local, or nothing came back. */
+  'items:preview': { args: { itemId: string }; result: LinkPreview | null };
   /** Rewords a memory (decision 78; memories only), then embeds it again. False when it's gone or not a memory. */
   'items:edit': { args: { itemId: string; text: string }; result: { edited: boolean } };
   /** Moves a saved item to another collection (created if needed). Null when the item is gone. */
@@ -704,7 +706,7 @@ export interface InvokeChannels {
   'roles:restore': { args: { moves: RoleMove[] }; result: Settings['roles'] };
   /** Shows a save dialog. Null when cancelled. */
   'data:export': { args: void; result: { path: string } | null };
-  /** Deletes items, entities, people, vectors, events, and collections (re-seeded). Keys, settings, the model list, and the embedding model stay. */
+  /** Deletes items, entities, people, vectors, events, collections, and preview images. Keys, settings, the model list, and the embedding model stay. */
   'data:delete-all': { args: void; result: void };
   /** Removes the saved keys, their test results, and the model list, resets settings to defaults (back to setup), and re-registers the default hotkey. Saved data stays. */
   'settings:reset': { args: void; result: void };

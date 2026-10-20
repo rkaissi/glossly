@@ -112,6 +112,33 @@ export function SavedInAnswers({ view }: { view: SettingsView }) {
 }
 
 /**
+ * Previews for saved pages and links (decision 84): the page's own preview, fetched once, else a
+ * picture of the browser window from when it was saved. On by default.
+ */
+export function LinkPreviews({ view }: { view: SettingsView }) {
+  const { busy, error, run } = useAction();
+  const set = (value: boolean) =>
+    void run(async () => {
+      const r = await glossly.invoke('settings:set', { key: 'linkPreviews', value });
+      if (r.error) throw new Error(r.error);
+    });
+  return (
+    <div className="field">
+      <div className="toggle">
+        <span>
+          <strong>Show previews for saved pages</strong>
+          <span className="muted small block">
+            When you save from a browser, Glossly asks that page for its preview once, the way a chat app does when you paste a link, with no sign-ins sent. Pages that need a sign-in get a picture of the browser window from when you saved, which can show other things on the page. Links you highlight are only fetched when you ask. Previews stay on this computer.
+          </span>
+        </span>
+        <Switch label="Show previews for saved pages" checked={view.settings.linkPreviews} disabled={busy} onChange={set} />
+      </div>
+      {error && <p className="error small">{error}</p>}
+    </div>
+  );
+}
+
+/**
  * The model call log (decision 61): every call's prompt (with the selected text), answer, model,
  * and timing, kept 30 days in the local database to see what the models saw. Turning it off
  * deletes it, so that asks first.

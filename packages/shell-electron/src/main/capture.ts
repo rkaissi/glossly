@@ -99,6 +99,7 @@ import {
   isBrowser,
   normalizePageAddress,
   stripBrowserSuffix,
+  type LinkPreview,
   type ClassifiedObstacle,
   type DetectedPerson,
   type ItemLink,
@@ -421,15 +422,30 @@ export class Capture {
     if (!fg || !isBrowser(fg)) return;
     const title = stripBrowserSuffix(fg.title).trim() || null;
     const t = performance.now();
+    const sv = this.services;
+    // The window picture is taken now, while the page is on screen; it's kept only if the page gives no preview.
+    const shot = sv.previews.enabled ? sv.previews.windowShot(fg.handle) : null;
     void this.helper
       .request('page_address', { handle: fg.handle })
       .catch(() => null)
-      .then((r) => {
+      .then(async (r) => {
         const url = normalizePageAddress(r?.value);
-        if (!this.services.store.getItem(itemId)) return;
-        this.services.store.setItemPage(itemId, { url, title });
+        if (!sv.store.getItem(itemId)) return;
+        sv.store.setItemPage(itemId, { url, title });
         log.info('page recorded', { found: Boolean(r?.found), url: Boolean(url), title: Boolean(title), ms: ms(t) });
-      });
+        // Only the page the user was on is fetched on its own (decision 84); a highlighted address waits for Load preview.
+        await sv.previews.record(itemId, url, shot);
+      })
+      .catch((e) => log.warn('page preview failed', errorInfo(e)));
+  }
+
+  /** Load preview (decision 84): the item's own address (a Link) or its page, fetched because the user asked. */
+  async loadPreview(itemId: string): Promise<LinkPreview | null> {
+    const item = this.services.store.getItem(itemId);
+    if (!item) return null;
+    const urls = item.urls_json ? (JSON.parse(item.urls_json) as string[]) : [];
+    const address = item.kind === 'link' ? (urls[0] ?? null) : item.page_url;
+    return this.services.previews.record(itemId, address, null);
   }
 
   /** The helper's selection, with what other apps leave in copied text (OBJ, invisible characters) cleaned out. */
@@ -2081,6 +2097,7 @@ ${s.selection.text}`;
     const s = this.current(sessionId);
     if (!s?.saved) return { undone: false };
     const undone = this.services.save.undo(s.saved.itemId);
+    if (undone) this.services.previews.sweep();
     if (this.lastAutosave?.notice.itemId === s.saved.itemId) this.lastAutosave = null;
     if (undone) {
       s.saved = null;
