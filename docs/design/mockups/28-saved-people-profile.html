@@ -263,16 +263,35 @@ button.sm { height:var(--h-sm); padding:0 10px; font-size:13px; }
 .rows .text.code { font:12.5px/1.5 var(--mono); background:var(--surface-2); border-radius:6px; padding:4px 8px; }
 .rows .quote { color:var(--fg-2); border-left:2px solid var(--border-strong); padding-left:8px; font-size:13px; }
 .meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
-.link-chip { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 8px; border-radius:999px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); font-size:12px; color:var(--fg-2); }
-.link-chip svg { color:var(--muted); }
+.link-chip { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 8px; border-radius:999px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); font-size:12px; color:var(--fg-2); white-space:nowrap; max-width:100%; min-width:0; flex:none; }
+.link-chip > span { overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.link-chip svg { color:var(--muted); flex:none; }
+.link-chip.offer { background:transparent; box-shadow:inset 0 0 0 1px var(--border-strong); color:var(--fg); height:26px; padding:0 10px; font-size:12.5px; cursor:pointer; }
+.link-chip.offer:hover { background:var(--hover); }
+.from-page { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--fg-2); min-width:0; max-width:100%; }
+.from-page .globe { width:16px; height:16px; border-radius:4px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); display:inline-flex; align-items:center; justify-content:center; flex:none; color:var(--muted); }
+.from-page .globe svg { width:11px; height:11px; }
+.from-page .t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.from-page .host { color:var(--muted); white-space:nowrap; }
+.add-note { align-self:flex-start; height:auto; padding:0; box-shadow:none; color:var(--muted); font-size:12.5px; gap:5px; }
+.add-note:hover { background:none; color:var(--fg); }
 .rows .side-acts { display:flex; gap:2px; }
 
 .mini-chart { display:flex; align-items:flex-end; gap:6px; height:56px; padding:6px 8px 0; border-radius:6px; background:var(--surface-2); width:200px; }
 .mini-chart i { flex:1; background:var(--fg-2); border-radius:3px 3px 0 0; opacity:.75; }
 
 /* cards view */
-.bento { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); grid-auto-flow:dense; gap:12px; }
-.tile { border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border); background:var(--surface); padding:14px; display:flex; flex-direction:column; gap:10px; min-height:150px; font-size:13px; }
+.bento { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); grid-auto-flow:dense; gap:12px; align-items:start; }
+.tile { border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border); background:var(--surface); padding:14px; display:flex; flex-direction:column; gap:10px; font-size:13px; overflow:hidden; min-width:0; }
+.tile .head { flex-wrap:wrap; }
+.tile.link { padding:0; gap:0; }
+.tile.link .preview { height:92px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, color-mix(in srgb,var(--fg) 5%,transparent), color-mix(in srgb,var(--fg) 1.5%,transparent)); border-bottom:1px solid var(--border); color:var(--faint); position:relative; }
+.tile.link .preview svg { width:30px; height:30px; stroke-width:1.25; }
+.tile.link .preview.shot { background:#f4f4f2; align-items:stretch; justify-content:stretch; padding:10px 12px 0; overflow:hidden; }
+.shot .page-mock { flex:1; background:#fff; border-radius:6px 6px 0 0; box-shadow:0 0 0 1px rgba(0,0,0,.08); padding:10px 12px; display:flex; flex-direction:column; gap:6px; }
+.shot .page-mock i { display:block; height:6px; border-radius:3px; background:#e3e3e0; }
+.shot .page-mock i.h { height:9px; width:60%; background:#cfcfcb; }
+.tile.link .lb { padding:12px 14px 12px; display:flex; flex-direction:column; gap:8px; }
 .tile.wide { grid-column:span 2; }
 .tile.tall { grid-row:span 2; }
 .tile .head { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
@@ -331,6 +350,8 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
 .ib .cap { font-size:12.5px; color:var(--fg-2); }
 .ib .cap b { color:var(--fg); }
 
+.group-head { flex-wrap:wrap; }
+@media (max-width:1060px) { .two { grid-template-columns:1fr; } }
 @media (max-width:820px) {
   .win { grid-template-columns:1fr; }
   .side { display:none; }
@@ -372,6 +393,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
   <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
   <symbol id="table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></symbol>
   <symbol id="ask" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
 </svg>
 
@@ -393,11 +415,11 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
       <p class="q">Things you kept, to find, reuse, or have Glossly know.</p>
       <ul>
         <li><b>Snippet</b>: any text you highlighted and saved.</li>
-        <li><b>Link</b>: saved from a browser, with the page's title and address, like a bookmark that keeps the line you highlighted.</li>
+        <li><b>Link</b>: a saved web address, like a bookmark: the page you were on, or a link you highlighted.</li>
         <li><b>Chart</b>: the chart itself and its data (the table, CSV) and the text it came from.</li>
         <li><b>Memory</b>: something Ask kept that isn't about you or a saved person ("Northwind's fiscal year starts in April").</li>
       </ul>
-      <div class="from">Any item can link to people, tasks, and events. Those links show on the item, and the item shows on them.</div>
+      <div class="from">Anything saved in a browser keeps the page it came from (title and address), whatever its type. Any item can link to people, tasks, and events. Those links show on the item, and the item shows on them.</div>
     </div>
     <div class="col">
       <h3><svg class="i"><use href="#users"/></svg>People</h3>
@@ -444,7 +466,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
       <div class="sv-tools">
         <div class="search"><svg class="i"><use href="#search"/></svg>Search words or meaning</div>
         <span class="select">Anyone <svg class="i sm"><use href="#chev"/></svg></span>
-        <span class="select">Any app <svg class="i sm"><use href="#chev"/></svg></span>
+        <span class="select">Any app or site <svg class="i sm"><use href="#chev"/></svg></span>
         <div class="seg icons" role="radiogroup" aria-label="View"><button class="on" title="List"><svg class="i sm"><use href="#list"/></svg></button><button title="Cards"><svg class="i sm"><use href="#grid"/></svg></button></div>
       </div>
       <div class="filters">
@@ -460,7 +482,8 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
             <span class="kind"><svg class="i"><use href="#text"/></svg></span>
             <div class="body">
               <span class="text">Q3 pricing: Starter $12, Team $29, Business $59 per seat per month. Annual plans get two months free.</span>
-              <span class="meta">Snippet · Docs · Oct 17
+              <a class="from-page"><span class="globe"><svg class="i"><use href="#globe"/></svg></span><span class="t">Acme pricing 2026</span><span class="host">docs.example.com</span><svg class="i sm"><use href="#ext"/></svg></a>
+              <span class="meta">Snippet · Oct 17
                 <span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span>
                 <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan</span>
               </span>
@@ -468,11 +491,11 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
             <div class="side-acts"><button class="icon-btn" title="Copy"><svg class="i sm"><use href="#copy"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
           </li>
           <li>
-            <span class="fav" style="background:#3b6ea5">A</span>
+            <span class="kind"><svg class="i"><use href="#globe"/></svg></span>
             <div class="body">
               <span class="title">How we run design reviews</span>
               <span class="quote">Every review starts with the problem, not the screens: two sentences on who is stuck and why.</span>
-              <span class="meta">Link · acme.example.com · Oct 16</span>
+              <span class="meta">Link · acme.example.com · Oct 16 · <i>"for the team wiki"</i></span>
             </div>
             <div class="side-acts"><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
           </li>
@@ -481,7 +504,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
             <div class="body">
               <span class="title">Signups by month, June to September</span>
               <div class="mini-chart"><i style="height:38%"></i><i style="height:55%"></i><i style="height:72%"></i><i style="height:94%"></i></div>
-              <span class="meta">Chart · 4 rows · Sheets · Oct 15
+              <span class="meta">Chart · 4 rows · Oct 15
                 <span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span>
               </span>
             </div>
@@ -508,7 +531,9 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
     </div>
   </div>
   <ul class="notes">
-    <li>The type comes from where and what: a browser page with an address is a Link, Visualize's save is a Chart, Ask's save is a Memory, and everything else is a Snippet. No model call.</li>
+    <li>The type comes from what was saved, in code: a selection that is a web address (or a page saved with nothing selected) is a Link, Visualize's save is a Chart, Ask's save is a Memory, and everything else is a Snippet. No model call.</li>
+    <li>Anything saved in a browser shows the page it came from under the text, with the site's address; clicking it opens the page in the default browser. The app filter lists sites too ("docs.example.com"), not just "Chrome".</li>
+    <li>Web addresses inside the highlighted text are pulled out in code and shown as their own small links on the item, so they open with one click and Search finds them. They don't become separate items.</li>
     <li>The Why you typed shows in quotes in the meta line, as now. It no longer competes with a collection for the panel's attention.</li>
     <li>Link chips open what they point to: a person's record, the task in Tasks, the event in Calendar. They come from the entities pass that already runs after a save, plus task and event matches.</li>
   </ul>
@@ -523,7 +548,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
       <div class="sv-tools">
         <div class="search"><svg class="i"><use href="#search"/></svg>Search words or meaning</div>
         <span class="select">Anyone <svg class="i sm"><use href="#chev"/></svg></span>
-        <span class="select">Any app <svg class="i sm"><use href="#chev"/></svg></span>
+        <span class="select">Any app or site <svg class="i sm"><use href="#chev"/></svg></span>
         <div class="seg icons"><button title="List"><svg class="i sm"><use href="#list"/></svg></button><button class="on" title="Cards"><svg class="i sm"><use href="#grid"/></svg></button></div>
       </div>
       <div class="filters">
@@ -535,21 +560,24 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
       </div>
       <div class="bento">
         <div class="tile wide">
-          <div class="head"><span class="kind"><svg class="i sm"><use href="#chart"/></svg></span>Chart · Sheets · Oct 15<span class="spacer"></span><span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
+          <div class="head"><span class="kind"><svg class="i sm"><use href="#chart"/></svg></span>Chart · Oct 15</div>
           <div class="big">Signups by month, June to September</div>
           <div class="chart"><div class="b">412<i style="height:38%"></i></div><div class="b">598<i style="height:55%"></i></div><div class="b">780<i style="height:72%"></i></div><div class="b">1,020<i style="height:94%"></i></div></div>
           <div class="axis"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div>
-          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button></div>
+          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button><span class="spacer"></span><span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
+        </div>
+        <div class="tile link">
+          <div class="preview shot"><div class="page-mock"><i class="h"></i><i></i><i style="width:85%"></i><i style="width:70%"></i></div></div>
+          <div class="lb">
+            <div class="big">How we run design reviews</div>
+            <div class="text muted">"Every review starts with the problem, not the screens."</div>
+            <div class="meta">acme.example.com · Oct 16<span class="spacer"></span><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button></div>
+          </div>
         </div>
         <div class="tile">
-          <div class="head"><span class="fav" style="background:#3b6ea5">A</span>acme.example.com</div>
-          <div class="big">How we run design reviews</div>
-          <div class="text muted">"Every review starts with the problem, not the screens."</div>
-          <div class="meta">Link · Oct 16<span class="spacer"></span><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button></div>
-        </div>
-        <div class="tile">
-          <div class="head"><span class="kind"><svg class="i sm"><use href="#text"/></svg></span>Snippet · Docs</div>
+          <div class="head"><span class="kind"><svg class="i sm"><use href="#text"/></svg></span>Snippet · Oct 17</div>
           <div class="text">Q3 pricing: Starter $12, Team $29, Business $59 per seat per month. Annual plans get two months free.</div>
+          <a class="from-page"><span class="globe"><svg class="i"><use href="#globe"/></svg></span><span class="t">Acme pricing 2026</span><span class="host">docs.example.com</span></a>
           <div class="meta"><span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span><span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing</span></div>
         </div>
         <div class="tile">
@@ -557,11 +585,13 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
           <div class="text">Northwind's fiscal year starts in April, so their budget talks happen in February.</div>
           <div class="meta">Oct 12</div>
         </div>
-        <div class="tile">
-          <div class="head"><span class="fav" style="background:#7a5a2f">D</span>docs.example.com</div>
-          <div class="big">Error handling, a field guide</div>
-          <div class="text muted">"Return errors where the caller can act on them; log them where it can't."</div>
-          <div class="meta">Link · Oct 9<span class="spacer"></span><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button></div>
+        <div class="tile link">
+          <div class="preview"><svg class="i"><use href="#globe"/></svg></div>
+          <div class="lb">
+            <div class="big">Error handling, a field guide</div>
+            <div class="text muted">"Return errors where the caller can act on them; log them where it can't."</div>
+            <div class="meta">docs.example.com · Oct 9<span class="spacer"></span><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button></div>
+          </div>
         </div>
         <div class="tile">
           <div class="head"><span class="kind"><svg class="i sm"><use href="#text"/></svg></span>Snippet · Terminal</div>
@@ -575,14 +605,15 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
   <ul class="notes">
     <li>Tiles are sized by type, not by the user: charts wide, everything else one column. No drag to rearrange (it's a library, not a board).</li>
     <li>A chart keeps three things: the rendered chart (as SVG, so it stays sharp and themes with light or dark), the table as CSV, and the source text. Copy image pastes it into a doc or chat.</li>
-    <li>A link keeps the page title, address, and site icon if the browser gives one (otherwise the letter tile), plus the line you highlighted. Open page goes back to it.</li>
+    <li>A link keeps the page title, address, and the line you highlighted. Its preview is a snapshot of the page taken from the screen at the moment you save (the first card), since the page is right there; nothing is downloaded, so it works offline and under Local only. Links saved without a snapshot (a highlighted address, or older saves) get the globe placeholder (the second card).</li>
+    <li>Tiles keep their own height (no stretching to match the tallest in a row), so a short card has no empty space at the bottom.</li>
   </ul>
 </section>
 
 <!-- ============ 4. Save panel ============ -->
 <section class="board">
   <h2>4. The Save panel</h2>
-  <p class="what">With no collections, Save has nothing to choose: Enter saves. What it shows instead is what Glossly worked out (the type and the links), each removable before saving.</p>
+  <p class="what">With no collections, Save has nothing to choose: Enter saves. What it shows instead is what Glossly worked out: the type, the page it came from, links to things you already have (each removable), and offers to add things you don't have yet. The note is a quiet link now, not a box.</p>
   <div class="pair">
     <div>
       <p class="label">Today</p>
@@ -602,19 +633,26 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
         <div class="bar"><button class="slot"><svg class="i"><use href="#ask"/></svg>Ask</button><button class="slot on"><svg class="i"><use href="#bookmark"/></svg>Save</button><button class="slot">Who is this</button></div>
         <div class="panel">
           <h4>Save <span class="muted">· Snippet</span></h4>
+          <a class="from-page"><span class="globe"><svg class="i"><use href="#globe"/></svg></span><span class="t">Acme pricing 2026</span><span class="host">docs.example.com</span></a>
           <div class="chips">
             <span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
             <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
           </div>
-          <div class="input ph">Why are you saving this? (optional)</div>
-          <div class="panel-foot"><kbd>Enter</kbd> save · <kbd>Esc</kbd> back</div>
+          <div class="chips">
+            <button class="link-chip offer"><svg class="i sm"><use href="#plus"/></svg>Add as task or event</button>
+            <button class="link-chip offer"><svg class="i sm"><use href="#plus"/></svg>Add person: Casey Lin</button>
+          </div>
+          <button class="add-note"><svg class="i sm"><use href="#pen"/></svg>Add a note</button>
+          <div class="panel-foot"><kbd>Enter</kbd> save · <kbd>N</kbd> note · <kbd>Esc</kbd> back</div>
         </div>
       </div>
     </div>
   </div>
   <ul class="notes">
     <li>Links fill in as they're found. People named in the text come from rules at once; a task or event match by meaning may arrive a moment later. Saving never waits for them: anything found after Enter is linked in the background, as the entities pass is today.</li>
-    <li>A person the text names who isn't saved yet gets no chip here. Who is this and Add person stay the way to create one (people are never created without a confirm).</li>
+    <li><b>Linking vs. adding.</b> Saving only ever <i>links</i> on its own: to people, tasks, and events you already have (filled chips with ×). Anything new is <i>offered</i>, never added: an outlined "+ Add" chip, the way Ask offers a task it noticed (decision 78). One click adds it, linked to this item, with Undo; the chip turns into a filled link. Ignoring it costs nothing.</li>
+    <li>Offers come only from what the bar already worked out, so Save spends no extra model call: "+ Add person" when the text names someone not saved (one click opens Who is this's form, prefilled, since people need a confirm); "+ Add as task or event" when the route found a commitment phrase or a date. Clicking it runs the Tasks and events extraction then (the one model call, only on click) and shows what it found, linked to this item, to add or drop. Without a model, rules find dates and "I'll …" phrases, as Tasks does today.</li>
+    <li><b>Add a note</b> opens a one-line field in place (or press <kbd>N</kbd>). The note is kept with the item: Search matches it, and Ask and Write here see it as "Why it was saved". It can be added or changed later in Saved.</li>
     <li>The bar slot reads "Save", so the router no longer sends a collection list or asks for <code>best_collection</code> on every bar open.</li>
   </ul>
 </section>
@@ -657,6 +695,13 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
               <li><span class="t">Vegetarian</span><span class="src">You · Oct 3</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
               <li><span class="t">Prefers a call over long email threads</span><span class="src">Ask · Sep 28</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
               <li class="add"><svg class="i sm"><use href="#plus"/></svg>Add something about Jordan</li>
+            </ul>
+          </div>
+          <div class="group-head" style="margin-top:28px"><div><h3>How you write to Jordan</h3><p>Learned from your replies to them. Your general habits on Profile still apply.</p></div></div>
+          <div class="card">
+            <ul class="habits">
+              <li><span class="t"><b>Skips the greeting</b><span class="meta">From your edits · Reply</span></span><span class="place">Work chat</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+              <li><span class="t"><b>Uses first names and emoji</b><span class="meta">Picked the casual draft 5 of 6 times · Reply</span></span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
             </ul>
           </div>
         </div>
@@ -772,7 +817,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
     <li><b>The switch is in the group's header</b>, next to what it controls. Turning it off keeps what was learned (still used) and stops learning; a line under the header says so while it's off.</li>
     <li><b>Examples are cards</b>, at most 5 you added and the latest from your edits, switched with a segmented control instead of a fold. The place is set when you paste (the same picker as today), and shown as a pill.</li>
     <li><b>Facts about you use the same list as a person's facts</b>: hover shows Edit and Delete, and Add sits at the end. The identity fields save as you leave them, so the Save button goes.</li>
-    <li>The place filter shows only places that have something, as now. Person-specific habits ("Writes more formally to Casey") move to that person's record.</li>
+    <li>The place filter shows only places that have something, as now. Habits about one person move to that person's record, under "How you write to Jordan" (section 5); habits about a kind of person ("to people outside Acme") stay here.</li>
   </ul>
 </section>
 
@@ -787,11 +832,11 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
     </div>
     <div class="ib pick">
       <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#idcard"/></svg>Profile</a></div>
-      <span class="cap"><b>IdCard</b>, recommended. A different outline (a card, not a head), and it reads as "who you are".</span>
+      <span class="cap"><b>IdCard</b>, finalist, recommended. The most different outline (a card, not a head), so it never reads as People at a glance.</span>
     </div>
-    <div class="ib">
+    <div class="ib pick">
       <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#circleuser"/></svg>Profile</a></div>
-      <span class="cap"><b>CircleUserRound</b>. The common "account" icon. Distinct, but still a head.</span>
+      <span class="cap"><b>CircleUserRound</b>, finalist. The familiar "your account" icon, but it's still a head next to two heads.</span>
     </div>
     <div class="ib">
       <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#contact"/></svg>Profile</a></div>
@@ -804,10 +849,10 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
 <section class="board">
   <h2>8. Still to decide</h2>
   <ul class="notes" style="margin-top:0">
-    <li><b>Links need the page address.</b> Glossly reads the browser's window title today, not its address. Reading the address bar through UI Automation works in Edge and Chrome; it needs a helper command and a check per browser. Without it, a Link has a title and site but no Open page.</li>
-    <li><b>Existing data:</b> items keep their text and lose their collection name; Ask's memories that are about you move to Profile, and those about a saved person move to that person (a one-time pass with the Fast model, or left as Memories if there's no model). Person notes split into facts by line.</li>
+    <li><b>The page address (agreed).</b> A new helper command reads the browser's address bar through UI Automation, for every browser Glossly already knows: Chrome, Edge, Brave, Opera, Vivaldi, and Arc (Chromium) and Firefox. The bars differ (Chromium hides <code>https://</code> and sometimes <code>www.</code>; Firefox names its bar differently), so each gets a fixture and a <code>--check</code> case. It's read once per save, only from a browser, and never logged. Private and InPrivate windows: don't save the address (or the snapshot), only the text, wherever Glossly can tell the window is private (to check per browser).</li>
+    <li><b>Page snapshots.</b> Taken from the screen at save time, stored locally as a small image beside the item. A switch in Privacy ("Keep a picture of the page with links"), on by default? It can catch other things on the page, which is why it should be easy to turn off.</li>
+    <li><b>Existing data (agreed):</b> items keep their text and lose their collection name; Ask's memories about you move to Profile, and those about a saved person move to that person (a one-time pass with the Fast model, or left as Memories if there's no model). Person notes split into facts by line.</li>
     <li><b>User-made groups</b> (projects you create, none by default) are parked for later, in the handoff.</li>
-    <li>Person-specific habits move to the person's record: worth a small "How you write to Jordan" list there, or leave them only in Reply's prompt?</li>
   </ul>
 </section>
 </div>
