@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="light" data-color="off">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -148,19 +148,67 @@ header.top h1 { font:600 26px/1.2 var(--font-display); margin:0; }
 .top-tools .toggle-theme { margin-left:0; }
 
 /*
- * Content colour (the mockup's Colour switch, off = today's black and white). Colour comes from
- * content, never from controls: chart series, a fixed hue per person, events. Buttons, filters,
- * switches, selection, and focus stay monochrome. Hues are OKLCH so they share one lightness.
+ * Content colour (the mockup's Colour switch; "off" is today's black and white). Colour comes from
+ * content, never from controls: a fixed hue per person (h1 to h6), events, and chart series.
+ * Buttons, filters, switches, selection, and focus stay monochrome. Each look sets four values
+ * per hue: --pa and --pb (the fill, a gradient), --pe (the edge), --pf (text and icons), and --bar.
  */
-:root { --hue-1: oklch(0.56 0.13 255); --hue-2: oklch(0.56 0.13 160); --hue-3: oklch(0.58 0.14 30); --hue-4: oklch(0.56 0.14 300); --hue-5: oklch(0.6 0.12 75); --hue-6: oklch(0.56 0.11 200); --chart-1: oklch(0.58 0.13 255); --event: oklch(0.58 0.14 30); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hue-1: oklch(0.74 0.11 255); --hue-2: oklch(0.74 0.11 160); --hue-3: oklch(0.75 0.12 30); --hue-4: oklch(0.74 0.11 300); --hue-5: oklch(0.78 0.11 75); --hue-6: oklch(0.74 0.09 200); --chart-1: oklch(0.72 0.11 255); --event: oklch(0.75 0.12 30); } }
-:root[data-theme="dark"] { --hue-1: oklch(0.74 0.11 255); --hue-2: oklch(0.74 0.11 160); --hue-3: oklch(0.75 0.12 30); --hue-4: oklch(0.74 0.11 300); --hue-5: oklch(0.78 0.11 75); --hue-6: oklch(0.74 0.09 200); --chart-1: oklch(0.72 0.11 255); --event: oklch(0.75 0.12 30); }
-.h1 { --hue: var(--hue-1); } .h2 { --hue: var(--hue-2); } .h3 { --hue: var(--hue-3); } .h4 { --hue: var(--hue-4); } .h5 { --hue: var(--hue-5); } .h6 { --hue: var(--hue-6); }
-:root[data-color="on"] .chart .b i, :root[data-color="on"] .mini-chart i { background:var(--chart-1); opacity:1; }
-:root[data-color="on"] .avatar[class*=" h"] { background:color-mix(in oklch, var(--hue) 16%, transparent); box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--hue) 30%, transparent); color:var(--hue); }
-:root[data-color="on"] .link-chip.person { background:color-mix(in oklch, var(--hue) 10%, transparent); box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--hue) 26%, transparent); }
-:root[data-color="on"] .link-chip.person svg { color:var(--hue); }
-:root[data-color="on"] .link-chip.event svg, :root[data-color="on"] .kind.ev { color:var(--event); }
+/* Bold: saturated, one lightness (OKLCH). */
+:root[data-color="bold"] .h1 { --pf: oklch(0.52 0.13 255); } :root[data-color="bold"] .h2 { --pf: oklch(0.52 0.12 160); } :root[data-color="bold"] .h3 { --pf: oklch(0.55 0.14 30); }
+:root[data-color="bold"] .h4 { --pf: oklch(0.52 0.14 300); } :root[data-color="bold"] .h5 { --pf: oklch(0.55 0.12 75); } :root[data-color="bold"] .h6 { --pf: oklch(0.52 0.1 200); }
+:root[data-color="bold"][data-theme="dark"] .h1 { --pf: oklch(0.76 0.11 255); } :root[data-color="bold"][data-theme="dark"] .h2 { --pf: oklch(0.76 0.11 160); } :root[data-color="bold"][data-theme="dark"] .h3 { --pf: oklch(0.77 0.12 30); }
+:root[data-color="bold"][data-theme="dark"] .h4 { --pf: oklch(0.76 0.11 300); } :root[data-color="bold"][data-theme="dark"] .h5 { --pf: oklch(0.8 0.11 75); } :root[data-color="bold"][data-theme="dark"] .h6 { --pf: oklch(0.76 0.09 200); }
+:root[data-color="bold"] [class*=" h"] { --pa: color-mix(in oklch, var(--pf) 15%, transparent); --pb: var(--pa); --pe: color-mix(in oklch, var(--pf) 32%, transparent); --bar: var(--pf); }
+
+/* Glass: the calendar's tempered glass (calendar.css), with sand and mint added. */
+:root[data-color="glass"] .h1 { --pa: rgba(185,211,238,.6); --pb: rgba(214,214,240,.5); --pe: rgba(92,128,178,.45); --pf: #2f4f78; }
+:root[data-color="glass"] .h2 { --pa: rgba(196,220,236,.6); --pb: rgba(204,228,226,.5); --pe: rgba(84,140,150,.45); --pf: #2d5f66; }
+:root[data-color="glass"] .h3 { --pa: rgba(232,200,216,.6); --pb: rgba(240,218,206,.5); --pe: rgba(176,112,140,.45); --pf: #7a3f5a; }
+:root[data-color="glass"] .h4 { --pa: rgba(210,200,240,.6); --pb: rgba(232,205,226,.5); --pe: rgba(128,102,176,.45); --pf: #5a4790; }
+:root[data-color="glass"] .h5 { --pa: rgba(240,224,196,.65); --pb: rgba(236,214,200,.5); --pe: rgba(170,130,70,.45); --pf: #74562a; }
+:root[data-color="glass"] .h6 { --pa: rgba(200,234,214,.6); --pb: rgba(214,232,236,.5); --pe: rgba(80,150,110,.45); --pf: #2f6346; }
+:root[data-color="glass"][data-theme="dark"] .h1 { --pa: rgba(60,92,140,.45); --pb: rgba(70,70,120,.32); --pe: rgba(150,185,235,.45); --pf: #c4d8f4; }
+:root[data-color="glass"][data-theme="dark"] .h2 { --pa: rgba(48,92,120,.45); --pb: rgba(40,96,96,.32); --pe: rgba(140,205,210,.45); --pf: #bfe6e8; }
+:root[data-color="glass"][data-theme="dark"] .h3 { --pa: rgba(110,56,84,.45); --pb: rgba(120,80,70,.32); --pe: rgba(235,170,200,.45); --pf: #f2c8db; }
+:root[data-color="glass"][data-theme="dark"] .h4 { --pa: rgba(88,70,140,.45); --pb: rgba(110,60,100,.32); --pe: rgba(190,165,240,.45); --pf: #d8cbf6; }
+:root[data-color="glass"][data-theme="dark"] .h5 { --pa: rgba(120,92,48,.45); --pb: rgba(110,76,60,.32); --pe: rgba(235,200,140,.45); --pf: #f0dcb6; }
+:root[data-color="glass"][data-theme="dark"] .h6 { --pa: rgba(48,104,76,.45); --pb: rgba(44,90,96,.32); --pe: rgba(150,215,180,.45); --pf: #c4ead4; }
+:root[data-color="glass"] { --sheen: linear-gradient(180deg, rgba(255,255,255,.6) 0%, rgba(255,255,255,.14) 45%, rgba(255,255,255,0) 100%); --rim-hi: rgba(255,255,255,.95); }
+:root[data-color="glass"][data-theme="dark"] { --sheen: linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.04) 45%, rgba(255,255,255,0) 100%); --rim-hi: rgba(255,255,255,.18); }
+
+/* Pastel: flat, soft, opaque. */
+:root[data-color="pastel"] .h1 { --pa: #dce9fb; --pe: #bcd1f1; --pf: #34557f; } :root[data-color="pastel"] .h2 { --pa: #d8f1e4; --pe: #b2dec7; --pf: #2f6246; }
+:root[data-color="pastel"] .h3 { --pa: #fde2d6; --pe: #f3c3ae; --pf: #864530; } :root[data-color="pastel"] .h4 { --pa: #e9e0fb; --pe: #cfc0f1; --pf: #5a4692; }
+:root[data-color="pastel"] .h5 { --pa: #fbf1cc; --pe: #ecda9a; --pf: #6f5a1c; } :root[data-color="pastel"] .h6 { --pa: #fbdde9; --pe: #efbdd2; --pf: #833b5c; }
+:root[data-color="pastel"][data-theme="dark"] .h1 { --pa: #2a3646; --pe: #3e5272; --pf: #bcd2f3; } :root[data-color="pastel"][data-theme="dark"] .h2 { --pa: #26382f; --pe: #3a5b49; --pf: #b6e2c9; }
+:root[data-color="pastel"][data-theme="dark"] .h3 { --pa: #3d2e29; --pe: #644638; --pf: #f5c8b4; } :root[data-color="pastel"][data-theme="dark"] .h4 { --pa: #322c44; --pe: #4d4371; --pf: #d6caf6; }
+:root[data-color="pastel"][data-theme="dark"] .h5 { --pa: #3a3524; --pe: #5d5333; --pf: #eedfa2; } :root[data-color="pastel"][data-theme="dark"] .h6 { --pa: #3c2a33; --pe: #644053; --pf: #f2c1d6; }
+:root[data-color="pastel"] [class*=" h"] { --pb: var(--pa); --bar: var(--pe); }
+
+/* Dusty: muted, earthy, grey in it. */
+:root[data-color="dusty"] .h1 { --pa: #e4e9ef; --pe: #c5cedb; --pf: #4a5d75; } :root[data-color="dusty"] .h2 { --pa: #e4ece3; --pe: #c4d4c2; --pf: #4d6a4c; }
+:root[data-color="dusty"] .h3 { --pa: #f2e5de; --pe: #ddc4b7; --pf: #8a5a46; } :root[data-color="dusty"] .h4 { --pa: #ece3eb; --pe: #d4c4d2; --pf: #6e5070; }
+:root[data-color="dusty"] .h5 { --pa: #f1ebda; --pe: #ddd1ad; --pf: #7a6630; } :root[data-color="dusty"] .h6 { --pa: #e0ebea; --pe: #bed4d2; --pf: #45706c; }
+:root[data-color="dusty"][data-theme="dark"] .h1 { --pf: #a9b8cb; } :root[data-color="dusty"][data-theme="dark"] .h2 { --pf: #aec4ad; } :root[data-color="dusty"][data-theme="dark"] .h3 { --pf: #d9b3a1; }
+:root[data-color="dusty"][data-theme="dark"] .h4 { --pf: #c8adc6; } :root[data-color="dusty"][data-theme="dark"] .h5 { --pf: #d6c58f; } :root[data-color="dusty"][data-theme="dark"] .h6 { --pf: #a3c6c2; }
+:root[data-color="dusty"][data-theme="dark"] [class*=" h"] { --pa: color-mix(in srgb, var(--pf) 15%, transparent); --pe: color-mix(in srgb, var(--pf) 30%, transparent); }
+:root[data-color="dusty"] [class*=" h"] { --pb: var(--pa); --bar: var(--pe); }
+:root[data-color="dusty"][data-theme="dark"] [class*=" h"] { --bar: color-mix(in srgb, var(--pf) 55%, transparent); }
+
+/* What every look colours. */
+:root:not([data-color="off"]) .avatar[class*=" h"],
+:root:not([data-color="off"]) .link-chip.person,
+:root:not([data-color="off"]) .link-chip.event,
+:root:not([data-color="off"]) .kind.ev { background:linear-gradient(135deg, var(--pa), var(--pb)); box-shadow:inset 0 0 0 1px var(--pe); color:var(--pf); }
+:root:not([data-color="off"]) .link-chip.person svg, :root:not([data-color="off"]) .link-chip.event svg { color:var(--pf); }
+:root:not([data-color="off"]) .chart .b i, :root:not([data-color="off"]) .mini-chart i { background:var(--bar); opacity:1; }
+/* Glass adds the sheen and a bright top rim, like calendar events. */
+:root[data-color="glass"] .avatar[class*=" h"],
+:root[data-color="glass"] .link-chip.person,
+:root[data-color="glass"] .link-chip.event,
+:root[data-color="glass"] .kind.ev,
+:root[data-color="glass"] .chart .b i,
+:root[data-color="glass"] .mini-chart i { background:var(--sheen), linear-gradient(135deg, var(--pa), var(--pb)); box-shadow:inset 0 0 0 1px var(--pe), inset 0 1px 0 var(--rim-hi), 0 1px 2px rgba(40,60,90,.08); }
 .people-strip { display:flex; flex-wrap:wrap; gap:16px; }
 .people-strip > div { display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12.5px; color:var(--fg-2); }
 .people-strip .avatar { width:40px; height:40px; font-size:14px; }
@@ -433,7 +481,10 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
   <div class="top-tools">
     <div class="seg" role="radiogroup" aria-label="Colour">
       <button class="on" data-color-opt="off" onclick="setColor('off')">Black and white</button>
-      <button data-color-opt="on" onclick="setColor('on')">Content colour</button>
+      <button data-color-opt="glass" onclick="setColor('glass')">Glass</button>
+      <button data-color-opt="pastel" onclick="setColor('pastel')">Pastel</button>
+      <button data-color-opt="dusty" onclick="setColor('dusty')">Dusty</button>
+      <button data-color-opt="bold" onclick="setColor('bold')">Bold</button>
     </div>
     <button class="toggle-theme ghost" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
   </div>
@@ -538,9 +589,9 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
             <span class="kind"><svg class="i"><use href="#chart"/></svg></span>
             <div class="body">
               <span class="title">Signups by month, June to September</span>
-              <div class="mini-chart"><i style="height:38%"></i><i style="height:55%"></i><i style="height:72%"></i><i style="height:94%"></i></div>
+              <div class="mini-chart h1"><i style="height:38%"></i><i style="height:55%"></i><i style="height:72%"></i><i style="height:94%"></i></div>
               <span class="meta">Chart · 4 rows · Oct 15
-                <span class="link-chip event"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span>
+                <span class="link-chip event h3"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span>
               </span>
             </div>
             <div class="side-acts"><button class="icon-btn" title="Copy data"><svg class="i sm"><use href="#table"/></svg></button><button class="icon-btn" title="Copy image"><svg class="i sm"><use href="#copy"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
@@ -597,9 +648,9 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
         <div class="tile wide">
           <div class="head"><span class="kind"><svg class="i sm"><use href="#chart"/></svg></span>Chart · Oct 15</div>
           <div class="big">Signups by month, June to September</div>
-          <div class="chart"><div class="b">412<i style="height:38%"></i></div><div class="b">598<i style="height:55%"></i></div><div class="b">780<i style="height:72%"></i></div><div class="b">1,020<i style="height:94%"></i></div></div>
+          <div class="chart h1"><div class="b">412<i style="height:38%"></i></div><div class="b">598<i style="height:55%"></i></div><div class="b">780<i style="height:72%"></i></div><div class="b">1,020<i style="height:94%"></i></div></div>
           <div class="axis"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div>
-          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button><span class="spacer"></span><span class="link-chip event"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
+          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button><span class="spacer"></span><span class="link-chip event h3"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
         </div>
         <div class="tile link">
           <div class="preview og"><span class="og-art"><b>Design reviews</b><span>The Acme blog</span></span></div>
@@ -758,7 +809,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
           <div class="card">
             <div class="day-head">Coming up</div>
             <ul class="timeline">
-              <li><span class="when">Thu 23<br>1:00 pm</span><span class="kind ev"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Lunch with Jordan</span><span class="sm">Event · Calendar</span></div></li>
+              <li><span class="when">Thu 23<br>1:00 pm</span><span class="kind ev h3"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Lunch with Jordan</span><span class="sm">Event · Calendar</span></div></li>
               <li><span class="when">Fri 24</span><span class="kind"><svg class="i sm"><use href="#task"/></svg></span><div class="body"><span>Send pricing to Jordan</span><span class="sm">You owe · from Slack, Oct 17</span></div><span class="due">due Fri</span></li>
             </ul>
             <div class="day-head">Earlier</div>
@@ -766,7 +817,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
               <li><span class="when">Oct 17</span><span class="kind"><svg class="i sm"><use href="#msg"/></svg></span><div class="body"><span>"Can you send the tiers before Thursday?"</span><span class="sm">Message · Slack</span></div></li>
               <li><span class="when">Oct 17</span><span class="kind"><svg class="i sm"><use href="#text"/></svg></span><div class="body"><span>Q3 pricing: Starter $12, Team $29, Business $59…</span><span class="sm">Snippet · Docs · mentions Jordan</span></div></li>
               <li><span class="when">Oct 14</span><span class="kind"><svg class="i sm"><use href="#task"/></svg></span><div class="body"><span><s class="muted">Review the onboarding deck</s></span><span class="sm">They owed · done Oct 16</span></div></li>
-              <li><span class="when">Oct 9</span><span class="kind ev"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Pricing kickoff</span><span class="sm">Event · with Jordan and Casey Lin</span></div></li>
+              <li><span class="when">Oct 9</span><span class="kind ev h3"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Pricing kickoff</span><span class="sm">Event · with Jordan and Casey Lin</span></div></li>
             </ul>
           </div>
         </div>
@@ -894,7 +945,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
 <!-- ============ Colour ============ -->
 <section class="board">
   <h2>8. Colour: content, not controls</h2>
-  <p class="what">Switch "Content colour" at the top to compare it with today's black and white across the whole page. Colour comes only from things that have their own: link previews and site icons, chart series, a fixed hue per person, and events. Buttons, filters, switches, selection, and focus rings stay monochrome. This would relax decision 39 (no accent colour anywhere).</p>
+  <p class="what">Use the switch at the top to compare four looks with today's black and white across the whole page, in light and dark: <b>Glass</b> (the calendar's tempered glass: translucent tints with a top sheen and a bright rim), <b>Pastel</b> (soft, flat), <b>Dusty</b> (muted, earthy), and <b>Bold</b> (the first try). Colour comes only from things that have their own: link previews and site icons, chart series, a fixed hue per person, and events. Buttons, filters, switches, selection, and focus rings stay monochrome. This would relax decision 39 (no accent colour anywhere).</p>
   <div class="win solo"><div class="main">
     <div class="people-strip">
       <div><span class="avatar h1">JH</span>Jordan Hale</div>
@@ -907,13 +958,13 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
     <div class="chips" style="margin-top:18px">
       <span class="link-chip person h1"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span>
       <span class="link-chip person h2"><svg class="i sm"><use href="#user"/></svg>Casey Lin</span>
-      <span class="link-chip event"><svg class="i sm"><use href="#cal"/></svg>Lunch with Jordan, Thu</span>
+      <span class="link-chip event h3"><svg class="i sm"><use href="#cal"/></svg>Lunch with Jordan, Thu</span>
       <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan</span>
     </div>
   </div></div>
   <ul class="notes">
     <li>A person's hue is picked from six by their id, so it never changes when they're renamed, and it's the same in People, Who is this, chips, and Reply. Avatars tint softly; chips get a faint wash and a coloured icon.</li>
-    <li>The six hues share one lightness (OKLCH), so none shouts louder than another, and each has a lighter version for dark mode.</li>
+    <li>Every look has six hues at one strength, so none shouts louder than another, and its own dark-mode version. Glass reuses the calendar's four tints (sky, periwinkle, blush, lilac) and adds sand and mint, so people and events would match the Calendar tab.</li>
     <li>Charts use one colour per series instead of solid black (Visualize's charts and the saved copies alike). Tasks stay monochrome: they're the controls you tick.</li>
   </ul>
 </section>
