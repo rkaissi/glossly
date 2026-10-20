@@ -198,10 +198,6 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     return this.settingsCache;
   }
 
-  collections(): string[] {
-    return this.store.listCollections().map((c) => c.name);
-  }
-
   /** Each model's measured speed (decision 79), worked out from the metrics at most every 10 minutes. */
   private speeds(): Record<string, Speed> {
     const now = Date.now();
@@ -270,7 +266,6 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
   view(): SettingsView {
     return {
       settings: this.settingsCache,
-      collections: this.collections(),
       providers: this.providerStatuses(),
       presets: this.presets(),
       local: this.localStatus(),

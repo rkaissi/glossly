@@ -472,7 +472,7 @@ export class PeopleRepo {
     const ids = this.itemIds(personId, limit);
     return ids.flatMap((id) => {
       const r = this.db
-        .prepare('SELECT i.id, i.text, i.why, i.source_app, i.created_at, c.name AS collection FROM items i LEFT JOIN collections c ON c.id = i.collection_id WHERE i.id = ?')
+        .prepare('SELECT id, text, why, kind, source_app, created_at FROM items WHERE id = ?')
         .get(id) as (Omit<PersonItemView, 'text'> & { text: string }) | undefined;
       return r ? [{ ...r, text: clip(oneLine(r.text), 240) }] : [];
     });

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { RecallHit, RecallReason } from '@glossly/core/api';
 import { appName, formatDay } from '../dates';
+import { KIND_LABEL } from '../kinds';
 
 export const REASON_LABELS: Record<RecallReason, string> = {
   same_person: 'Same person',
@@ -41,7 +42,7 @@ export function SavedRow({
   onClick?: () => void;
   actions?: ReactNode;
 }) {
-  const meta = [hit.collection, formatDay(hit.created_at), hit.source_app && appName(hit.source_app)].filter(Boolean).join(' · ');
+  const meta = [KIND_LABEL[hit.kind], formatDay(hit.created_at), hit.source_app && appName(hit.source_app)].filter(Boolean).join(' · ');
   const reason = REASON_LABELS[hit.reason];
   return (
     <li className={`saved-row${highlight ? ' highlight' : ''}${onClick ? ' clickable' : ''}`} onClick={onClick}>

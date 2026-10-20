@@ -9,6 +9,7 @@ import { InlineConfirm } from '../confirm';
 import { Select } from '../controls/Select';
 import { TaskCheck } from '../controls/Toggles';
 import { appName, firstName, formatDay, formatDue, formatEventTime } from '../dates';
+import { KIND_LABEL } from '../kinds';
 import { useAction } from '../settings/useAction';
 import { RELATIONSHIP_OPTIONS } from './relationship';
 import './people.css';
@@ -314,7 +315,7 @@ export function PersonCardView({
                   {it.why && <span className="muted"> · {it.why}</span>}
                 </span>
                 <span className="meta">
-                  {it.collection ? `${it.collection} · ` : ''}
+                  {`${KIND_LABEL[it.kind]} · `}
                   {formatDay(it.created_at)}
                 </span>
               </li>

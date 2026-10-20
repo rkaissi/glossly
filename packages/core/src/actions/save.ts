@@ -302,15 +302,6 @@ export class SaveService {
     return { item, undoUntil, enriched: this.startEnrich(item) };
   }
 
-  /** Moves a saved item to another collection (created if needed). Returns the collection's name, or null if the item is gone. */
-  move(itemId: string, collection: string): string | null {
-    const { store } = this.deps;
-    if (!store.getItem(itemId)) return null;
-    const c = store.collectionByName(collection) ?? store.createCollection(collection);
-    store.setItemCollection(itemId, c.id);
-    return c.name;
-  }
-
   /** Deletes a saved item for good (the Saved tab, after a confirm), stopping its enrichment first so nothing lands after. */
   remove(itemId: string): boolean {
     this.undoDeadlines.delete(itemId);

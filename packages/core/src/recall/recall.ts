@@ -6,7 +6,7 @@ import type { Settings } from '../settings';
 import type { CalendarRepo } from '../store/calendar';
 import type { PeopleRepo } from '../store/people';
 import type { EntityKind, Store } from '../store/store';
-import { isoNow, type Item } from '../types';
+import { isoNow, type Item, type LinkPreview } from '../types';
 import type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './types';
 
 export interface RecallDeps {
@@ -45,12 +45,12 @@ export function containsTerm(hay: string, term: string): boolean {
   return false;
 }
 
-function toHit(item: Item & { collection: string | null }, reason: RecallReason, term: string | null, similarity: number | null): RecallHit {
+function toHit(item: Item, reason: RecallReason, term: string | null, similarity: number | null): RecallHit {
   return {
     itemId: item.id,
     text: clip(item.text.trim(), MAX_HIT_CHARS),
     why: item.why,
-    collection: item.collection,
+    kind: item.kind,
     source_app: item.source_app,
     window_title: item.window_title,
     created_at: item.created_at,
@@ -106,7 +106,7 @@ export async function recall(deps: RecallDeps, input: { text: string; personIds?
   const order = [...entityIds, ...similar.map((r) => r.item_id).filter((id) => !entityIds.includes(id))];
 
   return store
-    .itemsWithCollection(order)
+    .itemsByIds(order)
     .filter((it) => !sameText(it.text, input.text))
     .slice(0, max)
     .map((it) => {
@@ -129,7 +129,7 @@ export async function search(deps: RecallDeps & { people: PeopleRepo; calendar?:
   const events = deps.calendar?.list({ from: today, ...(q && { query: q }), limit: SIDE_LIMIT }) ?? [];
 
   if (!q) {
-    const items = store.itemsWithCollection(store.recentItemIds(SEARCH_LIMIT)).map((it) => toHit(it, 'text_match', null, null));
+    const items = store.itemsByIds(store.recentItemIds(SEARCH_LIMIT)).map((it) => toHit(it, 'text_match', null, null));
     return { query: q, items, people: [], commitments: open.slice(0, SIDE_LIMIT), events, semantic: embedderReady };
   }
 
@@ -138,7 +138,7 @@ export async function search(deps: RecallDeps & { people: PeopleRepo; calendar?:
   const sims = new Map(similar.map((r) => [r.item_id, r.similarity]));
   const ids = [...exact, ...similar.map((r) => r.item_id).filter((id) => !exact.includes(id))].slice(0, SEARCH_LIMIT);
   const items = store
-    .itemsWithCollection(ids)
+    .itemsByIds(ids)
     .map((it) => (exact.includes(it.id) ? toHit(it, 'text_match', q, null) : toHit(it, 'similar_topic', null, sims.get(it.id) ?? null)));
 
   const lower = q.toLowerCase();
@@ -148,40 +148,61 @@ export async function search(deps: RecallDeps & { people: PeopleRepo; calendar?:
 
 const LIBRARY_HIT_CHARS = 1500;
 
+const parseJson = <T>(s: string | null): T | null => {
+  if (!s) return null;
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
+  }
+};
+
 /**
- * The Saved tab: with no query, the newest items (in one collection, or all); with a query,
- * items with those words first, then items close in meaning (`recall.searchSimilarity`).
+ * The Saved tab (decision 84): with no query, the newest items; with a query, items with those
+ * words first, then items close in meaning (`recall.searchSimilarity`). Either way narrowed by
+ * type, a linked person, and where it was saved. Each item comes with its page, addresses,
+ * preview, links (labelled), and a chart's spec.
  */
 export async function library(deps: RecallDeps, q: LibraryQuery): Promise<LibraryResult> {
   const { store } = deps;
   const query = q.query.replace(/\s+/g, ' ').trim().slice(0, 200);
   const limit = Math.max(1, Math.min(q.limit, 500));
-  const counts = store.collectionCounts();
-  const col = q.collection ? store.collectionByName(q.collection) : null;
+  const filter = { kind: q.kind ?? null, personId: q.personId ?? null, source: q.source ?? null };
   const semantic = Boolean(deps.embedder()) && store.hasVectors;
-  const base = { query, collection: col?.name ?? null, collections: counts.collections, total: counts.total, semantic };
-  // A collection that doesn't exist (renamed or gone) has nothing in it.
-  if (q.collection && !col) return { ...base, items: [], more: false };
+  const base = { query, ...filter, counts: store.kindCounts(), people: store.linkedPeople(), sources: store.itemSources(), semantic };
 
-  const toItem = (it: Item & { collection: string | null }, reason: RecallReason, term: string | null, similarity: number | null): LibraryItem => ({
-    ...toHit(it, reason, term, similarity),
-    text: clip(it.text.trim(), LIBRARY_HIT_CHARS),
-    clipped: it.text.trim().length > LIBRARY_HIT_CHARS,
-    kind: it.kind,
-  });
-
+  let picked: { item: Item; reason: RecallReason; term: string | null; similarity: number | null }[];
+  let more: boolean;
   if (!query) {
-    const ids = store.itemIdsPage(limit + 1, 0, col?.id);
-    return { ...base, items: store.itemsWithCollection(ids.slice(0, limit)).map((it) => toItem(it, 'text_match', null, null)), more: ids.length > limit };
+    const ids = store.libraryItemIds(filter, { limit: limit + 1 });
+    picked = store.itemsByIds(ids.slice(0, limit)).map((item) => ({ item, reason: 'text_match', term: null, similarity: null }));
+    more = ids.length > limit;
+  } else {
+    const exact = store.libraryItemIds(filter, { limit: limit + 1, words: query });
+    const near = ((await nearest(deps, query, limit * 3, deps.settings().recall.searchSimilarity)) ?? []).filter((r) => !exact.includes(r.item_id));
+    const sims = new Map(near.map((r) => [r.item_id, r.similarity]));
+    // The meaning matches go through the same filter; their order is by similarity.
+    const kept = new Set(store.libraryItemIds(filter, { limit: near.length, within: near.map((r) => r.item_id) }));
+    const ids = [...exact, ...near.map((r) => r.item_id).filter((id) => kept.has(id))];
+    picked = store
+      .itemsByIds(ids.slice(0, limit))
+      .map((item) => (sims.has(item.id) ? { item, reason: 'similar_topic', term: null, similarity: sims.get(item.id)! } : { item, reason: 'text_match', term: query, similarity: null }));
+    more = ids.length > limit;
   }
 
-  const exact = store.searchItemText(query, limit + 1, col?.id);
-  const similar = ((await nearest(deps, query, limit * 3, deps.settings().recall.searchSimilarity)) ?? []).filter((r) => !exact.includes(r.item_id));
-  const sims = new Map(similar.map((r) => [r.item_id, r.similarity]));
-  const matches = store.itemsWithCollection([...exact, ...similar.map((r) => r.item_id)]).filter((it) => !col || it.collection_id === col.id);
-  return {
-    ...base,
-    items: matches.slice(0, limit).map((it) => (sims.has(it.id) ? toItem(it, 'similar_topic', null, sims.get(it.id)!) : toItem(it, 'text_match', query, null))),
-    more: matches.length > limit,
-  };
+  const links = store.itemLinkLabels(picked.map((p) => p.item.id));
+  const items: LibraryItem[] = picked.map(({ item, reason, term, similarity }) => {
+    const chart = item.kind === 'chart' ? parseJson<{ spec?: Record<string, unknown> | null }>(item.data_json) : null;
+    return {
+      ...toHit(item, reason, term, similarity),
+      text: clip(item.text.trim(), LIBRARY_HIT_CHARS),
+      clipped: item.text.trim().length > LIBRARY_HIT_CHARS,
+      page: item.page_url || item.page_title ? { url: item.page_url, title: item.page_title } : null,
+      urls: parseJson<string[]>(item.urls_json) ?? [],
+      preview: parseJson<LinkPreview>(item.preview_json),
+      links: links.get(item.id) ?? [],
+      chartSpec: chart?.spec ?? null,
+    };
+  });
+  return { ...base, items, more };
 }

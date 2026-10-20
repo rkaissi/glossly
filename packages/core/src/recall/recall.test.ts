@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from '../settings';
 import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { containsTerm, library, recall, search } from './recall';
+import type { LibraryFilter } from './types';
 
 const require = createRequire(import.meta.url);
 const vecExtensionPath = (require('sqlite-vec') as { getLoadablePath(): string }).getLoadablePath();
@@ -130,29 +131,83 @@ describe('search', () => {
 });
 
 describe('library', () => {
-  it('lists newest first by collection, pages, and searches by words then meaning', async () => {
+  const any: LibraryFilter = { kind: null, personId: null, source: null };
+
+  it('lists newest first, pages, and searches by words then meaning (decision 84)', async () => {
     const { save, deps } = setup();
     const a = await save('Launch moved to Thursday', '2026-10-01T10:00:00-04:00');
-    const b = await save('Budget for the offsite', '2026-10-02T10:00:00-04:00');
+    await save('Budget for the offsite', '2026-10-02T10:00:00-04:00');
     const c = await save('Launch checklist', '2026-10-03T10:00:00-04:00');
-    const reading = store.createCollection('Reading');
-    store.setItemCollection(b.id, reading.id);
 
-    const all = await library(deps, { query: '', collection: null, limit: 2 });
-    expect(all.items.map((i) => i.itemId)).toEqual([c.id, b.id]);
+    const all = await library(deps, { query: '', ...any, limit: 2 });
+    expect(all.items.map((i) => i.itemId)).toEqual([c.id, expect.any(String)]);
     expect(all.more).toBe(true);
-    expect(all.total).toBe(3);
-    expect(all.collections.find((x) => x.name === 'Notes')?.count).toBe(2);
-    expect(all.collections.find((x) => x.name === 'Reading')?.count).toBe(1);
+    expect(all.counts).toEqual({ selection: 3, note: 0, chart: 0, link: 0, all: 3 });
+    expect(all.sources).toEqual([{ key: 'chrome.exe', count: 3 }]);
 
-    const inReading = await library(deps, { query: '', collection: 'Reading', limit: 10 });
-    expect(inReading.items.map((i) => i.itemId)).toEqual([b.id]);
-    expect(inReading.more).toBe(false);
-
-    const found = await library(deps, { query: 'thursday', collection: null, limit: 10 });
+    const found = await library(deps, { query: 'thursday', ...any, limit: 10 });
     expect(found.items.map((i) => [i.itemId, i.reason])).toEqual([[a.id, 'text_match']]);
-    const byMeaning = await library(deps, { query: 'launch', collection: 'Notes', limit: 10 });
+    const byMeaning = await library(deps, { query: 'launch', ...any, limit: 10 });
     expect(byMeaning.items.map((i) => i.itemId).sort()).toEqual([a.id, c.id].sort());
-    expect((await library(deps, { query: '', collection: 'Gone', limit: 10 })).items).toEqual([]);
+  });
+
+  it('narrows by type, a linked person, and the site or app, and brings each item its page, links, and preview', async () => {
+    const { save, deps } = setup();
+    const people = new PeopleRepo(store);
+    const jordan = people.create({ name: 'Jordan Hale' });
+    const task = people.addCommitment({ person_id: jordan.id, owner: 'me', text: 'Send pricing to Jordan', due_at: null });
+    const pricing = await save('Q3 pricing: Starter $12, Team $29', '2026-10-01T10:00:00-04:00');
+    store.setItemPage(pricing.id, { url: 'https://docs.example.com/d/1', title: 'Acme pricing 2026' });
+    store.linkItem(pricing.id, 'person', jordan.id);
+    store.linkItem(pricing.id, 'task', task.id);
+    const preview = { source: 'page' as const, title: 'Acme pricing 2026', description: null, site: 'Acme docs', image: null, icon: null };
+    store.setItemPreview(pricing.id, preview);
+    const link = store.insertItem({
+      collection_id: null,
+      kind: 'link',
+      text: 'https://acme.example.com/blog',
+      why: null,
+      source_app: 'slack.exe',
+      window_title: null,
+      data_json: null,
+      urls_json: JSON.stringify(['https://acme.example.com/blog']),
+      created_at: '2026-10-02T10:00:00-04:00',
+    });
+    const chart = store.insertItem({
+      collection_id: null,
+      kind: 'chart',
+      text: 'Month,Signups\nJun,412',
+      why: null,
+      source_app: 'excel.exe',
+      window_title: null,
+      data_json: JSON.stringify({ spec: { mark: 'bar' } }),
+      created_at: '2026-10-03T10:00:00-04:00',
+    });
+
+    const all = await library(deps, { query: '', ...any, limit: 10 });
+    expect(all.counts).toEqual({ selection: 1, note: 0, chart: 1, link: 1, all: 3 });
+    expect(all.people).toEqual([{ id: jordan.id, name: 'Jordan Hale', count: 1 }]);
+    expect(all.sources.map((s) => s.key).sort()).toEqual(['docs.example.com', 'excel.exe', 'slack.exe']);
+    const byId = new Map(all.items.map((i) => [i.itemId, i]));
+    expect(byId.get(pricing.id)).toMatchObject({
+      page: { url: 'https://docs.example.com/d/1', title: 'Acme pricing 2026' },
+      preview,
+      links: [
+        { kind: 'person', id: jordan.id, label: 'Jordan Hale' },
+        { kind: 'task', id: task.id, label: 'Send pricing to Jordan' },
+      ],
+      chartSpec: null,
+    });
+    expect(byId.get(link.id)).toMatchObject({ kind: 'link', urls: ['https://acme.example.com/blog'], page: null, preview: null });
+    expect(byId.get(chart.id)?.chartSpec).toEqual({ mark: 'bar' });
+
+    const ids = async (f: Partial<typeof any>, query = '') => (await library(deps, { query, ...any, ...f, limit: 10 })).items.map((i) => i.itemId);
+    expect(await ids({ kind: 'link' })).toEqual([link.id]);
+    expect(await ids({ personId: jordan.id })).toEqual([pricing.id]);
+    expect(await ids({ source: 'docs.example.com' })).toEqual([pricing.id]);
+    expect(await ids({ source: 'slack.exe' })).toEqual([link.id]);
+    expect(await ids({ source: 'chrome.exe' })).toEqual([]);
+    expect(await ids({ kind: 'chart' }, 'signups')).toEqual([chart.id]);
+    expect(await ids({ kind: 'link' }, 'pricing')).toEqual([]);
   });
 });

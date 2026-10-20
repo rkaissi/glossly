@@ -2,53 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Copy, Image as ImageIcon, RotateCcw, Table, Undo2 } from 'lucide-react';
 import type { Cell, FieldType, OverlayState, SaveDone, VisualizeResult } from '@glossly/core/api';
 import { glossly } from '../bridge';
+import { drawChart, type ChartView } from '../chart';
 import { ActionIcon } from '../icons';
 import { useSecondsLeft } from './SavedToast';
 
-type View = { toImageURL(type: string, scale?: number): Promise<string> };
-
-/**
- * Series colors for two or more series (the dataviz reference palette, validated for both
- * modes and color-vision deficiency). A single series uses the ink color, so the app stays
- * monochrome (decision 13) unless color has to tell series apart.
- */
-const SERIES = {
-  light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
-  dark: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
-};
-
-/** Vega-Lite config from the app's tokens: thin marks, recessive axes and grid, text in ink, not series colors. */
-function chartConfig(): Record<string, unknown> {
-  const css = getComputedStyle(document.documentElement);
-  const v = (name: string) => css.getPropertyValue(name).trim();
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const ink = v('--fg');
-  const ink2 = v('--fg-2');
-  const font = v('--font') || 'Segoe UI, sans-serif';
-  return {
-    background: 'transparent',
-    font,
-    view: { stroke: null },
-    axis: {
-      labelColor: ink2,
-      titleColor: ink2,
-      labelFontSize: 11,
-      titleFontSize: 11,
-      titleFontWeight: 500,
-      gridColor: v('--border'),
-      domainColor: v('--border-strong'),
-      tickColor: v('--border-strong'),
-      labelLimit: 120,
-    },
-    legend: { labelColor: ink2, titleColor: ink2, labelFontSize: 11, titleFontSize: 11, orient: 'top', symbolType: 'circle' },
-    range: { category: dark ? SERIES.dark : SERIES.light },
-    mark: { color: ink },
-    bar: { cornerRadiusEnd: 4, stroke: 'transparent' },
-    line: { strokeWidth: 2 },
-    point: { size: 64, filled: true },
-    area: { opacity: 0.85 },
-  };
-}
+type View = ChartView;
 
 function TableView({ columns, rows, types }: { columns: string[]; rows: Cell[][]; types: FieldType[] }) {
   return (
@@ -107,18 +65,8 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
     if (!spec || !chartShown || !chartEl.current) return;
     let finalize: (() => void) | null = null;
     let live = true;
-    void Promise.all([import('vega-embed'), import('vega-interpreter')])
-      .then(async ([{ default: embed }, { expressionInterpreter }]) => {
-        if (!live || !chartEl.current) return;
-        const dark = matchMedia('(prefers-color-scheme: dark)').matches;
-        const r = await embed(chartEl.current, { ...spec, config: chartConfig() } as never, {
-          actions: false,
-          renderer: 'svg',
-          tooltip: { theme: dark ? 'dark' : 'light' },
-          // The page's CSP forbids eval, so expressions run through vega's interpreter instead of new Function.
-          ast: true,
-          expr: expressionInterpreter,
-        });
+    void drawChart(chartEl.current, spec)
+      .then((r) => {
         if (!live) {
           r.finalize();
           return;

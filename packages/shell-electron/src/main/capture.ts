@@ -1049,7 +1049,7 @@ export class Capture {
         editable: s.focusEditable,
         recent: recentSnippets(this.services.store, settings).length,
         model: this.services.llm.hasModel('chat'),
-        writing: s.surroundings?.source === 'caret' && s.surroundings.text.trim().length > 0 && this.services.store.collectionCounts().total > 0,
+        writing: s.surroundings?.source === 'caret' && s.surroundings.text.trim().length > 0 && this.services.store.kindCounts().all > 0,
         reply: s.fieldRoute?.score ?? 0,
       },
       settings.router,
@@ -2488,7 +2488,7 @@ ${s.selection.text}`;
         const context = await this.askContext(s, q);
         if (ctl.signal.aborted) throw new LlmError('aborted', 'Cancelled.');
         // "Ask about these" picks the notes; otherwise the retriever's.
-        const picked = s.askRelated ? this.services.store.itemsWithCollection(s.askRelated) : null;
+        const picked = s.askRelated ? this.services.store.itemsByIds(s.askRelated) : null;
         const notes = picked
           ? picked.map((it) => ({ id: it.id, text: it.text, why: it.why, created_at: it.created_at }))
           : (context?.notes ?? []).map((h) => ({ id: h.itemId, text: h.text, why: h.why, created_at: h.created_at }));

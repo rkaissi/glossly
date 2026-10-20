@@ -1,5 +1,5 @@
-import { writeFileSync } from 'node:fs';
-import { app, clipboard, ClipboardItem, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { app, clipboard, ClipboardItem, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 import {
   linkNamedPeople,
   namedPeople,
@@ -99,6 +99,7 @@ const obj = (v: unknown): Record<string, unknown> => {
   return v as Record<string, unknown>;
 };
 const LINK_KINDS: readonly ItemLinkKind[] = ['person', 'task', 'event'];
+const ITEM_KINDS: readonly unknown[] = ['selection', 'note', 'chart', 'link'];
 /** The Save panel's kept links: at most 20, each a known kind and an id. Missing is none. */
 const itemLinks = (v: unknown): ItemLink[] | undefined => {
   if (v === undefined) return undefined;
@@ -255,7 +256,30 @@ export function registerIpc(deps: IpcDeps): void {
   handle('library:query', (a) => {
     const limit = num(a.limit);
     if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error('Invalid argument');
-    return capture.library({ query: str(a.query ?? '', 500), collection: optStr(a.collection, 100) ?? null, limit });
+    const kind = a.kind ?? null;
+    if (kind !== null && !ITEM_KINDS.includes(kind)) throw new Error('Invalid argument');
+    return capture.library({ query: str(a.query ?? '', 500), kind, personId: optStr(a.personId, 100) ?? null, source: optStr(a.source, 300) ?? null, limit });
+  });
+  // Opens an item's page or one of its addresses in the default browser. The address comes from the
+  // item, never from the renderer, and only http(s) pages are opened (decision 84).
+  handle('items:open', (a) => {
+    const item = services.store.getItem(str(a.itemId, 100));
+    if (!item) return { opened: false };
+    const urls = item.urls_json ? (JSON.parse(item.urls_json) as string[]) : [];
+    const index = a.index === undefined ? null : num(a.index);
+    const url = index === null ? item.page_url : (urls[index] ?? null);
+    if (!url || !/^https?:\/\//i.test(url)) return { opened: false };
+    void shell.openExternal(url);
+    return { opened: true };
+  });
+  // A preview's image as a data URL for the Saved tab; only files in the previews folder by their stored name.
+  handle('items:preview-image', (a) => {
+    const item = services.store.getItem(str(a.itemId, 100));
+    const name = item?.preview_json ? (JSON.parse(item.preview_json) as { image?: string | null }).image : null;
+    const path = name ? services.previews.imagePath(name) : null;
+    if (!path || !existsSync(path)) return null;
+    const ext = path.slice(path.lastIndexOf('.') + 1);
+    return `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${readFileSync(path).toString('base64')}`;
   });
   handle('items:delete', (a) => {
     const deleted = services.save.remove(str(a.itemId, 100));
@@ -272,11 +296,6 @@ export function registerIpc(deps: IpcDeps): void {
     const edited = services.save.editMemory(itemId, text);
     if (edited) linkNamedPeople(services.store, services.people, itemId, text);
     return { edited };
-  });
-  handle('items:move', (a) => {
-    const name = str(a.collection, 100).trim();
-    if (!name) throw new Error('Pick a collection.');
-    return { collection: services.save.move(str(a.itemId, 100), name) };
   });
 
   // ---- Reply ----

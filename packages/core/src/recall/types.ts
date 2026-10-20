@@ -1,7 +1,7 @@
 // Types shared with the UI (through api.ts). No runtime code.
 import type { CalendarEvent } from '../calendar/types';
 import type { CommitmentView, PersonSummary } from '../people/types';
-import type { Item } from '../types';
+import type { Item, ItemLinkKind, LinkPreview } from '../types';
 
 /** Why a saved item came back: an entity it shares with the selection, a similar meaning, or the typed words. */
 export type RecallReason = 'same_person' | 'same_company' | 'same_product' | 'same_place' | 'similar_topic' | 'text_match';
@@ -12,7 +12,8 @@ export interface RecallHit {
   /** Clipped for display. */
   text: string;
   why: string | null;
-  collection: string | null;
+  /** Snippet, Link, Chart, or Memory (decision 84). */
+  kind: Item['kind'];
   source_app: string | null;
   window_title: string | null;
   created_at: string;
@@ -35,30 +36,52 @@ export interface SearchResults {
   semantic: boolean;
 }
 
-/** The Saved tab in Settings: every saved item, searchable, by collection. */
-export interface LibraryQuery {
+/** Narrows the Saved tab (decision 84): by type, by a linked person, by where it was saved. Null is any. */
+export interface LibraryFilter {
+  kind: Item['kind'] | null;
+  personId: string | null;
+  /** A site's host ("docs.example.com") for pages, else the app's process name ("slack.exe"). */
+  source: string | null;
+}
+
+/** The Saved tab in Settings: every saved item, searchable, by type, person, and app or site. */
+export interface LibraryQuery extends LibraryFilter {
   query: string;
-  /** A collection's name, or null for all of them. */
-  collection: string | null;
   /** How many to return; the tab asks for more as the user scrolls. */
   limit: number;
 }
 
-export interface LibraryItem extends RecallHit {
-  kind: Item['kind'];
-  /** True when `text` was clipped for display; Copy still copies all of it. */
-  clipped: boolean;
+/** A person, task, or event an item links to, with what to show for it. */
+export interface LibraryLink {
+  kind: ItemLinkKind;
+  id: string;
+  label: string;
 }
 
-export interface LibraryResult {
+export interface LibraryItem extends RecallHit {
+  /** True when `text` was clipped for display; Copy still copies all of it. */
+  clipped: boolean;
+  /** The page it was saved from, when saved in a browser. */
+  page: { url: string | null; title: string | null } | null;
+  /** Web addresses in the text, in order. */
+  urls: string[];
+  preview: LinkPreview | null;
+  links: LibraryLink[];
+  /** A chart's Vega-Lite spec with its rows inlined, to draw it again. */
+  chartSpec: Record<string, unknown> | null;
+}
+
+export interface LibraryResult extends LibraryFilter {
   query: string;
-  collection: string | null;
   items: LibraryItem[];
   /** True when there may be more than `items` (ask again with a larger limit). */
   more: boolean;
-  /** Every collection with its item count, and the count across all of them. */
-  collections: { name: string; count: number }[];
-  total: number;
+  /** How many items of each type, and in all (not narrowed by the filter). */
+  counts: Record<Item['kind'], number> & { all: number };
+  /** The people that saved items link to, for the person filter, by name. */
+  people: { id: string; name: string; count: number }[];
+  /** Where items were saved (a site's host or an app's process name), most first. */
+  sources: { key: string; count: number }[];
   /** False when the embedding model isn't ready, so only exact words were searched. */
   semantic: boolean;
 }

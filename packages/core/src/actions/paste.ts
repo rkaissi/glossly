@@ -36,7 +36,7 @@ export const PASTE_COUNT: Record<PasteTarget, number> = { chat: 3, email: 5, cod
 export function recentSnippets(store: Store, settings: Pick<Settings, 'paste'>, now = Date.now()): Item[] {
   // Same format as created_at (local offset), so the string comparison in SQL holds.
   const since = isoNow(new Date(now - settings.paste.recentDays * DAY_MS));
-  return store.itemsWithCollection(store.recentItemIds(settings.paste.recentCount, since));
+  return store.itemsByIds(store.recentItemIds(settings.paste.recentCount, since));
 }
 
 export interface PasteDeps {
@@ -85,7 +85,7 @@ export async function pasteSnippets(deps: PasteDeps, input: { surroundings: Surr
         return Number.isFinite(age) ? 0.05 * Math.exp(-Math.max(0, age) / settings.paste.recentDays) : 0;
       };
       const items = deps.store
-        .itemsWithCollection(hits.map((h) => h.item_id))
+        .itemsByIds(hits.map((h) => h.item_id))
         .filter((it) => !alreadyThere(it, around))
         .sort((a, b) => sims.get(b.id)! + fresh(b) - (sims.get(a.id)! + fresh(a)))
         .slice(0, n);

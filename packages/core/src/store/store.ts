@@ -6,6 +6,7 @@ import { isoNow, type Collection, type Item, type ItemLink, type ItemLinkKind, t
 import { canonicalize } from '../people/names';
 import { DATA_TABLES, MIGRATIONS, USER_DATA_TABLES } from './migrations';
 import type { LlmCallRow } from './llm-call-row';
+import type { LibraryFilter } from '../recall/types';
 
 export type EntityKind = 'person' | 'company' | 'product' | 'place' | 'other';
 
@@ -246,10 +247,6 @@ export class Store {
     return this.db.prepare('SELECT * FROM items ORDER BY created_at DESC, rowid DESC LIMIT ?').all(limit) as unknown as Item[];
   }
 
-  setItemCollection(id: string, collectionId: string): void {
-    this.db.prepare('UPDATE items SET collection_id = ? WHERE id = ?').run(collectionId, id);
-  }
-
   updateItemWhy(id: string, why: string | null): void {
     this.db.prepare('UPDATE items SET why = ? WHERE id = ?').run(why, id);
   }
@@ -259,12 +256,10 @@ export class Store {
     this.db.prepare('UPDATE items SET text = ? WHERE id = ?').run(text, id);
   }
 
-  /** Items with their collection's name, in the order of `ids`. Missing ids are skipped. */
-  itemsWithCollection(ids: string[]): (Item & { collection: string | null })[] {
+  /** Items in the order of `ids`. Missing ids are skipped. */
+  itemsByIds(ids: string[]): Item[] {
     if (ids.length === 0) return [];
-    const rows = this.db
-      .prepare(`SELECT i.*, c.name AS collection FROM items i LEFT JOIN collections c ON c.id = i.collection_id WHERE i.id IN (${ids.map(() => '?').join(', ')})`)
-      .all(...ids) as unknown as (Item & { collection: string | null })[];
+    const rows = this.db.prepare(`SELECT * FROM items WHERE id IN (${ids.map(() => '?').join(', ')})`).all(...ids) as unknown as Item[];
     const byId = new Map(rows.map((r) => [r.id, r]));
     return ids.flatMap((id) => byId.get(id) ?? []);
   }
@@ -292,24 +287,113 @@ export class Store {
     return rows.map((r) => r.id);
   }
 
-  /** Newest first, `offset` in, optionally in one collection (the Saved tab's pages). */
-  itemIdsPage(limit: number, offset: number, collectionId?: string): string[] {
-    const rows = (
-      collectionId
-        ? this.db.prepare('SELECT id FROM items WHERE collection_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?').all(collectionId, limit, offset)
-        : this.db.prepare('SELECT id FROM items ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?').all(limit, offset)
-    ) as { id: string }[];
+  // ---- the Saved tab (decision 84) ----
+
+  /**
+   * Item ids newest first, narrowed by type, a linked person, and where they were saved (a page's
+   * host, else the app), and optionally by words (text, note, window or page title) or to `within`.
+   */
+  libraryItemIds(filter: LibraryFilter, opts: { limit: number; offset?: number; words?: string; within?: string[] }): string[] {
+    const where: string[] = [];
+    const args: SQLInputValue[] = [];
+    if (filter.kind) {
+      where.push('kind = ?');
+      args.push(filter.kind);
+    }
+    if (filter.personId) {
+      where.push("EXISTS (SELECT 1 FROM item_links l WHERE l.item_id = items.id AND l.kind = 'person' AND l.target_id = ?)");
+      args.push(filter.personId);
+    }
+    if (filter.source) {
+      const s = filter.source.toLowerCase();
+      if (s.endsWith('.exe')) {
+        where.push('lower(source_app) = ? AND page_url IS NULL');
+        args.push(s);
+      } else {
+        const host = s.replace(/[\\%_]/g, (c) => `\\${c}`);
+        where.push("(page_url LIKE ? ESCAPE '\\' OR page_url LIKE ? ESCAPE '\\')");
+        args.push(`http://${host}/%`, `https://${host}/%`);
+      }
+    }
+    if (opts.words) {
+      const q = `%${opts.words.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      where.push("(text LIKE ? ESCAPE '\\' OR why LIKE ? ESCAPE '\\' OR window_title LIKE ? ESCAPE '\\' OR page_title LIKE ? ESCAPE '\\')");
+      args.push(q, q, q, q);
+    }
+    if (opts.within) {
+      if (opts.within.length === 0) return [];
+      where.push(`id IN (${opts.within.map(() => '?').join(', ')})`);
+      args.push(...opts.within);
+    }
+    const rows = this.db
+      .prepare(`SELECT id FROM items ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?`)
+      .all(...args, opts.limit, opts.offset ?? 0) as { id: string }[];
     return rows.map((r) => r.id);
   }
 
-  /** Every collection with how many items it holds, in the order they were made, plus the total. */
-  collectionCounts(): { collections: { name: string; count: number }[]; total: number } {
-    const rows = this.db
-      .prepare('SELECT c.name AS name, COUNT(i.id) AS count FROM collections c LEFT JOIN items i ON i.collection_id = c.id GROUP BY c.id ORDER BY c.created_at, c.rowid')
-      .all() as { name: string; count: number }[];
-    const total = (this.db.prepare('SELECT COUNT(*) AS n FROM items').get() as { n: number }).n;
-    return { collections: rows.map((r) => ({ name: r.name, count: Number(r.count) })), total: Number(total) };
+  /** How many items of each kind, and in all. */
+  kindCounts(): Record<Item['kind'], number> & { all: number } {
+    const counts = { selection: 0, note: 0, chart: 0, link: 0, all: 0 };
+    for (const r of this.db.prepare('SELECT kind, COUNT(*) AS n FROM items GROUP BY kind').all() as { kind: Item['kind']; n: number }[]) {
+      if (r.kind in counts) counts[r.kind] = Number(r.n);
+      counts.all += Number(r.n);
+    }
+    return counts;
   }
+
+  /** The people saved items link to, by name, with how many. */
+  linkedPeople(): { id: string; name: string; count: number }[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT p.id, p.name, COUNT(*) AS count FROM item_links l JOIN people p ON p.id = l.target_id
+           WHERE l.kind = 'person' GROUP BY p.id ORDER BY p.name COLLATE NOCASE`,
+        )
+        .all() as { id: string; name: string; count: number }[]
+    ).map((r) => ({ ...r, count: Number(r.count) }));
+  }
+
+  /** Where items were saved: a page's host, else the app's process name, most items first. */
+  itemSources(): { key: string; count: number }[] {
+    const counts = new Map<string, number>();
+    for (const r of this.db.prepare('SELECT source_app, page_url FROM items').all() as { source_app: string | null; page_url: string | null }[]) {
+      let key = r.source_app?.toLowerCase() ?? null;
+      if (r.page_url) {
+        try {
+          const u = new URL(r.page_url);
+          if (u.hostname) key = u.hostname.toLowerCase();
+        } catch {
+          /* keep the app */
+        }
+      }
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+  }
+
+  /** What these items link to, with a label: the person's name, the task's text, or the event's title. */
+  itemLinkLabels(itemIds: string[]): Map<string, { kind: ItemLinkKind; id: string; label: string }[]> {
+    const out = new Map<string, { kind: ItemLinkKind; id: string; label: string }[]>();
+    if (itemIds.length === 0) return out;
+    const rows = this.db
+      .prepare(
+        `SELECT l.item_id, l.kind, l.target_id, COALESCE(p.name, c.text, e.title) AS label FROM item_links l
+         LEFT JOIN people p ON l.kind = 'person' AND p.id = l.target_id
+         LEFT JOIN commitments c ON l.kind = 'task' AND c.id = l.target_id
+         LEFT JOIN calendar_events e ON l.kind = 'event' AND e.id = l.target_id
+         WHERE l.item_id IN (${itemIds.map(() => '?').join(', ')})
+         ORDER BY CASE l.kind WHEN 'person' THEN 0 WHEN 'task' THEN 1 ELSE 2 END, l.rowid`,
+      )
+      .all(...itemIds) as { item_id: string; kind: ItemLinkKind; target_id: string; label: string | null }[];
+    for (const r of rows) {
+      if (!r.label) continue;
+      const list = out.get(r.item_id) ?? [];
+      list.push({ kind: r.kind, id: r.target_id, label: r.label });
+      out.set(r.item_id, list);
+    }
+    return out;
+  }
+
 
   /** Every person, company, product, and place entity, for matching against a selection. */
   matchableEntities(): { id: string; kind: EntityKind; canonical: string; display: string }[] {

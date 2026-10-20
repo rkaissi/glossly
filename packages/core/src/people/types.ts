@@ -2,6 +2,7 @@
 // Types only, so the UI can import them through `@glossly/core/api`.
 
 import type { CalendarEvent } from '../calendar/types';
+import type { Item } from '../types';
 import type { Relationship } from './relationship';
 import type { ReplyChannel } from './reply-style';
 
@@ -126,7 +127,7 @@ export interface PersonItemView {
   /** Clipped for display. */
   text: string;
   why: string | null;
-  collection: string | null;
+  kind: Item['kind'];
   source_app: string | null;
   created_at: string;
 }

@@ -418,12 +418,9 @@ describe('SaveService', () => {
     expect(store.listEvents().map((e) => e.payload)).toEqual([expect.objectContaining({ kind: 'link', links: 0 }), expect.objectContaining({ kind: 'selection', links: 2 })]);
   });
 
-  it('moves a saved item to another collection, and records how it was saved', () => {
+  it('records how it was saved', () => {
     const { svc } = setup();
-    const { item: saved } = svc.save({ selection: selection(), via: 'autosave' });
-    expect(svc.move(saved.id, 'Reading')).toBe('Reading');
-    expect(store.getItem(saved.id)?.collection_id).toBe(store.collectionByName('Reading')?.id);
-    expect(svc.move('missing', 'Reading')).toBeNull();
+    svc.save({ selection: selection(), via: 'autosave' });
     expect(store.listEvents()[0]?.payload).toMatchObject({ via: 'autosave' });
   });
 

@@ -38,7 +38,7 @@ export type { PromisesByRules } from './actions/promises';
 export type { SaveLinkView, SaveOpen } from './actions/save-links';
 export type { ItemLink, ItemLinkKind, LinkPreview } from './types';
 export type * from './calendar/types';
-export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
+export type { LibraryFilter, LibraryItem, LibraryLink, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
 export type { AppMode, Identity, ModelRef, Privacy, RoleName, Settings, SettingsKey } from './settings';
 
@@ -502,7 +502,6 @@ export interface EmbedStatus {
 
 export interface SettingsView {
   settings: Settings;
-  collections: string[];
   /** The hosted providers added, in order (decision 79). */
   providers: ProviderStatus[];
   /** Everything Add provider offers. */
@@ -632,10 +631,12 @@ export interface InvokeChannels {
   'items:delete': { args: { itemId: string }; result: { deleted: boolean } };
   /** Load preview (decision 84): fetches a Link's address (or the item's page) because the user asked. Null when off, local, or nothing came back. */
   'items:preview': { args: { itemId: string }; result: LinkPreview | null };
+  /** Opens the item's page (no index) or its index-th address in the default browser; http(s) only. */
+  'items:open': { args: { itemId: string; index?: number }; result: { opened: boolean } };
+  /** The item's preview image as a data URL, or null. */
+  'items:preview-image': { args: { itemId: string }; result: string | null };
   /** Rewords a memory (decision 78; memories only), then embeds it again. False when it's gone or not a memory. */
   'items:edit': { args: { itemId: string; text: string }; result: { edited: boolean } };
-  /** Moves a saved item to another collection (created if needed). Null when the item is gone. */
-  'items:move': { args: { itemId: string; collection: string }; result: { collection: string | null } };
   /** Pastes a search result into the focused field (only offered when `canInsert`), else the clipboard. */
   'items:insert': { args: { sessionId: number; itemId: string }; result: ReplyInsertResult };
 

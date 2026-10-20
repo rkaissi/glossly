@@ -57,7 +57,7 @@ describe('PeopleRepo', () => {
     store.linkItemEntity(item.id, store.upsertEntity('person', 'Maya Lin'));
     const maya = r.create({ name: 'Maya Lin' });
     expect(r.get(maya.id)!.entity_id).not.toBeNull();
-    expect(r.items(maya.id).map((i) => [i.text, i.collection])).toEqual([['Maya wants the slides', coll.name]]);
+    expect(r.items(maya.id).map((i) => [i.text, i.kind])).toEqual([['Maya wants the slides', 'selection']]);
     expect(r.seenIn('slack.exe').has(maya.id)).toBe(true);
     expect(r.seenIn('chrome.exe').has(maya.id)).toBe(false);
   });
