@@ -144,6 +144,26 @@ svg.i.sm { width:14px; height:14px; }
 header.top { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
 header.top h1 { font:600 26px/1.2 var(--font-display); margin:0; }
 .toggle-theme { margin-left:auto; }
+.top-tools { margin-left:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.top-tools .toggle-theme { margin-left:0; }
+
+/*
+ * Content colour (the mockup's Colour switch, off = today's black and white). Colour comes from
+ * content, never from controls: chart series, a fixed hue per person, events. Buttons, filters,
+ * switches, selection, and focus stay monochrome. Hues are OKLCH so they share one lightness.
+ */
+:root { --hue-1: oklch(0.56 0.13 255); --hue-2: oklch(0.56 0.13 160); --hue-3: oklch(0.58 0.14 30); --hue-4: oklch(0.56 0.14 300); --hue-5: oklch(0.6 0.12 75); --hue-6: oklch(0.56 0.11 200); --chart-1: oklch(0.58 0.13 255); --event: oklch(0.58 0.14 30); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hue-1: oklch(0.74 0.11 255); --hue-2: oklch(0.74 0.11 160); --hue-3: oklch(0.75 0.12 30); --hue-4: oklch(0.74 0.11 300); --hue-5: oklch(0.78 0.11 75); --hue-6: oklch(0.74 0.09 200); --chart-1: oklch(0.72 0.11 255); --event: oklch(0.75 0.12 30); } }
+:root[data-theme="dark"] { --hue-1: oklch(0.74 0.11 255); --hue-2: oklch(0.74 0.11 160); --hue-3: oklch(0.75 0.12 30); --hue-4: oklch(0.74 0.11 300); --hue-5: oklch(0.78 0.11 75); --hue-6: oklch(0.74 0.09 200); --chart-1: oklch(0.72 0.11 255); --event: oklch(0.75 0.12 30); }
+.h1 { --hue: var(--hue-1); } .h2 { --hue: var(--hue-2); } .h3 { --hue: var(--hue-3); } .h4 { --hue: var(--hue-4); } .h5 { --hue: var(--hue-5); } .h6 { --hue: var(--hue-6); }
+:root[data-color="on"] .chart .b i, :root[data-color="on"] .mini-chart i { background:var(--chart-1); opacity:1; }
+:root[data-color="on"] .avatar[class*=" h"] { background:color-mix(in oklch, var(--hue) 16%, transparent); box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--hue) 30%, transparent); color:var(--hue); }
+:root[data-color="on"] .link-chip.person { background:color-mix(in oklch, var(--hue) 10%, transparent); box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--hue) 26%, transparent); }
+:root[data-color="on"] .link-chip.person svg { color:var(--hue); }
+:root[data-color="on"] .link-chip.event svg, :root[data-color="on"] .kind.ev { color:var(--event); }
+.people-strip { display:flex; flex-wrap:wrap; gap:16px; }
+.people-strip > div { display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12.5px; color:var(--fg-2); }
+.people-strip .avatar { width:40px; height:40px; font-size:14px; }
 .lede { color:var(--fg-2); max-width:780px; margin:0 0 28px; }
 section.board { margin:52px 0 0; }
 section.board > h2 { font:600 18px/1.3 var(--font-display); margin:0 0 4px; }
@@ -410,7 +430,13 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
 <header class="top">
   <h1>Saved, People, and Profile</h1>
   <span class="muted">Step 28 proposal: everything Glossly keeps goes where its subject is</span>
-  <button class="toggle-theme ghost" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
+  <div class="top-tools">
+    <div class="seg" role="radiogroup" aria-label="Colour">
+      <button class="on" data-color-opt="off" onclick="setColor('off')">Black and white</button>
+      <button data-color-opt="on" onclick="setColor('on')">Content colour</button>
+    </div>
+    <button class="toggle-theme ghost" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
+  </div>
 </header>
 <p class="lede">The four collections go. Saved becomes one library with types Glossly works out (Snippet, Link, Chart, Memory). Facts about a person live on that person, and facts about you live on Profile. Profile becomes two sections: who you are, and how you write. All people, companies, and text below are made up.</p>
 
@@ -493,7 +519,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
               <span class="text">Q3 pricing: Starter $12, Team $29, Business $59 per seat per month. Annual plans get two months free.</span>
               <a class="from-page"><span class="globe"><svg class="i"><use href="#globe"/></svg></span><span class="t">Acme pricing 2026</span><span class="host">docs.example.com</span><svg class="i sm"><use href="#ext"/></svg></a>
               <span class="meta">Snippet · Oct 17
-                <span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span>
+                <span class="link-chip person h1"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span>
                 <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan</span>
               </span>
             </div>
@@ -514,7 +540,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
               <span class="title">Signups by month, June to September</span>
               <div class="mini-chart"><i style="height:38%"></i><i style="height:55%"></i><i style="height:72%"></i><i style="height:94%"></i></div>
               <span class="meta">Chart · 4 rows · Oct 15
-                <span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span>
+                <span class="link-chip event"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span>
               </span>
             </div>
             <div class="side-acts"><button class="icon-btn" title="Copy data"><svg class="i sm"><use href="#table"/></svg></button><button class="icon-btn" title="Copy image"><svg class="i sm"><use href="#copy"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
@@ -573,7 +599,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
           <div class="big">Signups by month, June to September</div>
           <div class="chart"><div class="b">412<i style="height:38%"></i></div><div class="b">598<i style="height:55%"></i></div><div class="b">780<i style="height:72%"></i></div><div class="b">1,020<i style="height:94%"></i></div></div>
           <div class="axis"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div>
-          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button><span class="spacer"></span><span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
+          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button><span class="spacer"></span><span class="link-chip event"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
         </div>
         <div class="tile link">
           <div class="preview og"><span class="og-art"><b>Design reviews</b><span>The Acme blog</span></span></div>
@@ -597,7 +623,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
           <div class="head"><span class="kind"><svg class="i sm"><use href="#text"/></svg></span>Snippet · Oct 17</div>
           <div class="text">Q3 pricing: Starter $12, Team $29, Business $59 per seat per month. Annual plans get two months free.</div>
           <a class="from-page"><span class="globe"><svg class="i"><use href="#globe"/></svg></span><span class="t">Acme pricing 2026</span><span class="host">docs.example.com</span></a>
-          <div class="meta"><span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span><span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing</span></div>
+          <div class="meta"><span class="link-chip person h1"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span><span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing</span></div>
         </div>
         <div class="tile">
           <div class="head"><span class="kind"><svg class="i sm"><use href="#memory"/></svg></span>Memory · from Ask</div>
@@ -625,7 +651,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
     <li>Tiles are sized by type, not by the user: charts wide, everything else one column. No drag to rearrange (it's a library, not a board).</li>
     <li>A chart keeps three things: the rendered chart (as SVG, so it stays sharp and themes with light or dark), the table as CSV, and the source text. Copy image pastes it into a doc or chat.</li>
     <li><b>Link previews, three tiers.</b> (1) <i>The page's own preview</i> (first link card), like Notion and Slack: after the save, Glossly fetches the page's head once and reads its Open Graph tags (image, title, description, site name, icon). Measured Oct 19 on nine public pages: the head arrives in 0.1 to 0.9 s, the image in another 25 to 180 ms; five of nine had an image. It runs in the background, so saving never waits. (2) <i>A picture of the screen</i> (second card): taken at the moment you save, kept only when (1) gives nothing, which is the case for pages behind a login (Notion, Docs, Gmail), intranet pages, and sites that block fetches. (3) <i>The globe</i> (third card): nothing worked, or previews are off.</li>
-    <li>A highlighted address that isn't the page you're on can only get tier 1 or 3, since it isn't on screen, and tier 1 only when you press Load preview on its card (section 8).</li>
+    <li>A highlighted address that isn't the page you're on can only get tier 1 or 3, since it isn't on screen, and tier 1 only when you press Load preview on its card (section 9).</li>
     <li>The cards pack like a bento box (masonry): each card keeps its own height, and the next card fills the space under a shorter one, so there are no gaps. Charts still span two columns.</li>
   </ul>
 </section>
@@ -655,7 +681,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
           <h4>Save <span class="muted">· Snippet</span></h4>
           <a class="from-page"><span class="globe"><svg class="i"><use href="#globe"/></svg></span><span class="t">Acme pricing 2026</span><span class="host">docs.example.com</span></a>
           <div class="chips">
-            <span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
+            <span class="link-chip person h1"><svg class="i sm"><use href="#user"/></svg>Jordan Hale<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
             <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
           </div>
           <div class="chips">
@@ -697,7 +723,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
     </nav>
     <div class="main">
       <div class="person-head">
-        <span class="avatar">JH</span>
+        <span class="avatar h1">JH</span>
         <div>
           <h2>Jordan Hale</h2>
           <div class="sub"><span class="select" style="height:24px;font-size:12.5px">Colleague <svg class="i sm"><use href="#chev"/></svg></span>jordan.hale@example.com · @jhale</div>
@@ -732,7 +758,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
           <div class="card">
             <div class="day-head">Coming up</div>
             <ul class="timeline">
-              <li><span class="when">Thu 23<br>1:00 pm</span><span class="kind"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Lunch with Jordan</span><span class="sm">Event · Calendar</span></div></li>
+              <li><span class="when">Thu 23<br>1:00 pm</span><span class="kind ev"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Lunch with Jordan</span><span class="sm">Event · Calendar</span></div></li>
               <li><span class="when">Fri 24</span><span class="kind"><svg class="i sm"><use href="#task"/></svg></span><div class="body"><span>Send pricing to Jordan</span><span class="sm">You owe · from Slack, Oct 17</span></div><span class="due">due Fri</span></li>
             </ul>
             <div class="day-head">Earlier</div>
@@ -740,7 +766,7 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
               <li><span class="when">Oct 17</span><span class="kind"><svg class="i sm"><use href="#msg"/></svg></span><div class="body"><span>"Can you send the tiers before Thursday?"</span><span class="sm">Message · Slack</span></div></li>
               <li><span class="when">Oct 17</span><span class="kind"><svg class="i sm"><use href="#text"/></svg></span><div class="body"><span>Q3 pricing: Starter $12, Team $29, Business $59…</span><span class="sm">Snippet · Docs · mentions Jordan</span></div></li>
               <li><span class="when">Oct 14</span><span class="kind"><svg class="i sm"><use href="#task"/></svg></span><div class="body"><span><s class="muted">Review the onboarding deck</s></span><span class="sm">They owed · done Oct 16</span></div></li>
-              <li><span class="when">Oct 9</span><span class="kind"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Pricing kickoff</span><span class="sm">Event · with Jordan and Casey Lin</span></div></li>
+              <li><span class="when">Oct 9</span><span class="kind ev"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Pricing kickoff</span><span class="sm">Event · with Jordan and Casey Lin</span></div></li>
             </ul>
           </div>
         </div>
@@ -865,9 +891,36 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
   </div>
 </section>
 
+<!-- ============ Colour ============ -->
+<section class="board">
+  <h2>8. Colour: content, not controls</h2>
+  <p class="what">Switch "Content colour" at the top to compare it with today's black and white across the whole page. Colour comes only from things that have their own: link previews and site icons, chart series, a fixed hue per person, and events. Buttons, filters, switches, selection, and focus rings stay monochrome. This would relax decision 39 (no accent colour anywhere).</p>
+  <div class="win solo"><div class="main">
+    <div class="people-strip">
+      <div><span class="avatar h1">JH</span>Jordan Hale</div>
+      <div><span class="avatar h2">CL</span>Casey Lin</div>
+      <div><span class="avatar h3">MC</span>Maya Chen</div>
+      <div><span class="avatar h4">AM</span>Alex Morgan</div>
+      <div><span class="avatar h5">RB</span>Riley Brooks</div>
+      <div><span class="avatar h6">SP</span>Sam Patel</div>
+    </div>
+    <div class="chips" style="margin-top:18px">
+      <span class="link-chip person h1"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span>
+      <span class="link-chip person h2"><svg class="i sm"><use href="#user"/></svg>Casey Lin</span>
+      <span class="link-chip event"><svg class="i sm"><use href="#cal"/></svg>Lunch with Jordan, Thu</span>
+      <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan</span>
+    </div>
+  </div></div>
+  <ul class="notes">
+    <li>A person's hue is picked from six by their id, so it never changes when they're renamed, and it's the same in People, Who is this, chips, and Reply. Avatars tint softly; chips get a faint wash and a coloured icon.</li>
+    <li>The six hues share one lightness (OKLCH), so none shouts louder than another, and each has a lighter version for dark mode.</li>
+    <li>Charts use one colour per series instead of solid black (Visualize's charts and the saved copies alike). Tasks stay monochrome: they're the controls you tick.</li>
+  </ul>
+</section>
+
 <!-- ============ 8. Open ============ -->
 <section class="board">
-  <h2>8. Still to decide</h2>
+  <h2>9. Still to decide</h2>
   <ul class="notes" style="margin-top:0">
     <li><b>The page address (agreed).</b> A new helper command reads the browser's address bar through UI Automation, for every browser Glossly already knows: Chrome, Edge, Brave, Opera, Vivaldi, and Arc (Chromium) and Firefox. The bars differ (Chromium hides <code>https://</code> and sometimes <code>www.</code>; Firefox names its bar differently), so each gets a fixture and a <code>--check</code> case. It's read once per save, only from a browser, and never logged. Private and InPrivate windows are parked for later (Rayan, Oct 19).</li>
     <li><b>Link previews (agreed: a Privacy switch, on by default).</b> One switch, "Show previews for saved links", covers both the page's own preview (a request to that site from this computer, like opening it) and the screen picture. The screen picture is taken of the browser window itself (not the screen), so the bar over it isn't in it. Previews are kept locally beside the item and removed with it. With the switch off, links get the globe. Local only doesn't stop previews (Rayan, Oct 19: it's about models, and offline a link just gets the globe). Fetches never carry the browser's cookies or sign-ins.</li>
@@ -878,6 +931,11 @@ kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; backgrou
 </section>
 </div>
 <script>
+// The mockup's Colour switch: off is today's black and white, on is content colour.
+function setColor(v) {
+  document.documentElement.dataset.color = v;
+  document.querySelectorAll('[data-color-opt]').forEach((b) => b.classList.toggle('on', b.dataset.colorOpt === v));
+}
 // Masonry for the cards view: each tile spans as many 1 px rows as it is tall, plus the gap.
 // The app would do the same from a ResizeObserver.
 function packBento() {
