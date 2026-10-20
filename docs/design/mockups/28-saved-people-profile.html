@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Saved, People, Profile</title>
+<!-- packages/ui/src/theme.css, inlined so the page renders anywhere -->
+<style>
+/*
+ * Shared tokens for the overlay and the settings window (Step 13 redesign, Step 20.1 scale).
+ * Monochrome: no accent color anywhere (Rayan kept it in Step 20.1, decision 39). Light and dark follow the system theme. The windows themselves are
+ * Windows 11 acrylic (overlay) and mica (settings); `--glass` is the tint laid over them so
+ * text stays readable on busy backgrounds.
+ */
+:root {
+  color-scheme: light;
+  --fg: #0d0d0d;
+  --fg-2: #4b4b4b;
+  --muted: #7a7a7a;
+  --faint: #a3a3a3;
+  --glass: rgba(255, 255, 255, 0.58);
+  /* Used where there is no acrylic or mica behind (Windows 10, the dot). */
+  --glass-solid: rgba(250, 250, 250, 0.97);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(0, 0, 0, 0.035);
+  --hover: rgba(0, 0, 0, 0.055);
+  --pressed: rgba(0, 0, 0, 0.09);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --primary: #0d0d0d;
+  --primary-fg: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ring: rgba(0, 0, 0, 0.42);
+  --select: rgba(0, 0, 0, 0.12);
+  --danger: #b42318;
+  --ok: #1f7a43;
+  --warn: #8a5a00;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --danger-solid: #c2463a;
+  --danger-solid-hover: #b03e33;
+  --border-hover: rgba(0, 0, 0, 0.34);
+  --toggle-on-hover: #404040;
+  --seg-thumb: #ffffff;
+  --popover: rgba(252, 252, 252, 0.94);
+  --popover-blur: saturate(1.6) blur(28px);
+  --shadow-lg: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12);
+  /* The scale (Step 20.1): a 4 px grid, three control heights, two icon sizes, one radius scale. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --h-sm: 28px;
+  /* Quiet buttons inside the overlay's dense panel rows (Copy, Edit, Redo, Undo). */
+  --h-xs: 26px;
+  --h-md: 32px;
+  --h-lg: 36px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --row-h: 40px;
+  --row-px: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --fade: 150ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /*
+   * Motion (Step 20.3, decision 41): damped springs sampled into linear() curves (the spring()
+   * generator is in docs/design/mockups/20-3-design-pass.html). Soft for things that appear,
+   * pop for small things (checks, presses), gentle for big things (panels). Exits ease in, fast,
+   * with no bounce.
+   */
+  --spring-soft: linear(0, 0.019, 0.067, 0.136, 0.218, 0.306, 0.395, 0.483, 0.566, 0.642, 0.711, 0.772, 0.825, 0.871, 0.909, 0.94, 0.965, 0.985, 1, 1.011, 1.019, 1.024, 1.027, 1.028, 1.028, 1.027, 1.025, 1.023, 1.02, 1.018, 1.015, 1.013, 1.011, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+  --spring-soft-ms: 470ms; /* 2.8% overshoot */
+  --spring-pop: linear(0, 0.03, 0.108, 0.216, 0.338, 0.464, 0.586, 0.697, 0.794, 0.876, 0.942, 0.992, 1.029, 1.054, 1.069, 1.075, 1.075, 1.071, 1.064, 1.055, 1.046, 1.036, 1.028, 1.02, 1.013, 1.007, 1.003, 0.999, 0.997, 0.995, 0.995, 0.994, 0.994, 0.995, 0.995, 0.996, 0.997, 0.998, 0.998, 0.999, 1);
+  --spring-pop-ms: 510ms; /* 7.5% overshoot */
+  --spring-gentle: linear(0, 0.021, 0.073, 0.146, 0.231, 0.321, 0.411, 0.498, 0.578, 0.651, 0.717, 0.774, 0.823, 0.865, 0.899, 0.928, 0.95, 0.969, 0.983, 0.993, 1.001, 1.006, 1.01, 1.012, 1.013, 1.013, 1.013, 1.012, 1.011, 1.01, 1.009, 1.008, 1.006, 1.005, 1.004, 1.004, 1.003, 1.002, 1.002, 1.001, 1);
+  --spring-gentle-ms: 580ms; /* 1.3% overshoot */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mono: 'Cascadia Mono', ui-monospace, Consolas, monospace;
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font: 14px/1.45 var(--font);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fg: #ececec;
+    --fg-2: #c2c2c2;
+    --muted: #949494;
+    --faint: #6b6b6b;
+    --glass: rgba(28, 28, 28, 0.5);
+    --glass-solid: rgba(36, 36, 36, 0.97);
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-2: rgba(255, 255, 255, 0.045);
+    --hover: rgba(255, 255, 255, 0.075);
+    --pressed: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --primary: #ececec;
+    --primary-fg: #0d0d0d;
+    --primary-hover: #ffffff;
+    --ring: rgba(255, 255, 255, 0.5);
+    --select: rgba(255, 255, 255, 0.16);
+    --danger: #ff8a80;
+    --ok: #7fd6a0;
+    --warn: #e8c070;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    --border-hover: rgba(255, 255, 255, 0.4);
+    --toggle-on-hover: #c4c4c4;
+    --seg-thumb: rgba(255, 255, 255, 0.12);
+    --popover: rgba(40, 40, 40, 0.92);
+    --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 16px rgba(0, 0, 0, 0.3), 0 24px 48px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] { color-scheme: dark; --fg:#ececec; --fg-2:#c2c2c2; --muted:#949494; --faint:#6b6b6b; --glass:rgba(28,28,28,.5); --glass-solid:rgba(36,36,36,.97); --surface:rgba(255,255,255,.055); --surface-2:rgba(255,255,255,.045); --hover:rgba(255,255,255,.075); --pressed:rgba(255,255,255,.12); --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.18); --primary:#ececec; --primary-fg:#0d0d0d; --ring:rgba(255,255,255,.5); --seg-thumb:rgba(255,255,255,.12); --popover:rgba(40,40,40,.92); --shadow-lg:0 0 0 1px rgba(255,255,255,.08),0 8px 16px rgba(0,0,0,.3),0 24px 48px rgba(0,0,0,.4); }
+:root[data-theme="light"] { color-scheme: light; --fg:#0d0d0d; --fg-2:#4b4b4b; --muted:#7a7a7a; --faint:#a3a3a3; --glass-solid:rgba(250,250,250,.97); --surface:rgba(255,255,255,.78); --surface-2:rgba(0,0,0,.035); --hover:rgba(0,0,0,.055); --pressed:rgba(0,0,0,.09); --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.16); --primary:#0d0d0d; --primary-fg:#fff; --ring:rgba(0,0,0,.42); --seg-thumb:#fff; --shadow-lg:0 0 0 1px rgba(0,0,0,.06),0 8px 16px rgba(0,0,0,.08),0 24px 48px rgba(0,0,0,.12); }
+body { margin:0; background:#e9e9e7; color:var(--fg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body { background:#161616; } }
+:root[data-theme="dark"] body { background:#161616; }
+button { font:inherit; color:inherit; height:var(--h-md); padding:0 12px; border-radius:var(--radius-sm); border:none; background:transparent; box-shadow:inset 0 0 0 1px var(--border-strong); display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap; }
+button:hover { background:var(--hover); }
+button.primary { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+button.ghost { box-shadow:none; color:var(--fg-2); }
+kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; background:color-mix(in srgb,var(--fg) 7%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fg) 14%,transparent); color:var(--fg-2); }
+code { font:12px var(--mono); }
+svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+svg.i.sm { width:14px; height:14px; }
+
+/* page */
+.page { max-width:1180px; margin:0 auto; padding:32px 24px 80px; }
+header.top { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+header.top h1 { font:600 26px/1.2 var(--font-display); margin:0; }
+.toggle-theme { margin-left:auto; }
+.lede { color:var(--fg-2); max-width:780px; margin:0 0 28px; }
+section.board { margin:52px 0 0; }
+section.board > h2 { font:600 18px/1.3 var(--font-display); margin:0 0 4px; }
+section.board > p.what { color:var(--fg-2); margin:0 0 16px; max-width:800px; }
+.label { font:600 11px/1 var(--font); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+.notes { margin:14px 0 0; padding-left:18px; color:var(--fg-2); font-size:13px; max-width:860px; }
+.notes li { margin:5px 0; }
+.muted { color:var(--muted); }
+.small { font-size:12.5px; }
+.spacer { flex:1; }
+button.ghost { box-shadow:none; color:var(--fg-2); }
+button.sm { height:var(--h-sm); padding:0 10px; font-size:13px; }
+.icon-btn { width:28px; height:28px; padding:0; justify-content:center; box-shadow:none; color:var(--muted); }
+.icon-btn:hover { color:var(--fg); }
+
+/* what goes where */
+.where { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr)); gap:16px; }
+.where .col { background:var(--glass-solid); border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border); padding:16px 18px; }
+.where h3 { display:flex; align-items:center; gap:8px; font:600 15px/1.3 var(--font-display); margin:0 0 4px; }
+.where .q { color:var(--fg-2); font-size:13px; margin:0 0 10px; }
+.where ul { margin:0; padding-left:18px; font-size:13px; color:var(--fg-2); }
+.where li { margin:4px 0; }
+.where .from { margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:12.5px; color:var(--muted); }
+
+/* the settings window */
+.win { display:grid; grid-template-columns:188px 1fr; background:var(--glass-solid); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); overflow:hidden; min-height:560px; }
+.win.solo { grid-template-columns:1fr; }
+.side { padding:14px 8px; background:var(--surface-2); border-right:1px solid var(--border); display:flex; flex-direction:column; gap:2px; }
+.side .brand { display:flex; align-items:center; gap:8px; font:600 14px var(--font-display); padding:4px 10px 14px; }
+.side .brand i { width:18px; height:18px; border-radius:6px; background:var(--primary); display:inline-block; }
+.side .grp { font-size:11px; color:var(--muted); padding:12px 10px 4px; }
+.side a { display:flex; align-items:center; gap:10px; height:32px; padding:0 10px; border-radius:var(--radius-sm); color:var(--fg-2); text-decoration:none; font-size:13.5px; }
+.side a.on { background:var(--hover); color:var(--fg); font-weight:600; }
+.main { padding:28px 32px 36px; min-width:0; }
+.main > h2 { font:600 22px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.main > p.intro { color:var(--muted); margin:0 0 22px; max-width:620px; }
+.group { margin-top:40px; }
+.group:first-of-type { margin-top:0; }
+.group-head { display:flex; align-items:flex-start; gap:16px; margin:0 0 12px; }
+.group-head h3 { font:600 15px/1.4 var(--font-display); margin:0; }
+.group-head p { margin:2px 0 0; color:var(--muted); font-size:12.5px; max-width:520px; }
+.card { background:var(--surface); border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border); }
+.card + .card { margin-top:16px; }
+.card .pad { padding:16px 20px; }
+
+/* switch */
+.switch { width:36px; height:20px; border-radius:999px; background:var(--primary); position:relative; flex:none; margin-top:2px; }
+.switch::after { content:''; position:absolute; top:3px; right:3px; width:14px; height:14px; border-radius:50%; background:var(--primary-fg); }
+.switch-label { display:flex; align-items:center; gap:10px; margin-left:auto; font-size:13px; color:var(--fg-2); white-space:nowrap; }
+
+/* form rows */
+.form { display:grid; grid-template-columns:120px 1fr; gap:12px 16px; align-items:center; }
+.form .k { color:var(--fg-2); font-size:13px; }
+.input { height:var(--h-md); border-radius:var(--radius-sm); box-shadow:inset 0 0 0 1px var(--border-strong); background:var(--surface); display:flex; align-items:center; gap:6px; padding:0 10px; font-size:13.5px; min-width:0; }
+.input.ph { color:var(--faint); }
+.input.multi { height:auto; min-height:var(--h-md); padding:4px 6px; flex-wrap:wrap; }
+.pill { display:inline-flex; align-items:center; gap:4px; height:22px; padding:0 4px 0 8px; border-radius:999px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); font-size:12.5px; }
+.pill svg { color:var(--muted); }
+.form-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+
+/* fact list: the one shape for facts about you and about a person */
+.facts { list-style:none; margin:0; padding:0; }
+.facts li { display:flex; align-items:center; gap:10px; min-height:var(--row-h); padding:6px 6px 6px 20px; }
+.facts li + li { border-top:1px solid var(--border); }
+.facts .t { flex:1; min-width:0; }
+.facts .src { font-size:12px; color:var(--muted); white-space:nowrap; }
+.facts .acts { display:flex; gap:2px; opacity:.0; }
+.facts li:hover .acts, .facts li.hover .acts { opacity:1; }
+.facts li.hover { background:var(--hover); }
+.facts li.add { color:var(--faint); gap:8px; }
+.facts li.add svg { color:var(--muted); }
+.delete-armed { height:26px; padding:0 8px; border-radius:6px; background:var(--danger-solid); color:#fff; box-shadow:none; font-size:12.5px; gap:5px; }
+
+/* segmented */
+.seg { display:inline-flex; padding:2px; border-radius:var(--radius-sm); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); }
+.seg button { height:26px; padding:0 10px; font-size:12.5px; box-shadow:none; border-radius:6px; color:var(--fg-2); gap:6px; }
+.seg button.on { background:var(--seg-thumb); color:var(--fg); box-shadow:var(--shadow-sm); }
+.seg button .n { color:var(--muted); }
+.seg.icons button { width:30px; padding:0; justify-content:center; }
+
+/* habits */
+.habits { list-style:none; margin:0; padding:0; }
+.habits li { display:flex; align-items:center; gap:12px; padding:10px 6px 10px 20px; }
+.habits li + li { border-top:1px solid var(--border); }
+.habits .t { flex:1; min-width:0; }
+.habits .t b { font-weight:500; }
+.habits .meta { display:block; font-size:12px; color:var(--muted); margin-top:1px; }
+.place { font-size:11.5px; padding:1px 7px; border-radius:999px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); color:var(--fg-2); white-space:nowrap; }
+.toolbar { display:flex; align-items:center; gap:10px; padding:12px 20px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+
+/* writing examples */
+.examples { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; padding:16px 20px 20px; }
+.ex { border-radius:var(--radius-sm); box-shadow:inset 0 0 0 1px var(--border); padding:12px 14px; display:flex; flex-direction:column; gap:10px; background:var(--glass-solid); font-size:13px; line-height:1.5; }
+.ex .q { color:var(--fg); display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.ex .foot { display:flex; align-items:center; gap:6px; margin-top:auto; font-size:12px; color:var(--muted); }
+.ex.add { box-shadow:inset 0 0 0 1.5px var(--border-strong); border:none; background:transparent; align-items:center; justify-content:center; color:var(--fg-2); min-height:120px; text-align:center; gap:6px; background-image:none; outline:1.5px dashed var(--border-strong); outline-offset:-1.5px; box-shadow:none; }
+
+/* Saved */
+.sv-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
+.search { flex:1; min-width:200px; height:var(--h-md); border-radius:var(--radius-sm); box-shadow:inset 0 0 0 1px var(--border-strong); background:var(--surface); display:flex; align-items:center; gap:8px; padding:0 10px; color:var(--faint); font-size:13.5px; }
+.search svg { color:var(--muted); }
+.select { height:var(--h-md); padding:0 10px; border-radius:var(--radius-sm); box-shadow:inset 0 0 0 1px var(--border-strong); display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--fg-2); }
+.filters { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; }
+.filter { height:30px; padding:0 12px; border-radius:999px; box-shadow:inset 0 0 0 1px var(--border); color:var(--fg-2); font-size:13px; gap:6px; }
+.filter .muted { margin-left:2px; }
+.filter.on { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.filter.on .muted, .filter.on svg { color:inherit; opacity:.75; }
+
+.rows { list-style:none; margin:0; padding:0; }
+.rows > li { display:flex; gap:12px; padding:12px 8px 12px 16px; align-items:flex-start; }
+.rows > li + li { border-top:1px solid var(--border); }
+.kind { width:30px; height:30px; flex:none; border-radius:8px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); display:inline-flex; align-items:center; justify-content:center; color:var(--fg-2); }
+.fav { width:30px; height:30px; flex:none; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font:600 13px var(--font-display); color:#fff; }
+.rows .body { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.rows .title { font-weight:600; }
+.rows .text { color:var(--fg); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.rows .text.code { font:12.5px/1.5 var(--mono); background:var(--surface-2); border-radius:6px; padding:4px 8px; }
+.rows .quote { color:var(--fg-2); border-left:2px solid var(--border-strong); padding-left:8px; font-size:13px; }
+.meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+.link-chip { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 8px; border-radius:999px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); font-size:12px; color:var(--fg-2); }
+.link-chip svg { color:var(--muted); }
+.rows .side-acts { display:flex; gap:2px; }
+
+.mini-chart { display:flex; align-items:flex-end; gap:6px; height:56px; padding:6px 8px 0; border-radius:6px; background:var(--surface-2); width:200px; }
+.mini-chart i { flex:1; background:var(--fg-2); border-radius:3px 3px 0 0; opacity:.75; }
+
+/* cards view */
+.bento { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); grid-auto-flow:dense; gap:12px; }
+.tile { border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border); background:var(--surface); padding:14px; display:flex; flex-direction:column; gap:10px; min-height:150px; font-size:13px; }
+.tile.wide { grid-column:span 2; }
+.tile.tall { grid-row:span 2; }
+.tile .head { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+.tile .head .kind, .tile .head .fav { width:24px; height:24px; border-radius:6px; font-size:11px; }
+.tile .big { font:600 14px/1.35 var(--font-display); }
+.tile .text { line-height:1.5; display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; }
+.tile .code { font:12px/1.5 var(--mono); background:var(--surface-2); border-radius:6px; padding:8px 10px; white-space:pre-wrap; }
+.tile .meta { margin-top:auto; }
+.chart { display:flex; align-items:flex-end; gap:10px; height:150px; padding:8px 8px 0; border-bottom:1px solid var(--border-strong); }
+.chart .b { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%; font-size:11px; color:var(--muted); }
+.chart .b i { width:100%; background:var(--fg); opacity:.8; border-radius:4px 4px 0 0; }
+.axis { display:flex; gap:10px; padding:4px 8px 0; font-size:11px; color:var(--muted); }
+.axis span { flex:1; text-align:center; }
+.tile .row-btns { display:flex; gap:6px; flex-wrap:wrap; }
+
+/* the overlay (Save panel) */
+.pair { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr)); gap:24px; align-items:start; }
+.frame { width:440px; max-width:100%; background:var(--glass-solid); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+.bar { height:40px; display:flex; align-items:center; gap:4px; padding:4px; border-bottom:1px solid var(--border); }
+.slot { height:32px; padding:0 10px; gap:7px; box-shadow:none; }
+.slot.on { background:var(--hover); box-shadow:inset 0 0 0 1.5px var(--ring); }
+.panel { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.panel h4 { margin:0; font:600 15px/1.35 var(--font-display); display:flex; align-items:center; gap:8px; }
+.panel .muted { font-weight:400; }
+.chip { height:28px; padding:0 12px; border-radius:999px; font-size:13px; }
+.chip.sel { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.panel-foot { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; background:color-mix(in srgb,var(--fg) 7%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fg) 14%,transparent); color:var(--fg-2); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.strike { text-decoration:line-through; color:var(--faint); }
+
+/* person record */
+.person-head { display:flex; align-items:center; gap:14px; margin:0 0 20px; }
+.avatar { width:48px; height:48px; border-radius:50%; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); display:inline-flex; align-items:center; justify-content:center; font:600 17px var(--font-display); color:var(--fg-2); }
+.person-head h2 { font:600 22px/1.25 var(--font-display); margin:0; }
+.person-head .sub { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px; font-size:12.5px; color:var(--muted); }
+.two { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.2fr); gap:20px; align-items:start; }
+.timeline { list-style:none; margin:0; padding:0; }
+.timeline li { display:flex; gap:12px; padding:10px 12px 10px 16px; align-items:flex-start; }
+.timeline li + li { border-top:1px solid var(--border); }
+.timeline .when { width:58px; flex:none; font-size:12px; color:var(--muted); padding-top:5px; }
+.timeline .kind { width:26px; height:26px; border-radius:7px; }
+.timeline .body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.timeline .body .sm { font-size:12px; color:var(--muted); }
+.due { font-size:11.5px; padding:1px 7px; border-radius:999px; box-shadow:inset 0 0 0 1px var(--border-strong); color:var(--fg-2); }
+.day-head { padding:10px 16px 4px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); border-top:1px solid var(--border); }
+.day-head:first-child { border-top:none; }
+
+/* icons board */
+.icons-board { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; }
+.ib { background:var(--glass-solid); border-radius:var(--radius-md); box-shadow:inset 0 0 0 1px var(--border); padding:14px; display:flex; flex-direction:column; gap:10px; }
+.ib.pick { box-shadow:inset 0 0 0 1.5px var(--ring); }
+.ib .nav-demo { display:flex; flex-direction:column; gap:2px; }
+.ib .nav-demo a { display:flex; align-items:center; gap:10px; height:30px; padding:0 10px; border-radius:var(--radius-sm); color:var(--fg-2); font-size:13.5px; text-decoration:none; }
+.ib .nav-demo a.on { background:var(--hover); color:var(--fg); font-weight:600; }
+.ib .cap { font-size:12.5px; color:var(--fg-2); }
+.ib .cap b { color:var(--fg); }
+
+@media (max-width:820px) {
+  .win { grid-template-columns:1fr; }
+  .side { display:none; }
+  .main { padding:20px 16px 28px; }
+  .two { grid-template-columns:1fr; }
+  .tile.wide { grid-column:auto; }
+  .form { grid-template-columns:1fr; gap:6px; }
+}
+@media (max-width:560px) { .page { padding:24px 16px 60px; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="bookmark" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol>
+  <symbol id="task" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></symbol>
+  <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+  <symbol id="idcard" viewBox="0 0 24 24"><path d="M16 10h2M16 14h2"/><path d="M6.17 15a3 3 0 0 1 5.66 0"/><circle cx="9" cy="11" r="2"/><rect x="2" y="5" width="20" height="14" rx="2"/></symbol>
+  <symbol id="circleuser" viewBox="0 0 24 24"><path d="M18 20a6 6 0 0 0-12 0"/><circle cx="12" cy="10" r="4"/><circle cx="12" cy="12" r="10"/></symbol>
+  <symbol id="contact" viewBox="0 0 24 24"><path d="M16 2v2M8 2v2"/><path d="M17.9 22a6 6 0 0 0-11.8 0"/><circle cx="12" cy="12" r="4"/><rect x="3" y="4" width="18" height="18" rx="2"/></symbol>
+  <symbol id="cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="text" viewBox="0 0 24 24"><path d="M17 6.1H3M21 12.1H3M15.1 18H3"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></symbol>
+  <symbol id="memory" viewBox="0 0 24 24"><path d="M9.94 14.06 4 20M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+  <symbol id="list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="ext" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/></symbol>
+  <symbol id="ask" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+</svg>
+
+<div class="page">
+<header class="top">
+  <h1>Saved, People, and Profile</h1>
+  <span class="muted">Step 28 proposal: everything Glossly keeps goes where its subject is</span>
+  <button class="toggle-theme ghost" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
+</header>
+<p class="lede">The four collections go. Saved becomes one library with types Glossly works out (Snippet, Link, Chart, Memory). Facts about a person live on that person, and facts about you live on Profile. Profile becomes two sections: who you are, and how you write. All people, companies, and text below are made up.</p>
+
+<!-- ============ 1. what goes where ============ -->
+<section class="board">
+  <h2>1. What goes where</h2>
+  <p class="what">One rule for every save, every memory Ask makes, and every habit Reply and Write here learn: it goes where its subject is. The model no longer guesses a collection. It only decides who a fact is about.</p>
+  <div class="where">
+    <div class="col">
+      <h3><svg class="i"><use href="#bookmark"/></svg>Saved</h3>
+      <p class="q">Things you kept, to find, reuse, or have Glossly know.</p>
+      <ul>
+        <li><b>Snippet</b>: any text you highlighted and saved.</li>
+        <li><b>Link</b>: saved from a browser, with the page's title and address, like a bookmark that keeps the line you highlighted.</li>
+        <li><b>Chart</b>: the chart itself and its data (the table, CSV) and the text it came from.</li>
+        <li><b>Memory</b>: something Ask kept that isn't about you or a saved person ("Northwind's fiscal year starts in April").</li>
+      </ul>
+      <div class="from">Any item can link to people, tasks, and events. Those links show on the item, and the item shows on them.</div>
+    </div>
+    <div class="col">
+      <h3><svg class="i"><use href="#users"/></svg>People</h3>
+      <p class="q">What you know about each person, and everything that involves them.</p>
+      <ul>
+        <li><b>Facts</b>: a short list replaces the free-text note ("Leads the pricing project"). You and Ask add them.</li>
+        <li><b>Related</b>: saved items that mention them, tasks either way, events they're in, and recent messages, in one timeline.</li>
+      </ul>
+      <div class="from">Ask's "remember" and "update person" become one path: a fact about a saved person goes on their list.</div>
+    </div>
+    <div class="col">
+      <h3><svg class="i"><use href="#idcard"/></svg>Profile</h3>
+      <p class="q">You, and how you write. Read by every answer and draft.</p>
+      <ul>
+        <li><b>Who you are</b>: name, emails, handles, and facts about you, in the same list shape as a person's.</li>
+        <li><b>How you write</b>: one list of habits in plain sentences, whatever taught them, and examples of your writing.</li>
+      </ul>
+      <div class="from">Replaces four sections: You, What Glossly knows about you, How you write, and Learn from what I pick, edit, and ask for.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. Saved, list ============ -->
+<section class="board">
+  <h2>2. Saved, list view</h2>
+  <p class="what">Types replace collections as the filter, with counts. Person and App narrow further. Each row shows what it links to. The view switch (list or cards) is remembered.</p>
+  <div class="win">
+    <nav class="side">
+      <div class="brand"><i></i>Glossly</div>
+      <a><svg class="i"><use href="#task"/></svg>Tasks</a>
+      <a><svg class="i"><use href="#cal"/></svg>Calendar</a>
+      <a><svg class="i"><use href="#users"/></svg>People</a>
+      <a class="on"><svg class="i"><use href="#bookmark"/></svg>Saved</a>
+      <div class="grp">Settings</div>
+      <a><svg class="i"><use href="#idcard"/></svg>Profile</a>
+      <a><svg class="i"><use href="#cpu"/></svg>Models</a>
+      <a><svg class="i"><use href="#shield"/></svg>Privacy</a>
+      <a><svg class="i"><use href="#sliders"/></svg>General</a>
+      <a><svg class="i"><use href="#activity"/></svg>Metrics</a>
+    </nav>
+    <div class="main">
+      <h2>Saved</h2>
+      <p class="intro">Everything you saved, and what Ask remembered. Glossly uses it in answers, replies, and Write here. Nothing here is sent anywhere.</p>
+      <div class="sv-tools">
+        <div class="search"><svg class="i"><use href="#search"/></svg>Search words or meaning</div>
+        <span class="select">Anyone <svg class="i sm"><use href="#chev"/></svg></span>
+        <span class="select">Any app <svg class="i sm"><use href="#chev"/></svg></span>
+        <div class="seg icons" role="radiogroup" aria-label="View"><button class="on" title="List"><svg class="i sm"><use href="#list"/></svg></button><button title="Cards"><svg class="i sm"><use href="#grid"/></svg></button></div>
+      </div>
+      <div class="filters">
+        <button class="filter on">All <span class="muted">128</span></button>
+        <button class="filter"><svg class="i sm"><use href="#text"/></svg>Snippets <span class="muted">84</span></button>
+        <button class="filter"><svg class="i sm"><use href="#link"/></svg>Links <span class="muted">21</span></button>
+        <button class="filter"><svg class="i sm"><use href="#chart"/></svg>Charts <span class="muted">6</span></button>
+        <button class="filter"><svg class="i sm"><use href="#memory"/></svg>Memories <span class="muted">17</span></button>
+      </div>
+      <div class="card">
+        <ul class="rows">
+          <li>
+            <span class="kind"><svg class="i"><use href="#text"/></svg></span>
+            <div class="body">
+              <span class="text">Q3 pricing: Starter $12, Team $29, Business $59 per seat per month. Annual plans get two months free.</span>
+              <span class="meta">Snippet · Docs · Oct 17
+                <span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span>
+                <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan</span>
+              </span>
+            </div>
+            <div class="side-acts"><button class="icon-btn" title="Copy"><svg class="i sm"><use href="#copy"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
+          </li>
+          <li>
+            <span class="fav" style="background:#3b6ea5">A</span>
+            <div class="body">
+              <span class="title">How we run design reviews</span>
+              <span class="quote">Every review starts with the problem, not the screens: two sentences on who is stuck and why.</span>
+              <span class="meta">Link · acme.example.com · Oct 16</span>
+            </div>
+            <div class="side-acts"><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
+          </li>
+          <li>
+            <span class="kind"><svg class="i"><use href="#chart"/></svg></span>
+            <div class="body">
+              <span class="title">Signups by month, June to September</span>
+              <div class="mini-chart"><i style="height:38%"></i><i style="height:55%"></i><i style="height:72%"></i><i style="height:94%"></i></div>
+              <span class="meta">Chart · 4 rows · Sheets · Oct 15
+                <span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span>
+              </span>
+            </div>
+            <div class="side-acts"><button class="icon-btn" title="Copy data"><svg class="i sm"><use href="#table"/></svg></button><button class="icon-btn" title="Copy image"><svg class="i sm"><use href="#copy"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
+          </li>
+          <li>
+            <span class="kind"><svg class="i"><use href="#memory"/></svg></span>
+            <div class="body">
+              <span class="text">Northwind's fiscal year starts in April, so their budget talks happen in February.</span>
+              <span class="meta">Memory · from Ask · Oct 12</span>
+            </div>
+            <div class="side-acts"><button class="icon-btn" title="Edit"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
+          </li>
+          <li>
+            <span class="kind"><svg class="i"><use href="#text"/></svg></span>
+            <div class="body">
+              <span class="text code">git log --since="2 weeks" --author=me --oneline</span>
+              <span class="meta">Snippet · Terminal · Oct 11 · <i>"for the weekly update"</i></span>
+            </div>
+            <div class="side-acts"><button class="icon-btn" title="Copy"><svg class="i sm"><use href="#copy"/></svg></button><button class="icon-btn" title="Delete"><svg class="i sm"><use href="#trash"/></svg></button></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li>The type comes from where and what: a browser page with an address is a Link, Visualize's save is a Chart, Ask's save is a Memory, and everything else is a Snippet. No model call.</li>
+    <li>The Why you typed shows in quotes in the meta line, as now. It no longer competes with a collection for the panel's attention.</li>
+    <li>Link chips open what they point to: a person's record, the task in Tasks, the event in Calendar. They come from the entities pass that already runs after a save, plus task and event matches.</li>
+  </ul>
+</section>
+
+<!-- ============ 3. Saved, cards ============ -->
+<section class="board">
+  <h2>3. Saved, cards view</h2>
+  <p class="what">The same items as tiles in a bento grid. Charts span two columns and show the real chart, links read like bookmarks, and code keeps its line breaks. Good for scanning what you kept; the list is better for searching.</p>
+  <div class="win solo">
+    <div class="main">
+      <div class="sv-tools">
+        <div class="search"><svg class="i"><use href="#search"/></svg>Search words or meaning</div>
+        <span class="select">Anyone <svg class="i sm"><use href="#chev"/></svg></span>
+        <span class="select">Any app <svg class="i sm"><use href="#chev"/></svg></span>
+        <div class="seg icons"><button title="List"><svg class="i sm"><use href="#list"/></svg></button><button class="on" title="Cards"><svg class="i sm"><use href="#grid"/></svg></button></div>
+      </div>
+      <div class="filters">
+        <button class="filter on">All <span class="muted">128</span></button>
+        <button class="filter"><svg class="i sm"><use href="#text"/></svg>Snippets <span class="muted">84</span></button>
+        <button class="filter"><svg class="i sm"><use href="#link"/></svg>Links <span class="muted">21</span></button>
+        <button class="filter"><svg class="i sm"><use href="#chart"/></svg>Charts <span class="muted">6</span></button>
+        <button class="filter"><svg class="i sm"><use href="#memory"/></svg>Memories <span class="muted">17</span></button>
+      </div>
+      <div class="bento">
+        <div class="tile wide">
+          <div class="head"><span class="kind"><svg class="i sm"><use href="#chart"/></svg></span>Chart · Sheets · Oct 15<span class="spacer"></span><span class="link-chip"><svg class="i sm"><use href="#cal"/></svg>Growth review, Tue</span></div>
+          <div class="big">Signups by month, June to September</div>
+          <div class="chart"><div class="b">412<i style="height:38%"></i></div><div class="b">598<i style="height:55%"></i></div><div class="b">780<i style="height:72%"></i></div><div class="b">1,020<i style="height:94%"></i></div></div>
+          <div class="axis"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span></div>
+          <div class="row-btns"><button class="sm"><svg class="i sm"><use href="#copy"/></svg>Copy image</button><button class="sm"><svg class="i sm"><use href="#table"/></svg>Copy data</button><button class="sm ghost">Show source text</button></div>
+        </div>
+        <div class="tile">
+          <div class="head"><span class="fav" style="background:#3b6ea5">A</span>acme.example.com</div>
+          <div class="big">How we run design reviews</div>
+          <div class="text muted">"Every review starts with the problem, not the screens."</div>
+          <div class="meta">Link · Oct 16<span class="spacer"></span><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button></div>
+        </div>
+        <div class="tile">
+          <div class="head"><span class="kind"><svg class="i sm"><use href="#text"/></svg></span>Snippet · Docs</div>
+          <div class="text">Q3 pricing: Starter $12, Team $29, Business $59 per seat per month. Annual plans get two months free.</div>
+          <div class="meta"><span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale</span><span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing</span></div>
+        </div>
+        <div class="tile">
+          <div class="head"><span class="kind"><svg class="i sm"><use href="#memory"/></svg></span>Memory · from Ask</div>
+          <div class="text">Northwind's fiscal year starts in April, so their budget talks happen in February.</div>
+          <div class="meta">Oct 12</div>
+        </div>
+        <div class="tile">
+          <div class="head"><span class="fav" style="background:#7a5a2f">D</span>docs.example.com</div>
+          <div class="big">Error handling, a field guide</div>
+          <div class="text muted">"Return errors where the caller can act on them; log them where it can't."</div>
+          <div class="meta">Link · Oct 9<span class="spacer"></span><button class="icon-btn" title="Open page"><svg class="i sm"><use href="#ext"/></svg></button></div>
+        </div>
+        <div class="tile">
+          <div class="head"><span class="kind"><svg class="i sm"><use href="#text"/></svg></span>Snippet · Terminal</div>
+          <div class="code">git log --since="2 weeks" \
+  --author=me --oneline</div>
+          <div class="meta">Oct 11 · <i>"for the weekly update"</i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li>Tiles are sized by type, not by the user: charts wide, everything else one column. No drag to rearrange (it's a library, not a board).</li>
+    <li>A chart keeps three things: the rendered chart (as SVG, so it stays sharp and themes with light or dark), the table as CSV, and the source text. Copy image pastes it into a doc or chat.</li>
+    <li>A link keeps the page title, address, and site icon if the browser gives one (otherwise the letter tile), plus the line you highlighted. Open page goes back to it.</li>
+  </ul>
+</section>
+
+<!-- ============ 4. Save panel ============ -->
+<section class="board">
+  <h2>4. The Save panel</h2>
+  <p class="what">With no collections, Save has nothing to choose: Enter saves. What it shows instead is what Glossly worked out (the type and the links), each removable before saving.</p>
+  <div class="pair">
+    <div>
+      <p class="label">Today</p>
+      <div class="frame">
+        <div class="bar"><button class="slot"><svg class="i"><use href="#ask"/></svg>Ask</button><button class="slot on"><svg class="i"><use href="#bookmark"/></svg>Save to Reading</button><button class="slot">Who is this</button></div>
+        <div class="panel">
+          <h4>Save</h4>
+          <div class="chips"><button class="chip">Notes</button><button class="chip sel">Reading</button><button class="chip">Ideas</button><button class="chip">People notes</button></div>
+          <div class="input ph">Why are you saving this? (optional)</div>
+          <div class="panel-foot"><kbd>Enter</kbd> save · <kbd>Tab</kbd> next collection · <kbd>Esc</kbd> back</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="label">Proposed</p>
+      <div class="frame">
+        <div class="bar"><button class="slot"><svg class="i"><use href="#ask"/></svg>Ask</button><button class="slot on"><svg class="i"><use href="#bookmark"/></svg>Save</button><button class="slot">Who is this</button></div>
+        <div class="panel">
+          <h4>Save <span class="muted">· Snippet</span></h4>
+          <div class="chips">
+            <span class="link-chip"><svg class="i sm"><use href="#user"/></svg>Jordan Hale<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
+            <span class="link-chip"><svg class="i sm"><use href="#task"/></svg>Send pricing to Jordan<button class="icon-btn" style="width:18px;height:18px" title="Don't link"><svg class="i sm"><use href="#x"/></svg></button></span>
+          </div>
+          <div class="input ph">Why are you saving this? (optional)</div>
+          <div class="panel-foot"><kbd>Enter</kbd> save · <kbd>Esc</kbd> back</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li>Links fill in as they're found. People named in the text come from rules at once; a task or event match by meaning may arrive a moment later. Saving never waits for them: anything found after Enter is linked in the background, as the entities pass is today.</li>
+    <li>A person the text names who isn't saved yet gets no chip here. Who is this and Add person stay the way to create one (people are never created without a confirm).</li>
+    <li>The bar slot reads "Save", so the router no longer sends a collection list or asks for <code>best_collection</code> on every bar open.</li>
+  </ul>
+</section>
+
+<!-- ============ 5. Person record ============ -->
+<section class="board">
+  <h2>5. A person's record</h2>
+  <p class="what">Two columns. On the left, what you know: facts, in the same list as your own on Profile. On the right, everything that involves them, newest first, filterable by type. Nothing folds away.</p>
+  <div class="win">
+    <nav class="side">
+      <div class="brand"><i></i>Glossly</div>
+      <a><svg class="i"><use href="#task"/></svg>Tasks</a>
+      <a><svg class="i"><use href="#cal"/></svg>Calendar</a>
+      <a class="on"><svg class="i"><use href="#users"/></svg>People</a>
+      <a><svg class="i"><use href="#bookmark"/></svg>Saved</a>
+      <div class="grp">Settings</div>
+      <a><svg class="i"><use href="#idcard"/></svg>Profile</a>
+      <a><svg class="i"><use href="#cpu"/></svg>Models</a>
+      <a><svg class="i"><use href="#shield"/></svg>Privacy</a>
+      <a><svg class="i"><use href="#sliders"/></svg>General</a>
+      <a><svg class="i"><use href="#activity"/></svg>Metrics</a>
+    </nav>
+    <div class="main">
+      <div class="person-head">
+        <span class="avatar">JH</span>
+        <div>
+          <h2>Jordan Hale</h2>
+          <div class="sub"><span class="select" style="height:24px;font-size:12.5px">Colleague <svg class="i sm"><use href="#chev"/></svg></span>jordan.hale@example.com · @jhale</div>
+        </div>
+        <span class="spacer"></span>
+        <button class="sm">Manage</button>
+      </div>
+      <div class="two">
+        <div>
+          <div class="group-head"><div><h3>What you know</h3><p>Ask adds to this when you tell it things about Jordan. Every reply and answer about them reads it.</p></div></div>
+          <div class="card">
+            <ul class="facts">
+              <li><span class="t">Leads the pricing project at Acme</span><span class="src">Ask · Oct 12</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+              <li class="hover"><span class="t">Moving to the Berlin office in January</span><span class="src">Ask · Oct 15</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="delete-armed"><svg class="i sm"><use href="#trash"/></svg>Delete</button></span></li>
+              <li><span class="t">Vegetarian</span><span class="src">You · Oct 3</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+              <li><span class="t">Prefers a call over long email threads</span><span class="src">Ask · Sep 28</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+              <li class="add"><svg class="i sm"><use href="#plus"/></svg>Add something about Jordan</li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div class="group-head"><div><h3>Related</h3></div><span class="spacer"></span>
+            <div class="seg"><button class="on">All <span class="n">9</span></button><button>Saved <span class="n">3</span></button><button>Tasks <span class="n">2</span></button><button>Events <span class="n">2</span></button><button>Messages <span class="n">2</span></button></div>
+          </div>
+          <div class="card">
+            <div class="day-head">Coming up</div>
+            <ul class="timeline">
+              <li><span class="when">Thu 23<br>1:00 pm</span><span class="kind"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Lunch with Jordan</span><span class="sm">Event · Calendar</span></div></li>
+              <li><span class="when">Fri 24</span><span class="kind"><svg class="i sm"><use href="#task"/></svg></span><div class="body"><span>Send pricing to Jordan</span><span class="sm">You owe · from Slack, Oct 17</span></div><span class="due">due Fri</span></li>
+            </ul>
+            <div class="day-head">Earlier</div>
+            <ul class="timeline">
+              <li><span class="when">Oct 17</span><span class="kind"><svg class="i sm"><use href="#msg"/></svg></span><div class="body"><span>"Can you send the tiers before Thursday?"</span><span class="sm">Message · Slack</span></div></li>
+              <li><span class="when">Oct 17</span><span class="kind"><svg class="i sm"><use href="#text"/></svg></span><div class="body"><span>Q3 pricing: Starter $12, Team $29, Business $59…</span><span class="sm">Snippet · Docs · mentions Jordan</span></div></li>
+              <li><span class="when">Oct 14</span><span class="kind"><svg class="i sm"><use href="#task"/></svg></span><div class="body"><span><s class="muted">Review the onboarding deck</s></span><span class="sm">They owed · done Oct 16</span></div></li>
+              <li><span class="when">Oct 9</span><span class="kind"><svg class="i sm"><use href="#cal"/></svg></span><div class="body"><span>Pricing kickoff</span><span class="sm">Event · with Jordan and Casey Lin</span></div></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li>The free-text note becomes facts, one per line, when the migration runs. A note with no line breaks becomes one fact, and can be split by editing.</li>
+    <li>Delete is the existing pattern: the trash morphs into a red Delete in place, and a second click confirms.</li>
+    <li>Related merges what the card shows in pieces today (You owe / They owe, last 5 messages, saved items) and adds events. The type filter is a segmented control, not tabs, so "All" is always one click away.</li>
+    <li>Who is this's small card in the overlay keeps its size; it shows the first three facts and the next thing coming up, and Open record leads here.</li>
+  </ul>
+</section>
+
+<!-- ============ 6. Profile ============ -->
+<section class="board">
+  <h2>6. Profile</h2>
+  <p class="what">Two groups with headings and no collapsibles: Who you are (identity and facts) and How you write (habits and examples). Each group is a card with one job, and the order follows how often you'd come here to change something.</p>
+  <div class="win">
+    <nav class="side">
+      <div class="brand"><i></i>Glossly</div>
+      <a><svg class="i"><use href="#task"/></svg>Tasks</a>
+      <a><svg class="i"><use href="#cal"/></svg>Calendar</a>
+      <a><svg class="i"><use href="#users"/></svg>People</a>
+      <a><svg class="i"><use href="#bookmark"/></svg>Saved</a>
+      <div class="grp">Settings</div>
+      <a class="on"><svg class="i"><use href="#idcard"/></svg>Profile</a>
+      <a><svg class="i"><use href="#cpu"/></svg>Models</a>
+      <a><svg class="i"><use href="#shield"/></svg>Privacy</a>
+      <a><svg class="i"><use href="#sliders"/></svg>General</a>
+      <a><svg class="i"><use href="#activity"/></svg>Metrics</a>
+    </nav>
+    <div class="main">
+      <h2>Profile</h2>
+      <p class="intro">Who you are and how you write, so Glossly can tell your messages from other people's and write as you. It stays on this computer.</p>
+
+      <div class="group">
+        <div class="group-head"><div><h3>Who you are</h3><p>Your name and addresses tell your messages apart. The facts below go into every answer and draft.</p></div></div>
+        <div class="card"><div class="pad">
+          <div class="form">
+            <span class="k">Name</span><span class="input">Alex Morgan</span>
+            <span class="k">Emails</span><span class="input multi"><span class="pill">alex.morgan@example.com<button class="icon-btn" style="width:18px;height:18px"><svg class="i sm"><use href="#x"/></svg></button></span><span class="pill">alex@acme.example.com<button class="icon-btn" style="width:18px;height:18px"><svg class="i sm"><use href="#x"/></svg></button></span><span class="muted small" style="padding:0 4px">Add an email</span></span>
+            <span class="k">Chat names</span><span class="input multi"><span class="pill">@alexm<button class="icon-btn" style="width:18px;height:18px"><svg class="i sm"><use href="#x"/></svg></button></span><span class="pill">alex.morgan<button class="icon-btn" style="width:18px;height:18px"><svg class="i sm"><use href="#x"/></svg></button></span><span class="muted small" style="padding:0 4px">Add a name</span></span>
+          </div>
+        </div></div>
+        <div class="card">
+          <ul class="facts">
+            <li><span class="t">Product manager at Acme</span><span class="src">You · Oct 2</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+            <li class="hover"><span class="t">Lives in Lisbon, works on Lisbon time</span><span class="src">Ask · Oct 8</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+            <li><span class="t">Prefers meetings after 10 am</span><span class="src">Ask · Oct 12</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+            <li><span class="t">Learning Portuguese</span><span class="src">Ask · Oct 15</span><span class="acts"><button class="icon-btn"><svg class="i sm"><use href="#pen"/></svg></button><button class="icon-btn"><svg class="i sm"><use href="#trash"/></svg></button></span></li>
+            <li class="add"><svg class="i sm"><use href="#plus"/></svg>Add something about you</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head">
+          <div><h3>How you write</h3><p>Reply and Write here learn from the drafts you pick, the edits you make, and what you ask for. A habit seen in two places applies everywhere.</p></div>
+          <label class="switch-label">Learn as I write<span class="switch" role="switch" aria-checked="true"></span></label>
+        </div>
+        <div class="card">
+          <div class="toolbar">
+            <div class="seg"><button class="on">All</button><button>Email</button><button>Work chat</button><button>Messaging</button><button>Documents</button></div>
+            <span class="spacer"></span><span class="muted small">7 habits</span>
+          </div>
+          <ul class="habits">
+            <li><span class="t"><b>Keeps replies short</b><span class="meta">Picked the shortest draft 9 of 11 times · Reply</span></span><span class="place">Work chat</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+            <li><span class="t"><b>Leaves off the final period</b><span class="meta">Seen in work chat and messaging · Reply and Write here</span></span><span class="place">Everywhere</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+            <li><span class="t"><b>Signs off with just "Alex"</b><span class="meta">From your edits · Reply</span></span><span class="place">Email</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+            <li><span class="t"><b>Opens with "hey", not "hi"</b><span class="meta">From your edits · Reply</span></span><span class="place">Messaging</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+            <li><span class="t"><b>Uses headings and short bullets</b><span class="meta">From what you asked for · Write here</span></span><span class="place">Documents</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+            <li><span class="t"><b>Writes more formally to people outside Acme</b><span class="meta">Picked the formal draft 6 of 7 times · Reply</span></span><span class="place">Email</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+            <li><span class="t"><b>Leaves out your saved notes</b><span class="meta">Took them out 4 of 5 times · Write here</span></span><span class="place">Email</span><button class="icon-btn" title="Forget"><svg class="i sm"><use href="#trash"/></svg></button></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="toolbar">
+            <strong style="font-size:13.5px">Examples of your writing</strong>
+            <span class="spacer"></span>
+            <div class="seg"><button class="on">You added <span class="n">2</span></button><button>From your edits <span class="n">6</span></button></div>
+          </div>
+          <div class="examples">
+            <div class="ex"><span class="q">Sounds good, I'll get the numbers over by Thursday. If anything changes on your side just ping me here</span><span class="foot"><span class="place">Work chat</span><span class="spacer"></span><button class="icon-btn" title="Remove"><svg class="i sm"><use href="#trash"/></svg></button></span></div>
+            <div class="ex"><span class="q">Hi Maya, thanks for sending this through. I've left two comments on the timeline; the rest looks ready to me. Best, Alex</span><span class="foot"><span class="place">Email</span><span class="spacer"></span><button class="icon-btn" title="Remove"><svg class="i sm"><use href="#trash"/></svg></button></span></div>
+            <div class="ex add"><svg class="i"><use href="#plus"/></svg><span>Paste a message you wrote</span><span class="muted small">2 of 5</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="notes">
+    <li><b>One list of habits.</b> Today's three lists (counted preferences, "Notes from your edits and requests", and "Write here leaves these out") become one. Each row is a plain sentence, with how it was learned in the meta line, so you can judge it, and the place as a pill on the right.</li>
+    <li><b>The switch is in the group's header</b>, next to what it controls. Turning it off keeps what was learned (still used) and stops learning; a line under the header says so while it's off.</li>
+    <li><b>Examples are cards</b>, at most 5 you added and the latest from your edits, switched with a segmented control instead of a fold. The place is set when you paste (the same picker as today), and shown as a pill.</li>
+    <li><b>Facts about you use the same list as a person's facts</b>: hover shows Edit and Delete, and Add sits at the end. The identity fields save as you leave them, so the Save button goes.</li>
+    <li>The place filter shows only places that have something, as now. Person-specific habits ("Writes more formally to Casey") move to that person's record.</li>
+  </ul>
+</section>
+
+<!-- ============ 7. Icons ============ -->
+<section class="board">
+  <h2>7. Profile and People icons</h2>
+  <p class="what">Today Profile is one person and People is two, and at 16 px they read as the same shape. The options below change only Profile, since People's two-person icon is the clear one.</p>
+  <div class="icons-board">
+    <div class="ib">
+      <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#user"/></svg>Profile</a></div>
+      <span class="cap"><b>Today</b> (UserRound). Too close to People.</span>
+    </div>
+    <div class="ib pick">
+      <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#idcard"/></svg>Profile</a></div>
+      <span class="cap"><b>IdCard</b>, recommended. A different outline (a card, not a head), and it reads as "who you are".</span>
+    </div>
+    <div class="ib">
+      <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#circleuser"/></svg>Profile</a></div>
+      <span class="cap"><b>CircleUserRound</b>. The common "account" icon. Distinct, but still a head.</span>
+    </div>
+    <div class="ib">
+      <div class="nav-demo"><a><svg class="i"><use href="#users"/></svg>People</a><a class="on"><svg class="i"><use href="#contact"/></svg>Profile</a></div>
+      <span class="cap"><b>ContactRound</b>. A contact page. Busier at 16 px.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8. Open ============ -->
+<section class="board">
+  <h2>8. Still to decide</h2>
+  <ul class="notes" style="margin-top:0">
+    <li><b>Links need the page address.</b> Glossly reads the browser's window title today, not its address. Reading the address bar through UI Automation works in Edge and Chrome; it needs a helper command and a check per browser. Without it, a Link has a title and site but no Open page.</li>
+    <li><b>Existing data:</b> items keep their text and lose their collection name; Ask's memories that are about you move to Profile, and those about a saved person move to that person (a one-time pass with the Fast model, or left as Memories if there's no model). Person notes split into facts by line.</li>
+    <li><b>User-made groups</b> (projects you create, none by default) are parked for later, in the handoff.</li>
+    <li>Person-specific habits move to the person's record: worth a small "How you write to Jordan" list there, or leave them only in Reply's prompt?</li>
+  </ul>
+</section>
+</div>
+</body>
+</html>
