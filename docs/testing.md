@@ -43,9 +43,9 @@ pnpm eval   # vitest run --project evals, then evals/print-results.mjs
 ```
 
 - **Router eval** (`evals/router.eval.ts`, 60 hand-written cases in `fixtures/{messages,commitments,tables,articles,code,contacts}.json`, each `{id, context, expected: {content_type, slots}}`). Rules run offline; the LLM run needs `GROQ_API_KEY` (model `groq:qwen/qwen3.8-27b` in the Decision role, override with `GLOSSLY_EVAL_MODEL`) and fails if more than 10% of calls error. It also scores the rules on exactly the cases the model answered (`rules_slot_accuracy_same_cases`), for the pre-agreed rule. Results go to git-ignored `evals/results/router-{rules,llm}.json`; `print-results.mjs` prints the summary, distinct errors, and misses.
-- **Comparison evals** (only with `GROQ_API_KEY` and `GLOSSLY_COMPARE=1`; helpers in `evals/lib.ts`, old code and prompts in `evals/legacy/`; calls paced by `GLOSSLY_COMPARE_GAP_MS`, default 2.5 s; about 300 calls for both):
+- **Comparison evals** (only with `GROQ_API_KEY` and `GLOSSLY_COMPARE=1`; helpers in `evals/lib.ts`, old code and prompts in `evals/legacy/`; calls paced by `GLOSSLY_COMPARE_GAP_MS`, default 2.5 s):
   - `evals/visualize-compare.eval.ts`: model-written Vega-Lite against the structured chart pick, 20 cases in `fixtures/visualize/charts.json`; renders both and writes JSON plus a side-by-side HTML page to `evals/results/`.
-  - `evals/router-collection-compare.eval.ts`: string collection with a code fix-up against the enum, 60 fixtures, Qwen 3.8 and gpt-oss-20b (`GLOSSLY_COMPARE_MODELS`).
+  - The router's collection comparison (string against enum) was removed in Step 28b: the router picks no collection since decision 84.
 
 ### Results so far
 

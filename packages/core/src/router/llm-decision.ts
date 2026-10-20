@@ -1,16 +1,14 @@
 import routerPrompt from '../../prompts/router-decision.md?raw';
 import { describeSource } from '../people/reply-style';
 import type { LlmProvider } from '../llm/types';
-import { ruleCollection } from './rules';
-import { decisionCallSchema, type DecisionInput, type DecisionProvider, type Decisions } from './types';
+import { DecisionCallSchema, type DecisionInput, type DecisionProvider, type Decisions } from './types';
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
 
-export function formatDecisionPrompt({ context, collections }: DecisionInput): string {
+export function formatDecisionPrompt({ context }: DecisionInput): string {
   return [
     `App: ${describeSource(context.source_app, context.window_title)}`,
     `In an editable field: ${context.is_editable ? 'yes' : 'no'}`,
-    `Collections: ${collections.join(', ')}`,
     '',
     '<before>',
     clip(context.context_before, 500),
@@ -42,13 +40,8 @@ export class LlmStructuredDecision implements DecisionProvider {
         maxOutputTokens: 200,
         ...(onFallback && { onFallback: () => onFallback() }),
       },
-      decisionCallSchema(input.collections),
+      DecisionCallSchema,
     );
-    const known = input.collections.find((c) => c.toLowerCase() === out.best_collection.trim().toLowerCase());
-    return {
-      ...out,
-      best_collection: known ?? ruleCollection(out.content_type, input.features, input.collections),
-      provider: 'llm_structured',
-    };
+    return { ...out, provider: 'llm_structured' };
   }
 }

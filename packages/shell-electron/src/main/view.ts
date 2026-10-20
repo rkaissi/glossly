@@ -24,19 +24,11 @@ function slot(action: ActionId, score?: number): SlotView {
   return { action, label: ACTION_LABELS[action], ...(score !== undefined && { score }), available: isAvailable(action) };
 }
 
-/**
- * The Save slot's label: "Save to Notes", or the collection alone ("People notes") when the whole
- * label wouldn't fit the 172 px slot next to a key chip (about 16 characters of Segoe UI at 13 px).
- * The tooltip always says "Save to …".
- */
-export const SAVE_LABEL_MAX = 16;
-export const saveLabel = (collection: string): string => (`Save to ${collection}`.length <= SAVE_LABEL_MAX ? `Save to ${collection}` : collection);
-
 export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView {
-  const collection = r.decisions.best_collection;
   return {
     slot1: slot('ask'),
-    slot2: { ...slot('save'), label: saveLabel(collection), collection },
+    // Just "Save": no collection to name since decision 84.
+    slot2: slot('save'),
     slot3: r.slots.slot3 ? slot(r.slots.slot3.action, r.slots.slot3.score) : null,
     slot4: r.slots.slot4 ? slot(r.slots.slot4.action, r.slots.slot4.score) : null,
     more: r.slots.more.map((a) => slot(a.action, a.score)),
@@ -52,7 +44,7 @@ export function slotsView(r: RouteResult, stage: SlotsView['stage']): SlotsView 
 export function emptySlotsView(slots: Slots): SlotsView {
   return {
     slot1: slot('ask'),
-    slot2: { ...slot('search'), collection: '' },
+    slot2: slot('search'),
     slot3: slots.slot3 ? slot(slots.slot3.action, slots.slot3.score) : null,
     slot4: slots.slot4 ? slot(slots.slot4.action, slots.slot4.score) : null,
     more: slots.more.map((a) => slot(a.action, a.score)),
@@ -64,12 +56,8 @@ export function emptySlotsView(slots: Slots): SlotsView {
   };
 }
 
-/**
- * Ask stays as first painted. Save's collection updates once, when the route settles,
- * unless the Save panel is already open. A contextual button already on screen is kept.
- */
-export function mergeRoute(prev: SlotsView, next: SlotsView, opts?: { keepSave?: boolean }): SlotsView {
-  const saveSettled = prev.stage === 'model' || prev.stage === 'rules_fallback';
+/** Ask and Save stay as first painted. A contextual button already on screen is kept. */
+export function mergeRoute(prev: SlotsView, next: SlotsView): SlotsView {
   const slot3 = shownSlot(prev.slot3, next.slot3);
   let slot4 = shownSlot(prev.slot4, next.slot4);
   // A kept button and a new one can name the same action: show it once.
@@ -81,7 +69,7 @@ export function mergeRoute(prev: SlotsView, next: SlotsView, opts?: { keepSave?:
   return {
     ...next,
     slot1: prev.slot1,
-    slot2: opts?.keepSave || saveSettled ? prev.slot2 : next.slot2,
+    slot2: prev.slot2,
     slot3,
     slot4,
     more: more.filter((m, i) => !inSlots.has(m.action) && more.findIndex((o) => o.action === m.action) === i),

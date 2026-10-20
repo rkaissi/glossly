@@ -13,8 +13,9 @@ import type { CatalogModel } from './llm/catalog';
 import type { MetricsSummary } from './metrics';
 import type { BarAction, ContentType, DecisionProviderId } from './router/types';
 import type { ApiStyle, AppMode, ModelRef, RoleName, Settings, SettingsKey } from './settings';
-import type { CaptureMethod, Trigger } from './types';
+import type { CaptureMethod, Item, ItemLink, Trigger } from './types';
 import type { WhoView } from './actions/who';
+import type { SaveOpen } from './actions/save-links';
 import type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
 import type { PromisesByRules } from './actions/promises';
 import type { CalendarEvent, EventPatch, EventCandidate, EventSaveRow } from './calendar/types';
@@ -34,6 +35,8 @@ export type { PickDraft, ReplyChannel, ReplyRedo, ReplyRedoAsk, StyleDimension, 
 export type { Relationship } from './people/relationship';
 export type { PasteTarget, WriteAsk, WriteSuggestion } from './actions/paste-types';
 export type { PromisesByRules } from './actions/promises';
+export type { SaveLinkView, SaveOpen } from './actions/save-links';
+export type { ItemLink, ItemLinkKind } from './types';
 export type * from './calendar/types';
 export type { LibraryItem, LibraryQuery, LibraryResult, RecallHit, RecallReason, SearchResults } from './recall/types';
 export type { Cell, FieldType, ParsedTable, VisualizeResult } from './visualize/types';
@@ -47,7 +50,7 @@ export type ActionId = 'ask' | 'save' | BarAction | 'recall';
 /** Actions with a working panel in this build; the rest show "Coming in a later phase". */
 export type AvailableAction = 'ask' | 'save' | 'who' | 'promises' | 'reply' | 'visualize' | 'search' | 'recall' | 'write';
 
-/** `toast`: the small "Saved to Notes · Undo" strip after the save hotkey; it never takes focus. */
+/** `toast`: the small "Saved · Undo" strip after the save hotkey; it never takes focus. */
 export type OverlayMode = 'hidden' | 'pill' | 'dot' | 'bar' | 'panel' | 'toast';
 
 type ObstacleSide = ClassifiedObstacle['side'];
@@ -107,8 +110,8 @@ export interface SlotView {
 export interface SlotsView {
   /** Always Ask. */
   slot1: SlotView;
-  /** "Save to {collection}", or the collection alone when that is too long (`saveLabel`). With nothing selected, Search (decision 82). */
-  slot2: SlotView & { collection: string };
+  /** Save (no collection since decision 84). With nothing selected, Search (decision 82). */
+  slot2: SlotView;
   slot3: SlotView | null;
   slot4: SlotView | null;
   more: SlotView[];
@@ -125,7 +128,7 @@ export type Badge = { kind: 'recall'; count: number } | { kind: 'person'; person
 /** A save made without the Save panel: by the save hotkey (shown as a toast) or by autosave (the pill and bar show it). */
 export interface SavedNotice {
   itemId: string;
-  collection: string;
+  kind: Item['kind'];
   /** Epoch ms. Undo works until then. */
   undoUntil: number;
   via: 'hotkey' | 'autosave';
@@ -186,7 +189,6 @@ export interface AskDone {
 export interface AskSaved {
   requestId: string;
   itemId: string;
-  collection: string;
   /** Epoch ms. */
   undoUntil: number;
   /** A saved memory about the same fact was reworded instead of adding a copy; Undo puts the old wording back. */
@@ -310,7 +312,7 @@ export interface WriteSnippet {
   line: string;
   /** The snippet as saved (cleaned), for the As saved form. */
   full: string;
-  /** "Notes · Oct 9": its collection and the day it was saved. */
+  /** "Snippet · Oct 9": what it is and the day it was saved. */
   detail: string;
 }
 
@@ -389,12 +391,16 @@ export type PromisesResult =
 
 export interface SaveArgs {
   sessionId: number;
-  collection: string;
   why?: string;
+  /** The links the panel showed and the user kept (decision 84). */
+  links?: ItemLink[];
+  /** People the panel showed and the user took off. */
+  unlinkedPeople?: string[];
 }
 export interface SaveDone {
   itemId: string;
-  collection: string;
+  /** What it was saved as: a Snippet, a Link, a Chart, or a Memory. */
+  kind: Item['kind'];
   /** Epoch ms. */
   undoUntil: number;
 }
@@ -569,6 +575,8 @@ export interface InvokeChannels {
   /** "Not related" on a row of the "Used N" chip: left out of later prompts in this session, and logged (kind and reason only). */
   'context:dismiss': { args: { sessionId: number; kind: ContextUsed['kind']; id: string }; result: void };
 
+  /** What the Save panel shows before saving: the type, links to saved people, tasks, and events, and offers (decision 84). No model call. */
+  'save:open': { args: { sessionId: number }; result: SaveOpen };
   'save:save': { args: SaveArgs; result: SaveDone };
   'save:setWhy': { args: { itemId: string; why: string }; result: boolean };
   'save:undo': { args: { itemId: string }; result: { undone: boolean } };
@@ -581,7 +589,7 @@ export interface InvokeChannels {
 
   /** Visualize: the table (parsed in code, else by the model) and a validated Vega-Lite spec. */
   'visualize:run': { args: { sessionId: number }; result: VisualizeResult };
-  /** Saves the last Visualize result as a chart item in the route's collection. */
+  /** Saves the last Visualize result as a chart item. */
   'visualize:save': { args: { sessionId: number }; result: SaveDone };
 
   /** Streams three drafts (Chat role) to the sender's reply:* channels. With `redo`, three new ones after "None of these". */

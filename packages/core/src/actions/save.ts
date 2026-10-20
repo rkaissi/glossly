@@ -5,7 +5,7 @@ import { LlmError, type LlmProvider } from '../llm/types';
 import type { Metrics } from '../metrics';
 import type { Settings } from '../settings';
 import type { EntityKind, Store } from '../store/store';
-import type { CaptureMethod, ContainerContext, Item, SelectionPayload, Trigger } from '../types';
+import type { CaptureMethod, ContainerContext, Item, ItemLink, SelectionPayload, Trigger } from '../types';
 import { contextWindow, type ContextWindow } from './context';
 
 export const EntityKindSchema = z.enum(['person', 'company', 'product', 'place', 'other']);
@@ -34,9 +34,11 @@ export interface SelectionItemData {
 export interface SaveInput {
   selection: SelectionPayload;
   container?: ContainerContext | null;
-  /** Collection name. Created if it does not exist yet. */
-  collection: string;
   why?: string | null;
+  /** People, tasks, and events the user kept linked in the Save panel (decision 84). */
+  links?: ItemLink[];
+  /** People the panel offered and the user took off, so finding names after the save doesn't link them again. */
+  unlinkedPeople?: string[];
   /** How the save was asked for, for metrics only. */
   via?: 'panel' | 'hotkey' | 'autosave';
 }
@@ -79,6 +81,41 @@ function cleanWhy(why: string | null | undefined): string | null {
   return w ? w.slice(0, MAX_WHY) : null;
 }
 
+/** What each kind of item is called in the app (decision 84). The UI keeps its own copy (it imports no core code). */
+export const ITEM_KIND_LABEL: Record<Item['kind'], string> = { selection: 'Snippet', link: 'Link', chart: 'Chart', note: 'Memory' };
+
+const MAX_URLS = 20;
+// A web address: http(s) or a bare www., up to whitespace or a quote or bracket; trailing punctuation isn't part of it.
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"'`()[\]{}]+/gi;
+const TRAILING = /[.,;:!?'"]+$/;
+
+/** The web addresses in a text, in order, without repeats; "www." gets https:// (decision 84). */
+export function extractUrls(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(URL_RE)) {
+    const raw = m[0].replace(TRAILING, '');
+    const url = /^www\./i.test(raw) ? `https://${raw}` : raw;
+    if (url.length > 2048 || out.includes(url)) continue;
+    try {
+      const u = new URL(url);
+      if (!u.hostname.includes('.') && u.hostname !== 'localhost') continue;
+    } catch {
+      continue;
+    }
+    out.push(url);
+    if (out.length >= MAX_URLS) break;
+  }
+  return out;
+}
+
+/** A selection that is one web address and nothing else is saved as a Link (decision 84). */
+export function isLinkText(text: string): boolean {
+  const t = text.trim();
+  if (!t || /\s/.test(t)) return false;
+  const urls = extractUrls(t);
+  return urls.length === 1 && (urls[0] === t.replace(TRAILING, '') || urls[0] === `https://${t.replace(TRAILING, '')}`);
+}
+
 export function embedText(item: Pick<Item, 'text' | 'why'>): string {
   return (item.why ? `${item.text}\n${item.why}` : item.text).slice(0, MAX_EMBED_CHARS);
 }
@@ -99,6 +136,8 @@ export class SaveService {
   /** Memories reworded by `remember`, with their wording before, so Undo puts it back instead of deleting. */
   private readonly reworded = new Map<string, string>();
   private readonly running = new Map<string, { ctl: AbortController; done: Promise<EnrichResult> }>();
+  /** Per item, the people the user took off in the Save panel; kept until its entities are found. */
+  private readonly unlinked = new Map<string, Set<string>>();
 
   constructor(private readonly deps: SaveServiceDeps) {}
 
@@ -110,7 +149,7 @@ export class SaveService {
     const { store } = this.deps;
     const settings = this.deps.settings();
     const { selection } = input;
-    const collection = store.collectionByName(input.collection) ?? store.createCollection(input.collection);
+    const urls = extractUrls(selection.text);
     const data: SelectionItemData = {
       excerpt: contextWindow(selection, input.container, settings.save.excerptChars),
       method: selection.method,
@@ -118,18 +157,31 @@ export class SaveService {
       captured_at: selection.captured_at,
       is_editable: selection.is_editable,
     };
-    const item = store.insertItem({
-      collection_id: collection.id,
-      kind: 'selection',
-      text: selection.text,
-      why: cleanWhy(input.why),
-      source_app: selection.source_app || null,
-      window_title: selection.window_title || null,
-      data_json: JSON.stringify(data),
+    const item = store.tx(() => {
+      const row = store.insertItem({
+        collection_id: null,
+        kind: isLinkText(selection.text) ? 'link' : 'selection',
+        text: selection.text,
+        why: cleanWhy(input.why),
+        source_app: selection.source_app || null,
+        window_title: selection.window_title || null,
+        data_json: JSON.stringify(data),
+        urls_json: urls.length ? JSON.stringify(urls) : null,
+      });
+      for (const l of input.links ?? []) store.linkItem(row.id, l.kind, l.target_id);
+      return row;
     });
+    if (input.unlinkedPeople?.length) this.unlinked.set(item.id, new Set(input.unlinkedPeople));
     const undoUntil = this.now() + settings.save.undoSeconds * 1000;
     this.undoDeadlines.set(item.id, undoUntil);
-    this.deps.metrics?.record('save_done', { method: selection.method, trigger: selection.trigger, has_why: Boolean(item.why), via: input.via ?? 'panel' });
+    this.deps.metrics?.record('save_done', {
+      method: selection.method,
+      trigger: selection.trigger,
+      has_why: Boolean(item.why),
+      via: input.via ?? 'panel',
+      kind: item.kind,
+      links: input.links?.length ?? 0,
+    });
     return { item, undoUntil, enriched: this.startEnrich(item) };
   }
 
@@ -137,13 +189,12 @@ export class SaveService {
    * Saves a new memory from Ask (asked for or not, decision 78): an item of kind "note" (shown as
    * "Memory"), embedded and enriched like any save, with the same undo window.
    */
-  saveNote(input: { text: string; collection: string; selection: SelectionPayload | null }): SaveResult {
+  saveNote(input: { text: string; selection: SelectionPayload | null }): SaveResult {
     const { store } = this.deps;
     const settings = this.deps.settings();
-    const collection = store.collectionByName(input.collection) ?? store.createCollection(input.collection);
     const sel = input.selection;
     const item = store.insertItem({
-      collection_id: collection.id,
+      collection_id: null,
       kind: 'note',
       text: input.text,
       why: null,
@@ -162,7 +213,7 @@ export class SaveService {
    * least `ask.memoryUpdateSimilarity` alike (the same fact, said again or changed), else saves a
    * new one with `saveNote`. Undo puts the old wording back, or deletes the new memory.
    */
-  async remember(input: { text: string; collection: string; selection: SelectionPayload | null }): Promise<SaveResult & { updated: boolean }> {
+  async remember(input: { text: string; selection: SelectionPayload | null }): Promise<SaveResult & { updated: boolean }> {
     const { store } = this.deps;
     const close = await this.closeMemory(input.text).catch(() => null);
     if (close) {
@@ -211,12 +262,11 @@ export class SaveService {
    * Visualize's Save: the table and its chart as an item of kind "chart". The text is the
    * table as CSV, so search and Recall can find it; the rows and spec go in data_json.
    */
-  saveChart(input: { csv: string; data: Record<string, unknown>; collection: string; selection: SelectionPayload }): SaveResult {
+  saveChart(input: { csv: string; data: Record<string, unknown>; selection: SelectionPayload }): SaveResult {
     const { store } = this.deps;
     const settings = this.deps.settings();
-    const collection = store.collectionByName(input.collection) ?? store.createCollection(input.collection);
     const item = store.insertItem({
-      collection_id: collection.id,
+      collection_id: null,
       kind: 'chart',
       text: input.csv,
       why: null,
@@ -296,7 +346,10 @@ export class SaveService {
   private startEnrich(item: Item): Promise<EnrichResult> {
     const ctl = new AbortController();
     const done = this.enrich(item, ctl.signal).finally(() => {
-      if (this.running.get(item.id)?.ctl === ctl) this.running.delete(item.id);
+      if (this.running.get(item.id)?.ctl === ctl) {
+        this.running.delete(item.id);
+        this.unlinked.delete(item.id);
+      }
     });
     this.running.set(item.id, { ctl, done });
     return done;
@@ -404,6 +457,8 @@ export class SaveService {
             entityId = store.upsertEntity('person', e.name);
             store.setPersonEntity(person.id, entityId);
           }
+          // A saved person the text names is linked, unless the user took that link off before saving (decision 84).
+          if (person && !this.unlinked.get(item.id)?.has(person.id)) store.linkItem(item.id, 'person', person.id);
         }
         entityId ??= store.upsertEntity(e.kind, e.name);
         store.linkItemEntity(item.id, entityId);

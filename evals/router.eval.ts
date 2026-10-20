@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   assignSlots,
-  DEFAULT_COLLECTIONS,
   DEFAULT_SETTINGS,
   decideByRules,
   extractFeatures,
@@ -48,7 +47,6 @@ const allCases: Case[] = readdirSync(fixturesDir)
 
 // GLOSSLY_EVAL_LIMIT takes cases in turn from each fixture file (Step 21: start small).
 const cases = limitCases(allCases);
-const collections = [...DEFAULT_COLLECTIONS];
 
 function score(c: Case, d: Decisions, ms: number): CaseResult {
   const slots = assignSlots(d, extractFeatures(c.context), DEFAULT_SETTINGS.router);
@@ -94,7 +92,7 @@ describe('router eval', () => {
   it(`rules: content_type accuracy >= ${TARGET * 100}%`, () => {
     const results = cases.map((c) => {
       const t = performance.now();
-      const d = decideByRules({ context: c.context, features: extractFeatures(c.context), collections });
+      const d = decideByRules({ context: c.context, features: extractFeatures(c.context) });
       return score(c, d, performance.now() - t);
     });
     const s = report('rules', results);
@@ -120,7 +118,7 @@ describe('router eval', () => {
       let t = performance.now();
       try {
         const d = await withRateLimitRetry(
-          () => decision.decide({ context: c.context, features, collections }),
+          () => decision.decide({ context: c.context, features }),
           () => {
             counted.reset();
             t = performance.now();
@@ -133,14 +131,14 @@ describe('router eval', () => {
           stopped = e.message;
           break;
         }
-        const fallback = decideByRules({ context: c.context, features, collections });
+        const fallback = decideByRules({ context: c.context, features });
         const err = e as Error;
         results.push({ ...score(c, fallback, performance.now() - t), error: `${err.name}: ${err.message.slice(0, 120)}` });
       }
     }
     // The rules on exactly the cases the model answered, for the pre-agreed rule (HANDOFF, Step 21).
     const answered = new Set(results.map((r) => r.id));
-    const rules = cases.filter((c) => answered.has(c.id)).map((c) => score(c, decideByRules({ context: c.context, features: extractFeatures(c.context), collections }), 0));
+    const rules = cases.filter((c) => answered.has(c.id)).map((c) => score(c, decideByRules({ context: c.context, features: extractFeatures(c.context) }), 0));
     const total = counted.total();
     const s = report('llm', results, {
       model: modelRef,

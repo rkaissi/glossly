@@ -94,7 +94,12 @@ import {
   contextUsed,
   linkNamedPeople,
   retrieveContext,
+  saveOpen,
+  ITEM_KIND_LABEL,
   type ClassifiedObstacle,
+  type DetectedPerson,
+  type ItemLink,
+  type SaveOpen,
   type CommandResult,
   type ContainerContext,
   type HelperEvent,
@@ -242,8 +247,8 @@ interface Session {
   writeKinds: Set<ContextUsed['kind']>;
   /** Saved without the Save panel (autosave or the save hotkey): Save becomes Undo. */
   saved: SavedNotice | null;
-  /** Autosave moves its item to the route's collection once; set after that. */
-  savedSettled: boolean;
+  /** The item saved in this session by any route, so tasks and events added from it link back (decision 84). */
+  savedItemId: string | null;
   /** The running Visualize, and its last result (for Save). */
   visualCtl: AbortController | null;
   visual: Extract<VisualizeResult, { ok: true }> | null;
@@ -605,7 +610,7 @@ export class Capture {
         writeKinds: new Set(),
         writeLast: null,
         saved: null,
-        savedSettled: false,
+        savedItemId: null,
         visualCtl: null,
         visual: null,
       };
@@ -856,7 +861,7 @@ export class Capture {
       writeKinds: new Set(),
       writeLast: null,
       saved: null,
-      savedSettled: false,
+      savedItemId: null,
       visualCtl: null,
       visual: null,
     };
@@ -1058,7 +1063,6 @@ export class Capture {
       decision: model ? new LlmStructuredDecision(sv.llm) : null,
       field: model ? (input, signal, onFallback) => decideField(sv.llm, input, signal, onFallback) : null,
       settings: () => sv.settings,
-      collections: () => sv.collections(),
       people: () => sv.store.listKnownPeople(),
       identity: () => sv.settings.identity,
     });
@@ -1092,9 +1096,8 @@ export class Capture {
       s.timings.route = Math.round(r.ms);
       const prev = this.state.slots;
       const next = slotsView(r, r.fallback ? 'rules_fallback' : 'model');
-      const saveOpen = this.state.mode === 'panel' && this.state.panel === 'save';
-      const slots = prev ? mergeRoute(prev, next, { keepSave: saveOpen }) : next;
-      this.overlay.patch({ slots, debug: this.debugFor(s), saved: this.settleAutosave(s, slots.slot2.collection) });
+      const slots = prev ? mergeRoute(prev, next) : next;
+      this.overlay.patch({ slots, debug: this.debugFor(s), saved: s.saved });
       const routed = {
         provider: r.decisions.provider,
         fallback: r.fallback ?? 'none',
@@ -1635,11 +1638,11 @@ ${s.selection.text}`;
   saveVisualize(sessionId: number): SaveDone {
     const s = this.current(sessionId);
     if (!s?.selection || !s.visual) throw new Error('Nothing to save yet.');
-    const collection = s.route?.decisions.best_collection ?? 'Notes';
     const v = s.visual;
-    const r = this.services.save.saveChart({ csv: v.csv, data: { columns: v.table.columns, rows: v.table.rows, types: v.types, spec: v.spec }, collection, selection: s.selection });
+    const r = this.services.save.saveChart({ csv: v.csv, data: { columns: v.table.columns, rows: v.table.rows, types: v.types, spec: v.spec }, selection: s.selection });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
-    return { itemId: r.item.id, collection, undoUntil: r.undoUntil };
+    s.savedItemId = r.item.id;
+    return { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil };
   }
 
   // ---- Write here (nothing selected, decision 81) ----
@@ -1723,12 +1726,11 @@ ${s.selection.text}`;
     const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
     const snippets = picked.items.map((it) => {
       const saved = new Date(it.created_at);
-      const collection = (it as typeof it & { collection?: string | null }).collection;
       return {
         id: it.id,
         line: pasteList([it], target, rich),
         full: pasteAsSaved([it]),
-        detail: [collection ?? 'Saved', Number.isNaN(saved.getTime()) ? null : day.format(saved)].filter(Boolean).join(' · '),
+        detail: [ITEM_KIND_LABEL[it.kind], Number.isNaN(saved.getTime()) ? null : day.format(saved)].filter(Boolean).join(' · '),
       };
     });
     const noModel: WriteOpen['noModel'] = model
@@ -1995,15 +1997,23 @@ ${s.selection.text}`;
   savePromises(sessionId: number, rows: PromiseSaveRow[], events: EventSaveRow[] = []): { saved: number; created: number; updated: number; events: number } {
     const s = this.current(sessionId);
     if (!s?.selection) throw new Error('This selection is gone. Select the message again.');
-    for (const e of events) this.services.calendar.add(e, s.selection.source_app);
-    const r = savePromises(this.services.people, rows, {
+    const sv = this.services;
+    // Tasks and events added after saving this selection link back to the saved item (decision 84).
+    const item = s.savedItemId && sv.store.getItem(s.savedItemId) ? s.savedItemId : null;
+    const before = item ? new Set(sv.people.commitments({}).map((c) => c.id)) : null;
+    for (const e of events) {
+      const added = sv.calendar.add(e, s.selection.source_app);
+      if (item) sv.store.linkItem(item, 'event', added.id);
+    }
+    const r = savePromises(sv.people, rows, {
       message: s.selection.text,
       sourceApp: s.selection.source_app,
       authorPersonId: s.author?.personId ?? null,
       authorIsMe: s.author?.isMe ?? false,
     });
-    this.services.metrics.record('promises_saved', { count: r.saved, created: r.created, updated: r.updated, events: events.length, offered: rows.length });
-    log.info('promises saved', { ...r, events: events.length });
+    if (item && before) for (const c of sv.people.commitments({})) if (!before.has(c.id)) sv.store.linkItem(item, 'task', c.id);
+    sv.metrics.record('promises_saved', { count: r.saved, created: r.created, updated: r.updated, events: events.length, offered: rows.length, linked: Boolean(item) });
+    log.info('promises saved', { ...r, events: events.length, linked: Boolean(item) });
     return { ...r, events: events.length };
   }
 
@@ -2023,7 +2033,7 @@ ${s.selection.text}`;
 
   // ---- Save modes (decision 15) ----
 
-  /** Autosave: the highlight is saved to the rules' collection as the pill shows. */
+  /** Autosave: the highlight is saved as the pill shows. */
   private autosave(s: Session): void {
     if (!s.selection || !s.fg) return;
     const last = this.lastAutosave;
@@ -2031,29 +2041,15 @@ ${s.selection.text}`;
       // The same text is still selected: show that save again instead of saving twice.
       if (this.services.store.getItem(last.notice.itemId)) {
         s.saved = last.notice;
-        s.savedSettled = true;
       }
       return;
     }
-    const collection = this.router().quick(toContext(s.selection)).decisions.best_collection;
-    const r = this.services.save.save({ selection: s.selection, container: null, collection, via: 'autosave' });
+    const r = this.services.save.save({ selection: s.selection, container: null, via: 'autosave' });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
-    s.saved = { itemId: r.item.id, collection, undoUntil: r.undoUntil, via: 'autosave' };
+    s.saved = { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil, via: 'autosave' };
+    s.savedItemId = r.item.id;
     this.lastAutosave = { handle: s.fg.handle, text: s.selection.text, notice: s.saved };
     log.info('autosaved');
-  }
-
-  /** When the route settles, an autosaved item moves to its collection once (the same choice as the Save label). */
-  private settleAutosave(s: Session, collection: string): SavedNotice | null {
-    const saved = s.saved;
-    if (!saved || saved.via !== 'autosave' || s.savedSettled) return saved;
-    s.savedSettled = true;
-    if (collection === saved.collection) return saved;
-    const moved = this.services.save.move(saved.itemId, collection);
-    if (!moved) return saved;
-    s.saved = { ...saved, collection: moved };
-    if (this.lastAutosave?.notice.itemId === saved.itemId) this.lastAutosave.notice = s.saved;
-    return s.saved;
   }
 
   undoSaved(sessionId: number): { undone: boolean } {
@@ -2071,7 +2067,7 @@ ${s.selection.text}`;
   }
 
   /**
-   * The save hotkey: saves the selection to the route's collection with no panel, and shows a
+   * The save hotkey: saves the selection with no panel, and shows a
    * small toast with Undo that never takes focus. Passwords and empty selections are never saved.
    */
   async saveHotkey(): Promise<void> {
@@ -2122,13 +2118,11 @@ ${s.selection.text}`;
           selection.context_after = cleanText(ctx.after, { trimEdges: false });
         }
       }
-      // The same choice as the Save label: the route's collection when it settles in time, else the rules'.
-      const route = await this.router().route(toContext(selection));
-      const collection = route.decisions.best_collection;
-      const r = this.services.save.save({ selection, container: null, collection, via: 'hotkey' });
+      // No route: with no collection to pick (decision 84) the save hotkey makes no model call.
+      const r = this.services.save.save({ selection, container: null, via: 'hotkey' });
       void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
-      log.info('saved by hotkey', { ms: ms(t0), fallback: route.fallback ?? 'none' });
-      this.showToast({ itemId: r.item.id, collection, undoUntil: r.undoUntil, via: 'hotkey' }, sel?.bounds ?? null, cursor, null, fg);
+      log.info('saved by hotkey', { ms: ms(t0) });
+      this.showToast({ itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil, via: 'hotkey' }, sel?.bounds ?? null, cursor, null, fg);
     } catch (e) {
       if (!(e instanceof HelperError)) log.error('save hotkey failed', errorInfo(e));
     }
@@ -2174,7 +2168,7 @@ ${s.selection.text}`;
       writeKinds: new Set(),
       writeLast: null,
       saved,
-      savedSettled: true,
+      savedItemId: saved?.itemId ?? null,
       visualCtl: null,
       visual: null,
     };
@@ -2435,19 +2429,17 @@ ${s.selection.text}`;
       try {
         const container = (await s.container) ?? null;
         const remember = {
-          collections: this.services.collections(),
-          suggested: s.route?.decisions.best_collection ?? 'Notes',
           // A memory (decision 78): asked for or not, a close one reworded, linked to the saved people it names.
-          save: async (note: string, collection: string, asked: boolean) => {
+          save: async (note: string, asked: boolean) => {
             const sv = this.services;
-            const saved = await sv.save.remember({ text: note, collection, selection: s.selection });
-            const where = saved.updated ? (sv.store.itemsWithCollection([saved.item.id])[0]?.collection ?? collection) : collection;
+            const saved = await sv.save.remember({ text: note, selection: s.selection });
             const linked = linkNamedPeople(sv.store, sv.people, saved.item.id, note);
+            for (const id of linked) sv.store.linkItem(saved.item.id, 'person', id);
             void saved.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
-            send<AskSaved>('ask:saved', { requestId, itemId: saved.item.id, collection: where, undoUntil: saved.undoUntil, updated: saved.updated, asked, text: note.slice(0, 200) });
+            send<AskSaved>('ask:saved', { requestId, itemId: saved.item.id, undoUntil: saved.undoUntil, updated: saved.updated, asked, text: note.slice(0, 200) });
             log.info('ask remembered', { asked, updated: saved.updated, people: linked.length });
             sv.metrics.record('ask_remembered', { asked, updated: saved.updated, people: linked.length });
-            return { collection: where, updated: saved.updated };
+            return { updated: saved.updated };
           },
         };
         const context = await this.askContext(s, q);
@@ -2489,14 +2481,39 @@ ${s.selection.text}`;
     s.asks.clear();
   }
 
-  async save(sessionId: number, collection: string, why?: string): Promise<SaveDone> {
+  /**
+   * What the Save panel shows before saving (decision 84): the type, saved people, tasks, and
+   * events to link, and the offers. Local only: detection, the route already made, and search.
+   */
+  async openSave(sessionId: number): Promise<SaveOpen> {
     const s = this.current(sessionId);
     if (!s?.selection) throw new Error('Nothing to save.');
-    const name = collection.trim() || s.route?.decisions.best_collection || 'Notes';
+    const sv = this.services;
+    const t = performance.now();
+    const route = s.route ?? this.router().quick(toContext(s.selection));
+    let detected: DetectedPerson[] = [];
+    try {
+      detected = detectPeople(detectInputFor(s.selection, null), this.settings.identity, sv.store.listKnownPeople()).people;
+    } catch (e) {
+      log.warn('save detect failed', errorInfo(e));
+    }
+    const open = await saveOpen(
+      { store: sv.store, people: sv.people, calendar: sv.calendar, embedder: () => sv.embed.embedder(), settings: () => sv.settings, sync: () => sv.embed.syncContext() },
+      { text: s.selection.text, detected, commitment: route.decisions.contains_commitment, hasDateWord: route.features.hasDateWord },
+    );
+    const count = (k: string) => open.links.filter((l) => l.kind === k).length;
+    log.info('save open', { kind: open.kind, people: count('person'), tasks: count('task'), events: count('event'), addPerson: Boolean(open.addPerson), addTask: open.addTask, ms: ms(t) });
+    return open;
+  }
+
+  async save(sessionId: number, args: { why?: string; links?: ItemLink[]; unlinkedPeople?: string[] }): Promise<SaveDone> {
+    const s = this.current(sessionId);
+    if (!s?.selection) throw new Error('Nothing to save.');
     const container = (await s.container) ?? null;
-    const r = this.services.save.save({ selection: s.selection, container, collection: name, why });
+    const r = this.services.save.save({ selection: s.selection, container, why: args.why, links: args.links, unlinkedPeople: args.unlinkedPeople });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
-    return { itemId: r.item.id, collection: name, undoUntil: r.undoUntil };
+    s.savedItemId = r.item.id;
+    return { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil };
   }
 
   // ---- closing ----

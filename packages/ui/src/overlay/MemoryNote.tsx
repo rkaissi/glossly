@@ -15,9 +15,9 @@ export function MemoryNote({ saved }: { saved: AskSaved }) {
   const what = saved.asked ? '' : `: ${saved.text}`;
   const label = undone
     ? saved.updated
-      ? `Put back the earlier memory in ${saved.collection}.`
-      : `Removed from ${saved.collection}.`
-    : `${saved.updated ? 'Updated a memory in' : saved.asked ? 'Saved to' : 'Remembered in'} ${saved.collection}${what}`;
+      ? 'Put back the earlier memory.'
+      : 'Removed the memory.'
+    : `${saved.updated ? 'Updated a memory' : 'Remembered'}${what}`;
   return (
     <div className="inline-note memory-note">
       <Bookmark size={14} strokeWidth={1.75} aria-hidden />

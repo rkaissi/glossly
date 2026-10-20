@@ -33,7 +33,7 @@ const embedder: Embedder = {
 function setup() {
   const store = new Store(':memory:', { vecExtensionPath });
   store.ensureVectorModel('fake', 4);
-  const notes = store.collectionByName('Notes')!;
+  const notes = store.createCollection('Notes');
   const put = (text: string, daysAgo: number) =>
     store.insertItem({ collection_id: notes.id, kind: 'selection', text, why: null, source_app: null, window_title: null, data_json: null, created_at: at(daysAgo) });
   const add = async (text: string, daysAgo: number) => {

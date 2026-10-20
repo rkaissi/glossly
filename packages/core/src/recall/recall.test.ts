@@ -34,7 +34,7 @@ afterEach(() => store?.close());
 function setup(withEmbedder = true) {
   store = new Store(':memory:', { vecExtensionPath });
   store.ensureVectorModel('fake', DIMS);
-  const notes = store.collectionByName('Notes')!;
+  const notes = store.createCollection('Notes');
   const save = async (text: string, created_at: string, entities: [Parameters<Store['upsertEntity']>[0], string][] = []) => {
     const item = store.insertItem({ collection_id: notes.id, kind: 'selection', text, why: null, source_app: 'chrome.exe', window_title: 'Docs', data_json: null, created_at });
     for (const [kind, name] of entities) store.linkItemEntity(item.id, store.upsertEntity(kind, name));
@@ -135,7 +135,7 @@ describe('library', () => {
     const a = await save('Launch moved to Thursday', '2026-10-01T10:00:00-04:00');
     const b = await save('Budget for the offsite', '2026-10-02T10:00:00-04:00');
     const c = await save('Launch checklist', '2026-10-03T10:00:00-04:00');
-    const reading = store.collectionByName('Reading')!;
+    const reading = store.createCollection('Reading');
     store.setItemCollection(b.id, reading.id);
 
     const all = await library(deps, { query: '', collection: null, limit: 2 });

@@ -25,10 +25,11 @@ function unit(dims: number, hot: number): Float32Array {
 }
 
 describe('Store', () => {
-  it('migrates and seeds default collections', () => {
+  it('migrates and seeds no collections (decision 84)', () => {
     store = new Store(':memory:');
     expect(store.schemaVersion).toBe(MIGRATIONS.length);
-    expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
+    expect(store.listCollections()).toEqual([]);
+    store.createCollection('Reading');
     expect(store.collectionByName('reading')?.name).toBe('Reading');
   });
 
@@ -278,7 +279,7 @@ describe('Store', () => {
 
   it('stores items with entities and deletes orphans with the item', () => {
     store = new Store(':memory:');
-    const notes = store.collectionByName('Notes')!;
+    const notes = store.createCollection('Notes');
     const item = store.insertItem({
       collection_id: notes.id,
       kind: 'selection',
@@ -348,7 +349,7 @@ describe('Store', () => {
     expect(store.listEvents()).toHaveLength(0);
     expect(store.db.prepare('SELECT COUNT(*) AS n FROM entities').get()).toEqual({ n: 0 });
     expect(store.searchVectors(unit(4, 0))).toHaveLength(0);
-    expect(store.listCollections().map((c) => c.name)).toEqual(['Notes', 'Reading', 'Ideas', 'People notes']);
+    expect(store.listCollections()).toEqual([]);
     expect(store.getSettings()).toMatchObject({ privacy: 'local', firstRunComplete: true });
     expect(store.listModels()).toHaveLength(1);
     expect(store.getMeta('key_test:groq')).toBe('{"ok":true}');
@@ -360,7 +361,7 @@ describe('Store', () => {
     store.resetSettings();
     expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);
     expect(store.getItem(id)).not.toBeNull();
-    expect(store.listCollections()).toHaveLength(5);
+    expect(store.listCollections()).toHaveLength(1);
     store.clearModels();
     expect(store.listModels()).toHaveLength(0);
   });

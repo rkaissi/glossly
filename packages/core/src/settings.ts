@@ -251,8 +251,6 @@ export type SettingsKey = keyof Settings;
 
 export const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
 
-export const DEFAULT_COLLECTIONS = ['Notes', 'Reading', 'Ideas', 'People notes'] as const;
-
 /**
  * One-time changes to stored values, applied in order and tracked in meta
  * `settings_migrations`. Settings are stored per key, so a changed default only reaches users

@@ -1,7 +1,7 @@
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { uuidv7 } from 'uuidv7';
 import type { KnownPerson } from '../router/types';
-import { DEFAULT_COLLECTIONS, SETTINGS_MIGRATIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
+import { SETTINGS_MIGRATIONS, parseSettings, type Settings, type SettingsKey } from '../settings';
 import { isoNow, type Collection, type Item, type ItemLink, type ItemLinkKind, type ItemPageFields, type LinkPreview } from '../types';
 import { canonicalize } from '../people/names';
 import { DATA_TABLES, MIGRATIONS, USER_DATA_TABLES } from './migrations';
@@ -51,7 +51,6 @@ export class Store {
     this.hasVectors = Boolean(opts.vecExtensionPath);
     this.migrate();
     this.migrateSettings();
-    this.ensureDefaultCollections();
   }
 
   close(): void {
@@ -143,16 +142,7 @@ export class Store {
       .run(key, JSON.stringify(value));
   }
 
-  // ---- collections ----
-
-  ensureDefaultCollections(): void {
-    const count = (this.db.prepare('SELECT COUNT(*) AS n FROM collections').get() as { n: number }).n;
-    if (count > 0) return;
-    const ins = this.db.prepare('INSERT INTO collections (id, name, created_at) VALUES (?, ?, ?)');
-    this.tx(() => {
-      for (const name of DEFAULT_COLLECTIONS) ins.run(uuidv7(), name, isoNow());
-    });
-  }
+  // ---- collections (none are seeded since decision 84; old ones stay until the Saved tab moves to types) ----
 
   listCollections(): Collection[] {
     return this.db.prepare('SELECT id, name, created_at FROM collections ORDER BY created_at, rowid').all() as unknown as Collection[];
@@ -636,8 +626,8 @@ export class Store {
   }
 
   /**
-   * "Delete all data": every saved item, entity, person, vector, event, and collection, then
-   * re-creates the default collections. Settings, the model list, and meta stay, except the
+   * "Delete all data": every saved item, entity, person, vector, event, and collection.
+   * Settings, the model list, and meta stay, except the
    * Reply style notes the user removed (their text) and the edit count toward the next notes.
    */
   deleteAll(): void {
@@ -648,7 +638,6 @@ export class Store {
       if (this.hasVectors && this.contextTableExists()) this.db.exec('DELETE FROM context_vectors');
     });
     this.db.exec('VACUUM');
-    this.ensureDefaultCollections();
   }
 
   /** "Reset settings": every stored setting goes back to its default (first run included). */

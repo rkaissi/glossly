@@ -31,7 +31,6 @@ export interface Features {
   hasDateWord: boolean;
   endsWithQuestion: boolean;
   codeScore: number;
-  ideaWords: boolean;
   /** Automated or broadcast mail (no-reply, receipts, shipping, one-time codes, notices to everyone): nobody to reply to. */
   automated: boolean;
   /** The last chat header up to the end of the selection is the user's own. */
@@ -83,7 +82,6 @@ const AUTOMATED =
 // "Hi all, a reminder that..." is a notice to everyone, not a message to answer.
 const BROADCAST_GREETING = /^\s*(?:hi|hello|hey|dear|good morning)\s+(?:all|everyone|everybody|colleagues)\b/i;
 const BROADCAST_WORDS = /\b(?:reminder|announce|announcement|please note|heads up|fyi)\b/i;
-const IDEA = /\b(?:idea|what if|we could|imagine|brainstorm|concept|maybe we|someday)\b/i;
 // Keywords are also common English words ("can you return my drill"), so they only count
 // on a line that also has code punctuation.
 const CODE_KEYWORD =
@@ -306,7 +304,6 @@ export function extractFeatures(ctx: SelectionContext, people: KnownPerson[] = [
     hasDateWord: DATE_WORD.test(text),
     endsWithQuestion: /\?\s*$/.test(text),
     codeScore,
-    ideaWords: IDEA.test(text),
     automated: AUTOMATED.test(text) || AUTOMATED.test(ctx.window_title) || (BROADCAST_GREETING.test(text) && BROADCAST_WORDS.test(text)),
     ...author(`${ctx.context_before}${text}`, people, me),
     inEditable: ctx.is_editable,

@@ -32,46 +32,39 @@ export interface AskInput {
 }
 
 export interface RememberDeps {
-  /** The user's collections; the model picks one. */
-  collections: string[];
-  /** The collection the router picked for this selection, offered as the default. */
-  suggested: string;
-  /** Saves the memory, or rewords a close one (decision 78), and says where it went. */
-  save: (note: string, collection: string, asked: boolean) => Promise<{ collection: string; updated: boolean }> | { collection: string; updated: boolean };
+  /** Saves the memory, or rewords a close one (decision 78). */
+  save: (note: string, asked: boolean) => Promise<{ updated: boolean }> | { updated: boolean };
 }
 
 const MAX_NOTE = 1000;
 
 interface RememberInput {
   note: string;
-  collection: string;
   asked: boolean;
 }
 
 /**
- * The `remember` tool on the Ask stream (decisions 24 and 78): saves a memory into a collection,
- * when asked or when the conversation shows something worth keeping. Asked, it reports the save
- * in the answer ("Saved to Notes: ...") and the stream ends there; unasked, it says nothing (the
- * panel shows it with Undo) and the model goes on to answer if it hadn't (`continueAfterTools`).
+ * The `remember` tool on the Ask stream (decisions 24 and 78): saves a memory, when asked or when
+ * the conversation shows something worth keeping. Asked, it reports the save in the answer
+ * ("Remembered: ...") and the stream ends there; unasked, it says nothing (the panel shows it with
+ * Undo) and the model goes on to answer if it hadn't (`continueAfterTools`). No collection since
+ * decision 84; who a memory is about comes in Step 28f.
  */
 export function rememberTool(deps: RememberDeps) {
-  const names = deps.collections.length ? deps.collections : [deps.suggested];
   return tool({
     description:
       `Save a memory for the person: when they ask you to remember, save, keep, or note something, and also on your own when the conversation shows something worth knowing later ` +
-      `(a fact about them or someone they know, a preference, a plan with a date). Not for passing details, things only true right now, or secrets such as passwords or card or ID numbers. Collections: ${names.join(', ')}.`,
+      `(a fact about them or someone they know, a preference, a plan with a date). Not for passing details, things only true right now, or secrets such as passwords or card or ID numbers.`,
     inputSchema: z.object({
       note: z.string().describe('What to remember: short and self-contained, with the full names and dates it needs.'),
-      collection: z.string().describe(`One of: ${names.join(', ')}. Use ${deps.suggested} when unsure.`),
       asked: z.boolean().describe('True when the person asked you to remember this; false when you chose to.'),
     }),
-    execute: async ({ note, collection, asked }: RememberInput) => {
+    execute: async ({ note, asked }: RememberInput) => {
       const text = note.replace(/\s+/g, ' ').trim().slice(0, MAX_NOTE);
       if (!text) return { say: asked ? 'There was nothing to save.' : '' };
-      const known = names.find((n) => n.toLowerCase() === collection.trim().toLowerCase()) ?? deps.suggested;
-      const saved = await deps.save(text, known, asked !== false);
+      const saved = await deps.save(text, asked !== false);
       if (asked === false) return { say: '' };
-      return { say: `${saved.updated ? 'Updated in' : 'Saved to'} ${saved.collection}: "${clip(text, 160)}"` };
+      return { say: `${saved.updated ? 'Updated a memory' : 'Remembered'}: "${clip(text, 160)}"` };
     },
   });
 }

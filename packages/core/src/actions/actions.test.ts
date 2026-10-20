@@ -5,6 +5,7 @@ import type { Embedder } from '../embed/types';
 import { LlmError, type ChatRequest, type LlmProvider } from '../llm/types';
 import { Metrics } from '../metrics';
 import { DEFAULT_SETTINGS } from '../settings';
+import { PeopleRepo } from '../store/people';
 import { Store } from '../store/store';
 import { isoNow, type Item, type SelectionPayload } from '../types';
 import { ask, buildAskPrompt, noteLabel, noteLabels } from './ask';
@@ -236,19 +237,17 @@ describe('SaveService', () => {
 
     it('rewords the memory about the same fact instead of adding a copy, and Undo puts the old wording back', async () => {
       const { svc } = setup({ embedder: topical });
-      const first = await svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });
+      const first = await svc.remember({ text: 'Casey Lin is vegetarian', selection: null });
       await first.enriched;
       expect(first.updated).toBe(false);
-      const mom = await svc.remember({ text: "Mom's birthday is May 3", collection: 'Notes', selection: null });
+      const mom = await svc.remember({ text: "Mom's birthday is May 3", selection: null });
       await mom.enriched;
       expect(mom.updated).toBe(false);
 
-      const again = await svc.remember({ text: 'Casey Lin is vegan now', collection: 'Ideas', selection: null });
+      const again = await svc.remember({ text: 'Casey Lin is vegan now', selection: null });
       await again.enriched;
       expect(again).toMatchObject({ updated: true, item: { id: first.item.id, text: 'Casey Lin is vegan now' } });
       expect(store.listItems().filter((i) => i.kind === 'note')).toHaveLength(2);
-      // It stays in its collection.
-      expect(store.getItem(first.item.id)?.collection_id).toBe(store.collectionByName('Notes')!.id);
 
       expect(svc.undo(first.item.id)).toBe(true);
       expect(store.getItem(first.item.id)?.text).toBe('Casey Lin is vegetarian');
@@ -256,37 +255,37 @@ describe('SaveService', () => {
 
     it('undoes only the latest rewording', async () => {
       const { svc } = setup({ embedder: topical });
-      const m = await svc.remember({ text: 'Casey Lin is on the 4th floor', collection: 'Notes', selection: null });
+      const m = await svc.remember({ text: 'Casey Lin is on the 4th floor', selection: null });
       await m.enriched;
-      await (await svc.remember({ text: 'Casey Lin is on the 5th floor', collection: 'Notes', selection: null })).enriched;
-      await (await svc.remember({ text: 'Casey Lin is on the 3rd floor', collection: 'Notes', selection: null })).enriched;
+      await (await svc.remember({ text: 'Casey Lin is on the 5th floor', selection: null })).enriched;
+      await (await svc.remember({ text: 'Casey Lin is on the 3rd floor', selection: null })).enriched;
       expect(svc.undo(m.item.id)).toBe(true);
       expect(store.getItem(m.item.id)?.text).toBe('Casey Lin is on the 5th floor');
     });
 
     it('lets the user reword a memory, but not a saved selection', async () => {
       const { svc } = setup({ embedder: topical });
-      const m = await svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });
+      const m = await svc.remember({ text: 'Casey Lin is vegetarian', selection: null });
       await m.enriched;
       expect(svc.editMemory(m.item.id, '  Casey Lin is   vegan ')).toBe(true);
       expect(store.getItem(m.item.id)?.text).toBe('Casey Lin is vegan');
       expect(svc.editMemory(m.item.id, '   ')).toBe(false);
-      const sel = svc.save({ selection: selection(), collection: 'Notes' });
+      const sel = svc.save({ selection: selection() });
       expect(svc.editMemory(sel.item.id, 'changed')).toBe(false);
       await svc.idle();
     });
 
     it('never rewords a saved selection, and saves new memories without the embedder', async () => {
       const { svc } = setup({ embedder: topical });
-      const sel = svc.save({ selection: { ...selection(), text: 'Casey sent the menu' }, collection: 'Notes' });
+      const sel = svc.save({ selection: { ...selection(), text: 'Casey sent the menu' } });
       await sel.enriched;
-      const r = await svc.remember({ text: 'Casey Lin likes the menu', collection: 'Notes', selection: null });
+      const r = await svc.remember({ text: 'Casey Lin likes the menu', selection: null });
       expect(r.updated).toBe(false);
       expect(store.getItem(sel.item.id)?.text).toBe('Casey sent the menu');
 
       const off = setup({ embedder: null });
-      const a = await off.svc.remember({ text: 'Casey Lin is vegetarian', collection: 'Notes', selection: null });
-      const b = await off.svc.remember({ text: 'Casey Lin is vegan now', collection: 'Notes', selection: null });
+      const a = await off.svc.remember({ text: 'Casey Lin is vegetarian', selection: null });
+      const b = await off.svc.remember({ text: 'Casey Lin is vegan now', selection: null });
       expect([a.updated, b.updated]).toEqual([false, false]);
       expect(b.item.id).not.toBe(a.item.id);
     });
@@ -305,10 +304,10 @@ describe('SaveService', () => {
     store.db.prepare("INSERT INTO people (id, name, created_at, updated_at) VALUES ('p1', 'Sam Lee', 'x', 'x')").run();
     store.db.prepare("INSERT INTO person_aliases (person_id, kind, value) VALUES ('p1', 'name', 'Sam')").run();
 
-    const { item: saved, undoUntil, enriched } = svc.save({ selection: selection(), collection: 'Reading', why: '  launch   date ' });
+    const { item: saved, undoUntil, enriched } = svc.save({ selection: selection(), why: '  launch   date ' });
     expect(store.getItem(saved.id)?.text).toBe(selection().text);
     expect(saved.why).toBe('launch date');
-    expect(saved.collection_id).toBe(store.collectionByName('Reading')!.id);
+    expect(saved).toMatchObject({ collection_id: null, kind: 'selection', urls_json: null });
     expect(undoUntil).toBeGreaterThan(Date.now());
     const data = JSON.parse(saved.data_json!) as SelectionItemData;
     expect(data).toMatchObject({ method: 'uia', trigger: 'auto', captured_at: selection().captured_at, is_editable: false });
@@ -319,7 +318,18 @@ describe('SaveService', () => {
     expect(store.entitiesForItem(saved.id).map((e) => `${e.kind}:${e.display}`)).toEqual(['company:Acme', 'person:Sam']);
     const person = store.db.prepare("SELECT entity_id FROM people WHERE id = 'p1'").get() as { entity_id: string };
     expect(store.entitiesForItem(saved.id).find((e) => e.kind === 'person')!.id).toBe(person.entity_id);
+    // The saved person it names is linked (decision 84).
+    expect(store.itemLinks(saved.id)).toEqual([{ kind: 'person', target_id: 'p1' }]);
     expect(llm.calls[0]).toMatchObject({ role: 'fast', action: 'save_entities' });
+  });
+
+  it("doesn't link a person the user took off in the Save panel (decision 84)", async () => {
+    const llm = new FakeLlm(() => ({ entities: [{ kind: 'person', name: 'Sam Lee' }] }));
+    const { svc } = setup({ llm });
+    store.db.prepare("INSERT INTO people (id, name, created_at, updated_at) VALUES ('p1', 'Sam Lee', 'x', 'x')").run();
+    const { item: saved, enriched } = svc.save({ selection: selection(), unlinkedPeople: ['p1'] });
+    await enriched;
+    expect(store.itemLinks(saved.id)).toEqual([]);
   });
 
   it('reuses the entity already linked to a matched person', async () => {
@@ -327,7 +337,7 @@ describe('SaveService', () => {
     const { svc } = setup({ llm });
     const existing = store.upsertEntity('person', 'Samuel Lee');
     store.db.prepare("INSERT INTO people (id, entity_id, name, created_at, updated_at) VALUES ('p1', ?, 'Sam Lee', 'x', 'x')").run(existing);
-    const { item: saved, enriched } = svc.save({ selection: selection(), collection: 'Notes' });
+    const { item: saved, enriched } = svc.save({ selection: selection() });
     await enriched;
     expect(store.entitiesForItem(saved.id).map((e) => e.id)).toEqual([existing]);
   });
@@ -337,7 +347,7 @@ describe('SaveService', () => {
       throw new LlmError('local_only', 'Local only is on');
     });
     const { svc } = setup({ llm });
-    const { item: saved, enriched } = svc.save({ selection: selection(), collection: 'Notes' });
+    const { item: saved, enriched } = svc.save({ selection: selection() });
     expect(await enriched).toEqual({ embedded: true, entities: 0, entitiesSkipped: 'local_only', cancelled: false });
     expect(store.getItem(saved.id)).not.toBeNull();
     expect(store.itemsWithoutVectors()).toHaveLength(0);
@@ -352,10 +362,10 @@ describe('SaveService', () => {
       return { entities: [{ kind: 'company', name: 'Northwind' }] };
     });
     const { svc } = setup({ llm });
-    const a = svc.save({ selection: selection(), collection: 'Notes' });
+    const a = svc.save({ selection: selection() });
     await a.enriched;
     const noModel = new SaveService({ store, llm: new FakeLlm(undefined, false), embedder: () => null, settings: () => DEFAULT_SETTINGS });
-    const b = noModel.save({ selection: selection(), collection: 'Notes' });
+    const b = noModel.save({ selection: selection() });
     await b.enriched;
     expect(store.countEntitiesPending()).toBe(2);
 
@@ -375,22 +385,42 @@ describe('SaveService', () => {
       return { entities: [] };
     });
     const { svc } = setup({ llm });
-    await svc.save({ selection: selection(), collection: 'Notes' }).enriched;
-    store.setEntitiesPending(svc.save({ selection: selection(), collection: 'Notes' }).item.id, true);
+    await svc.save({ selection: selection() }).enriched;
+    store.setEntitiesPending(svc.save({ selection: selection() }).item.id, true);
     await svc.idle();
     const r = await svc.backfillEntities();
     expect(r).toMatchObject({ done: 1, left: 1, error: 'Slow down' });
   });
 
-  it('creates a missing collection', () => {
+  it('saves a lone web address as a Link, keeps the addresses in any text, and links what the panel kept (decision 84)', () => {
     const { svc } = setup();
-    const { item: saved } = svc.save({ selection: selection(), collection: 'Recipes' });
-    expect(store.collectionByName('Recipes')?.id).toBe(saved.collection_id);
+    const people = new PeopleRepo(store);
+    const jordan = people.create({ name: 'Jordan Hale' });
+    const task = people.addCommitment({ person_id: jordan.id, owner: 'me', text: 'Send pricing to Jordan', due_at: null });
+
+    const link = svc.save({ selection: { ...selection(), text: ' https://acme.example.com/blog/design-reviews ' } }).item;
+    expect(link).toMatchObject({ kind: 'link', urls_json: JSON.stringify(['https://acme.example.com/blog/design-reviews']) });
+
+    const text = 'Pricing is on www.acme.example.com/pricing, and the deck is at https://docs.example.com/d/1.';
+    const snippet = svc.save({
+      selection: { ...selection(), text },
+      links: [
+        { kind: 'person', target_id: jordan.id },
+        { kind: 'task', target_id: task.id },
+      ],
+    }).item;
+    expect(snippet).toMatchObject({ kind: 'selection', collection_id: null });
+    expect(JSON.parse(snippet.urls_json!)).toEqual(['https://www.acme.example.com/pricing', 'https://docs.example.com/d/1']);
+    expect(store.itemLinks(snippet.id)).toEqual([
+      { kind: 'person', target_id: jordan.id },
+      { kind: 'task', target_id: task.id },
+    ]);
+    expect(store.listEvents().map((e) => e.payload)).toEqual([expect.objectContaining({ kind: 'link', links: 0 }), expect.objectContaining({ kind: 'selection', links: 2 })]);
   });
 
   it('moves a saved item to another collection, and records how it was saved', () => {
     const { svc } = setup();
-    const { item: saved } = svc.save({ selection: selection(), collection: 'Notes', via: 'autosave' });
+    const { item: saved } = svc.save({ selection: selection(), via: 'autosave' });
     expect(svc.move(saved.id, 'Reading')).toBe('Reading');
     expect(store.getItem(saved.id)?.collection_id).toBe(store.collectionByName('Reading')?.id);
     expect(svc.move('missing', 'Reading')).toBeNull();
@@ -400,13 +430,13 @@ describe('SaveService', () => {
   it('undoes within the window and not after', async () => {
     let t = 1_000_000;
     const { svc } = setup({ now: () => t });
-    const a = svc.save({ selection: selection(), collection: 'Notes' });
+    const a = svc.save({ selection: selection() });
     t += 10_500;
     expect(svc.undo(a.item.id)).toBe(true);
     expect(store.getItem(a.item.id)).toBeNull();
     expect(svc.undo(a.item.id)).toBe(false);
 
-    const b = svc.save({ selection: selection(), collection: 'Notes' });
+    const b = svc.save({ selection: selection() });
     t += 12_000;
     expect(svc.undo(b.item.id)).toBe(false);
     expect(store.getItem(b.item.id)).not.toBeNull();
@@ -422,7 +452,7 @@ describe('SaveService', () => {
       return { entities: [{ kind: 'company', name: 'Acme' }] };
     });
     const { svc } = setup({ llm });
-    const { item: saved, enriched } = svc.save({ selection: selection(), collection: 'Notes' });
+    const { item: saved, enriched } = svc.save({ selection: selection() });
     await new Promise((r) => setTimeout(r, 0));
     expect(svc.undo(saved.id)).toBe(true);
     release();
@@ -436,21 +466,21 @@ describe('SaveService', () => {
       throw new LlmError('provider', 'Sam said something secret', 500);
     });
     const { svc } = setup({ llm, embedder: null });
-    const { enriched } = svc.save({ selection: selection(), collection: 'Notes' });
+    const { enriched } = svc.save({ selection: selection() });
     expect(await enriched).toEqual({ embedded: false, entities: 0, cancelled: false });
     const err = store.listEvents().find((e) => e.kind === 'save_enrich_error')!;
     expect(err.payload).toEqual({ stage: 'entities', code: 'provider' });
     expect(JSON.stringify(store.listEvents())).not.toContain('Sam');
 
     const noModel = setup({ llm: new FakeLlm(undefined, false) });
-    await noModel.svc.save({ selection: selection(), collection: 'Notes' }).enriched;
+    await noModel.svc.save({ selection: selection() }).enriched;
     expect(noModel.llm.calls).toHaveLength(0);
   });
 
   it('sets why and re-embeds with it', async () => {
     const embedder = fakeEmbedder();
     const { svc } = setup({ embedder });
-    const { item: saved } = svc.save({ selection: selection(), collection: 'Notes' });
+    const { item: saved } = svc.save({ selection: selection() });
     expect(await svc.setWhy(saved.id, 'for the launch post')).toBe(true);
     expect(store.getItem(saved.id)?.why).toBe('for the launch post');
     expect(embedder.texts.at(-1)).toBe(`${selection().text}\nfor the launch post`);

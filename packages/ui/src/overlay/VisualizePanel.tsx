@@ -203,7 +203,7 @@ export function VisualizePanel({ s }: { s: OverlayState }) {
       {(note || saved) && (
         <div className="inline-note">
           <Check size={14} strokeWidth={2} aria-hidden />
-          <span>{saved ? (saved.undone ? `Removed from ${saved.collection}.` : `Saved to ${saved.collection}.`) : note}</span>
+          <span>{saved ? (saved.undone ? 'Removed the chart.' : 'Saved the chart.') : note}</span>
           {saved && !saved.undone && undoLeft > 0 && (
             <button
               className="ghost"

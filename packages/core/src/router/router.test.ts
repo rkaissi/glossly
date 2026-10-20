@@ -1,22 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { z } from 'zod';
 import type { ChatRequest, LlmProvider } from '../llm/types';
-import { DEFAULT_COLLECTIONS, DEFAULT_SETTINGS } from '../settings';
+import { DEFAULT_SETTINGS } from '../settings';
 import { extractFeatures } from './features';
 import { formatDecisionPrompt, LlmStructuredDecision } from './llm-decision';
 import { Router } from './router';
-import { decideByRules, ruleCollection } from './rules';
+import { decideByRules } from './rules';
 import { assignSlots, rankSlots, scoreActions } from './slots';
 import type { DecisionProvider, Decisions, SelectionContext } from './types';
-
-const collections = [...DEFAULT_COLLECTIONS];
 
 function ctx(text: string, over: Partial<SelectionContext> = {}): SelectionContext {
   return { text, context_before: '', context_after: '', source_app: 'chrome.exe', window_title: 'Page - Google Chrome', is_editable: false, ...over };
 }
 
 const rules = (c: SelectionContext, people = [] as Parameters<typeof extractFeatures>[1]) =>
-  decideByRules({ context: c, features: extractFeatures(c, people), collections });
+  decideByRules({ context: c, features: extractFeatures(c, people) });
 
 const THREAD = 'Sam Lee  10:42 AM\nhey, can you send the deck by Friday?\nPriya Shah  10:44 AM\nsure, will do';
 const TABLE = 'Region\tQ1\tQ2\nNorth\t120\t140\nSouth\t90\t95\nWest\t70\t88';
@@ -91,15 +89,6 @@ describe('decideByRules', () => {
     expect(rules(ctx(THREAD)).contains_commitment).toBe(0.75);
     expect(rules(ctx(`${TABLE}\nI'll send it by Friday`)).contains_commitment).toBeLessThanOrEqual(0.2);
   });
-
-  it('picks collections from the user’s list only', () => {
-    expect(rules(ctx(ARTICLE)).best_collection).toBe('Reading');
-    expect(rules(ctx('Sam Lee\nsam@acme.io\n555-123-4567')).best_collection).toBe('People notes');
-    expect(rules(ctx('what if we could ship weekly')).best_collection).toBe('Ideas');
-    const f = extractFeatures(ctx(ARTICLE));
-    expect(ruleCollection('article', f, ['Inbox'])).toBe('Inbox');
-    expect(ruleCollection('article', f, [])).toBe('Notes');
-  });
 });
 
 describe('slots', () => {
@@ -108,7 +97,6 @@ describe('slots', () => {
     authored_by_other: 0.9,
     mentions_people: 0.6,
     contains_commitment: 0.3,
-    best_collection: 'Notes',
     provider: 'rules',
   };
   // Someone other than the user is named, so the model's people score counts in full (decision 53).
@@ -180,7 +168,6 @@ const modelDecision: Decisions = {
   authored_by_other: 0.9,
   mentions_people: 0.2,
   contains_commitment: 0.8,
-  best_collection: 'Notes',
   provider: 'llm_structured',
 };
 
@@ -203,7 +190,6 @@ function router(decision: DecisionProvider | null, over: Partial<typeof DEFAULT_
   return new Router({
     decision,
     settings: () => ({ ...DEFAULT_SETTINGS, ...over, router: { ...DEFAULT_SETTINGS.router, decisionTimeoutMs: 50 } }),
-    collections: () => collections,
   });
 }
 
@@ -254,7 +240,6 @@ describe('Router', () => {
       new Router({
         decision: d,
         settings: () => ({ ...DEFAULT_SETTINGS, router: { ...DEFAULT_SETTINGS.router, decisionTimeoutMs: 50, fallbackTimeoutMs: 400 } }),
-        collections: () => collections,
       });
     const moved = await withBudgets(moving(10)).route(ctx(THREAD));
     expect([moved.fallback, moved.fellBack, moved.decisions.provider]).toEqual([null, true, 'llm_structured']);
@@ -285,25 +270,25 @@ describe('LlmStructuredDecision', () => {
     };
   }
 
-  it('calls the decision role, and its schema allows only the known collections', async () => {
-    const llm = fakeLlm({ ...modelDecision, best_collection: 'Reading' });
+  it('calls the decision role and asks for no collection (decision 84)', async () => {
+    const llm = fakeLlm({ ...modelDecision });
     const c = ctx(ARTICLE);
-    const input = { context: c, features: extractFeatures(c), collections };
+    const input = { context: c, features: extractFeatures(c) };
     const d = await new LlmStructuredDecision(llm).decide(input);
-    expect(d.best_collection).toBe('Reading');
+    expect(d).not.toHaveProperty('best_collection');
     expect(d.provider).toBe('llm_structured');
     expect(llm.calls[0]).toMatchObject({ role: 'decision', action: 'router', temperature: 0 });
 
-    // An enum of the user's collections: anything else fails the schema, and the router falls back to rules.
-    await expect(new LlmStructuredDecision(fakeLlm({ ...modelDecision, best_collection: 'Taxes' })).decide(input)).rejects.toThrow();
+    // A malformed answer fails the schema, and the router falls back to rules.
+    await expect(new LlmStructuredDecision(fakeLlm({ ...modelDecision, content_type: 'poem' as never })).decide(input)).rejects.toThrow();
   });
 
   it('formats the prompt with clipped tier-1 context', () => {
     const c = ctx('SEL', { context_before: 'b'.repeat(900), context_after: 'after', source_app: 'slack.exe' });
-    const p = formatDecisionPrompt({ context: c, features: extractFeatures(c), collections });
+    const p = formatDecisionPrompt({ context: c, features: extractFeatures(c) });
     expect(p).toContain('App: slack.exe');
     expect(p).toContain(`<before>\n${'b'.repeat(500)}\n</before>`);
     expect(p).toContain('<selection>\nSEL\n</selection>');
-    expect(p).toContain('Collections: Notes, Reading, Ideas, People notes');
+    expect(p).not.toContain('Collections');
   });
 });

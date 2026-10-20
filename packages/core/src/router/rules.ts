@@ -12,18 +12,6 @@ function contentType(f: Features): ContentType {
   return 'other';
 }
 
-/** Picks from the user's existing collections only. */
-export function ruleCollection(type: ContentType, f: Features, collections: string[]): string {
-  const has = (name: string) => collections.find((c) => c.toLowerCase() === name.toLowerCase());
-  const pick =
-    (type === 'contact_info' && has('People notes')) ||
-    (f.ideaWords && has('Ideas')) ||
-    (type === 'article' && has('Reading')) ||
-    has('Notes') ||
-    collections[0];
-  return pick ?? 'Notes';
-}
-
 /** Deterministic features only. Always available; the fallback for every other provider. */
 export class RulesDecision implements DecisionProvider {
   readonly id = 'rules' as const;
@@ -33,7 +21,7 @@ export class RulesDecision implements DecisionProvider {
   }
 }
 
-export function decideByRules({ context, features: f, collections }: DecisionInput): Decisions {
+export function decideByRules({ context, features: f }: DecisionInput): Decisions {
   const type = contentType(f);
   const isMessage = type === 'message_thread' || type === 'single_message';
 
@@ -64,7 +52,6 @@ export function decideByRules({ context, features: f, collections }: DecisionInp
     authored_by_other: authored,
     mentions_people: mentions,
     contains_commitment: type === 'code' || type === 'table_or_numbers' ? Math.min(commitment, 0.2) : commitment,
-    best_collection: ruleCollection(type, f, collections),
     provider: 'rules',
   };
 }

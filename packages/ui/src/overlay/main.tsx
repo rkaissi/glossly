@@ -103,7 +103,7 @@ function Pill({ s }: { s: OverlayState }) {
       </button>
       {s.saved ? (
         // Autosave: already saved. The bar it expands into offers Undo.
-        <button className="slot save saved" title={`Saved to ${s.saved.collection}`} onClick={() => expand(s.sessionId)}>
+        <button className="slot save saved" title="Saved" onClick={() => expand(s.sessionId)}>
           <Check size={16} strokeWidth={2} aria-hidden />
           <span>Saved</span>
         </button>
@@ -224,8 +224,7 @@ function Expanded({ s }: { s: OverlayState }) {
 
   const isHighlighted = (target: BarItem) => s.keyboard && s.mode === 'bar' && sameItem(items[hl], target);
   const titleFor = (view: SlotView) => {
-    const label = view.action === 'save' && 'collection' in view && view.collection ? `Save to ${view.collection}` : view.label;
-    const title = view.available ? label : `${label}: coming in a later phase`;
+    const title = view.available ? view.label : `${view.label}: coming in a later phase`;
     return view.score !== undefined ? `${title} (score ${view.score.toFixed(2)})` : title;
   };
 
@@ -283,12 +282,12 @@ function Expanded({ s }: { s: OverlayState }) {
             <button
               key="slot2:saved"
               className={['slot save', isHighlighted({ slot: 2 }) && 'highlight'].filter(Boolean).join(' ')}
-              title={undoLeft > 0 ? `Undo: remove it from ${s.saved.collection}` : `Saved to ${s.saved.collection}`}
+              title={undoLeft > 0 ? 'Undo: remove what was saved' : 'Saved'}
               disabled={undoLeft === 0}
               onClick={() => run(id, { slot: 2 })}
             >
               {undoLeft > 0 ? <Undo2 size={16} strokeWidth={1.75} aria-hidden /> : <Check size={16} strokeWidth={2} aria-hidden />}
-              <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : `Saved to ${s.saved.collection}`}</span>
+              <span>{undoLeft > 0 ? `Undo save (${undoLeft}s)` : 'Saved'}</span>
               {hints && undoLeft > 0 && <kbd className="keychip">{slotKey(items, 2)}</kbd>}
             </button>
           )}

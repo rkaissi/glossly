@@ -7,7 +7,7 @@ const slot = (action: SlotView['action'], available = false): SlotView => ({ act
 
 const slots: SlotsView = {
   slot1: slot('ask', true),
-  slot2: { ...slot('save', true), collection: 'Notes' },
+  slot2: slot('save', true),
   slot3: slot('reply'),
   slot4: null,
   more: [slot('visualize')],
@@ -40,7 +40,7 @@ describe('barKey', () => {
     expect(barKey(key('2'), ctx({ items: barItems(null, false, false) }))).toBeNull();
   });
   it('numbers the buttons by position: the empty bar is 1 Ask, 2 Search, 3 and 4 (decision 82)', () => {
-    const empty: SlotsView = { ...slots, slot2: { ...slot('search', true), collection: '' }, slot3: slot('reply', true), slot4: slot('write', true), more: [] };
+    const empty: SlotsView = { ...slots, slot2: slot('search', true), slot3: slot('reply', true), slot4: slot('write', true), more: [] };
     const items = barItems(empty, false, false);
     expect([slotKey(items, 1), slotKey(items, 2), slotKey(items, 3), slotKey(items, 4)]).toEqual([1, 2, 3, 4]);
     expect(barKey(key('2'), ctx({ items }))).toEqual({ kind: 'run', target: { slot: 2 } });

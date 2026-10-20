@@ -90,7 +90,7 @@ describe('context eval', () => {
       );
       toFixture.set(row.id, e.id);
     }
-    const notesCol = store.collectionByName('Notes')!;
+    const notesCol = store.createCollection('Notes');
     const noteVectors = await embedder.embed(fixture.notes.map((n) => n.text));
     fixture.notes.forEach((n, i) => {
       const item = store.insertItem({ collection_id: notesCol.id, kind: 'note', text: n.text, why: null, source_app: null, window_title: null, data_json: null });

@@ -139,7 +139,7 @@ describe('retrieveContext', () => {
 
   it('brings saved notes through Recall and caps each kind', async () => {
     const { store, people, deps, event } = setup();
-    const notes = store.collectionByName('Notes')!;
+    const notes = store.createCollection('Notes');
     const item = store.insertItem({ collection_id: notes.id, kind: 'note', text: 'Northwind Cafe does the best lunch', why: null, source_app: null, window_title: null, data_json: null });
     store.setVector(item.id, (await embedder.embed([item.text]))[0]!);
     for (let d = 15; d < 25; d++) event(`Lunch ${d}`, at(d, 12));
@@ -166,7 +166,7 @@ describe('linkNamedPeople', () => {
     const { store, people } = setup();
     const casey = people.create({ name: 'Casey Lin' });
     const jordan = people.create({ name: 'Jordan Hale' });
-    const notes = store.collectionByName('Notes')!;
+    const notes = store.createCollection('Notes');
     const item = store.insertItem({ collection_id: notes.id, kind: 'note', text: 'Casey Lin is vegetarian; Jordan knows', why: null, source_app: null, window_title: null, data_json: null });
     expect(linkNamedPeople(store, people, item.id, item.text)).toEqual([casey.id]);
     expect(people.card(casey.id)!.items.map((i) => i.id)).toEqual([item.id]);

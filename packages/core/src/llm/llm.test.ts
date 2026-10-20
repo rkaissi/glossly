@@ -760,25 +760,23 @@ describe('AiSdkLlm.stream with a tool', () => {
   it('runs Ask\'s remember tool once, says what it saved, and makes no second call', async () => {
     const parts: LanguageModelV4StreamPart[] = [
       { type: 'stream-start', warnings: [] },
-      { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Maya prefers  mornings', collection: 'notes', asked: true }) },
+      { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Maya prefers  mornings', asked: true }) },
       { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
     ];
     const model = new MockLanguageModelV4({ doStream: { stream: convertArrayToReadableStream(parts) } });
     const { llm } = llmWith({ [CHAT.model]: model }, roles({ chat: { ...CHAT, fallback: null } }));
-    const saved: [string, string, boolean][] = [];
+    const saved: [string, boolean][] = [];
     const tools = {
       remember: rememberTool({
-        collections: ['Notes', 'Reading'],
-        suggested: 'Reading',
-        save: (note, collection, asked) => {
-          saved.push([note, collection, asked]);
-          return { collection, updated: false };
+        save: (note, asked) => {
+          saved.push([note, asked]);
+          return { updated: false };
         },
       }),
     };
     const r = llm.stream({ role: 'chat', action: 'ask', instructions: 'i', prompt: 'p', tools, continueAfterTools: answerAfterUnaskedSave });
-    expect(await collect(r.textStream)).toBe('Saved to Notes: "Maya prefers mornings"');
-    expect(saved).toEqual([['Maya prefers mornings', 'Notes', true]]);
+    expect(await collect(r.textStream)).toBe('Remembered: "Maya prefers mornings"');
+    expect(saved).toEqual([['Maya prefers mornings', true]]);
     expect(model.doStreamCalls).toHaveLength(1);
   });
 
@@ -786,7 +784,7 @@ describe('AiSdkLlm.stream with a tool', () => {
     const steps: LanguageModelV4StreamPart[][] = [
       [
         { type: 'stream-start', warnings: [] },
-        { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Casey Lin is vegetarian', collection: 'Notes', asked: false }) },
+        { type: 'tool-call', toolCallId: 'c1', toolName: 'remember', input: JSON.stringify({ note: 'Casey Lin is vegetarian', asked: false }) },
         { type: 'finish', usage, finishReason: { unified: 'tool-calls', raw: 'tool_calls' } },
       ],
       [
@@ -801,7 +799,7 @@ describe('AiSdkLlm.stream with a tool', () => {
     const model = new MockLanguageModelV4({ doStream: async () => ({ stream: convertArrayToReadableStream(steps[Math.min(call++, 1)]!) }) });
     const { llm } = llmWith({ [CHAT.model]: model }, roles({ chat: { ...CHAT, fallback: null } }));
     const saved: boolean[] = [];
-    const tools = { remember: rememberTool({ collections: ['Notes'], suggested: 'Notes', save: (_n, collection, asked) => (saved.push(asked), { collection, updated: false }) }) };
+    const tools = { remember: rememberTool({ save: (_n, asked) => (saved.push(asked), { updated: false }) }) };
     const r = llm.stream({ role: 'chat', action: 'ask', instructions: 'i', prompt: 'p', tools, continueAfterTools: answerAfterUnaskedSave });
     expect(await collect(r.textStream)).toBe('Try the veggie place.');
     expect(saved).toEqual([false]);

@@ -27,6 +27,8 @@ import {
   type StyleView,
   type ActionId,
   type AliasKind,
+  type ItemLink,
+  type ItemLinkKind,
   type CommitmentStatus,
   type TaskChange,
   type EventPatch,
@@ -95,6 +97,17 @@ const strList = (v: unknown, maxItems: number, max: number): string[] => {
 const obj = (v: unknown): Record<string, unknown> => {
   if (typeof v !== 'object' || v === null) throw new Error('Invalid argument');
   return v as Record<string, unknown>;
+};
+const LINK_KINDS: readonly ItemLinkKind[] = ['person', 'task', 'event'];
+/** The Save panel's kept links: at most 20, each a known kind and an id. Missing is none. */
+const itemLinks = (v: unknown): ItemLink[] | undefined => {
+  if (v === undefined) return undefined;
+  if (!Array.isArray(v) || v.length > 20) throw new Error('Invalid argument');
+  return v.map((x) => {
+    const l = obj(x);
+    if (!LINK_KINDS.includes(l.kind as ItemLinkKind)) throw new Error('Invalid argument');
+    return { kind: l.kind as ItemLinkKind, target_id: str(l.target_id, 100) };
+  });
 };
 /** Reply's pick: up to 3 drafts (text plus the model's tags) and the chosen index. Missing is fine (nothing is learned). */
 const replyPick = (v: unknown): ReplyPick | undefined => {
@@ -194,7 +207,14 @@ export function registerIpc(deps: IpcDeps): void {
   // ---- Ask and Save ----
   handle('ask:start', (a, e) => capture.startAsk(num(a.sessionId), str(a.question ?? '', 2000), e.sender));
   handle('ask:cancel', (a) => capture.cancelAsk(str(a.requestId, 100)));
-  handle('save:save', (a) => capture.save(num(a.sessionId), str(a.collection, 100), a.why === undefined ? undefined : str(a.why, 2000)));
+  handle('save:open', (a) => capture.openSave(num(a.sessionId)));
+  handle('save:save', (a) =>
+    capture.save(num(a.sessionId), {
+      why: a.why === undefined ? undefined : str(a.why, 2000),
+      links: itemLinks(a.links),
+      unlinkedPeople: a.unlinkedPeople === undefined ? undefined : strList(a.unlinkedPeople, 20, 100),
+    }),
+  );
   handle('save:setWhy', (a) => services.save.setWhy(str(a.itemId, 100), str(a.why, 2000)));
   handle('save:undo', (a) => ({ undone: services.save.undo(str(a.itemId, 100)) }));
   handle('saved:undo', (a) => capture.undoSaved(num(a.sessionId)));

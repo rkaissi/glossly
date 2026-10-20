@@ -20,7 +20,7 @@ function summary(capture: Capture): Record<string, unknown> {
     stage: s.slots?.stage,
     fallback: s.slots?.fallback,
     content_type: s.slots?.content_type,
-    slot2: s.slots?.slot2.collection,
+    slot2: s.slots?.slot2.action,
     slot3: s.slots?.slot3?.action,
     slot4: s.slots?.slot4?.action,
     notice: Boolean(s.notice),
@@ -56,9 +56,9 @@ export async function runSmoke({ helper, capture, services }: { helper: HelperMa
       await capture.run(s.sessionId, { slot: 2 });
       log.info('panel', { mode: capture.state.mode, panel: capture.state.panel, timings: capture.state.debug?.timings });
       const before = services.store.listItems(1000).length;
-      const saved = await capture.save(s.sessionId, '', undefined);
+      const saved = await capture.save(s.sessionId, {});
       const undone = services.save.undo(saved.itemId);
-      log.info('save+undo', { collection: saved.collection, undone, itemsBefore: before, itemsAfter: services.store.listItems(1000).length });
+      log.info('save+undo', { kind: saved.kind, undone, itemsBefore: before, itemsAfter: services.store.listItems(1000).length });
     }
   }
   capture.close('smoke');

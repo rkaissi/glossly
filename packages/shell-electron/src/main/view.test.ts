@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { RouteResult } from '@glossly/core';
-import { anchoredTo, ExpiringLru, Lru, replyCacheKey, writeCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, saveLabel, shouldHideOverlay, slotsView, sourceRoom } from './view';
+import { anchoredTo, ExpiringLru, Lru, replyCacheKey, writeCacheKey, actionForSlot, clickedWhere, routeComparison, distanceToRect, emptySlotsView, fitOnScreen, growFrom, holdForRoute, mergeRoute, mouseAwayLimit, needsTier2, shouldHideOverlay, slotsView, sourceRoom } from './view';
 
 const area = { x: 0, y: 0, w: 1000, h: 800 };
 
-function route(partial: Partial<RouteResult['slots']> = {}, collection = 'Notes'): RouteResult {
+function route(partial: Partial<RouteResult['slots']> = {}): RouteResult {
   return {
     decisions: {
       content_type: 'single_message',
       authored_by_other: 0.9,
       mentions_people: 0.1,
       contains_commitment: 0.7,
-      best_collection: collection,
       provider: 'rules',
     },
     slots: {
@@ -33,7 +32,7 @@ describe('slotsView', () => {
   it('labels slots, with every action available now that Visualize is built', () => {
     const v = slotsView(route(), 'rules');
     expect(v.slot1).toMatchObject({ action: 'ask', label: 'Ask', available: true });
-    expect(v.slot2).toMatchObject({ action: 'save', label: 'Save to Notes', collection: 'Notes', available: true });
+    expect(v.slot2).toMatchObject({ action: 'save', label: 'Save', available: true });
     expect(v.slot3).toMatchObject({ action: 'reply', available: true, score: 0.9 });
     expect(v.slot4).toMatchObject({ action: 'promises', label: 'Tasks and events', available: true });
     expect(slotsView(route({ slot3: { action: 'visualize', score: 1 } }), 'rules').slot3).toMatchObject({ action: 'visualize', label: 'Visualize', available: true });
@@ -41,35 +40,30 @@ describe('slotsView', () => {
   });
 
   it('fills empty slots from the settled route and does not remove a button already shown', () => {
-    const waiting = holdForRoute(slotsView(route({}, 'Notes'), 'rules'));
+    const waiting = holdForRoute(slotsView(route({}), 'rules'));
     expect(waiting.slot3).toBeNull();
     expect(waiting.slot4).toBeNull();
     expect(waiting.more).toEqual([]);
     expect(waiting.stage).toBe('pending');
-    expect(waiting.slot2.collection).toBe('Notes');
+    expect(waiting.slot2.label).toBe('Save');
 
-    const settled = slotsView(route({ slot3: { action: 'who', score: 0.8 }, slot4: null, more: [{ action: 'promises', score: 0.4 }] }, 'Reading'), 'model');
+    const settled = slotsView(route({ slot3: { action: 'who', score: 0.8 }, slot4: null, more: [{ action: 'promises', score: 0.4 }] }), 'model');
     const merged = mergeRoute(waiting, settled);
-    expect(merged.slot2.collection).toBe('Reading');
+    expect(merged.slot2).toBe(waiting.slot2);
     expect(merged.slot3?.action).toBe('who');
     expect(merged.slot4).toBeNull();
     expect(merged.more.map((m) => m.action)).toEqual(['promises']);
     expect(merged.stage).toBe('model');
 
-    const again = slotsView(route({ slot3: null, slot4: null, more: [] }, 'Ideas'), 'rules_fallback');
+    const again = slotsView(route({ slot3: null, slot4: null, more: [] }), 'rules_fallback');
     const kept = mergeRoute(merged, again);
-    expect(kept.slot2.collection).toBe('Reading');
     expect(kept.slot3?.action).toBe('who');
     expect(kept.more.map((m) => m.action)).toEqual(['promises']);
 
-    const open = mergeRoute(waiting, settled, { keepSave: true });
-    expect(open.slot2.collection).toBe('Notes');
-    expect(open.slot3?.action).toBe('who');
-
-    const swapped = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.5 } }, 'Notes'), 'model'));
+    const swapped = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.5 } }), 'model'));
     expect(swapped.slot3?.action).toBe('who');
 
-    const moved = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.6 }, slot4: { action: 'who', score: 0.5 }, more: [{ action: 'who', score: 0.5 }] }, 'Notes'), 'model'));
+    const moved = mergeRoute(kept, slotsView(route({ slot3: { action: 'reply', score: 0.6 }, slot4: { action: 'who', score: 0.5 }, more: [{ action: 'who', score: 0.5 }] }), 'model'));
     expect(moved.slot3?.action).toBe('who');
     expect(moved.slot4).toBeNull();
     expect(moved.more.map((m) => m.action)).not.toContain('who');
@@ -272,12 +266,9 @@ describe("Reply's cache key", () => {
   });
 });
 
-describe('saveLabel', () => {
-  it('says "Save to" while it fits the slot, else the collection alone', () => {
-    expect(saveLabel('Notes')).toBe('Save to Notes');
-    expect(saveLabel('Reading')).toBe('Save to Reading');
-    expect(saveLabel('People notes')).toBe('People notes');
-    expect(slotsView(route({}, 'Client research'), 'rules').slot2).toMatchObject({ label: 'Client research', collection: 'Client research' });
+describe('the Save slot', () => {
+  it('reads just "Save", with no collection (decision 84)', () => {
+    expect(slotsView(route(), 'rules').slot2).toEqual({ action: 'save', label: 'Save', available: true });
   });
 });
 

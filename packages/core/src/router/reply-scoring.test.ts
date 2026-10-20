@@ -2,7 +2,7 @@
 // Rules only, so it runs offline; the full router eval stays in `pnpm eval`.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_COLLECTIONS, DEFAULT_SETTINGS } from '../settings';
+import { DEFAULT_SETTINGS } from '../settings';
 import { authorUnknown, extractFeatures } from './features';
 import { Router } from './router';
 import { decideByRules } from './rules';
@@ -34,7 +34,7 @@ const ctx = (over: Partial<SelectionContext>): SelectionContext => ({
 describe('Reply scoring', () => {
   it.each(cases.map((c) => [c.id, c] as const))('%s offers Reply only where expected', (_id, c) => {
     const f = extractFeatures(c.context);
-    const d = decideByRules({ context: c.context, features: f, collections: [...DEFAULT_COLLECTIONS] });
+    const d = decideByRules({ context: c.context, features: f });
     const s = assignSlots(d, f, DEFAULT_SETTINGS.router);
     const shown = [s.slot3, s.slot4].some((x) => x?.action === 'reply');
     expect(shown).toBe(c.expected.slots.includes('reply'));
@@ -62,7 +62,6 @@ describe('Reply scoring', () => {
       authored_by_other: 0.9,
       mentions_people: 0.1,
       contains_commitment: 0.8,
-      best_collection: 'Notes',
       provider: 'llm_structured',
     };
     expect(scoreActions(model, f).reply).toBe(0);
@@ -78,7 +77,7 @@ describe('Reply scoring', () => {
       text: 'what kinda job are you doing currently?',
     });
     const f = extractFeatures(c, [], me);
-    const model: Decisions = { content_type: 'question', authored_by_other: 0.3, mentions_people: 0.05, contains_commitment: 0.05, best_collection: 'Notes', provider: 'llm_structured' };
+    const model: Decisions = { content_type: 'question', authored_by_other: 0.3, mentions_people: 0.05, contains_commitment: 0.05, provider: 'llm_structured' };
     const s = assignSlots(model, f, DEFAULT_SETTINGS.router);
     expect([s.slot3?.action, s.slot4?.action]).toEqual(['reply', 'who']);
     // Not in a text field (a draft), and not the user's own message.
@@ -92,7 +91,7 @@ describe('slots on a chat question (decision 51)', () => {
   const me = { name: 'Alex Morgan', emails: [], handles: [] };
   // The user's own question in a fictional Discord DM.
   const text = 'haha nice\nwhat do you work on there\nis it more lab work or office stuff?';
-  const question: Decisions = { content_type: 'question', authored_by_other: 0.3, mentions_people: 0.1, contains_commitment: 0.6, best_collection: 'Notes', provider: 'llm_structured' };
+  const question: Decisions = { content_type: 'question', authored_by_other: 0.3, mentions_people: 0.1, contains_commitment: 0.6, provider: 'llm_structured' };
 
   it('keeps Tasks out of the slots when nothing in the text backs the model’s commitment score', () => {
     const f = extractFeatures(ctx({ source_app: 'discord.exe', window_title: 'Discord', context_before: 'Jordan\n9:38 PM\nstarted at a lab supply startup\n', text }), [], me);
@@ -105,7 +104,7 @@ describe('slots on a chat question (decision 51)', () => {
   });
 
   it('knows when tier 1 shows no header, and drops Reply once more of the conversation shows the user wrote it', () => {
-    const router = new Router({ decision: null, settings: () => DEFAULT_SETTINGS, collections: () => [...DEFAULT_COLLECTIONS], identity: () => me });
+    const router = new Router({ decision: null, settings: () => DEFAULT_SETTINGS, identity: () => me });
     const bare = ctx({ source_app: 'discord.exe', window_title: 'Discord', context_before: 'started at a lab supply startup\n', text });
     const r = router.quick(bare);
     expect(authorUnknown(r.features)).toBe(true);
@@ -128,14 +127,14 @@ describe('evidence for Who and Tasks (decision 53)', () => {
     const welcome = email('Hi Alex,\nWelcome to Northwind! We are excited to have you join as a Software Engineer Intern. The People Team will follow up.');
     expect(welcome.namePairs).toEqual([]);
     expect(welcome.someoneNamed).toBe(false);
-    const d: Decisions = { content_type: 'article', authored_by_other: 0.6, mentions_people: 0.6, contains_commitment: 0.1, best_collection: 'Notes', provider: 'llm_structured' };
+    const d: Decisions = { content_type: 'article', authored_by_other: 0.6, mentions_people: 0.6, contains_commitment: 0.1, provider: 'llm_structured' };
     expect(scoreActions(d, welcome).who).toBe(0.45);
     expect(email('Casey Lin will join the call; her address is casey@example.com').someoneNamed).toBe(true);
     expect(email('Write to me at alex@example.com or to support@example.com').someoneNamed).toBe(false);
   });
 
   it('does not back a task with "please" alone', () => {
-    const d: Decisions = { content_type: 'article', authored_by_other: 0.6, mentions_people: 0.1, contains_commitment: 0.7, best_collection: 'Notes', provider: 'llm_structured' };
+    const d: Decisions = { content_type: 'article', authored_by_other: 0.6, mentions_people: 0.1, contains_commitment: 0.7, provider: 'llm_structured' };
     expect(scoreActions(d, email('Please share the news with your friends and family!')).promises).toBe(0.45);
     expect(scoreActions(d, email('Please send me the signed forms.')).promises).toBe(0.7);
   });

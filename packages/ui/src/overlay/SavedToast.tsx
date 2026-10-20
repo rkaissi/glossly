@@ -20,7 +20,7 @@ export function useSecondsLeft(until: number | null | undefined): number {
 }
 
 /**
- * After the save hotkey: "Saved to Notes" with Undo. Shown without focus, so typing stays in
+ * After the save hotkey: "Saved" with Undo. Shown without focus, so typing stays in
  * the app; it goes away when the undo window ends, on a click elsewhere, or on a scroll.
  */
 export function SavedToast({ s }: { s: OverlayState }) {
@@ -38,7 +38,7 @@ export function SavedToast({ s }: { s: OverlayState }) {
       {s.saved ? (
         <>
           <Check size={16} strokeWidth={2} aria-hidden />
-          <span className="toast-text">Saved to {s.saved.collection}</span>
+          <span className="toast-text">Saved</span>
           {left > 0 && (
             <button
               className="ghost"

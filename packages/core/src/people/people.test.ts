@@ -52,7 +52,7 @@ describe('PeopleRepo', () => {
 
   it('links saved items that mention the person, including ones saved before they existed', () => {
     const r = repo();
-    const coll = store.listCollections()[0]!;
+    const coll = store.createCollection('Notes');
     const item = store.insertItem({ collection_id: coll.id, kind: 'selection', text: 'Maya wants the slides', why: null, source_app: 'slack.exe', window_title: null, data_json: null });
     store.linkItemEntity(item.id, store.upsertEntity('person', 'Maya Lin'));
     const maya = r.create({ name: 'Maya Lin' });

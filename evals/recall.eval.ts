@@ -37,7 +37,7 @@ describe('recall eval', () => {
     const embedder = await createTransformersEmbedder({ model, dims, cacheDir: modelsDir });
     const store = new Store(':memory:', { vecExtensionPath });
     store.ensureVectorModel(model, dims);
-    const notes = store.collectionByName('Notes')!;
+    const notes = store.createCollection('Notes');
     const byFixture = new Map<string, string>();
     const vectors = new Map<string, Float32Array>();
     const vs = await embedder.embed(fixture.items.map((i) => i.text));

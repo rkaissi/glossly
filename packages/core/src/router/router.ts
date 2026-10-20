@@ -43,7 +43,6 @@ export interface RouterDeps {
   /** The model's read of a field with nothing selected, or null without a model. */
   field?: FieldDecider | null;
   settings: () => Pick<Settings, 'router' | 'privacy'>;
-  collections: () => string[];
   people?: () => KnownPerson[];
   /** The user's identity, to tell their own messages apart. */
   identity?: () => Identity;
@@ -63,7 +62,7 @@ export class Router {
   quick(context: SelectionContext): RouteResult {
     const start = this.now();
     const features = extractFeatures(context, this.deps.people?.() ?? [], this.deps.identity?.());
-    const decisions = decideByRules({ context, features, collections: this.deps.collections() });
+    const decisions = decideByRules({ context, features });
     return {
       decisions,
       features,
@@ -79,7 +78,7 @@ export class Router {
     const start = this.now();
     const settings = this.deps.settings();
     const features = extractFeatures(context, this.deps.people?.() ?? [], this.deps.identity?.());
-    const input = { context, features, collections: this.deps.collections() };
+    const input = { context, features };
     const decision = this.deps.decision;
     const { value: decisions, fallback, fellBack } = await this.withBudget(decision && ((s, f) => decision.decide(input, s, f)), start, signal);
 
