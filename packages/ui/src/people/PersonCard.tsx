@@ -1,9 +1,9 @@
 // The person card (spec: Who is this): name, aliases, about them, open commitments
 // split into "You owe" and "They owe", recent interactions, and saved items that mention
 // them. Shared by the overlay's Who panel and the settings window's full record.
-import { useState, type KeyboardEvent } from 'react';
-import { ArrowDownLeft, ArrowUpRight, Bookmark, CalendarDays, ExternalLink, Pencil, Plus, X } from 'lucide-react';
-import type { CommitmentView, PersonCard, Relationship } from '@glossly/core/api';
+import { useEffect, useState, type KeyboardEvent } from 'react';
+import { ArrowDownLeft, ArrowUpRight, Bookmark, CalendarDays, CircleCheck, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
+import type { CommitmentView, PersonCard, Relationship, StylePreferenceView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { InlineConfirm } from '../confirm';
 import { Select } from '../controls/Select';
@@ -72,53 +72,109 @@ export function CommitmentList({ items, showPerson }: { items: CommitmentView[];
   );
 }
 
-function Note({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(card.note ?? '');
+/**
+ * What is known about them (decision 84): a list of facts, each reworded or removed on its own
+ * (trash morphs into Delete in place, decision 46), and one added at the end. Ask adds to it too.
+ * `limit` shows only the first few (the Who card), with Add but no editing.
+ */
+function Facts({ card, onChange, limit }: { card: PersonCard; onChange: (c: PersonCard) => void; limit?: number }) {
+  const [editing, setEditing] = useState<{ id: string | null; text: string } | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
   const { busy, error, run } = useAction();
+  const shown = limit ? card.facts.slice(0, limit) : card.facts;
   const save = () =>
     void run(async () => {
-      onChange(await glossly.invoke('people:update', { personId: card.id, note: text.trim() || null }));
-      setEditing(false);
+      if (!editing) return;
+      const text = editing.text.trim();
+      if (editing.id) onChange(await glossly.invoke('people:fact-update', { personId: card.id, factId: editing.id, text }));
+      else if (text) onChange(await glossly.invoke('people:fact-add', { personId: card.id, text }));
+      setEditing(null);
+    });
+  const remove = (factId: string) =>
+    void run(async () => {
+      onChange(await glossly.invoke('people:fact-remove', { personId: card.id, factId }));
+      setPending(null);
     });
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter') {
       e.preventDefault();
       save();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      setEditing(false);
-      setText(card.note ?? '');
+      setEditing(null);
     }
   };
-  if (!editing) {
-    return card.note ? (
-      <div className="note">
-        <p>{card.note}</p>
-        <button className="ghost icon-only" title="Edit note" aria-label="Edit note" onClick={() => setEditing(true)}>
-          <Pencil size={14} strokeWidth={1.75} aria-hidden />
-        </button>
-      </div>
-    ) : (
-      <button className="ghost add-note" onClick={() => setEditing(true)}>
-        <Plus size={14} strokeWidth={1.75} aria-hidden />
-        About {firstName(card.name)}
+  const field = (
+    <div className="fact-edit">
+      <input
+        autoFocus
+        value={editing?.text ?? ''}
+        maxLength={300}
+        placeholder={`Something about ${firstName(card.name)}`}
+        aria-label="Fact"
+        disabled={busy}
+        onChange={(e) => setEditing((x) => (x ? { ...x, text: e.target.value } : x))}
+        onKeyDown={onKeyDown}
+      />
+      <button className="primary sm" disabled={busy} onClick={save}>
+        Save
       </button>
-    );
-  }
+      <button className="ghost sm" onClick={() => setEditing(null)}>
+        Cancel
+      </button>
+    </div>
+  );
+  const source = (s: PersonCard['facts'][number]['source']) => (s === 'ask' ? 'Ask' : s === 'note' ? 'Note' : 'You');
   return (
-    <div className="note-edit">
-      <textarea autoFocus rows={2} value={text} maxLength={1000} placeholder="About this person" aria-label="About" onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} />
-      <div className="row-tight">
-        <button className="primary" disabled={busy} onClick={save}>
-          Save note
+    <div className="facts-block">
+      {shown.length > 0 && (
+        <ul className="facts">
+          {shown.map((f) =>
+            editing?.id === f.id ? (
+              <li key={f.id}>{field}</li>
+            ) : (
+              <li key={f.id}>
+                <span className="grow">{f.text}</span>
+                {!limit && (
+                  <>
+                    <span className="fact-src">
+                      {source(f.source)} · {formatDay(f.created_at)}
+                    </span>
+                    <span className="fact-acts">
+                      <button className="icon-btn sm" title="Reword" aria-label="Reword" disabled={busy} onClick={() => setEditing({ id: f.id, text: f.text })}>
+                        <Pencil size={14} strokeWidth={1.75} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className={`delete-btn${pending === f.id ? ' armed' : ''}`}
+                        title={pending === f.id ? 'Remove this' : 'Remove'}
+                        aria-label={pending === f.id ? 'Confirm: remove this' : 'Remove'}
+                        disabled={busy}
+                        onClick={() => (pending === f.id ? remove(f.id) : setPending(f.id))}
+                        onBlur={() => setPending(null)}
+                      >
+                        <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+                        <span>Delete</span>
+                      </button>
+                    </span>
+                  </>
+                )}
+              </li>
+            ),
+          )}
+        </ul>
+      )}
+      {limit !== undefined && card.facts.length > limit && <p className="muted small-text">and {card.facts.length - limit} more in the record</p>}
+      {editing?.id === null ? (
+        field
+      ) : (
+        <button className="ghost add-note" onClick={() => setEditing({ id: null, text: '' })}>
+          <Plus size={14} strokeWidth={1.75} aria-hidden />
+          Add something about {firstName(card.name)}
         </button>
-        <button className="ghost" onClick={() => setEditing(false)}>
-          Cancel
-        </button>
-        {error && <span className="error">{error}</span>}
-      </div>
+      )}
+      {error && <span className="error">{error}</span>}
     </div>
   );
 }
@@ -238,92 +294,220 @@ export function PersonCardView({
   /** The settings record lists more below the card (done tasks), so it isn't empty. */
   hasMore?: boolean;
 }) {
-  const empty = !hasMore && !card.youOwe.length && !card.theyOwe.length && !card.events.length && !card.interactions.length && !card.items.length;
+  if (compact) return <CompactCard card={card} onChange={onChange} />;
   return (
-    <div className={`person${compact ? ' compact' : ''}`}>
-      {compact && (
-        <div className="person-head">
-          <h2>{card.name}</h2>
-          <span className="spacer" />
-          <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'people', personId: card.id })}>
-            <ExternalLink size={14} strokeWidth={1.75} aria-hidden />
-            Open record
-          </button>
+    <div className="person person-record">
+      <div className="person-col">
+        <Aliases card={card} onChange={onChange} removable={removableAliases} />
+        <RelationshipSelect card={card} onChange={onChange} />
+        <div className="person-section">
+          <h4>What you know</h4>
+          <Facts card={card} onChange={onChange} />
         </div>
-      )}
-      <Aliases card={card} onChange={onChange} removable={removableAliases} />
-      <RelationshipSelect card={card} onChange={onChange} />
-      <Note card={card} onChange={onChange} />
+        <WritingTo card={card} />
+      </div>
+      <div className="person-col">
+        <Related card={card} hasMore={hasMore} />
+      </div>
+    </div>
+  );
+}
 
-      {card.youOwe.length > 0 && (
+/** The Who card (decision 84): the first three facts and the next thing coming up; the rest is in the record. */
+function CompactCard({ card, onChange }: { card: PersonCard; onChange: (c: PersonCard) => void }) {
+  const next = upcoming(card)[0] ?? null;
+  return (
+    <div className="person compact">
+      <div className="person-head">
+        <h2>{card.name}</h2>
+        <span className="spacer" />
+        <button className="ghost" onClick={() => void glossly.invoke('settings:open', { tab: 'people', personId: card.id })}>
+          <ExternalLink size={14} strokeWidth={1.75} aria-hidden />
+          Open record
+        </button>
+      </div>
+      <Aliases card={card} onChange={onChange} />
+      <RelationshipSelect card={card} onChange={onChange} />
+      <Facts card={card} onChange={onChange} limit={3} />
+      {next && (
         <div className="person-section">
-          <h4>You owe</h4>
-          <CommitmentList items={card.youOwe} />
-        </div>
-      )}
-      {card.theyOwe.length > 0 && (
-        <div className="person-section">
-          <h4>{firstName(card.name)} owes you</h4>
-          <CommitmentList items={card.theyOwe} />
-        </div>
-      )}
-      {card.events.length > 0 && (
-        <div className="person-section">
-          <h4>Coming up</h4>
-          <ul className="commitments">
-            {card.events.map((e) => (
-              <li key={e.id} className="commitment">
-                <CalendarDays size={14} strokeWidth={1.75} aria-hidden />
-                <span className="grow">{e.title}</span>
-                <span className="due">{formatEventTime(e)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {card.interactions.length > 0 && (
-        <div className="person-section">
-          <h4>Recent</h4>
+          <h4>Next</h4>
           <ul className="timeline">
-            {card.interactions.map((i) => (
-              <li key={i.id}>
-                {i.direction === 'inbound' ? (
-                  <ArrowDownLeft size={14} strokeWidth={1.75} aria-label="From them" />
-                ) : (
-                  <ArrowUpRight size={14} strokeWidth={1.75} aria-label="From you" />
-                )}
-                <span className="grow clip2">{i.text}</span>
-                <span className="meta">
-                  {appName(i.source_app)}
-                  {i.source_app ? ' · ' : ''}
-                  {formatDay(i.occurred_at)}
-                </span>
-              </li>
-            ))}
+            <TimelineRow entry={next} name={card.name} />
           </ul>
         </div>
       )}
-      {card.items.length > 0 && (
-        <div className="person-section">
-          <h4>Saved</h4>
+    </div>
+  );
+}
+
+type Entry =
+  | { kind: 'event'; at: string; key: string; event: PersonCard['events'][number] }
+  | { kind: 'task'; at: string; key: string; task: CommitmentView }
+  | { kind: 'message'; at: string; key: string; message: PersonCard['interactions'][number] }
+  | { kind: 'saved'; at: string; key: string; item: PersonCard['items'][number] };
+type RelatedFilter = 'all' | 'saved' | 'task' | 'event' | 'message';
+
+/** Their events and open tasks, soonest first (tasks with no due day last). */
+function upcoming(card: PersonCard): Entry[] {
+  const events: Entry[] = card.events.map((e) => ({ kind: 'event', at: e.starts_at, key: `e:${e.id}`, event: e }));
+  const tasks: Entry[] = [...card.youOwe, ...card.theyOwe].map((t) => ({ kind: 'task', at: t.due_at ?? '9999', key: `t:${t.id}`, task: t }));
+  return [...events, ...tasks].sort((a, b) => a.at.localeCompare(b.at));
+}
+
+function TimelineRow({ entry, name }: { entry: Entry; name: string }) {
+  switch (entry.kind) {
+    case 'event':
+      return (
+        <li>
+          <CalendarDays size={14} strokeWidth={1.75} aria-hidden />
+          <span className="grow">{entry.event.title}</span>
+          <span className="meta">{formatEventTime(entry.event)}</span>
+        </li>
+      );
+    case 'task':
+      return (
+        <li>
+          <CircleCheck size={14} strokeWidth={1.75} aria-hidden />
+          <span className="grow">{entry.task.text}</span>
+          <span className="meta">
+            {entry.task.owner === 'me' ? 'You owe' : `${firstName(name)} owes`}
+            {entry.task.due_at ? ` · ${formatDue(entry.task.due_at)}` : ''}
+          </span>
+        </li>
+      );
+    case 'message':
+      return (
+        <li>
+          {entry.message.direction === 'inbound' ? (
+            <ArrowDownLeft size={14} strokeWidth={1.75} aria-label="From them" />
+          ) : (
+            <ArrowUpRight size={14} strokeWidth={1.75} aria-label="From you" />
+          )}
+          <span className="grow clip2">{entry.message.text}</span>
+          <span className="meta">
+            {appName(entry.message.source_app)}
+            {entry.message.source_app ? ' · ' : ''}
+            {formatDay(entry.message.occurred_at)}
+          </span>
+        </li>
+      );
+    case 'saved':
+      return (
+        <li>
+          <Bookmark size={14} strokeWidth={1.75} aria-hidden />
+          <span className="grow clip2">
+            {entry.item.text}
+            {entry.item.why && <span className="muted"> · {entry.item.why}</span>}
+          </span>
+          <span className="meta">{`${KIND_LABEL[entry.item.kind]} · ${formatDay(entry.item.created_at)}`}</span>
+        </li>
+      );
+  }
+}
+
+/**
+ * Everything that involves them (decision 84), in one timeline: coming up (events and open tasks,
+ * soonest first), then earlier (messages and saved items, newest first), filtered by kind.
+ */
+function Related({ card, hasMore }: { card: PersonCard; hasMore?: boolean }) {
+  const [filter, setFilter] = useState<RelatedFilter>('all');
+  const soon = upcoming(card);
+  const earlier: Entry[] = [
+    ...card.interactions.map((m): Entry => ({ kind: 'message', at: m.occurred_at, key: `m:${m.id}`, message: m })),
+    ...card.items.map((it): Entry => ({ kind: 'saved', at: it.created_at, key: `s:${it.id}`, item: it })),
+  ].sort((a, b) => b.at.localeCompare(a.at));
+  const count = (k: Entry['kind']) => [...soon, ...earlier].filter((e) => e.kind === k).length;
+  const keep = (e: Entry) => filter === 'all' || e.kind === filter;
+  const total = soon.length + earlier.length;
+  if (total === 0) {
+    return hasMore ? null : <p className="muted small-text">Nothing involves {firstName(card.name)} yet. Tasks, events, messages, and things you save with them show up here.</p>;
+  }
+  const options: [RelatedFilter, string, number][] = [
+    ['all', 'All', total],
+    ['saved', 'Saved', count('saved')],
+    ['task', 'Tasks', count('task')],
+    ['event', 'Events', count('event')],
+    ['message', 'Messages', count('message')],
+  ];
+  const shownSoon = soon.filter(keep);
+  const shownEarlier = earlier.filter(keep);
+  return (
+    <div className="person-section related">
+      <h4>Related</h4>
+      <div className="filters" role="radiogroup" aria-label="Show">
+        {options.map(([v, label, n]) => (
+          <button key={v} role="radio" aria-checked={filter === v} className={filter === v ? 'filter on' : 'filter'} onClick={() => setFilter(v)}>
+            {label} <span className="muted">{n}</span>
+          </button>
+        ))}
+      </div>
+      {shownSoon.length > 0 && (
+        <>
+          <p className="day-head">Coming up</p>
           <ul className="timeline">
-            {card.items.map((it) => (
-              <li key={it.id}>
-                <Bookmark size={14} strokeWidth={1.75} aria-hidden />
-                <span className="grow clip2">
-                  {it.text}
-                  {it.why && <span className="muted"> · {it.why}</span>}
-                </span>
-                <span className="meta">
-                  {`${KIND_LABEL[it.kind]} · `}
-                  {formatDay(it.created_at)}
-                </span>
-              </li>
+            {shownSoon.map((e) => (
+              <TimelineRow key={e.key} entry={e} name={card.name} />
             ))}
           </ul>
-        </div>
+        </>
       )}
-      {empty && <p className="muted small-text">Nothing saved about {firstName(card.name)} yet. Promises and replies you save with them show up here.</p>}
+      {shownEarlier.length > 0 && (
+        <>
+          <p className="day-head">Earlier</p>
+          <ul className="timeline">
+            {shownEarlier.map((e) => (
+              <TimelineRow key={e.key} entry={e} name={card.name} />
+            ))}
+          </ul>
+        </>
+      )}
+      {shownSoon.length + shownEarlier.length === 0 && <p className="muted small-text">Nothing of that kind yet.</p>}
+    </div>
+  );
+}
+
+/**
+ * How you write to them (decision 84): what Reply and Write here learned about this one person,
+ * moved here from Profile. Each can be forgotten.
+ */
+function WritingTo({ card }: { card: PersonCard }) {
+  const [prefs, setPrefs] = useState<StylePreferenceView[]>([]);
+  const { busy, run } = useAction();
+  useEffect(() => {
+    let live = true;
+    void glossly.invoke('style:get').then((v) => live && setPrefs(v.preferences.filter((p) => p.scope === 'person' && p.personId === card.id)));
+    return () => {
+      live = false;
+    };
+  }, [card.id]);
+  if (prefs.length === 0) return null;
+  const forget = (p: StylePreferenceView) =>
+    void run(async () => {
+      const v = await glossly.invoke('style:forget', { dimension: p.dimension, channel: p.channel, personId: p.personId, relationship: p.relationship });
+      setPrefs(v.preferences.filter((x) => x.scope === 'person' && x.personId === card.id));
+    });
+  return (
+    <div className="person-section">
+      <h4>How you write to {firstName(card.name)}</h4>
+      <ul className="facts">
+        {prefs.map((p) => (
+          <li key={`${p.dimension}:${p.channel}`}>
+            <span className="grow">
+              {p.label}
+              <span className="fact-src">
+                {' '}
+                · {p.agree} of {p.of}
+              </span>
+            </span>
+            <span className="fact-acts">
+              <button className="icon-btn sm" title="Forget" aria-label="Forget" disabled={busy} onClick={() => forget(p)}>
+                <X size={14} strokeWidth={1.75} aria-hidden />
+              </button>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

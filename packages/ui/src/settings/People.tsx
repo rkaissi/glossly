@@ -206,7 +206,7 @@ function PersonRecord({ personId }: { personId: string }) {
         <>
           <RecordHead card={card} onChange={setCard} />
           <p className="muted small">Added {formatDay(card.created_at)}</p>
-          <div className="field">
+          <div className="field record-field">
             <PersonCardView card={card} onChange={setCard} removableAliases hasMore={closed.length > 0} />
           </div>
           {closed.length > 0 && (

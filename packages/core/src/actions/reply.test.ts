@@ -28,6 +28,7 @@ const maya: PersonCard = {
   name: 'Maya Lin',
   relationship: 'colleague',
   note: 'PM on the Acme account',
+  facts: [{ id: 'f1', person_id: 'p1', text: 'PM on the Acme account', source: 'you', created_at: '2026-10-01T09:00:00-04:00' }],
   aliases: [],
   youOwe: [{ id: 'c1', owner: 'me', text: 'send the onboarding deck', due_at: '2026-10-16', status: 'open', completed_at: null, person_id: 'p1', person_name: 'Maya Lin' }],
   theyOwe: [{ id: 'c2', owner: 'them', text: 'share the budget sheet', due_at: null, status: 'open', completed_at: null, person_id: 'p1', person_name: 'Maya Lin' }],

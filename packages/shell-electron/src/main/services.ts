@@ -114,6 +114,8 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
     }
     this.store = store;
     this.people = new PeopleRepo(store);
+    const caughtUp = this.people.catchUpNotes();
+    if (caughtUp) log.info('note lines copied to facts', { count: caughtUp });
     // Samples pasted before decision 59 get a suggested platform, once.
     const labeled = this.people.labelPastedVoice();
     if (labeled) log.info('pasted voice samples labeled', { count: labeled });

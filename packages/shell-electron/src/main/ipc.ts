@@ -418,6 +418,21 @@ export function registerIpc(deps: IpcDeps): void {
     });
     return changed(id);
   });
+  handle('people:fact-add', (a) => {
+    const id = str(a.personId, 100);
+    if (!people.addFact(id, str(a.text, 600), 'you')) throw new Error('A fact needs some words.');
+    return changed(id);
+  });
+  handle('people:fact-update', (a) => {
+    const id = str(a.personId, 100);
+    people.updateFact(str(a.factId, 100), str(a.text, 600));
+    return changed(id);
+  });
+  handle('people:fact-remove', (a) => {
+    const id = str(a.personId, 100);
+    people.removeFact(str(a.factId, 100));
+    return changed(id);
+  });
   handle('people:alias-add', (a) => {
     const id = str(a.personId, 100);
     const value = str(a.value, 200);

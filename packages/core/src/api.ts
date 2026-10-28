@@ -651,6 +651,10 @@ export interface InvokeChannels {
   /** "Is this the same Sam?" answered yes: the detected name, email, and handle become aliases. */
   'people:confirm-same': { args: { personId: string; name?: string; email?: string; handle?: string }; result: PersonCard };
   'people:update': { args: { personId: string; name?: string; note?: string | null; relationship?: Relationship | null }; result: PersonCard };
+  /** A person's facts (decision 84): add one, reword one (empty text removes it), or remove one. */
+  'people:fact-add': { args: { personId: string; text: string }; result: PersonCard };
+  'people:fact-update': { args: { personId: string; factId: string; text: string }; result: PersonCard };
+  'people:fact-remove': { args: { personId: string; factId: string }; result: PersonCard };
   /** The kind is guessed from the value unless given ("a@b.c" email, "@x" handle, else name). */
   'people:alias-add': { args: { personId: string; value: string; kind?: AliasKind }; result: PersonCard };
   'people:alias-remove': { args: { personId: string; kind: AliasKind; value: string }; result: PersonCard };

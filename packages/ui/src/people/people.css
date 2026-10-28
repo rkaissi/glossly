@@ -74,16 +74,83 @@ button.chip-x.danger:hover:not(:disabled) {
   color: var(--danger);
 }
 
-.note {
+/* What you know about them (decision 84): one row per fact; the actions show on hover or focus. */
+.facts-block {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
 }
-.note p {
+.facts {
+  list-style: none;
   margin: 0;
+  padding: 0;
+}
+.facts li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 2px 0;
+}
+.facts li + li {
+  border-top: 1px solid var(--border);
+}
+.facts .grow {
   flex: 1;
-  white-space: pre-wrap;
-  color: var(--fg);
+  min-width: 0;
+}
+.fact-src {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.fact-acts {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--fade) ease;
+}
+.facts li:hover .fact-acts,
+.facts li:focus-within .fact-acts {
+  opacity: 1;
+}
+.fact-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.fact-edit input {
+  flex: 1;
+  min-width: 0;
+}
+/* The full record: what you know on the left, everything related on the right. */
+.person-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 24px;
+  align-items: start;
+}
+.person-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+@container (max-width: 640px) {
+  .person-record {
+    grid-template-columns: 1fr;
+  }
+}
+.related .filters {
+  margin: 4px 0;
+}
+.day-head {
+  margin: 8px 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .person .icon-only {
   width: 26px;
@@ -234,4 +301,9 @@ button.chip-x.danger:hover:not(:disabled) {
   align-items: center;
   gap: 8px;
   font-size: 13px;
+}
+
+/* The record's card is the container its two columns respond to. */
+.record-field {
+  container-type: inline-size;
 }

@@ -132,14 +132,14 @@ export function askTools(deps: AskToolDeps) {
     }),
     update_person: tool({
       description:
-        'Add to what the person knows about someone already in their saved people (by full name): a line for their note (their role, where they work, how they know them), or their relationship. Never for someone not saved.',
+        'Add to what the person knows about someone already in their saved people (by full name): a fact for their list (their role, where they work, how they know them, a preference), or their relationship. Never for someone not saved.',
       inputSchema: z.object({
         name: z.string().describe('The saved person\'s full name.'),
-        add_to_note: z.string().nullable().describe('One short, self-contained line for their note, naming them ("Casey Lin is vegan"), or null.'),
+        add_to_note: z.string().nullable().describe('One short, self-contained fact, naming them ("Casey Lin is vegan"), or null.'),
         replaces: z
           .string()
           .nullable()
-          .describe('When the new line changes something their note already says, that old line copied exactly as shown (note lines are separated by " / "); else null.'),
+          .describe('When the new fact changes one they already have, that old fact copied exactly as shown (facts are separated by " / "); else null.'),
         relationship: z.enum(RELATIONSHIPS).nullable().describe('Their relationship to the person asking, when it is clear, or null.'),
         asked: z.boolean().describe('True when they asked you to.'),
       }),

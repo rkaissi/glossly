@@ -136,7 +136,10 @@ export interface PersonItemView {
 export interface PersonCard {
   id: string;
   name: string;
+  /** Their facts as one note, a line each (decision 84): what prompts read. */
   note: string | null;
+  /** What is known about them, oldest first (decision 84). */
+  facts: PersonFact[];
   relationship: Relationship | null;
   aliases: PersonAlias[];
   /** Open commitments you made to them. */

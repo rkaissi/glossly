@@ -30,6 +30,13 @@ import type { Store } from './store';
 const MAX_NAME = 100;
 const MAX_NOTE = 1000;
 const MAX_FACT = 300;
+
+/**
+ * A person's facts as one note, a line each in the order added, for a query on `people p`
+ * (decision 84). Null when they have none.
+ */
+export const NOTE_FROM_FACTS =
+  '(SELECT group_concat(text, char(10)) FROM (SELECT f.text FROM person_facts f WHERE f.person_id = p.id ORDER BY f.created_at, f.rowid))';
 const MAX_ALIAS = 200;
 const MAX_TEXT = 2000;
 /** Edited replies kept as voice samples; older ones are dropped. */
@@ -96,27 +103,76 @@ export class PeopleRepo {
 
   // ---- people ----
 
-  create(p: NewPerson): Person {
+  /** A note given when making someone (Who is this, Tasks) becomes their facts, one per line. */
+  create(p: NewPerson, source: FactSource = 'you'): Person {
     const name = clip(oneLine(p.name), MAX_NAME);
     if (!name) throw new Error('A person needs a name.');
     const id = uuidv7();
     const at = this.now();
     this.store.tx(() => {
       this.db
-        .prepare('INSERT INTO people (id, entity_id, name, note, relationship, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?)')
-        .run(id, name, p.note?.trim() ? clip(p.note.trim(), MAX_NOTE) : null, p.relationship ?? null, at, at);
+        .prepare('INSERT INTO people (id, entity_id, name, note, relationship, created_at, updated_at) VALUES (?, NULL, ?, NULL, ?, ?, ?)')
+        .run(id, name, p.relationship ?? null, at, at);
       for (const a of p.aliases ?? []) this.insertAlias(id, a.kind, a.value, true);
       this.linkEntity(id);
+      this.setFactsFromNote(id, p.note ?? null, source);
     });
     return this.get(id)!;
   }
 
+  /**
+   * `note` is their facts, one per line (decision 84): every reader of the note (Reply, Ask,
+   * Write here, Who, retrieval) gets the facts without a change of its own.
+   */
   get(id: string): Person | null {
-    const row = this.db.prepare('SELECT id, entity_id, name, note, relationship, created_at, updated_at FROM people WHERE id = ?').get(id) as
+    const row = this.db.prepare(`SELECT p.id, p.entity_id, p.name, ${NOTE_FROM_FACTS} AS note, p.relationship, p.created_at, p.updated_at FROM people p WHERE p.id = ?`).get(id) as
       | Omit<Person, 'aliases'>
       | undefined;
     if (!row) return null;
     return { ...row, aliases: this.aliases(id) };
+  }
+
+  /**
+   * Makes their facts match a note's lines: facts still there keep their source and date, the
+   * rest go, and new lines are added with `source`. How editing "the note" works since decision 84
+   * (Ask's update_person and its Undo, older callers).
+   */
+  private setFactsFromNote(personId: string, note: string | null, source: FactSource): void {
+    const key = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const lines = (note ?? '').split('\n').map((l) => clip(oneLine(l.replace(/^\s*[-*•·]\s*/, '')), MAX_FACT)).filter(Boolean);
+    const wanted = new Set(lines.map(key));
+    const have = this.facts(personId);
+    for (const f of have) if (!wanted.has(key(f.text))) this.removeFact(f.id);
+    const kept = new Set(have.map((f) => key(f.text)));
+    for (const l of lines) {
+      if (kept.has(key(l))) continue;
+      kept.add(key(l));
+      this.addFact(personId, l, source);
+    }
+  }
+
+  /**
+   * Once: copies note lines written after migration 12 (by a build that still wrote the note)
+   * into facts, so nothing typed in between is lost. The note column is never read after this.
+   */
+  catchUpNotes(): number {
+    if (this.store.getMeta('notes_to_facts') === 'done') return 0;
+    let added = 0;
+    const key = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    this.store.tx(() => {
+      const rows = this.db.prepare("SELECT id, note FROM people WHERE note IS NOT NULL AND trim(note) <> ''").all() as { id: string; note: string }[];
+      for (const r of rows) {
+        const have = new Set(this.facts(r.id).map((f) => key(f.text)));
+        for (const raw of r.note.split('\n')) {
+          const line = oneLine(raw.replace(/^\s*[-*•·]\s*/, ''));
+          if (!line || have.has(key(line))) continue;
+          have.add(key(line));
+          if (this.addFact(r.id, line, 'note')) added++;
+        }
+      }
+      this.store.setMeta('notes_to_facts', 'done');
+    });
+    return added;
   }
 
   aliases(personId: string): PersonAlias[] {
@@ -128,7 +184,7 @@ export class PeopleRepo {
   list(query = ''): PersonSummary[] {
     const rows = this.db
       .prepare(
-        `SELECT p.id, p.name, p.note,
+        `SELECT p.id, p.name, ${NOTE_FROM_FACTS} AS note,
            (SELECT COUNT(*) FROM commitments c WHERE c.person_id = p.id AND c.status = 'open') AS open,
            (SELECT MAX(occurred_at) FROM interactions i WHERE i.person_id = p.id) AS last_seen
          FROM people p ORDER BY p.name COLLATE NOCASE`,
@@ -144,15 +200,16 @@ export class PeopleRepo {
     return out;
   }
 
-  update(id: string, patch: { name?: string; note?: string | null; relationship?: Relationship | null }): Person {
+  /** `note` sets their facts to its lines (`setFactsFromNote`), new ones from `source`. */
+  update(id: string, patch: { name?: string; note?: string | null; relationship?: Relationship | null }, source: FactSource = 'you'): Person {
     const p = this.get(id);
     if (!p) throw new Error('That person no longer exists.');
     const name = patch.name !== undefined ? clip(oneLine(patch.name), MAX_NAME) : p.name;
     if (!name) throw new Error('A person needs a name.');
-    const note = patch.note !== undefined ? (patch.note?.trim() ? clip(patch.note.trim(), MAX_NOTE) : null) : p.note;
     const relationship = patch.relationship !== undefined ? patch.relationship : p.relationship;
     this.store.tx(() => {
-      this.db.prepare('UPDATE people SET name = ?, note = ?, relationship = ?, updated_at = ? WHERE id = ?').run(name, note, relationship, this.now(), id);
+      this.db.prepare('UPDATE people SET name = ?, relationship = ?, updated_at = ? WHERE id = ?').run(name, relationship, this.now(), id);
+      if (patch.note !== undefined && clip((patch.note ?? '').trim(), MAX_NOTE) !== (p.note ?? '')) this.setFactsFromNote(id, patch.note, source);
       // The old name stays findable.
       if (canonicalize(name) !== canonicalize(p.name)) this.insertAlias(id, 'name', p.name, true);
       this.linkEntity(id);
@@ -247,8 +304,8 @@ export class PeopleRepo {
       this.db.prepare('DELETE FROM people WHERE id = ?').run(dropId);
       for (const a of moved) this.insertAlias(keepId, a.kind, a.value, true);
       this.insertAlias(keepId, 'name', drop.name, true);
-      const note = [keep.note, drop.note].filter(Boolean).join('\n') || null;
-      this.db.prepare('UPDATE people SET note = ?, entity_id = COALESCE(entity_id, ?), updated_at = ? WHERE id = ?').run(note, drop.entity_id, this.now(), keepId);
+      // Their facts moved above; the note column isn't read any more (decision 84).
+      this.db.prepare('UPDATE people SET entity_id = COALESCE(entity_id, ?), updated_at = ? WHERE id = ?').run(drop.entity_id, this.now(), keepId);
     });
     return this.get(keepId)!;
   }
@@ -458,13 +515,14 @@ export class PeopleRepo {
     return (
       this.db
         .prepare(
-          `SELECT DISTINCT i.id, i.created_at FROM items i
-           JOIN item_entities ie ON ie.item_id = i.id JOIN entities e ON e.id = ie.entity_id
-           WHERE (e.id = ? OR (e.kind = 'person' AND e.canonical IN (${marks})))
+          `SELECT i.id, i.created_at FROM items i
+           WHERE (EXISTS (SELECT 1 FROM item_entities ie JOIN entities e ON e.id = ie.entity_id
+                          WHERE ie.item_id = i.id AND (e.id = ? OR (e.kind = 'person' AND e.canonical IN (${marks}))))
+                  OR EXISTS (SELECT 1 FROM item_links l WHERE l.item_id = i.id AND l.kind = 'person' AND l.target_id = ?))
            ${sourceApp ? 'AND lower(i.source_app) = ?' : ''}
            ORDER BY i.created_at DESC LIMIT ?`,
         )
-        .all(p.entity_id ?? '', ...names, ...(sourceApp ? [sourceApp] : []), limit) as { id: string }[]
+        .all(p.entity_id ?? '', ...names, personId, ...(sourceApp ? [sourceApp] : []), limit) as { id: string }[]
     ).map((r) => r.id);
   }
 
@@ -495,6 +553,7 @@ export class PeopleRepo {
       id: p.id,
       name: p.name,
       note: p.note,
+      facts: this.facts(personId),
       relationship: p.relationship,
       aliases: p.aliases,
       youOwe: open.filter((c) => c.owner === 'me'),

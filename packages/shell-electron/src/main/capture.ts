@@ -2379,10 +2379,10 @@ ${s.selection.text}`;
       editPerson: (p, _asked, label) => {
         const before = sv.people.get(p.personId);
         if (!before) return fail(`${p.name} isn't in your people any more.`);
-        // The line the model says this changes is replaced (the live check found "vegetarian" and "vegan now" side by side).
+        // Their facts get the new line (decision 84); the one the model says it changes is replaced (the live check found "vegetarian" and "vegan now" side by side).
         const note = p.addNote ? noteWithLine(before.note, p.addNote, p.replaces) : before.note;
         return register('person', label, true, () => {
-          sv.people.update(p.personId, { note, relationship: p.relationship ?? before.relationship });
+          sv.people.update(p.personId, { note, relationship: p.relationship ?? before.relationship }, 'ask');
           return () => {
             if (sv.people.get(p.personId)) sv.people.update(p.personId, { note: before.note, relationship: before.relationship });
           };

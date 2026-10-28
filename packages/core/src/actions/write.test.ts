@@ -14,6 +14,7 @@ const jordan: PersonCard = {
   name: 'Jordan Hale',
   relationship: 'professional',
   note: 'Runs marketing at Acme',
+  facts: [{ id: 'f1', person_id: 'p1', text: 'Runs marketing at Acme', source: 'you', created_at: '2026-10-01T09:00:00-04:00' }],
   aliases: [],
   youOwe: [{ id: 'c1', owner: 'me', text: 'Send Jordan the Acme deck', due_at: '2026-10-14', status: 'open', completed_at: null, person_id: 'p1', person_name: 'Jordan Hale' }],
   theyOwe: [],

@@ -176,6 +176,47 @@ describe('Store', () => {
     expect(store.db.prepare('SELECT COUNT(*) AS n FROM person_facts').get()).toEqual({ n: 0 });
   });
 
+  it('reads a person\'s note from their facts and writes the note as facts (decision 84)', () => {
+    store = new Store(':memory:');
+    let t = 0;
+    const people = new PeopleRepo(store, () => `2026-10-19T10:00:${String(t++).padStart(2, '0')}-04:00`);
+    const casey = people.create({ name: 'Casey Lin', note: '- Vegetarian\nWorks at Northwind' });
+    expect(people.facts(casey.id).map((f) => [f.text, f.source])).toEqual([
+      ['Vegetarian', 'you'],
+      ['Works at Northwind', 'you'],
+    ]);
+    expect(people.get(casey.id)?.note).toBe('Vegetarian\nWorks at Northwind');
+    expect(people.list().find((p) => p.id === casey.id)?.note).toBe('Vegetarian\nWorks at Northwind');
+
+    // Ask's update_person rewords one line: the other keeps its source and date, the new one is Ask's.
+    const before = people.facts(casey.id)[1]!;
+    people.update(casey.id, { note: 'Vegan now\nWorks at Northwind' }, 'ask');
+    expect(people.facts(casey.id).map((f) => [f.text, f.source])).toEqual([
+      ['Works at Northwind', 'you'],
+      ['Vegan now', 'ask'],
+    ]);
+    expect(people.facts(casey.id)[0]).toEqual(before);
+    people.update(casey.id, { relationship: 'colleague' });
+    expect(people.facts(casey.id)).toHaveLength(2);
+    people.update(casey.id, { note: null });
+    expect(people.get(casey.id)?.note).toBeNull();
+  });
+
+  it('copies note lines written before facts into facts, once (decision 84)', () => {
+    store = new Store(':memory:');
+    const people = new PeopleRepo(store);
+    const jordan = people.create({ name: 'Jordan Hale' });
+    people.addFact(jordan.id, 'Leads the pricing project', 'ask');
+    store.db.prepare('UPDATE people SET note = ? WHERE id = ?').run('Leads the pricing project\n• Moving to Berlin in January', jordan.id);
+    expect(people.catchUpNotes()).toBe(1);
+    expect(people.facts(jordan.id).map((f) => [f.text, f.source])).toEqual([
+      ['Leads the pricing project', 'ask'],
+      ['Moving to Berlin in January', 'note'],
+    ]);
+    store.db.prepare('UPDATE people SET note = ? WHERE id = ?').run('Something else', jordan.id);
+    expect(people.catchUpNotes()).toBe(0);
+  });
+
   it('round-trips settings with defaults for missing and corrupt keys', () => {
     store = new Store(':memory:');
     expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);

@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import type { CalendarEvent } from '../calendar/types';
 import type { CommitmentView, Interaction, Person, PersonAlias } from '../people/types';
+import { NOTE_FROM_FACTS } from '../store/people';
 import type { ContextKind, Store } from '../store/store';
 
 export interface ContextDoc {
@@ -101,7 +102,7 @@ export function contextDocs(store: Store): ContextDoc[] {
   }
 
   const docs: ContextDoc[] = [];
-  const people = db.prepare('SELECT id, name, note, relationship FROM people').all() as Pick<Person, 'id' | 'name' | 'note' | 'relationship'>[];
+  const people = db.prepare(`SELECT p.id, p.name, ${NOTE_FROM_FACTS} AS note, p.relationship FROM people p`).all() as Pick<Person, 'id' | 'name' | 'note' | 'relationship'>[];
   for (const p of people) docs.push(personDoc({ ...p, aliases: aliases.get(p.id) ?? [] }, recent.get(p.id) ?? []));
   const tasks = db
     .prepare('SELECT c.id, c.owner, c.text, c.due_at, p.name AS person_name FROM commitments c LEFT JOIN people p ON p.id = c.person_id')
