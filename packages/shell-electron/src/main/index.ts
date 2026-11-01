@@ -121,6 +121,8 @@ async function main(): Promise<void> {
 
   if (services.embed.downloaded || services.settings.firstRunComplete) services.embed.start();
   services.refreshIfStale().catch((e: unknown) => log.warn('catalog refresh failed', errorInfo(e)));
+  // Once, a minute in, so it doesn't compete with the first selection (Step 28h).
+  setTimeout(() => void services.sortOldMemories(), 60_000).unref();
   setInterval(() => services.pruneCallLog(), 86_400_000).unref();
   // Opening Glossly opens its window, like any app; at sign-in it starts quietly in the tray.
   syncLoginItem(services.settings.openAtLogin);

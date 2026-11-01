@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { app } from 'electron';
 import { getLoadablePath } from 'sqlite-vec';
 import {
   AiSdkLlm,
+  sortMemories,
   CalendarRepo,
   DEFAULT_BLOCK_LIST,
   DEFAULT_HOTKEY_ONLY,
@@ -284,6 +286,35 @@ export class Services extends EventEmitter<{ settings: [Settings]; people: [] }>
    * "Delete all data": saved items and their preview images, entities, people, vectors, usage
    * events, and collections. Keys, settings, the model list, and the embedding model stay.
    */
+  /**
+   * Once (decision 84, Step 28h): moves Ask's older memories where their subject is, a fact about
+   * the user to Profile and one about a saved person to their facts, with the Fast model. It waits
+   * for a model (none under Local only without a local one) and tries again at the next start if a
+   * call fails; it's recorded as done only when it finishes.
+   */
+  async sortOldMemories(): Promise<void> {
+    if (this.store.getMeta('memories_sorted') === 'done' || !this.llm.hasModel('fast')) return;
+    const t = performance.now();
+    try {
+      const r = await sortMemories({
+        llm: this.llm,
+        store: this.store,
+        people: this.people,
+        userName: this.settingsCache.identity.name,
+        aboutMe: () => this.settingsCache.aboutMe,
+        setAboutMe: (next) => void this.setSetting('aboutMe', next),
+        newId: () => randomUUID(),
+        now: () => isoNow(),
+      });
+      this.store.setMeta('memories_sorted', 'done');
+      log.info('memories sorted', { ...r, ms: Math.round(performance.now() - t) });
+      this.metrics.record('memories_sorted', { ...r });
+      if (r.toUser || r.toPeople) this.emit('people');
+    } catch (e) {
+      log.warn('memories not sorted', { code: (e as Error)?.name ?? 'error' });
+    }
+  }
+
   async deleteAll(): Promise<void> {
     // A save still being enriched would write its vector and entities after the wipe.
     await Promise.race([this.save.idle(), new Promise((r) => setTimeout(r, 2000))]);
