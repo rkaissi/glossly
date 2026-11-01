@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Edit proposal</title>
+<!-- packages/ui/src/theme.css, inlined so the page renders anywhere -->
+<style>
+/*
+ * Shared tokens for the overlay and the settings window (Step 13 redesign, Step 20.1 scale).
+ * Monochrome: no accent color anywhere (Rayan kept it in Step 20.1, decision 39). Light and dark follow the system theme. The windows themselves are
+ * Windows 11 acrylic (overlay) and mica (settings); `--glass` is the tint laid over them so
+ * text stays readable on busy backgrounds.
+ */
+:root {
+  color-scheme: light;
+  --fg: #0d0d0d;
+  --fg-2: #4b4b4b;
+  --muted: #7a7a7a;
+  --faint: #a3a3a3;
+  --glass: rgba(255, 255, 255, 0.58);
+  /* Used where there is no acrylic or mica behind (Windows 10, the dot). */
+  --glass-solid: rgba(250, 250, 250, 0.97);
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(0, 0, 0, 0.035);
+  --hover: rgba(0, 0, 0, 0.055);
+  --pressed: rgba(0, 0, 0, 0.09);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --primary: #0d0d0d;
+  --primary-fg: #ffffff;
+  --primary-hover: #2f2f2f;
+  --ring: rgba(0, 0, 0, 0.42);
+  --select: rgba(0, 0, 0, 0.12);
+  --danger: #b42318;
+  --ok: #1f7a43;
+  --warn: #8a5a00;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --danger-solid: #c2463a;
+  --danger-solid-hover: #b03e33;
+  --border-hover: rgba(0, 0, 0, 0.34);
+  --toggle-on-hover: #404040;
+  --seg-thumb: #ffffff;
+  --popover: rgba(252, 252, 252, 0.94);
+  --popover-blur: saturate(1.6) blur(28px);
+  --shadow-lg: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12);
+  /* The scale (Step 20.1): a 4 px grid, three control heights, two icon sizes, one radius scale. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --h-sm: 28px;
+  /* Quiet buttons inside the overlay's dense panel rows (Copy, Edit, Redo, Undo). */
+  --h-xs: 26px;
+  --h-md: 32px;
+  --h-lg: 36px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --row-h: 40px;
+  --row-px: 12px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --fade: 150ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /*
+   * Motion (Step 20.3, decision 41): damped springs sampled into linear() curves (the spring()
+   * generator is in docs/design/mockups/20-3-design-pass.html). Soft for things that appear,
+   * pop for small things (checks, presses), gentle for big things (panels). Exits ease in, fast,
+   * with no bounce.
+   */
+  --spring-soft: linear(0, 0.019, 0.067, 0.136, 0.218, 0.306, 0.395, 0.483, 0.566, 0.642, 0.711, 0.772, 0.825, 0.871, 0.909, 0.94, 0.965, 0.985, 1, 1.011, 1.019, 1.024, 1.027, 1.028, 1.028, 1.027, 1.025, 1.023, 1.02, 1.018, 1.015, 1.013, 1.011, 1.009, 1.007, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+  --spring-soft-ms: 470ms; /* 2.8% overshoot */
+  --spring-pop: linear(0, 0.03, 0.108, 0.216, 0.338, 0.464, 0.586, 0.697, 0.794, 0.876, 0.942, 0.992, 1.029, 1.054, 1.069, 1.075, 1.075, 1.071, 1.064, 1.055, 1.046, 1.036, 1.028, 1.02, 1.013, 1.007, 1.003, 0.999, 0.997, 0.995, 0.995, 0.994, 0.994, 0.995, 0.995, 0.996, 0.997, 0.998, 0.998, 0.999, 1);
+  --spring-pop-ms: 510ms; /* 7.5% overshoot */
+  --spring-gentle: linear(0, 0.021, 0.073, 0.146, 0.231, 0.321, 0.411, 0.498, 0.578, 0.651, 0.717, 0.774, 0.823, 0.865, 0.899, 0.928, 0.95, 0.969, 0.983, 0.993, 1.001, 1.006, 1.01, 1.012, 1.013, 1.013, 1.013, 1.012, 1.011, 1.01, 1.009, 1.008, 1.006, 1.005, 1.004, 1.004, 1.003, 1.002, 1.002, 1.001, 1);
+  --spring-gentle-ms: 580ms; /* 1.3% overshoot */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --mono: 'Cascadia Mono', ui-monospace, Consolas, monospace;
+  --font: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font: 14px/1.45 var(--font);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fg: #ececec;
+    --fg-2: #c2c2c2;
+    --muted: #949494;
+    --faint: #6b6b6b;
+    --glass: rgba(28, 28, 28, 0.5);
+    --glass-solid: rgba(36, 36, 36, 0.97);
+    --surface: rgba(255, 255, 255, 0.055);
+    --surface-2: rgba(255, 255, 255, 0.045);
+    --hover: rgba(255, 255, 255, 0.075);
+    --pressed: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --primary: #ececec;
+    --primary-fg: #0d0d0d;
+    --primary-hover: #ffffff;
+    --ring: rgba(255, 255, 255, 0.5);
+    --select: rgba(255, 255, 255, 0.16);
+    --danger: #ff8a80;
+    --ok: #7fd6a0;
+    --warn: #e8c070;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+    --border-hover: rgba(255, 255, 255, 0.4);
+    --toggle-on-hover: #c4c4c4;
+    --seg-thumb: rgba(255, 255, 255, 0.12);
+    --popover: rgba(40, 40, 40, 0.92);
+    --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 16px rgba(0, 0, 0, 0.3), 0 24px 48px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] { color-scheme: dark; --fg:#ececec; --fg-2:#c2c2c2; --muted:#949494; --faint:#6b6b6b; --glass:rgba(28,28,28,.5); --glass-solid:rgba(36,36,36,.97); --surface:rgba(255,255,255,.055); --surface-2:rgba(255,255,255,.045); --hover:rgba(255,255,255,.075); --pressed:rgba(255,255,255,.12); --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.18); --primary:#ececec; --primary-fg:#0d0d0d; --ring:rgba(255,255,255,.5); --seg-thumb:rgba(255,255,255,.12); --popover:rgba(40,40,40,.92); --shadow-lg:0 0 0 1px rgba(255,255,255,.08),0 8px 16px rgba(0,0,0,.3),0 24px 48px rgba(0,0,0,.4); }
+:root[data-theme="light"] { color-scheme: light; --fg:#0d0d0d; --fg-2:#4b4b4b; --muted:#7a7a7a; --faint:#a3a3a3; --glass-solid:rgba(250,250,250,.97); --surface:rgba(255,255,255,.78); --surface-2:rgba(0,0,0,.035); --hover:rgba(0,0,0,.055); --pressed:rgba(0,0,0,.09); --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.16); --primary:#0d0d0d; --primary-fg:#fff; --ring:rgba(0,0,0,.42); --seg-thumb:#fff; --shadow-lg:0 0 0 1px rgba(0,0,0,.06),0 8px 16px rgba(0,0,0,.08),0 24px 48px rgba(0,0,0,.12); }
+body { margin:0; background:#e9e9e7; color:var(--fg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body { background:#161616; } }
+:root[data-theme="dark"] body { background:#161616; }
+button { font:inherit; color:inherit; height:var(--h-md); padding:0 12px; border-radius:var(--radius-sm); border:none; background:transparent; box-shadow:inset 0 0 0 1px var(--border-strong); display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap; }
+button:hover { background:var(--hover); }
+button.primary { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+button.ghost { box-shadow:none; color:var(--fg-2); }
+kbd { font:600 11px/18px var(--mono); padding:0 5px; border-radius:5px; background:color-mix(in srgb,var(--fg) 7%,transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--fg) 14%,transparent); color:var(--fg-2); }
+code { font:12px var(--mono); }
+svg.i { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+svg.i.sm { width:14px; height:14px; }
+
+/* page */
+.page { max-width:1180px; margin:0 auto; padding:32px 24px 80px; }
+header.top { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+header.top h1 { font:600 26px/1.2 var(--font-display); margin:0; }
+.toggle-theme { margin-left:auto; }
+.lede { color:var(--fg-2); max-width:760px; margin:0 0 28px; }
+section.board { margin:44px 0 0; }
+section.board > h2 { font:600 18px/1.3 var(--font-display); margin:0 0 4px; }
+section.board > p.what { color:var(--fg-2); margin:0 0 16px; max-width:780px; }
+.pair { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr)); gap:24px; align-items:start; }
+.label { font:600 11px/1 var(--font); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+.notes { margin:12px 0 0; padding-left:18px; color:var(--fg-2); font-size:13px; }
+.notes li { margin:4px 0; }
+
+/* the app behind the overlay, always light so it reads as "some other app" */
+.app { background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.1); overflow:hidden; font-size:13px; color:#222; }
+.app .chrome { height:30px; display:flex; align-items:center; padding:0 10px; gap:8px; background:#f3f3f3; font-size:12px; color:#777; }
+.app .body { padding:12px 14px 34px; line-height:1.5; }
+.app .field { border:1px solid rgba(0,0,0,.12); border-radius:6px; padding:8px 10px; min-height:60px; }
+.caret { display:inline-block; width:1.5px; height:15px; background:currentColor; vertical-align:-3px; animation:blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.quoted { color:#888; border-left:2px solid rgba(0,0,0,.12); padding-left:8px; margin-top:8px; }
+.stage .frame { margin:-26px 0 0 36px; position:relative; }
+
+/* the overlay */
+.frame { width:460px; max-width:100%; background:var(--glass-solid); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); display:flex; flex-direction:column; overflow:hidden; }
+.frame > :not(.row) { border-top:1px solid var(--border); }
+.frame > .panel:first-child { border-top:none; }
+.row { height:40px; display:flex; align-items:center; gap:4px; padding:4px; overflow:hidden; }
+.slot { height:32px; padding:0 10px; gap:7px; box-shadow:none; color:var(--fg); flex:0 1 auto; min-width:0; }
+.slot span { overflow:hidden; text-overflow:ellipsis; }
+.slot.later { color:var(--fg-2); }
+.slot.highlight { background:var(--hover); box-shadow:inset 0 0 0 1.5px var(--ring); }
+.panel { padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.panel h2 { margin:0; font:600 15px/1.35 var(--font-display); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.panel h2 .muted { font-weight:400; }
+.muted { color:var(--muted); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { height:28px; padding:0 12px; border-radius:999px; font-size:13px; }
+.chip.selected { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.chip.sug { gap:6px; color:var(--fg-2); }
+.chip.sug svg { color:var(--muted); }
+.seg { display:inline-flex; padding:2px; border-radius:var(--radius-sm); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); }
+.seg button { height:24px; padding:0 10px; font-size:12.5px; box-shadow:none; border-radius:6px; color:var(--fg-2); }
+.seg button.on { background:var(--seg-thumb); color:var(--fg); box-shadow:var(--shadow-sm); }
+.draft { background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 10px; line-height:1.55; white-space:pre-wrap; min-height:80px; }
+.draft .cur { display:inline-block; width:7px; height:14px; background:var(--fg-2); vertical-align:-2px; border-radius:1px; animation:blink 1s steps(1) infinite; }
+.composer { display:flex; align-items:center; gap:6px; height:40px; padding:0 4px 0 12px; background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-md); }
+.composer.small { height:34px; }
+.composer .ph { flex:1; color:var(--faint); }
+.send { width:28px; height:28px; padding:0; border-radius:50%; justify-content:center; background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.composer.small .send { width:24px; height:24px; }
+.used { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:999px; font-size:12.5px; color:var(--fg-2); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); align-self:flex-start; }
+.panel-foot { display:flex; align-items:center; gap:8px; min-height:24px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+.panel-foot button { height:var(--h-xs); padding:0 10px; font-size:12.5px; }
+.spacer { flex:1; }
+.srcs { display:flex; flex-direction:column; border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; }
+.src { display:flex; align-items:flex-start; gap:10px; padding:8px 10px; font-size:13px; }
+.src + .src { border-top:1px solid var(--border); }
+.src .k { flex:none; width:76px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding-top:2px; }
+.src .t { flex:1; min-width:0; }
+.src .why { display:block; font-size:12px; color:var(--muted); }
+.src .x { height:22px; width:22px; padding:0; justify-content:center; box-shadow:none; color:var(--muted); }
+.src.off .t > :first-child, .src.off .t { color:var(--faint); }
+.src.off .t s { text-decoration-color:var(--faint); }
+.check { width:16px; height:16px; flex:none; border-radius:4px; background:var(--primary); color:var(--primary-fg); display:inline-flex; align-items:center; justify-content:center; margin-top:2px; }
+.check.no { background:transparent; box-shadow:inset 0 0 0 1.5px var(--border-strong); }
+.note { display:flex; gap:8px; align-items:center; font-size:12.5px; color:var(--fg-2); flex-wrap:wrap; }
+.cmp { display:grid; grid-template-columns:120px 1fr 1fr; border:1px solid var(--border-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--glass-solid); font-size:13px; }
+.cmp > div { padding:8px 12px; border-top:1px solid var(--border); }
+.cmp > div:nth-child(-n+3) { border-top:none; font-weight:600; background:var(--surface-2); }
+.cmp > div:nth-child(3n+1) { color:var(--muted); }
+.tag { font-size:11px; padding:1px 6px; border-radius:4px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); color:var(--fg-2); }
+@media (max-width:560px) { .page { padding:24px 16px 60px; } .stage .frame { margin:-20px 0 0 0; } .cmp { grid-template-columns:80px 1fr 1fr; font-size:12px; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ask" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="clip" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="reply" viewBox="0 0 24 24"><path d="M9 17l-5-5 5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></symbol>
+  <symbol id="enter" viewBox="0 0 24 24"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+  <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="task" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="redo" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+</svg>
+<style>
+/* Step 29 additions */
+.app .field.sel-wrap { min-height:70px; }
+.sel { background:#cfe3ff; border-radius:2px; }
+.chip.first { box-shadow:inset 0 0 0 1.5px var(--ring); }
+.chip.model { gap:6px; color:var(--fg-2); box-shadow:inset 0 0 0 1px var(--border-strong); border-style:dashed; }
+.chip.model svg { color:var(--muted); }
+.chip.model.loading { color:var(--faint); box-shadow:inset 0 0 0 1px var(--border); }
+.chip .n { font:600 11px/16px var(--font); padding:0 5px; border-radius:999px; background:var(--primary); color:var(--primary-fg); }
+.result { background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 10px; line-height:1.6; white-space:pre-wrap; }
+.result del { color:var(--faint); text-decoration:line-through; text-decoration-color:var(--muted); }
+.result ins { text-decoration:none; background:var(--select); border-radius:3px; padding:0 2px; font-weight:600; }
+.trail { display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--muted); flex-wrap:wrap; }
+.trail .step { height:24px; padding:0 9px; border-radius:999px; font-size:12px; color:var(--fg-2); background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); }
+.trail .step.on { background:var(--primary); color:var(--primary-fg); box-shadow:none; }
+.kept { font-size:12px; color:var(--muted); }
+.menu { width:220px; background:var(--popover); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:4px; display:flex; flex-direction:column; margin:6px 0 0 auto; }
+.menu button { height:32px; box-shadow:none; justify-content:flex-start; width:100%; }
+.menu button.on { background:var(--hover); }
+.toast { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 6px 0 12px; border-radius:var(--radius-md); background:var(--glass-solid); box-shadow:var(--shadow-lg); font-size:13px; }
+.toast button { height:26px; font-size:12.5px; }
+.rules { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); border:1px solid var(--border-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--glass-solid); font-size:13px; }
+.rules > div { padding:8px 12px; border-top:1px solid var(--border); }
+.rules > div:nth-child(-n+2) { border-top:none; font-weight:600; background:var(--surface-2); }
+.rules .ex { font-family:var(--mono); font-size:12px; color:var(--fg-2); }
+.fmtnote { font-size:12px; color:var(--muted); display:flex; gap:6px; align-items:center; }
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="save" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="edit" viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14 8l3 3"/><path d="M14 20h6"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="who" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+</svg>
+<div class="page">
+<header class="top">
+  <h1>Edit</h1>
+  <span class="muted">Step 29 proposal: change the text you selected, in place</span>
+  <button class="toggle-theme ghost" onclick="const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
+</header>
+<p class="lede">Select text in a field you can type in, and the bar offers Edit. Its panel has a box for any change and buttons picked for this text. The result shows with its changes marked, and Enter puts it in place of the selection. Nothing in the field changes until you press Replace. All people, companies, and text below are made up.</p>
+
+<!-- 1 -->
+<section class="board">
+  <h2>1. When Edit shows up</h2>
+  <p class="what">A selection in a field you can type in gets Edit in slot 3. Ask and Save keep 1 and 2, and slot 4 is still the router's pick. With nothing selected the bar works as it does today, so Write here and Edit are never on the bar together.</p>
+  <div class="pair">
+    <div>
+      <p class="label">Your own draft selected in a reply box</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#save"/></svg><span>Save</span><kbd>2</kbd></button>
+        <button class="slot highlight"><svg class="i"><use href="#edit"/></svg><span>Edit</span><kbd>3</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#task"/></svg><span>Tasks</span><kbd>4</kbd></button>
+      </div></div>
+      <ul class="notes"><li>Slot 4 here is Tasks because the draft promises "I'll send it Friday". Without a promise it's whatever the router picks, or nothing.</li></ul>
+      <p class="label" style="margin-top:16px">Nothing selected, caret in the same box</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#search"/></svg><span>Search</span><kbd>2</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#reply"/></svg><span>Reply</span><kbd>3</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#pen"/></svg><span>Write here</span><kbd>4</kbd></button>
+      </div></div>
+      <ul class="notes"><li>As today (decision 82). Edit needs a selection, so it isn't here.</li></ul>
+    </div>
+    <div>
+      <p class="label">Their quoted email selected inside your reply</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#save"/></svg><span>Save</span><kbd>2</kbd></button>
+        <button class="slot highlight"><svg class="i"><use href="#reply"/></svg><span>Reply</span><kbd>3</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#edit"/></svg><span>Edit</span><kbd>4</kbd></button>
+      </div></div>
+      <ul class="notes"><li>The field is editable, but the text has a quote header ("On Tue, Jordan Hale wrote:") or <code>&gt;</code> lines, so it's someone else's message: Reply wins slot 3.</li></ul>
+      <p class="label" style="margin-top:16px">A message selected on a page you can't type in</p>
+      <div class="frame"><div class="row">
+        <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span><kbd>1</kbd></button>
+        <button class="slot"><svg class="i"><use href="#save"/></svg><span>Save</span><kbd>2</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#reply"/></svg><span>Reply</span><kbd>3</kbd></button>
+        <button class="slot later"><svg class="i"><use href="#who"/></svg><span>Who is this</span><kbd>4</kbd></button>
+        <span class="spacer"></span>
+        <button class="slot later"><svg class="i"><use href="#more"/></svg></button>
+      </div></div>
+      <div class="menu">
+        <button><svg class="i"><use href="#task"/></svg>Tasks and events</button>
+        <button class="on"><svg class="i"><use href="#edit"/></svg>Edit <span class="spacer"></span><span class="muted" style="font-size:12px">copy only</span></button>
+        <button><svg class="i"><use href="#search"/></svg>Search</button>
+      </div>
+      <ul class="notes"><li>Edit is only under More here, and its result can be copied, not put back.</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="board">
+  <h2>2. Opening Edit</h2>
+  <p class="what">The panel opens at once with the rule buttons. One quick model call adds up to two buttons made for this text (dashed). They appear a moment later, and the rule buttons never wait for them.</p>
+  <div class="pair">
+    <div class="stage">
+      <div class="app">
+        <div class="chrome">Re: Northwind invoice · Mail</div>
+        <div class="body"><div class="field sel-wrap"><span class="sel">hey Casey, thanks for the reciept. Ill send the signed copy to Northwind tommorow, sorry for the delay</span><span class="caret"></span></div></div>
+      </div>
+      <div class="frame">
+        <div class="row">
+          <button class="slot"><svg class="i"><use href="#ask"/></svg><span>Ask</span></button>
+          <button class="slot"><svg class="i"><use href="#save"/></svg><span>Save</span></button>
+          <button class="slot highlight"><svg class="i"><use href="#edit"/></svg><span>Edit</span></button>
+          <button class="slot later"><svg class="i"><use href="#task"/></svg><span>Tasks</span></button>
+        </div>
+        <div class="panel">
+          <h2><svg class="i"><use href="#edit"/></svg>Edit your text <span class="muted">· 17 words</span></h2>
+          <div class="composer small"><span class="ph">Describe a change…</span><button class="send"><svg class="i sm"><use href="#up"/></svg></button></div>
+          <div class="chips">
+            <button class="chip first">Fix 4 mistakes</button>
+            <button class="chip">Rewrite</button>
+            <button class="chip">Shorter</button>
+            <button class="chip">Friendlier</button>
+            <button class="chip">More formal</button>
+            <button class="chip model"><svg class="i sm"><use href="#ask"/></svg>Give a time</button>
+          </div>
+          <div class="panel-foot"><span><kbd>Tab</kbd> buttons · <kbd>Enter</kbd> run · <kbd>Esc</kbd> back</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="label">How the buttons were picked</p>
+      <ul class="notes">
+        <li><b>Fix</b> comes first. It opened as "Fix 3 typos": the spellchecker found "reciept", "Ill", and "tommorow". It also flagged "Northwind" and "Casey", but they're saved names (an entity and a person), so they don't count. A moment later the model counted one grammar problem (the run-on before "sorry"), so it now reads "Fix 4 mistakes". With no typos and no grammar problems there's no Fix button at all; with grammar problems only, it's "Fix grammar".</li>
+        <li><b>Rewrite, Shorter, Friendlier, More formal</b> are always there for prose.</li>
+        <li><b>Give a time</b> (dashed) is the model's idea for this text: "tomorrow" with no time, in a promise.</li>
+        <li>The box takes anything: "say it was my fault", "in French", "as bullet points".</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="board">
+  <h2>3. Fix: the changes, marked</h2>
+  <p class="what">A fix shows every change in place: the old word struck out, the new one highlighted. Enter replaces the selection in your field.</p>
+  <div class="pair">
+    <div class="frame"><div class="panel">
+      <h2><svg class="i"><use href="#edit"/></svg>Fixed 4 mistakes</h2>
+      <div class="result">hey Casey, thanks for the <del>reciept</del> <ins>receipt</ins>. <del>Ill</del> <ins>I'll</ins> send the signed copy to Northwind <del>tommorow</del><del>,</del> <ins>tomorrow.</ins> <del>sorry</del> <ins>Sorry</ins> for the delay<ins>.</ins></div>
+      <div class="kept">Left alone: Casey, Northwind (saved names).</div>
+      <div class="chips"><button class="chip">Friendlier</button><button class="chip">More formal</button><button class="chip">Shorter</button></div>
+      <div class="composer small"><span class="ph">Change it more…</span><button class="send"><svg class="i sm"><use href="#up"/></svg></button></div>
+      <div class="panel-foot"><span><kbd>Enter</kbd> replace · <kbd>Esc</kbd> back</span><span class="spacer"></span>
+        <button class="ghost"><svg class="i sm"><use href="#redo"/></svg>Try again</button>
+        <button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button>
+        <button class="primary"><svg class="i sm"><use href="#enter"/></svg>Replace</button></div>
+    </div></div>
+    <div>
+      <ul class="notes">
+        <li>A fix changes as little as it can and keeps your casual tone ("hey" stays). It runs on the quick model, so it's back in about a second.</li>
+        <li>The marks are only in the panel. Replace puts in the clean text.</li>
+        <li>"Left alone" shows when a flagged word was skipped because it's a name, so you can see why it wasn't touched.</li>
+        <li>Buttons under the result change it again on top of the fix (section 5).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="board">
+  <h2>4. A bigger change: plain text, with changes on demand</h2>
+  <p class="what">When most words change (Rewrite, Friendlier, a typed request), the marks would bury the text, so it shows plain. "Show changes" turns the marks on.</p>
+  <div class="pair">
+    <div>
+      <p class="label">Friendlier · changes hidden</p>
+      <div class="frame"><div class="panel">
+        <h2><svg class="i"><use href="#edit"/></svg>Friendlier <span class="spacer"></span><span class="seg"><button class="on">Result</button><button>Show changes</button></span></h2>
+        <div class="result">Hi Casey, thanks so much for the receipt! I'll get the signed copy over to Northwind tomorrow. Sorry it took me a while.</div>
+        <div class="panel-foot"><span><kbd>Enter</kbd> replace</span><span class="spacer"></span>
+          <button class="ghost"><svg class="i sm"><use href="#redo"/></svg>Try again</button>
+          <button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button>
+          <button class="primary"><svg class="i sm"><use href="#enter"/></svg>Replace</button></div>
+      </div></div>
+    </div>
+    <div>
+      <p class="label">Same result · Show changes</p>
+      <div class="frame"><div class="panel">
+        <h2><svg class="i"><use href="#edit"/></svg>Friendlier <span class="spacer"></span><span class="seg"><button>Result</button><button class="on">Show changes</button></span></h2>
+        <div class="result"><del>hey</del> <ins>Hi</ins> Casey, thanks <ins>so much</ins> for the <del>reciept.</del> <ins>receipt!</ins> <del>Ill send</del> <ins>I'll get</ins> the signed copy <ins>over</ins> to Northwind <del>tommorow, sorry for the delay</del> <ins>tomorrow. Sorry it took me a while.</ins></div>
+        <div class="panel-foot"><span><kbd>Enter</kbd> replace</span><span class="spacer"></span>
+          <button class="ghost"><svg class="i sm"><use href="#redo"/></svg>Try again</button>
+          <button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button>
+          <button class="primary"><svg class="i sm"><use href="#enter"/></svg>Replace</button></div>
+      </div></div>
+    </div>
+  </div>
+  <ul class="notes"><li>Tone changes write in your learned voice (the style Reply and Write here share), so "Friendlier" sounds like you being friendly, not a template.</li><li>The switch remembers your choice. Fix typos always opens with the marks on.</li></ul>
+</section>
+
+<!-- 5 -->
+<section class="board">
+  <h2>5. Changes on top of changes</h2>
+  <p class="what">Each button or typed request applies to the latest result. A trail of steps sits above it, and clicking an earlier step goes back to it.</p>
+  <div class="pair">
+    <div class="frame"><div class="panel">
+      <div class="trail"><button class="step">Your text</button>›<button class="step">Fix 3 typos</button>›<button class="step">Friendlier</button>›<button class="step on">Shorter</button></div>
+      <div class="result">Hi Casey, thanks for the receipt! Signed copy goes to Northwind tomorrow. Sorry for the wait.</div>
+      <div class="chips"><button class="chip">Rewrite</button><button class="chip">More formal</button><button class="chip">Longer</button></div>
+      <div class="composer small"><span class="ph">Change it more…</span><button class="send"><svg class="i sm"><use href="#up"/></svg></button></div>
+      <div class="panel-foot"><span><kbd>Enter</kbd> replace · <kbd>Alt</kbd>+<kbd>←</kbd> step back</span><span class="spacer"></span>
+        <button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button>
+        <button class="primary"><svg class="i sm"><use href="#enter"/></svg>Replace</button></div>
+    </div></div>
+    <div>
+      <ul class="notes">
+        <li>Steps stay until the panel closes. Switching to another slot and back keeps them, like Write here's cached text.</li>
+        <li>After Shorter, the buttons swap to fit: Longer appears, Shorter goes.</li>
+        <li>Typed requests and tone buttons teach your style, like Write here's (when "Learn as I write" is on). Fixes teach nothing.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="board">
+  <h2>6. Write this out: an instruction or a placeholder</h2>
+  <p class="what">When the selection reads like a note to yourself ("tell…", "write…", "[pricing here]", "TODO: …"), Edit's first button writes the real text from what you saved, the way Write here does, with the same Used chip.</p>
+  <div class="pair">
+    <div class="stage">
+      <div class="app">
+        <div class="chrome">#acme-launch · Chat</div>
+        <div class="body"><div class="field sel-wrap"><span class="sel">tell jordan the deck slips to friday, nicely</span><span class="caret"></span></div></div>
+      </div>
+      <div class="frame">
+        <div class="panel">
+          <h2><svg class="i"><use href="#edit"/></svg>Write this out <span class="muted">· to Jordan</span></h2>
+          <div class="result">Hey Jordan, quick heads-up: the Acme deck needs a little more time, so I'll have it to you Friday instead of Wednesday. That still leaves the weekend before Monday's review. Thanks for bearing with me!</div>
+          <span class="used"><svg class="i sm"><use href="#chev"/></svg>Used 1 task · 1 event · Jordan</span>
+          <div class="chips"><button class="chip">Shorter</button><button class="chip">More formal</button><button class="chip model"><svg class="i sm"><use href="#ask"/></svg>Say why</button></div>
+          <div class="panel-foot"><span><kbd>Enter</kbd> replace</span><span class="spacer"></span>
+            <button class="ghost"><svg class="i sm"><use href="#copy"/></svg>Copy</button>
+            <button class="primary"><svg class="i sm"><use href="#enter"/></svg>Replace</button></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <ul class="notes">
+        <li>Write this out runs on its own when the whole selection is an instruction, since there's nothing to fix. A placeholder inside longer text ("…pricing: [table here]") gets it as the first button instead.</li>
+        <li>It knew "Wednesday" and "Monday's review" from the saved task and event, like Write here. Without saved matches it writes from the instruction alone.</li>
+        <li>This is the one selection case Write here used to cover, so the two never compete.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="board">
+  <h2>7. Putting it back, and when that can't happen</h2>
+  <p class="what">Replace goes back to the app, checks the selection is still the same text, and pastes over it. Your clipboard is put back after, as it is now. The app's own Ctrl+Z undoes it.</p>
+  <div class="pair">
+    <div>
+      <p class="label">Replaced</p>
+      <div class="toast"><svg class="i"><use href="#tick"/></svg>Replaced · <kbd>Ctrl</kbd>+<kbd>Z</kbd> in Mail undoes it<button class="ghost"><svg class="i sm"><use href="#x"/></svg></button></div>
+      <p class="label" style="margin-top:20px">The selection changed while the panel was open</p>
+      <div class="toast"><svg class="i"><use href="#info"/></svg>Your selection changed, so it's copied instead<button class="ghost">OK</button></div>
+      <p class="label" style="margin-top:20px">First Replace in a rich editor (once)</p>
+      <div class="frame"><div class="panel">
+        <div class="fmtnote"><svg class="i sm"><use href="#info"/></svg>Edit puts back plain text, so bold, links, and colours in the selection are lost.</div>
+        <div class="panel-foot"><span class="spacer"></span><button class="ghost">Copy instead</button><button class="primary"><svg class="i sm"><use href="#enter"/></svg>Replace anyway</button></div>
+      </div></div>
+    </div>
+    <div>
+      <p class="label">Outside a typing field (from More)</p>
+      <div class="frame"><div class="panel">
+        <h2><svg class="i"><use href="#edit"/></svg>Shorter <span class="muted">· copy only</span></h2>
+        <div class="result">Northwind moves the kickoff to May 6 and needs the signed SOW by Friday.</div>
+        <div class="panel-foot"><span><kbd>Enter</kbd> copy</span><span class="spacer"></span>
+          <button class="ghost"><svg class="i sm"><use href="#redo"/></svg>Try again</button>
+          <button class="primary"><svg class="i sm"><use href="#copy"/></svg>Copy</button></div>
+      </div></div>
+      <ul class="notes">
+        <li>No Replace, because the page can't be typed into. Enter copies.</li>
+        <li>The rich-editor note shows when the app is a document or mail editor (Word, Docs, Outlook, Gmail), once per app.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="board">
+  <h2>8. Which buttons show for which text</h2>
+  <p class="what">Rules decide at once, with no model call. The model's two buttons and its grammar count come in after.</p>
+  <div class="rules">
+    <div>Selected text</div><div>Buttons</div>
+    <div class="ex">thanks for the reciept, Ill send it tommorow</div><div><b>Fix 3 typos</b>, Rewrite, Shorter, Friendlier, More formal, Longer</div>
+    <div class="ex">Thanks Casey, I'll send Northwind the signed copy tomorrow.</div><div>Rewrite, Shorter, Friendlier, More formal (no typos, so no Fix)</div>
+    <div class="ex">The GPT5 demo on iPhone went well, ask Maya about the macOS build</div><div>No Fix: GPT5, iPhone, macOS have digits or inner capitals; Maya is a saved name</div>
+    <div class="ex">- pricing done<br>- quotes from Casey<br>- review Thu</div><div><b>Make it a paragraph</b>, Rewrite, Friendlier, More formal</div>
+    <div class="ex">We shipped the beta. Feedback was good. Two bugs remain. Docs are late.</div><div><b>Make a list</b>, Shorter, Rewrite, Friendlier, More formal</div>
+    <div class="ex">ok sounds good</div><div><b>Longer</b>, Friendlier, More formal</div>
+    <div class="ex">Merci pour le reçu, je l'envoie demain.</div><div><b>Translate to English</b>, then the usual buttons (the spellchecker skips text in another language)</div>
+    <div class="ex">tell jordan the deck slips to friday, nicely</div><div><b>Write this out</b> runs straight away</div>
+    <div class="ex">if (total &gt; limit) { warn(); }</div><div>Edit stays under More (code); in the panel only the box</div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>
