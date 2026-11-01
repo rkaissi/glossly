@@ -48,7 +48,7 @@ Press the hotkey with nothing selected in any text field, and Write here writes 
 
 ### Who is this
 
-A card for each person in what you selected: who they are to you, your notes, what you owe each other, and your last messages. New people can be added in one click, with their name, email, and handle filled in from the text.
+A card for each person in what you selected: who they are to you, a few things you know about them, what's coming up, what you owe each other, and your last messages. Their record in Settings lists everything you know about them and everything linked to them: saved items, tasks, and events. New people can be added in one click, with their name, email, and handle filled in from the text.
 
 <p align="center"><img src="docs/media/who.gif" width="820" alt="Who is this: a person card opened from a selected message"></p>
 
@@ -66,7 +66,7 @@ Ask anything about what you selected, or anything at all, and get the answer rig
 
 ### Save and Recall
 
-Save a highlight in one click (or automatically), sorted into a collection. Later, when you select something related, a badge shows the notes that match by meaning or by the people and companies in them. Search and matching run on your computer.
+Save a highlight in one click (or automatically). Glossly tells what it is (a snippet, a link, a chart, or a memory), keeps the page it came from with a preview of it, and links it to the people, tasks, and events it's about. Settings > Saved shows everything as a list or as cards, by type, person, or site. Later, when you select something related, a badge shows the notes that match by meaning or by the people and companies in them. Search and matching run on your computer.
 
 <p align="center"><img src="docs/media/recall.gif" width="820" alt="Save and Recall: saving a message, then seeing related notes on a later selection"></p>
 
@@ -83,7 +83,7 @@ Select a table (from a spreadsheet, a web page, Markdown, or a CSV) and get a cl
 <p align="center"><img src="docs/media/banner-connected.png" width="820" alt="Recall, Search, Write here, People, Calendar, and Local only, connected"></p>
 
 - **Search** everything you saved, your people, and open tasks: press the hotkey with nothing selected.
-- **Settings** has full Tasks and Calendar views, your people and saved items, model choices, privacy controls, and local usage metrics, in light and dark.
+- **Settings** has full Tasks and Calendar views, your people and saved items, a Profile with what Glossly knows about you and how you write, model choices, privacy controls, and local usage metrics, in light and dark.
 
 <details>
 <summary>Settings: the Calendar and Tasks tabs</summary>
@@ -141,6 +141,7 @@ Glossly is built so you decide what leaves your computer.
 - **Local only mode** keeps everything on your computer: a local model does the work, and features that would need a cloud model say so instead.
 - **Your data stays local.** Saved items, people, tasks, the calendar, and search embeddings live in a SQLite database in `%APPDATA%\Glossly`. Search runs on a small embedding model on your computer.
 - **Only the saved data that fits goes out.** Ask and Reply send just the few saved notes, people, tasks, and events closest to the question, show what they used, and Settings > Privacy turns this off.
+- **Link previews come from the page, signed out.** When you save from a web page, Glossly asks that page for its preview image and title, with none of your cookies or sign-ins, and never from an address on your computer or local network. A link you highlight waits until you click Load preview. Settings > Privacy turns previews off.
 - **Keys are encrypted** with Windows' data protection (Electron `safeStorage`) and only ever sent to their own provider. With a gateway or a host, your text goes to that service and from there to the model's maker.
 - **No password fields, no keylogging.** Password fields are never read, and the keyboard is never hooked.
 - **No telemetry.** Usage metrics are counts and timings, stored locally and shown in Settings > Metrics. Logs hold codes and timings, never your text.
@@ -205,6 +206,7 @@ docs/              Architecture, decisions, features, testing, and design notes
 - [x] Memory: answers that use what you saved, and Ask that remembers and acts
 - [x] Providers from a list: Gemini, xAI, DeepSeek, gateways, hosts, and any compatible address
 - [x] Write here: writes where you're typing from what you saved, and learns from your edits
+- [x] Saved, People, and Profile: saves sorted by type with page previews, facts on people, and one place for how you write
 - [ ] Code-signed installer
 - [ ] Google Calendar sync
 - [ ] macOS
