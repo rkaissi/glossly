@@ -609,15 +609,129 @@ th {
   width: 136px;
   flex: none;
 }
-.voice-add {
+/* Profile (decision 84): two groups, each a heading with a line and, for How you write, the switch. */
+.settings section > .group-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  margin: 40px 0 var(--s-3);
+}
+.settings section > p.muted:first-of-type + .group-head {
+  margin-top: 0;
+}
+.group-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.group-head h3 {
+  margin: 0;
+}
+.group-head p {
+  margin: 2px 0 0;
+}
+.group-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 13px;
+  color: var(--fg-2);
+  white-space: nowrap;
+  margin-top: 2px;
+}
+.place-pill {
+  flex: none;
+  font-size: 11.5px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.habits li {
+  padding-top: var(--s-2);
+  padding-bottom: var(--s-2);
+}
+.habit-text {
+  font-weight: 500;
+}
+.facts-me .fact-acts {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--fade) ease;
+}
+.facts-me li:hover .fact-acts,
+.facts-me li:focus-within .fact-acts {
+  opacity: 1;
+}
+button.add-fact {
+  color: var(--muted);
+  padding: 0;
+  height: auto;
+  gap: 6px;
+}
+button.add-fact:hover:not(:disabled) {
+  background: transparent;
+  color: var(--fg);
+}
+.form-status:empty {
+  display: none;
+}
+.examples-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--s-3);
+}
+.example {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+  min-width: 0;
 }
-.voice-add textarea {
+.example-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.example-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+}
+.example textarea {
   width: 100%;
   resize: vertical;
   font: inherit;
+}
+button.example.add {
+  height: auto;
+  min-height: 120px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  background: transparent;
+  box-shadow: none;
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: -1.5px;
+  color: var(--fg-2);
 }
 
 /* Save mode: one choice per row (ChoiceCards, controls.css). */

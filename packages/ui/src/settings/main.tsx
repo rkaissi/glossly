@@ -3,7 +3,7 @@
 // Main changes the hash on an open window to switch tabs. #keys, #data, and #agenda are older names.
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, Bookmark, CalendarDays, CircleCheck, Cpu, Shield, SlidersHorizontal, Sparkles, UserRound, UsersRound, type LucideIcon } from 'lucide-react';
+import { Activity, Bookmark, CalendarDays, CircleCheck, Cpu, Shield, SlidersHorizontal, CircleUserRound, Sparkles, UsersRound, type LucideIcon } from 'lucide-react';
 import type { SettingsView } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { GlosslyMark } from '../icons';
@@ -37,7 +37,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]['id'];
 
-const TAB_ICONS: Record<Tab, LucideIcon> = { tasks: CircleCheck, calendar: CalendarDays, people: UsersRound, saved: Bookmark, profile: UserRound, models: Cpu, privacy: Shield, general: SlidersHorizontal, metrics: Activity };
+const TAB_ICONS: Record<Tab, LucideIcon> = { tasks: CircleCheck, calendar: CalendarDays, people: UsersRound, saved: Bookmark, profile: CircleUserRound, models: Cpu, privacy: Shield, general: SlidersHorizontal, metrics: Activity };
 
 /** Tabs that moved: Keys is part of Models and Data of Privacy (Step 20.1); Agenda became Tasks and Calendar (Step 20.2). */
 const MOVED: Record<string, Tab> = { keys: 'models', data: 'privacy', agenda: 'tasks' };
@@ -131,7 +131,7 @@ function App() {
           )}
           {view.settings.firstRunComplete && !view.settings.identity.name.trim() && tab !== 'profile' && (
             <a href="#profile" className="setup-link">
-              <UserRound size={16} strokeWidth={1.75} aria-hidden />
+              <CircleUserRound size={16} strokeWidth={1.75} aria-hidden />
               Add your name
             </a>
           )}

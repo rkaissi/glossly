@@ -1,6 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
-import { Pencil, Trash2, X } from 'lucide-react';
-import type { ContextUsed, DroppedKindView, Identity, ReplyChannel, SettingsView, StylePreferenceView, StyleSource, StyleView, VoiceSample } from '@glossly/core/api';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import type { ContextUsed, Identity, ReplyChannel, SettingsView, StyleSource, StyleView, VoiceSample } from '@glossly/core/api';
 import { glossly } from '../bridge';
 import { Select } from '../controls/Select';
 import { Segmented, Switch } from '../controls/Toggles';
@@ -99,9 +99,9 @@ function IdentityForm({ value, onChange, autoFocus }: { value: Identity; onChang
         />
       </div>
       <div className="form-row">
-        <span>Handles</span>
+        <span>Chat names</span>
         <ListInput
-          label="Handles"
+          label="Chat names"
           values={value.handles}
           onChange={(handles) => onChange({ ...value, handles })}
           parse={parseHandle}
@@ -137,14 +137,20 @@ function reloadOnFocus(load: () => void): () => void {
   return () => window.removeEventListener('focus', load);
 }
 
-function VoiceSamples() {
+/**
+ * Examples of your writing (decision 84): the ones you added (up to 5, each with where you wrote
+ * it) and the ones taken from replies you edited, as cards, switched with a segmented control.
+ */
+function WritingExamples() {
   const [samples, setSamples] = useState<VoiceSample[] | null>(null);
   const [text, setText] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [which, setWhich] = useState<'pasted' | 'edits'>('pasted');
   const [pendingId, setPendingId] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   useEffect(() => reloadOnFocus(() => void glossly.invoke('voice:list').then(setSamples)), []);
   const pasted = (samples ?? []).filter((v) => v.origin === 'pasted');
-  const inserted = (samples ?? []).filter((v) => v.origin !== 'pasted');
+  const edits = (samples ?? []).filter((v) => v.origin !== 'pasted');
   const remove = (id: string) =>
     void run(async () => {
       setSamples(await glossly.invoke('voice:remove', { id }));
@@ -154,166 +160,176 @@ function VoiceSamples() {
     void run(async () => {
       setSamples(await glossly.invoke('voice:add', { text }));
       setText('');
+      setAdding(false);
     });
   const label = (id: string, platform: VoicePlatform) =>
     void run(async () => {
       setSamples(await glossly.invoke('voice:label', { id, channel: platform === 'any' ? null : platform }));
     });
-  const sample = (v: VoiceSample) => (
-    <li key={v.id}>
-      <span className="grow voice-text">{v.text}</span>
-      {v.origin === 'pasted' && (
-        <Select<VoicePlatform>
-          size="sm"
-          className="voice-platform"
-          label="Where you wrote this"
-          value={v.channel ?? 'any'}
-          disabled={busy || pendingId === v.id}
-          onChange={(p) => label(v.id, p)}
-          options={VOICE_PLATFORMS}
-        />
-      )}
-      <button
-        type="button"
-        className={`delete-btn${pendingId === v.id ? ' armed' : ''}`}
-        title={pendingId === v.id ? 'Remove this sample' : 'Remove sample'}
-        aria-label={pendingId === v.id ? 'Confirm: remove sample' : 'Remove sample'}
-        disabled={busy}
-        onClick={() => (pendingId === v.id ? remove(v.id) : setPendingId(v.id))}
-        onBlur={() => setPendingId(null)}
-      >
-        <Trash2 size={14} strokeWidth={1.75} aria-hidden />
-        <span>Delete</span>
-      </button>
-    </li>
+  const card = (v: VoiceSample) => (
+    <div key={v.id} className="example">
+      <p className="example-text">{v.text}</p>
+      <div className="example-foot">
+        {v.origin === 'pasted' ? (
+          <Select<VoicePlatform>
+            size="sm"
+            className="voice-platform"
+            label="Where you wrote this"
+            value={v.channel ?? 'any'}
+            disabled={busy || pendingId === v.id}
+            onChange={(p) => label(v.id, p)}
+            options={VOICE_PLATFORMS}
+          />
+        ) : (
+          v.channel && <span className="place-pill">{PLACE_LABELS[v.channel]}</span>
+        )}
+        <span className="spacer" />
+        <button
+          type="button"
+          className={`delete-btn${pendingId === v.id ? ' armed' : ''}`}
+          title={pendingId === v.id ? 'Remove this example' : 'Remove'}
+          aria-label={pendingId === v.id ? 'Confirm: remove this example' : 'Remove'}
+          disabled={busy}
+          onClick={() => (pendingId === v.id ? remove(v.id) : setPendingId(v.id))}
+          onBlur={() => setPendingId(null)}
+        >
+          <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
   );
+  const shown = which === 'pasted' ? pasted : edits;
   return (
     <div className="field">
-      <div className="field-label">
-        <strong>How you write</strong>
-        <p className="muted small">
-          Paste a few messages you wrote, and say where, so replies sound like you. Replies you edit are added on their own.
-        </p>
+      <div className="examples-head">
+        <strong>Examples of your writing</strong>
+        <span className="spacer" />
+        <Segmented
+          size="sm"
+          label="Examples"
+          value={which}
+          options={[
+            ['pasted', `You added ${pasted.length}`],
+            ['edits', `From your edits ${edits.length}`],
+          ]}
+          onChange={setWhich}
+        />
       </div>
-      {pasted.length > 0 && <ul className="list">{pasted.map(sample)}</ul>}
-      {pasted.length < 5 && (
-        <div className="voice-add">
-          <textarea rows={3} value={text} maxLength={2000} placeholder="Paste a message you wrote" onChange={(e) => setText(e.target.value)} />
-          <div className="row">
-            <button disabled={busy || !text.trim()} onClick={add}>
-              Add sample
+      <div className="examples">
+        {shown.map(card)}
+        {which === 'pasted' &&
+          pasted.length < 5 &&
+          (adding ? (
+            <div className="example">
+              <textarea autoFocus rows={4} value={text} maxLength={2000} placeholder="Paste a message you wrote" aria-label="A message you wrote" onChange={(e) => setText(e.target.value)} />
+              <div className="example-foot">
+                <span className="muted small">{pasted.length} of 5</span>
+                <span className="spacer" />
+                <button className="sm" onClick={() => setAdding(false)}>
+                  Cancel
+                </button>
+                <button className="sm primary" disabled={busy || !text.trim()} onClick={add}>
+                  Add
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button className="example add" onClick={() => setAdding(true)}>
+              <Plus size={16} strokeWidth={1.75} aria-hidden />
+              <span>Paste a message you wrote</span>
+              <span className="muted small">{pasted.length} of 5</span>
             </button>
-            <span className="muted small">{pasted.length} of 5</span>
-          </div>
-        </div>
-      )}
-      {inserted.length > 0 && (
-        <details className="small">
-          <summary className="muted">From replies you edited or wrote ({inserted.length})</summary>
-          <ul className="list">{inserted.map(sample)}</ul>
-        </details>
-      )}
+          ))}
+        {which === 'edits' && edits.length === 0 && <p className="muted small">Replies and texts you edit before using them show up here.</p>}
+      </div>
       {error && <p className="error small">{error}</p>}
     </div>
   );
 }
 
-/** Which actions taught a preference, for its row. */
+/** Which actions taught a habit, for its row. */
 const SOURCE_WORDS: Record<StyleSource, string> = { reply: 'Reply', write: 'Write here' };
 const sourceWords = (sources: StyleSource[]) => sources.map((s) => SOURCE_WORDS[s]).join(' and ');
 /** The places Profile can filter by; the list shows only the ones that have something. */
 const PLACE_LABELS: Record<ReplyChannel, string> = { email: 'Email', messaging: 'Messaging', work_chat: 'Work chat', document: 'Documents', other: 'Other' };
-const PLACE_WORDS: Record<ReplyChannel, string> = { email: 'email', messaging: 'messaging', work_chat: 'work chat', document: 'documents', other: 'other apps' };
-const KIND_WORDS: Record<ContextUsed['kind'], string> = { note: 'notes', person: 'people', task: 'tasks', event: 'events' };
+const KIND_WORDS: Record<ContextUsed['kind'], string> = { note: 'saved notes', person: 'people', task: 'tasks', event: 'events' };
 type PlaceFilter = ReplyChannel | 'all';
 const REPLY_PLACES: ReplyChannel[] = ['email', 'messaging', 'work_chat', 'document', 'other'];
 
+/** One habit, whatever taught it: a counted preference, a style note, or a kind Write here leaves out. */
+interface Habit {
+  key: string;
+  text: string;
+  how: string;
+  /** "Everywhere", a place, or "Email and Work chat" for one that holds in several. */
+  place: string;
+  forget: () => Promise<StyleView>;
+}
+
 /**
- * What Reply and Write here learned (decision 81): preferences counted in code (per place, per
- * person, and everywhere), the model's style notes, and the kinds of saved data Write here leaves
- * out in a place. A place filter narrows the list; each row can be forgotten; one switch turns
- * learning off.
+ * How you write (decision 84): one list of habits in plain sentences, whatever taught them
+ * (counted preferences, the model's notes, the kinds of saved data Write here leaves out), each
+ * with how it was learned and its place. A place filter narrows it; each can be forgotten. Habits
+ * about one person are on that person's record.
  */
-function LearnedStyle({ learning }: { learning: boolean }) {
+function HowYouWrite({ learning }: { learning: boolean }) {
   const [view, setView] = useState<StyleView | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [place, setPlace] = useState<PlaceFilter>('all');
   const { busy, error, run } = useAction();
   useEffect(() => reloadOnFocus(() => void glossly.invoke('style:get').then(setView)), [learning]);
-  const prefKey = (p: StylePreferenceView) => `${p.dimension}:${p.scope}:${p.personId ?? `${p.relationship ?? ''}:${p.channel}`}`;
-  const forget = (p: StylePreferenceView) =>
-    void run(async () => {
-      setView(
-        await glossly.invoke('style:forget', {
-          dimension: p.dimension,
-          channel: p.channel,
-          personId: p.personId,
-          relationship: p.relationship,
-          ...(p.scope === 'everywhere' && { pole: p.pole }),
-        }),
-      );
-      setPending(null);
-    });
-  const forgetDropped = (d: DroppedKindView) =>
-    void run(async () => {
-      setView(await glossly.invoke('style:forget-dropped', { channel: d.channel, kind: d.kind }));
-      setPending(null);
-    });
-  const removeNote = (id: string) =>
-    void run(async () => {
-      setView(await glossly.invoke('style:note-remove', { id }));
-      setPending(null);
-    });
-  const toggle = (on: boolean) =>
-    void run(async () => {
-      const r = await glossly.invoke('settings:set', { key: 'replyLearning', value: on });
-      if (r.error) throw new Error(r.error);
-    });
-  const row = (key: string, text: string, meta: string | null, onRemove: () => void) => (
-    <li key={key}>
-      <span className="grow">
-        {text}
-        {meta && <span className="muted small"> · {meta}</span>}
-      </span>
-      <button
-        type="button"
-        className={`delete-btn${pending === key ? ' armed' : ''}`}
-        title={pending === key ? 'Forget this' : 'Forget'}
-        aria-label={pending === key ? 'Confirm: forget this' : 'Forget'}
-        disabled={busy}
-        onClick={() => (pending === key ? onRemove() : setPending(key))}
-        onBlur={() => setPending(null)}
-      >
-        <Trash2 size={14} strokeWidth={1.75} aria-hidden />
-        <span>Forget</span>
-      </button>
-    </li>
-  );
-  const allPrefs = view?.preferences ?? [];
-  const allNotes = view?.notes ?? [];
-  const allDropped = view?.dropped ?? [];
-  // A place shows its own rows and the ones that hold everywhere (or, for an everywhere preference, in that place).
+  const prefs = (view?.preferences ?? []).filter((p) => p.scope !== 'person');
+  const notes = view?.notes ?? [];
+  const dropped = view?.dropped ?? [];
+  const placeOf = (channel: ReplyChannel | null, places?: ReplyChannel[]) =>
+    channel ? PLACE_LABELS[channel] : places?.length ? places.map((c) => PLACE_LABELS[c]).join(' and ') : 'Everywhere';
   const inPlace = (channel: ReplyChannel | null, places?: ReplyChannel[]) => place === 'all' || channel === place || (channel === null && (!places || places.includes(place)));
-  const prefs = allPrefs.filter((p) => (p.scope === 'person' ? place === 'all' : inPlace(p.channel, p.places)));
-  const notes = allNotes.filter((n) => inPlace(n.channel));
-  const dropped = allDropped.filter((d) => inPlace(d.channel));
-  const places = REPLY_PLACES.filter((c) => allPrefs.some((p) => p.channel === c || p.places?.includes(c)) || allNotes.some((n) => n.channel === c) || allDropped.some((d) => d.channel === c));
-  const nothing = allPrefs.length === 0 && allNotes.length === 0 && allDropped.length === 0;
-  const prefMeta = (p: StylePreferenceView) =>
-    [`${p.agree} of ${p.of}`, p.scope === 'everywhere' && p.places ? p.places.map((c) => PLACE_WORDS[c]).join(' and ') : null, p.sources.length ? sourceWords(p.sources) : null].filter(Boolean).join(' · ');
+  const habits: Habit[] = [
+    ...prefs
+      .filter((p) => inPlace(p.channel, p.places))
+      .map(
+        (p): Habit => ({
+          key: `${p.dimension}:${p.scope}:${p.relationship ?? ''}:${p.channel}`,
+          text: p.relationship ? `${p.label} ${p.where}` : p.label,
+          how: [`${p.agree} of ${p.of} times`, sourceWords(p.sources)].filter(Boolean).join(' · '),
+          place: placeOf(p.channel, p.scope === 'everywhere' ? p.places : undefined),
+          forget: () =>
+            glossly.invoke('style:forget', {
+              dimension: p.dimension,
+              channel: p.channel,
+              personId: p.personId,
+              relationship: p.relationship,
+              ...(p.scope === 'everywhere' && { pole: p.pole }),
+            }),
+        }),
+      ),
+    ...notes
+      .filter((n) => inPlace(n.channel))
+      .map((n): Habit => ({ key: `note:${n.id}`, text: n.text, how: 'From your edits and requests', place: placeOf(n.channel), forget: () => glossly.invoke('style:note-remove', { id: n.id }) })),
+    ...dropped
+      .filter((d) => inPlace(d.channel))
+      .map(
+        (d): Habit => ({
+          key: `dropped:${d.channel}:${d.kind}`,
+          text: `Leaves out your ${KIND_WORDS[d.kind]}`,
+          how: 'You took them out of Write here',
+          place: placeOf(d.channel),
+          forget: () => glossly.invoke('style:forget-dropped', { channel: d.channel, kind: d.kind }),
+        }),
+      ),
+  ];
+  const places = REPLY_PLACES.filter((c) => prefs.some((p) => p.channel === c || p.places?.includes(c)) || notes.some((n) => n.channel === c) || dropped.some((d) => d.channel === c));
+  const nothing = prefs.length === 0 && notes.length === 0 && dropped.length === 0;
+  const forget = (h: Habit) =>
+    void run(async () => {
+      setView(await h.forget());
+      setPending(null);
+    });
   return (
     <div className="field">
-      <div className="toggle">
-        <span>
-          <strong>Learn from what I pick, edit, and ask for</strong>
-          <span className="muted small block">
-            Reply and Write here learn your habits from the drafts you choose, the edits you make, and what you ask them to write or change, per place. A
-            habit you show in two places applies everywhere else too. What they learned shows here.
-          </span>
-        </span>
-        <Switch label="Learn from what I pick, edit, and ask for" checked={learning} disabled={busy} onChange={toggle} />
-      </div>
-      {learning && view && nothing && <p className="muted small">Nothing learned yet. After a few replies or texts, what you tend to pick shows here.</p>}
+      {!learning && <p className="muted small">Learning is off: what was learned is still used, and nothing new is learned.</p>}
+      {learning && view && nothing && <p className="muted small">Nothing learned yet. After a few replies or texts, your habits show up here.</p>}
       {places.length > 1 && (
         <Segmented
           size="sm"
@@ -326,76 +342,109 @@ function LearnedStyle({ learning }: { learning: boolean }) {
           }}
         />
       )}
-      {prefs.length > 0 && <ul className="list">{prefs.map((p) => row(prefKey(p), `${p.label} ${p.where}`, prefMeta(p), () => forget(p)))}</ul>}
-      {notes.length > 0 && (
-        <>
-          <p className="muted small">Notes from your edits and requests</p>
-          <ul className="list">{notes.map((n) => row(`note:${n.id}`, n.text, n.where, () => removeNote(n.id)))}</ul>
-        </>
-      )}
-      {dropped.length > 0 && (
-        <>
-          <p className="muted small">Write here leaves these out, since you usually do</p>
-          <ul className="list">{dropped.map((d) => row(`dropped:${d.channel}:${d.kind}`, `Your ${KIND_WORDS[d.kind]}`, d.where, () => forgetDropped(d)))}</ul>
-        </>
+      {habits.length > 0 && (
+        <ul className="list habits">
+          {habits.map((h) => (
+            <li key={h.key}>
+              <span className="grow">
+                <span className="habit-text">{h.text}</span>
+                <span className="muted small block">{h.how}</span>
+              </span>
+              <span className="place-pill">{h.place}</span>
+              <button
+                type="button"
+                className={`delete-btn${pending === h.key ? ' armed' : ''}`}
+                title={pending === h.key ? 'Forget this' : 'Forget'}
+                aria-label={pending === h.key ? 'Confirm: forget this' : 'Forget'}
+                disabled={busy}
+                onClick={() => (pending === h.key ? forget(h) : setPending(h.key))}
+                onBlur={() => setPending(null)}
+              >
+                <Trash2 size={14} strokeWidth={1.75} aria-hidden />
+                <span>Forget</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
       {error && <p className="error small">{error}</p>}
     </div>
   );
 }
 
+/** The learning switch, in the How you write header (decision 84). */
+function LearnSwitch({ learning }: { learning: boolean }) {
+  const { busy, error, run } = useAction();
+  const toggle = (on: boolean) =>
+    void run(async () => {
+      const r = await glossly.invoke('settings:set', { key: 'replyLearning', value: on });
+      if (r.error) throw new Error(r.error);
+    });
+  return (
+    <label className="group-switch">
+      <span>Learn as I write</span>
+      <Switch label="Learn as I write" checked={learning} disabled={busy} onChange={toggle} />
+      {error && <span className="error small">{error}</span>}
+    </label>
+  );
+}
+
 /**
- * What Glossly knows about you (decision 78): facts Ask noted, always in its prompt. Ask adds
- * them; here they can be reworded or removed, since a wrong one would color every answer.
+ * What Glossly knows about you (decision 78): facts Ask noted, always in its prompt, in the same
+ * list shape as a person's facts. They can be added, reworded, or removed here, since a wrong one
+ * would color every answer.
  */
 function AboutMe({ facts }: { facts: SettingsView['settings']['aboutMe'] }) {
   const { busy, error, run } = useAction();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [editing, setEditing] = useState<{ id: string | null; text: string } | null>(null);
   const write = (next: SettingsView['settings']['aboutMe']) =>
     run(async () => {
       const r = await glossly.invoke('settings:set', { key: 'aboutMe', value: next });
       if (r.error) throw new Error(r.error);
     });
   const saveEdit = () => {
-    const text = editing?.text.replace(/\s+/g, ' ').trim();
-    if (!editing || !text) return;
-    void write(facts.map((f) => (f.id === editing.id ? { ...f, text: text.slice(0, 300) } : f))).then(() => setEditing(null));
+    const text = editing?.text.replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (!editing) return;
+    if (!text) return setEditing(null);
+    const next = editing.id
+      ? facts.map((f) => (f.id === editing.id ? { ...f, text } : f))
+      : [...facts, { id: crypto.randomUUID(), text, at: new Date().toISOString() }].slice(-50);
+    void write(next).then(() => setEditing(null));
   };
+  const field = (
+    <li key="editing">
+      <input
+        className="grow"
+        value={editing?.text ?? ''}
+        maxLength={300}
+        autoFocus
+        placeholder="Something about you, like where you work"
+        aria-label="Fact about you"
+        onChange={(e) => setEditing((x) => (x ? { ...x, text: e.target.value } : x))}
+        onKeyDown={(e: KeyboardEvent) => {
+          if (e.key === 'Enter') saveEdit();
+          else if (e.key === 'Escape') setEditing(null);
+        }}
+      />
+      <button className="sm" disabled={busy} onClick={() => setEditing(null)}>
+        Cancel
+      </button>
+      <button className="sm primary" disabled={busy || !editing?.text.trim()} onClick={saveEdit}>
+        Save
+      </button>
+    </li>
+  );
   return (
     <div className="field">
-      <div className="field-label">
-        <strong>What Glossly knows about you</strong>
-        <p className="muted small">Ask adds what you tell it about yourself, and uses it in every answer. Reword or remove anything that's wrong.</p>
-      </div>
-      {facts.length === 0 && <p className="muted small">Nothing yet. Tell Ask something about yourself, like where you work.</p>}
-      {facts.length > 0 && (
-        <ul className="list">
-          {facts.map((f) =>
-            editing?.id === f.id ? (
-              <li key={f.id}>
-                <input
-                  className="grow"
-                  value={editing.text}
-                  maxLength={300}
-                  autoFocus
-                  aria-label="Fact about you"
-                  onChange={(e) => setEditing({ id: f.id, text: e.target.value })}
-                  onKeyDown={(e: KeyboardEvent) => {
-                    if (e.key === 'Enter') saveEdit();
-                    else if (e.key === 'Escape') setEditing(null);
-                  }}
-                />
-                <button disabled={busy} onClick={() => setEditing(null)}>
-                  Cancel
-                </button>
-                <button className="primary" disabled={busy || !editing.text.trim()} onClick={saveEdit}>
-                  Save
-                </button>
-              </li>
-            ) : (
-              <li key={f.id}>
-                <span className="grow">{f.text}</span>
+      <ul className="list facts-me">
+        {facts.map((f) =>
+          editing?.id === f.id ? (
+            field
+          ) : (
+            <li key={f.id}>
+              <span className="grow">{f.text}</span>
+              <span className="fact-acts">
                 <button className="icon-btn sm" title="Reword" aria-label="Reword" disabled={busy} onClick={() => setEditing({ id: f.id, text: f.text })}>
                   <Pencil size={14} strokeWidth={1.75} aria-hidden />
                 </button>
@@ -411,61 +460,95 @@ function AboutMe({ facts }: { facts: SettingsView['settings']['aboutMe'] }) {
                   <Trash2 size={14} strokeWidth={1.75} aria-hidden />
                   <span>Delete</span>
                 </button>
-              </li>
-            ),
-          )}
-        </ul>
-      )}
+              </span>
+            </li>
+          ),
+        )}
+        {editing?.id === null ? (
+          field
+        ) : (
+          <li key="add">
+            <button className="ghost add-fact" onClick={() => setEditing({ id: null, text: '' })}>
+              <Plus size={14} strokeWidth={1.75} aria-hidden />
+              Add something about you
+            </button>
+          </li>
+        )}
+      </ul>
       {error && <p className="error small">{error}</p>}
     </div>
   );
 }
 
-export function ProfileTab({ view }: { view: SettingsView }) {
-  const saved = view.settings.identity;
+/** Your name, emails, and chat names, saved a moment after you stop typing (no Save button, decision 84). */
+function WhoYouAre({ saved }: { saved: Identity }) {
   const [draft, setDraft] = useState<Identity>(saved);
-  const { busy, error, run } = useAction();
-  const [done, setDone] = useState(false);
-  // A save from elsewhere (setup in another window state) replaces an untouched draft.
+  const [status, setStatus] = useState<'idle' | 'saved'>('idle');
+  const { error, run } = useAction();
+  // A save from elsewhere (setup) replaces an untouched draft.
   useEffect(() => setDraft((d) => (same(d, saved) ? d : saved)), [saved]);
-
   const dirty = !same(draft, saved);
-  const save = () =>
-    void run(async () => {
-      const r = await glossly.invoke('settings:set', { key: 'identity', value: { ...draft, name: draft.name.trim() } });
-      if (r.error) throw new Error(r.error);
-      setDone(true);
-    });
+  useEffect(() => {
+    if (!dirty || !draft.name.trim()) return;
+    const t = setTimeout(
+      () =>
+        void run(async () => {
+          const r = await glossly.invoke('settings:set', { key: 'identity', value: { ...draft, name: draft.name.trim() } });
+          if (r.error) throw new Error(r.error);
+          setStatus('saved');
+        }),
+      700,
+    );
+    return () => clearTimeout(t);
+  }, [draft, dirty]);
+  return (
+    <div className="field">
+      <IdentityForm
+        value={draft}
+        onChange={(next) => {
+          setDraft(next);
+          setStatus('idle');
+        }}
+      />
+      <div className="row form-status">
+        {!draft.name.trim() && <span className="muted small">Your name is required.</span>}
+        {status === 'saved' && !dirty && <span className="ok small">Saved</span>}
+        {error && <span className="error small">{error}</span>}
+      </div>
+    </div>
+  );
+}
 
+/**
+ * Profile (decision 84): two groups. Who you are: your name and addresses, then what Glossly
+ * knows about you. How you write: the habits Reply and Write here learned, with the learning
+ * switch in the header, then examples of your writing.
+ */
+export function ProfileTab({ view }: { view: SettingsView }) {
+  const learning = view.settings.replyLearning;
   return (
     <section>
       <h2>Profile</h2>
-      <p className="muted">
-        Lets Glossly tell your messages from other people's and write replies as you. It stays on this computer.
-      </p>
-      <div className="field">
-        <div className="field-label">
-          <strong>You</strong>
-        </div>
-        <IdentityForm
-          value={draft}
-          onChange={(next) => {
-            setDraft(next);
-            setDone(false);
-          }}
-        />
-        <div className="row form-actions">
-          <button className="primary" disabled={!dirty || busy || !draft.name.trim()} onClick={save}>
-            Save
-          </button>
-          {done && !dirty && <span className="ok small">Saved</span>}
-          {!draft.name.trim() && <span className="muted small">Your name is required.</span>}
-          {error && <span className="error small">{error}</span>}
+      <p className="muted">Who you are and how you write, so Glossly can tell your messages from other people's and write as you. It stays on this computer.</p>
+
+      <div className="group-head">
+        <div>
+          <h3>Who you are</h3>
+          <p className="muted small">Your name and addresses tell your messages apart. The facts below go into every answer and draft.</p>
         </div>
       </div>
+      <WhoYouAre saved={view.settings.identity} />
       <AboutMe facts={view.settings.aboutMe} />
-      <VoiceSamples />
-      <LearnedStyle learning={view.settings.replyLearning} />
+
+      <div className="group-head">
+        <div>
+          <h3>How you write</h3>
+          <p className="muted small">Reply and Write here learn from the drafts you pick, the edits you make, and what you ask for. A habit seen in two places applies everywhere.</p>
+        </div>
+        <LearnSwitch learning={learning} />
+      </div>
+      <HowYouWrite learning={learning} />
+      <WritingExamples />
     </section>
   );
 }
