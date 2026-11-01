@@ -4,6 +4,7 @@ import type { Embedder } from '../embed/types';
 import { LlmError, type LlmProvider } from '../llm/types';
 import type { Metrics } from '../metrics';
 import type { Settings } from '../settings';
+import { canonicalize } from '../people/names';
 import type { EntityKind, Store } from '../store/store';
 import type { CaptureMethod, ContainerContext, Item, ItemLink, SelectionPayload, Trigger } from '../types';
 import { contextWindow, type ContextWindow } from './context';
@@ -470,8 +471,10 @@ export class SaveService {
             entityId = store.upsertEntity('person', e.name);
             store.setPersonEntity(person.id, entityId);
           }
-          // A saved person the text names is linked, unless the user took that link off before saving (decision 84).
-          if (person && !this.unlinked.get(item.id)?.has(person.id)) store.linkItem(item.id, 'person', person.id);
+          // A saved person the saved text itself names is linked, unless the user took that link off before
+          // saving (decision 84). Names found only in the text around it are entities, not links (28i recheck).
+          const named = canonicalize(item.text).includes(canonicalize(e.name));
+          if (person && named && !this.unlinked.get(item.id)?.has(person.id)) store.linkItem(item.id, 'person', person.id);
         }
         entityId ??= store.upsertEntity(e.kind, e.name);
         store.linkItemEntity(item.id, entityId);

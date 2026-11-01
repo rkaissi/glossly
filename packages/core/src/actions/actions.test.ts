@@ -323,6 +323,16 @@ describe('SaveService', () => {
     expect(llm.calls[0]).toMatchObject({ role: 'fast', action: 'save_entities' });
   });
 
+  it("doesn't link a saved person named only in the text around the selection (28i recheck)", async () => {
+    const llm = new FakeLlm(() => ({ entities: [{ kind: 'person', name: 'Sam Lee' }] }));
+    const { svc } = setup({ llm });
+    store.db.prepare("INSERT INTO people (id, name, created_at, updated_at) VALUES ('p1', 'Sam Lee', 'x', 'x')").run();
+    const { item: saved, enriched } = svc.save({ selection: { ...selection(), text: 'https://github.com/electron/electron', context_before: 'Sam Lee shared this:' } });
+    await enriched;
+    expect(store.entitiesForItem(saved.id).map((e) => e.display)).toEqual(['Sam Lee']);
+    expect(store.itemLinks(saved.id)).toEqual([]);
+  });
+
   it("doesn't link a person the user took off in the Save panel (decision 84)", async () => {
     const llm = new FakeLlm(() => ({ entities: [{ kind: 'person', name: 'Sam Lee' }] }));
     const { svc } = setup({ llm });

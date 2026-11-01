@@ -10,6 +10,7 @@ const FETCH_TIMEOUT_MS = 5000;
 /** Enough for heads that carry a lot of inline script before their tags (YouTube's runs past 512 KB). */
 const MAX_HEAD_BYTES = 1_500_000;
 const MAX_IMAGE_BYTES = 3_000_000;
+const MAX_REDIRECTS = 5;
 const SHOT_SIZE = { width: 960, height: 600 };
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36';
 
@@ -28,6 +29,8 @@ interface FetchedPage {
  */
 export class Previews {
   private ses: Session | null = null;
+  /** Redirects seen in the preview session, from → to (Electron's fetch doesn't report them). */
+  private readonly redirects = new Map<string, string>();
 
   constructor(
     private readonly store: Store,
@@ -115,23 +118,52 @@ export class Previews {
   }
 
   private session(): Session {
+    if (this.ses) return this.ses;
     // No "persist:" prefix: in memory only, nothing kept between runs, no cookies from anywhere else.
-    this.ses ??= session.fromPartition('glossly-previews', { cache: false });
-    return this.ses;
+    const ses = session.fromPartition('glossly-previews', { cache: false });
+    // Every request in this session, redirects included, must be to a public http(s) address, so a
+    // redirect can't reach this computer or the local network.
+    ses.webRequest.onBeforeRequest((details, done) => {
+      const ok = isFetchableAddress(details.url);
+      if (!ok) log.info('page fetch dropped', { code: 'local' });
+      done({ cancel: !ok });
+    });
+    // Electron's fetch leaves `Response.url` empty (28i recheck), so redirects are recorded here to
+    // find where a fetch ended up.
+    ses.webRequest.onBeforeRedirect((details) => {
+      this.redirects.set(details.url, details.redirectURL);
+      if (this.redirects.size > 200) this.redirects.delete(this.redirects.keys().next().value!);
+    });
+    this.ses = ses;
+    return ses;
+  }
+
+  /** Where a fetch of `address` ended up, through the redirects recorded for it (at most MAX_REDIRECTS). */
+  private finalUrl(address: string): string {
+    let url = address;
+    for (let hop = 0; hop < MAX_REDIRECTS && this.redirects.has(url); hop++) url = this.redirects.get(url)!;
+    return url;
+  }
+
+  private async fetchFollowing(address: string, signal: AbortSignal): Promise<{ res: Response; url: string } | null> {
+    if (!isFetchableAddress(address)) return null;
+    const res = await this.session().fetch(address, {
+      redirect: 'follow',
+      credentials: 'omit',
+      headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': USER_AGENT },
+      signal,
+    });
+    return { res, url: this.finalUrl(address) };
   }
 
   private async fetchPage(address: string): Promise<FetchedPage | null> {
     try {
-      const res = await this.session().fetch(address, {
-        redirect: 'follow',
-        credentials: 'omit',
-        headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': USER_AGENT },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-      // A redirect onto this computer or the local network is dropped like the address itself.
-      if (!isFetchableAddress(res.url)) return null;
-      const gated = !res.ok || (res.redirected && new URL(res.url).pathname !== new URL(address).pathname);
-      if (!/text\/html|application\/xhtml/i.test(res.headers.get('content-type') ?? '') || !res.body) return { meta: parseOpenGraph('', res.url), gated: true };
+      const got = await this.fetchFollowing(address, AbortSignal.timeout(FETCH_TIMEOUT_MS));
+      if (!got) return null;
+      const { res, url: finalUrl } = got;
+      // An error, or a redirect to another path (often a sign-in page), is gated: the window picture wins.
+      const gated = !res.ok || new URL(finalUrl).pathname !== new URL(address).pathname;
+      if (!/text\/html|application\/xhtml/i.test(res.headers.get('content-type') ?? '') || !res.body) return { meta: parseOpenGraph('', finalUrl), gated: true };
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let html = '';
@@ -144,7 +176,7 @@ export class Previews {
         if (headDone(html)) break;
       }
       void reader.cancel().catch(() => undefined);
-      return { meta: parseOpenGraph(html, res.url), gated };
+      return { meta: parseOpenGraph(html, finalUrl), gated };
     } catch (e) {
       log.info('page fetch failed', { code: (e as Error)?.name ?? 'unknown' });
       return null;
@@ -154,7 +186,9 @@ export class Previews {
   private async fetchImage(url: string, itemId: string): Promise<string | null> {
     if (!isFetchableAddress(url)) return null;
     try {
-      const res = await this.session().fetch(url, { credentials: 'omit', headers: { 'user-agent': USER_AGENT }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      const got = await this.fetchFollowing(url, AbortSignal.timeout(FETCH_TIMEOUT_MS));
+      if (!got) return null;
+      const { res } = got;
       const ext = PREVIEW_IMAGE_TYPES[(res.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase()];
       if (!res.ok || !ext || Number(res.headers.get('content-length') ?? 0) > MAX_IMAGE_BYTES) return null;
       const data = Buffer.from(await res.arrayBuffer());
