@@ -22,6 +22,8 @@ export interface SaveOpen {
   addPerson: string | null;
   /** True when the route found a commitment phrase or a date, for "+ Add as task or event". */
   addTask: boolean;
+  /** The browser page it's saved from, when there is one (the shell fills it in). */
+  page?: { url: string | null; title: string | null } | null;
 }
 
 export interface SaveOpenInput {

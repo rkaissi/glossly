@@ -169,6 +169,8 @@ const HOTKEY_SETTLE_MS = 500;
 const KEY_HIDE_GRACE_MS = 400;
 
 type Foreground = CommandResult<'foreground'>;
+/** A browser page as the Save panel saw it: its address (or null) and title. */
+type PageSeen = { url: string | null; title: string | null };
 
 /** One thing Ask's tools did or offered (decision 78): how to do it, and how to take it back once done. */
 interface AskActionEntry {
@@ -253,6 +255,8 @@ interface Session {
   saved: SavedNotice | null;
   /** The item saved in this session by any route, so tasks and events added from it link back (decision 84). */
   savedItemId: string | null;
+  /** The page the Save panel read when it opened, so saving reuses it (28i). */
+  pageSeen: PageSeen | null;
   /** The running Visualize, and its last result (for Save). */
   visualCtl: AbortController | null;
   visual: Extract<VisualizeResult, { ok: true }> | null;
@@ -418,25 +422,31 @@ export class Capture {
    * from the browser's bar (`page_address`). Only for browsers; read once, after the save, so
    * saving never waits for it. The address is never logged.
    */
-  private recordPage(itemId: string, fg: Foreground | null): void {
+  private recordPage(item: Item, fg: Foreground | null, known: PageSeen | null = null): void {
     if (!fg || !isBrowser(fg)) return;
     const title = stripBrowserSuffix(fg.title).trim() || null;
     const t = performance.now();
     const sv = this.services;
+    // A highlighted address is another page: the picture of this one would be the wrong preview, and
+    // it's fetched only on Load preview (28i live check). Only the page the user was on gets one now.
+    const ownPreview = item.kind !== 'link';
     // The window picture is taken now, while the page is on screen; it's kept only if the page gives no preview.
-    const shot = sv.previews.enabled ? sv.previews.windowShot(fg.handle) : null;
-    void this.helper
-      .request('page_address', { handle: fg.handle })
-      .catch(() => null)
+    const shot = ownPreview && sv.previews.enabled ? sv.previews.windowShot(fg.handle) : null;
+    const address = known ? Promise.resolve({ found: Boolean(known.url), url: known.url }) : this.readPageAddress(fg);
+    void address
       .then(async (r) => {
-        const url = normalizePageAddress(r?.value);
-        if (!sv.store.getItem(itemId)) return;
-        sv.store.setItemPage(itemId, { url, title });
-        log.info('page recorded', { found: Boolean(r?.found), url: Boolean(url), title: Boolean(title), ms: ms(t) });
-        // Only the page the user was on is fetched on its own (decision 84); a highlighted address waits for Load preview.
-        await sv.previews.record(itemId, url, shot);
+        if (!sv.store.getItem(item.id)) return;
+        sv.store.setItemPage(item.id, { url: r.url, title });
+        log.info('page recorded', { found: r.found, url: Boolean(r.url), title: Boolean(title), known: Boolean(known), ms: ms(t) });
+        if (ownPreview) await sv.previews.record(item.id, r.url, shot);
       })
       .catch((e) => log.warn('page preview failed', errorInfo(e)));
+  }
+
+  /** The browser's address bar as a URL (`page_address`); never logged. */
+  private async readPageAddress(fg: Foreground): Promise<{ found: boolean; url: string | null }> {
+    const r = await this.helper.request('page_address', { handle: fg.handle }).catch(() => null);
+    return { found: Boolean(r?.found), url: normalizePageAddress(r?.value) };
   }
 
   /** Load preview (decision 84): the item's own address (a Link) or its page, fetched because the user asked. */
@@ -650,6 +660,7 @@ export class Capture {
         writeLast: null,
         saved: null,
         savedItemId: null,
+        pageSeen: null,
         visualCtl: null,
         visual: null,
       };
@@ -901,6 +912,7 @@ export class Capture {
       writeLast: null,
       saved: null,
       savedItemId: null,
+      pageSeen: null,
       visualCtl: null,
       visual: null,
     };
@@ -1681,7 +1693,7 @@ ${s.selection.text}`;
     const r = this.services.save.saveChart({ csv: v.csv, data: { columns: v.table.columns, rows: v.table.rows, types: v.types, spec: v.spec }, selection: s.selection });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     s.savedItemId = r.item.id;
-    this.recordPage(r.item.id, s.fg);
+    this.recordPage(r.item, s.fg, s.pageSeen);
     return { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil };
   }
 
@@ -2088,7 +2100,7 @@ ${s.selection.text}`;
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     s.saved = { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil, via: 'autosave' };
     s.savedItemId = r.item.id;
-    this.recordPage(r.item.id, s.fg);
+    this.recordPage(r.item, s.fg, s.pageSeen);
     this.lastAutosave = { handle: s.fg.handle, text: s.selection.text, notice: s.saved };
     log.info('autosaved');
   }
@@ -2164,7 +2176,7 @@ ${s.selection.text}`;
       const r = this.services.save.save({ selection, container: null, via: 'hotkey' });
       void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
       log.info('saved by hotkey', { ms: ms(t0) });
-      this.recordPage(r.item.id, fg);
+      this.recordPage(r.item, fg);
       this.showToast({ itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil, via: 'hotkey' }, sel?.bounds ?? null, cursor, null, fg);
     } catch (e) {
       if (!(e instanceof HelperError)) log.error('save hotkey failed', errorInfo(e));
@@ -2212,6 +2224,7 @@ ${s.selection.text}`;
       writeLast: null,
       saved,
       savedItemId: saved?.itemId ?? null,
+      pageSeen: null,
       visualCtl: null,
       visual: null,
     };
@@ -2536,7 +2549,8 @@ ${s.selection.text}`;
     const route = s.route ?? this.router().quick(toContext(s.selection));
     let detected: DetectedPerson[] = [];
     try {
-      detected = detectPeople(detectInputFor(s.selection, null), this.settings.identity, sv.store.listKnownPeople()).people;
+      // People named in the selection only: a name in the text around it isn't what's being saved (28i).
+      detected = detectPeople({ ...detectInputFor(s.selection, null), before: '', after: '' }, this.settings.identity, sv.store.listKnownPeople()).people;
     } catch (e) {
       log.warn('save detect failed', errorInfo(e));
     }
@@ -2544,6 +2558,12 @@ ${s.selection.text}`;
       { store: sv.store, people: sv.people, calendar: sv.calendar, embedder: () => sv.embed.embedder(), settings: () => sv.settings, sync: () => sv.embed.syncContext() },
       { text: s.selection.text, detected, commitment: route.decisions.contains_commitment, hasDateWord: route.features.hasDateWord },
     );
+    // The page it comes from, shown in the panel and kept for the save (about 0.2 s, 28i live check).
+    if (s.fg && isBrowser(s.fg)) {
+      const r = await this.readPageAddress(s.fg);
+      s.pageSeen = { url: r.url, title: stripBrowserSuffix(s.fg.title).trim() || null };
+      open.page = s.pageSeen;
+    }
     const count = (k: string) => open.links.filter((l) => l.kind === k).length;
     log.info('save open', { kind: open.kind, people: count('person'), tasks: count('task'), events: count('event'), addPerson: Boolean(open.addPerson), addTask: open.addTask, ms: ms(t) });
     return open;
@@ -2556,7 +2576,7 @@ ${s.selection.text}`;
     const r = this.services.save.save({ selection: s.selection, container, why: args.why, links: args.links, unlinkedPeople: args.unlinkedPeople });
     void r.enriched.then((e) => log.info('save enriched', { embedded: e.embedded, entities: e.entities, skipped: e.entitiesSkipped ?? null, cancelled: e.cancelled }));
     s.savedItemId = r.item.id;
-    this.recordPage(r.item.id, s.fg);
+    this.recordPage(r.item, s.fg, s.pageSeen);
     return { itemId: r.item.id, kind: r.item.kind, undoUntil: r.undoUntil };
   }
 

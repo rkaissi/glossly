@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { CalendarDays, Check, CircleCheck, PencilLine, Plus, Undo2, UserRound, X } from 'lucide-react';
+import { CalendarDays, Check, CircleCheck, Globe, PencilLine, Plus, Undo2, UserRound, X } from 'lucide-react';
 import type { ItemLinkKind, OverlayState, SaveDone, SaveLinkView, SaveOpen } from '@glossly/core/api';
 import { glossly } from '../bridge';
 
@@ -9,6 +9,14 @@ type Phase = { kind: 'choose' } | { kind: 'saving' } | { kind: 'saved'; done: Sa
 const KIND_LABEL: Record<SaveDone['kind'], string> = { selection: 'Snippet', link: 'Link', chart: 'Chart', note: 'Memory' };
 const LINK_ICON: Record<ItemLinkKind, typeof UserRound> = { person: UserRound, task: CircleCheck, event: CalendarDays };
 const linkKey = (l: SaveLinkView) => `${l.kind}:${l.id}`;
+const hostOf = (url: string | null) => {
+  if (!url) return null;
+  try {
+    return /^https?:/.test(url) ? new URL(url).hostname.replace(/^www\./, '') : null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Save (decision 84): no collection to choose, so Enter saves. The panel shows what the item will
@@ -127,6 +135,14 @@ export function SavePanel({ s }: { s: OverlayState }) {
         <h2>
           Save <span className="muted">· {kind}</span>
         </h2>
+      )}
+
+      {phase.kind !== 'undone' && open?.page && (open.page.title || open.page.url) && (
+        <span className="from-page" title={open.page.url ?? undefined}>
+          <Globe size={12} strokeWidth={1.75} aria-hidden />
+          <span className="from-page-title">{open.page.title ?? hostOf(open.page.url)}</span>
+          {open.page.title && hostOf(open.page.url) && <span className="muted">{hostOf(open.page.url)}</span>}
+        </span>
       )}
 
       {phase.kind !== 'undone' && links.length > 0 && (

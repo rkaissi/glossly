@@ -240,7 +240,7 @@ function ItemActions({ item, onChanged, onEditNote, onEditMemory }: { item: Libr
     });
   return (
     <>
-      {item.kind === 'link' && !item.preview && (
+      {item.kind === 'link' && item.preview?.source !== 'page' && (
         <button className="sm ghost" disabled={busy} onClick={load} title="Ask the page for its preview">
           Load preview
         </button>

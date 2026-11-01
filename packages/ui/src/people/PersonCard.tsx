@@ -372,7 +372,7 @@ function TimelineRow({ entry, name }: { entry: Entry; name: string }) {
           <span className="grow">{entry.task.text}</span>
           <span className="meta">
             {entry.task.owner === 'me' ? 'You owe' : `${firstName(name)} owes`}
-            {entry.task.due_at ? ` · ${formatDue(entry.task.due_at)}` : ''}
+            {entry.task.due_at ? ` · ${formatDue(entry.task.due_at).label}` : ''}
           </span>
         </li>
       );
